@@ -133,3 +133,5 @@ protection/ruleset API 返回 HTTP 403，必须升级 Pro 或由项目负责人�
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。
 
 容量假设必须在 Beta 前使用压测和真实流量重新校准。
+
+[Gate protection negative check](./missing-gate-protection-proof.md)
