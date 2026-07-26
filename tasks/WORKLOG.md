@@ -220,3 +220,29 @@ Not run: Build, browser smoke and image build were skipped by the failed hosted 
 Observability: Existing unit reports uploaded successfully; missing downstream Playwright output no longer obscures the primary failure  
 Docs: Updated `CHANGELOG.md` and this worklog  
 Known gaps: Await corrected hosted run and container job
+
+## ADR-0006 — 免费运营年与延后自动充值
+
+Task: 产品基线补充（关联未来 `COM-006`）  
+Changed: 公开上线后 12 个月全站免费；预留 `/v1/billing/auto-top-up-policy` 资源名和 Commerce 应用端口，但不提前开放路由  
+Contracts: OpenAPI/Prisma 当前不变；`COM-006` 实现时必须先更新 OpenAPI、数据模型和契约测试  
+Migrations: 无  
+Security: 自动充值默认关闭且逐用户 opt-in；仅保存 provider reference；要求幂等、签名 webhook、限额、kill switch、通知、审计和对账  
+Tests run: `scripts/check-architecture.sh` passed with full PyYAML/jsonschema validation（101 tasks、依赖无环、31 paths、52 schemas）；`pnpm format:check` passed  
+Not run: 收费与自动充值实现/支付测试（依赖 Gate 5，按 Gate 纪律延后）  
+Observability: 规定未来记录策略版本、触发窗口、订单/支付引用和失败分类，不记录卡数据  
+Docs: Added ADR-0006；更新商业化文档、假设决策、实施顺序、Backlog、交付清单和 Changelog  
+Known gaps: 正式上线时间、收费价格、支付条款、退款、税务和 provider 生产账号仍需在周年日前复核；周年日不会自动启用收费
+
+## FND-005 — 首次托管容器构建差异修复
+
+Task: FND-005 四应用容器与健康检查（GitHub run 30185679624）  
+Changed: Build stage installs OpenSSL and supplies a fixed loopback-only Prisma datasource URL to generation/compilation; container contract asserts the placeholder and `.env` exclusion  
+Contracts: OpenAPI/Prisma unchanged；runtime configuration contract unchanged  
+Migrations: 无  
+Security: No secret enters the Docker context or image；the placeholder cannot address a remote database；runtime still fails fast without deployment-provided configuration  
+Tests run: Hosted quality job passed locked install、architecture/contracts、migration/baseline/upgrade、typecheck、lint、51 tests、7 builds and 4 Playwright smoke cases；local `pnpm containers:check`、`pnpm ci:workflow:check`、`pnpm governance:check`、`pnpm format:check` and full `scripts/check-architecture.sh` passed after the fix  
+Not run: Corrected hosted four-target build awaits the next commit  
+Observability: 无生产遥测变化；GitHub job logs retain the failed layer and corrected build evidence  
+Docs: Updated `docs/local-containers.md`、`CHANGELOG.md` and this worklog  
+Known gaps: Run 30185679624 failed before the first runtime target completed；all four corrected targets must build before FND-005 is done

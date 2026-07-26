@@ -22,6 +22,8 @@
 - Expanded CODEOWNERS and the pull request template across contracts, migrations, security, idempotency, tests and observability, with an executable CI governance contract and explicit role-alias mapping requirements.
 - Made the architecture checker repeatable after dependency/bootstrap output exists by selecting an available Python 3 runtime, excluding generated/dependency trees, and safely allowing an explicitly ignored local `.env`.
 - Fixed clean-checkout Vitest resolution for `@socal/contracts` and prevented an upstream test failure from being obscured by a secondary missing-Playwright-artifact error.
+- Accepted a 12-month free launch period and deferred, opt-in automatic wallet top-up behind Gate 5 contracts, safety controls and an explicit commercialization flag.
+- Fixed clean-container Prisma generation by supplying a non-secret build-only datasource URL and installing OpenSSL in the build base; the container contract now prevents regression.
 
 ## 0.1.0 — Architecture handoff package
 

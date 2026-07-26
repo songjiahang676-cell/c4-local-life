@@ -4,6 +4,11 @@ FND-005 defines four production-shaped application targets in the root `Dockerfi
 `web-runtime`, `admin-runtime`, `api-runtime`, and `worker-runtime`. Each target runs as the
 unprivileged image-provided `node` user and has a native Node.js health check.
 
+Prisma client generation parses the datasource configuration but does not connect to PostgreSQL.
+The build stage therefore supplies a fixed, non-secret loopback `DATABASE_URL` only to the generate
+and compile commands. It never copies `.env`, never uses a deployable credential, and runtime
+processes must still receive validated environment configuration through the deployment platform.
+
 ## Start the stack
 
 Create the local runtime file once and keep it untracked:

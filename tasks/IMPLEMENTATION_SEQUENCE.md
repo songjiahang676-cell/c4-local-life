@@ -81,12 +81,15 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 2. `COM-002` Stripe checkout/payment/webhook receipt。
 3. `COM-003` ledger/wallet/reconciliation。
 4. `COM-004` promotion fulfillment/refund。
-5. `ADS-001` placements/inventory/reservation。
-6. `ADS-002` campaign/creative/review/schedule。
-7. `ADS-003` qualified impression/click/report。
-8. `ADMIN-004` finance/ad ops workspaces。
+5. `COM-005` subscription/package entitlement（默认关闭）。
+6. `COM-006` opt-in auto top-up policy/provider port（默认关闭）。
+7. `ADS-001` placements/inventory/reservation。
+8. `ADS-002` campaign/creative/review/schedule。
+9. `ADS-003` qualified impression/click/report。
+10. `ADMIN-004` finance/ad ops workspaces。
 
 支付测试先证明重复、乱序、超时和退款，再开放真实模式。
+正式公开上线后的前 12 个月保持全站免费；周年日只触发商业化准备复核，不自动开启收费或自动充值。
 
 ## Gate 6 — Production
 

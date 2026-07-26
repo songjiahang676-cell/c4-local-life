@@ -3,7 +3,7 @@
 - `CODEX_PROMPT.md`：可直接粘贴给 Codex 的首次提示词。
 - `IMPLEMENTATION_SEQUENCE.md`：Gate 顺序和关键路径。
 - `EPICS.md`：能力域总览。
-- `BACKLOG.csv`：100 个可执行任务，包含依赖、验收和参考文档。
+- `BACKLOG.csv`：101 个可执行任务，包含依赖、验收和参考文档。
 - `STATUS.md`：项目启动后的状态维护模板。
 
 ## 使用方式

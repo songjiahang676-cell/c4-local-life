@@ -58,6 +58,17 @@ if (!/^\.env$/m.test(dockerignoreSource) || !/^node_modules$/m.test(dockerignore
   throw new Error(".dockerignore must exclude local secrets and dependencies");
 }
 
+if (
+  !/^ARG DATABASE_URL=postgresql:\/\/build:build@127\.0\.0\.1:5432\/socal_build\?schema=public$/m.test(
+    dockerfileSource,
+  ) ||
+  !/DATABASE_URL="\$\{DATABASE_URL\}" pnpm db:generate/.test(dockerfileSource)
+) {
+  throw new Error(
+    "Docker build must provide the non-secret compile-only Prisma URL without copying .env",
+  );
+}
+
 console.log(
   `Container contract checks passed: ${Object.keys(applications).length} non-root application targets.`,
 );

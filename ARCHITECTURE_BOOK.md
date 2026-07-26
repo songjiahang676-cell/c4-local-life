@@ -5,7 +5,7 @@
 
 ---
 
-<!-- source: docs/00-executive-summary.md -->
+<!-- source: docs\00-executive-summary.md -->
 
 # 00. 执行摘要
 
@@ -61,17 +61,17 @@
 
 以下为设计目标，需在 Beta 前重新压测：
 
-| 项目 | 目标 |
-|---|---|
-| 公开服务月可用性 | 99.9% |
-| API 读 p95 | < 300ms（不含第三方） |
-| API 写 p95 | < 700ms |
-| 搜索查询 p95 | < 450ms |
-| 搜索索引新鲜度 p95 | < 60s |
-| 首页关键内容 LCP p75 | < 2.5s |
-| RPO / RTO | 15 分钟 / 2 小时 |
-| 核心支付/账本 | 不丢失、可重放、可审计 |
-| 无障碍 | WCAG 2.2 AA 目标 |
+| 项目                 | 目标                   |
+| -------------------- | ---------------------- |
+| 公开服务月可用性     | 99.9%                  |
+| API 读 p95           | < 300ms（不含第三方）  |
+| API 写 p95           | < 700ms                |
+| 搜索查询 p95         | < 450ms                |
+| 搜索索引新鲜度 p95   | < 60s                  |
+| 首页关键内容 LCP p75 | < 2.5s                 |
+| RPO / RTO            | 15 分钟 / 2 小时       |
+| 核心支付/账本        | 不丢失、可重放、可审计 |
+| 无障碍               | WCAG 2.2 AA 目标       |
 
 ## 0.6 主要风险
 
@@ -88,7 +88,7 @@
 
 ---
 
-<!-- source: docs/01-assumptions-and-decisions.md -->
+<!-- source: docs\01-assumptions-and-decisions.md -->
 
 # 01. 假设、约束与决策
 
@@ -104,17 +104,18 @@
 
 这些是假设，不应被误读为已有业务数据：
 
-| 假设 | 基线 | 复核时间 |
-|---|---:|---|
-| 首年注册用户 | 100,000 | Beta 前和每季度 |
-| 有效+历史信息 | 500,000 | 数据容量测试前 |
-| 日活 | 10,000 | 公测后 |
-| 持续/峰值请求 | 100 / 500 RPS | 压测与真实流量 |
-| 首发语言 | 简体中文、英语 | 内容运营准备时 |
-| 时区 | America/Los_Angeles | 不变，用户可覆盖 |
-| 货币 | USD | 扩区时复核 |
-| 年龄门槛 | 18+ 发布/交易 | 法律审查后确认 |
-| 生产云 | AWS 单主区域 | 成本与团队能力复核 |
+| 假设          |                           基线 | 复核时间           |
+| ------------- | -----------------------------: | ------------------ |
+| 首年注册用户  |                        100,000 | Beta 前和每季度    |
+| 有效+历史信息 |                        500,000 | 数据容量测试前     |
+| 日活          |                         10,000 | 公测后             |
+| 持续/峰值请求 |                  100 / 500 RPS | 压测与真实流量     |
+| 首发语言      |                 简体中文、英语 | 内容运营准备时     |
+| 时区          |            America/Los_Angeles | 不变，用户可覆盖   |
+| 货币          |                            USD | 扩区时复核         |
+| 年龄门槛      |                  18+ 发布/交易 | 法律审查后确认     |
+| 生产云        |                   AWS 单主区域 | 成本与团队能力复核 |
+| 商业化启用    | 公开上线后 12 个月保持全站免费 | 首个周年日前 90 天 |
 
 ## 1.3 核心约束
 
@@ -128,13 +129,14 @@
 
 ## 1.4 已接受的架构决策
 
-| 决策 | 结论 | 记录 |
-|---|---|---|
-| 服务形态 | 模块化单体 + 独立 Worker | ADR-0001 |
-| 搜索 | PostgreSQL 主数据 + OpenSearch 读模型 | ADR-0002 |
-| API | REST-first + OpenAPI 3.1 | ADR-0003 |
-| 可靠事件 | Transactional Outbox + 至少一次投递 | ADR-0004 |
-| 生产部署 | AWS 托管服务 + ECS Fargate | ADR-0005 |
+| 决策     | 结论                                                           | 记录     |
+| -------- | -------------------------------------------------------------- | -------- |
+| 服务形态 | 模块化单体 + 独立 Worker                                       | ADR-0001 |
+| 搜索     | PostgreSQL 主数据 + OpenSearch 读模型                          | ADR-0002 |
+| API      | REST-first + OpenAPI 3.1                                       | ADR-0003 |
+| 可靠事件 | Transactional Outbox + 至少一次投递                            | ADR-0004 |
+| 生产部署 | AWS 托管服务 + ECS Fargate                                     | ADR-0005 |
+| 收费节奏 | 首个公开运营年度免费；后续收费和自动充值均由 Feature Flag 控制 | ADR-0006 |
 
 ## 1.5 有意推迟的决策
 
@@ -170,7 +172,7 @@
 
 ---
 
-<!-- source: docs/02-product-requirements.md -->
+<!-- source: docs\02-product-requirements.md -->
 
 # 02. 产品需求与范围
 
@@ -180,16 +182,16 @@
 
 ## 2.2 主要角色
 
-| 角色 | 核心需求 |
-|---|---|
-| 访客/求职者/租客/买家 | 快速搜索、筛选、辨别新鲜度和可信度、收藏、联系 |
-| 个人发布者 | 快速创建、预览、提交、编辑、刷新、查看效果、处理咨询 |
-| 招聘方/房东/店主 | 组织身份、多人协作、批量管理、套餐与数据 |
-| 商家 | 商家页、营业信息、优惠、评价、广告和线索 |
-| 本地师傅/服务商 | 服务范围、资质、报价、评价、可用时间和线索 |
-| 运营审核员 | 队列、证据、规则命中、处置、申诉、审计 |
-| 客服/财务/广告运营 | 用户支持、订单退款、对账、广告排期和报告 |
-| 平台管理员 | 配置、权限、分类、城市、风控规则和系统健康 |
+| 角色                  | 核心需求                                             |
+| --------------------- | ---------------------------------------------------- |
+| 访客/求职者/租客/买家 | 快速搜索、筛选、辨别新鲜度和可信度、收藏、联系       |
+| 个人发布者            | 快速创建、预览、提交、编辑、刷新、查看效果、处理咨询 |
+| 招聘方/房东/店主      | 组织身份、多人协作、批量管理、套餐与数据             |
+| 商家                  | 商家页、营业信息、优惠、评价、广告和线索             |
+| 本地师傅/服务商       | 服务范围、资质、报价、评价、可用时间和线索           |
+| 运营审核员            | 队列、证据、规则命中、处置、申诉、审计               |
+| 客服/财务/广告运营    | 用户支持、订单退款、对账、广告排期和报告             |
+| 平台管理员            | 配置、权限、分类、城市、风控规则和系统健康           |
 
 ## 2.3 MVP 功能需求
 
@@ -291,7 +293,7 @@
 
 ---
 
-<!-- source: docs/03-information-architecture.md -->
+<!-- source: docs\03-information-architecture.md -->
 
 # 03. 信息架构
 
@@ -299,21 +301,21 @@
 
 公开站顶层导航与设想图保持一致，但按发布阶段控制：
 
-| 导航 | MVP | 目标路由 | 说明 |
-|---|---|---|---|
-| 首页 | 是 | `/[locale]` | 城市化首页编排 |
-| 招聘 | 是 | `/[locale]/jobs` | 列表、详情、发布 |
-| 租房 | 是 | `/[locale]/rentals` | 列表、详情、发布 |
-| 转让 | 是 | `/[locale]/transfers` | 生意/店铺/设备转让 |
-| 二手 | 是 | `/[locale]/marketplace` | 二手物品 |
-| 找师傅 | 是 | `/[locale]/providers` | 本地服务商目录 |
-| 商家 | 是 | `/[locale]/businesses` | 商家黄页 |
-| 优惠 | Phase 2 | `/[locale]/deals` | 商家优惠 |
-| 问答 | Phase 2 | `/[locale]/questions` | 本地问答 |
-| 论坛 | Phase 2 | `/[locale]/community` | 社区板块 |
-| 活动 | Phase 2 | `/[locale]/events` | 本地活动 |
-| 国内货源 | Phase 2/3 | `/[locale]/suppliers` | 审核后启用 |
-| 更多 | 是 | 菜单 | 新闻、帮助、关于、政策 |
+| 导航     | MVP       | 目标路由                | 说明                   |
+| -------- | --------- | ----------------------- | ---------------------- |
+| 首页     | 是        | `/[locale]`             | 城市化首页编排         |
+| 招聘     | 是        | `/[locale]/jobs`        | 列表、详情、发布       |
+| 租房     | 是        | `/[locale]/rentals`     | 列表、详情、发布       |
+| 转让     | 是        | `/[locale]/transfers`   | 生意/店铺/设备转让     |
+| 二手     | 是        | `/[locale]/marketplace` | 二手物品               |
+| 找师傅   | 是        | `/[locale]/providers`   | 本地服务商目录         |
+| 商家     | 是        | `/[locale]/businesses`  | 商家黄页               |
+| 优惠     | Phase 2   | `/[locale]/deals`       | 商家优惠               |
+| 问答     | Phase 2   | `/[locale]/questions`   | 本地问答               |
+| 论坛     | Phase 2   | `/[locale]/community`   | 社区板块               |
+| 活动     | Phase 2   | `/[locale]/events`      | 本地活动               |
+| 国内货源 | Phase 2/3 | `/[locale]/suppliers`   | 审核后启用             |
+| 更多     | 是        | 菜单                    | 新闻、帮助、关于、政策 |
 
 ## 3.2 核心层级
 
@@ -417,7 +419,7 @@
 
 ---
 
-<!-- source: docs/04-user-journeys.md -->
+<!-- source: docs\04-user-journeys.md -->
 
 # 04. 关键用户旅程
 
@@ -502,7 +504,7 @@
 
 ---
 
-<!-- source: docs/05-roles-and-permissions.md -->
+<!-- source: docs\05-roles-and-permissions.md -->
 
 # 05. 角色、权限与授权模型
 
@@ -514,29 +516,29 @@
 
 ## 5.2 平台角色
 
-| 角色 | 典型权限 | 限制 |
-|---|---|---|
-| Guest | 浏览公开资源、搜索 | 不可发布、收藏、联系、举报 |
-| User | 个人资料、草稿、发布、收藏、消息、举报、订单 | 仅自己的资源和会话 |
-| Verified User | 高风险分类或更高额度 | 仍受规则和限频 |
-| Support | 查看最小必要账户/会话元数据、协助恢复 | 默认不能看消息正文和验证原件 |
-| Moderator | 审核内容、处理举报、施加内容动作 | 不处理付款、不能改自身审计 |
-| Senior Moderator | 申诉、用户/组织高级限制 | 高风险动作需双人确认 |
-| Ad Ops | 广告库存、素材审核、排期 | 不能退款或改账本 |
-| Finance | 订单、退款、对账、账本调整 | 不审核内容；调整需理由和复核 |
-| Taxonomy Admin | 城市、分类、表单和首页编排 | 发布前需版本/回滚 |
-| Platform Admin | 系统配置、角色授权、Feature Flag | 强制 MFA，最小人数，所有动作审计 |
-| Read-only Auditor | 只读审计和报告 | 无写权限、导出受控 |
+| 角色              | 典型权限                                     | 限制                             |
+| ----------------- | -------------------------------------------- | -------------------------------- |
+| Guest             | 浏览公开资源、搜索                           | 不可发布、收藏、联系、举报       |
+| User              | 个人资料、草稿、发布、收藏、消息、举报、订单 | 仅自己的资源和会话               |
+| Verified User     | 高风险分类或更高额度                         | 仍受规则和限频                   |
+| Support           | 查看最小必要账户/会话元数据、协助恢复        | 默认不能看消息正文和验证原件     |
+| Moderator         | 审核内容、处理举报、施加内容动作             | 不处理付款、不能改自身审计       |
+| Senior Moderator  | 申诉、用户/组织高级限制                      | 高风险动作需双人确认             |
+| Ad Ops            | 广告库存、素材审核、排期                     | 不能退款或改账本                 |
+| Finance           | 订单、退款、对账、账本调整                   | 不审核内容；调整需理由和复核     |
+| Taxonomy Admin    | 城市、分类、表单和首页编排                   | 发布前需版本/回滚                |
+| Platform Admin    | 系统配置、角色授权、Feature Flag             | 强制 MFA，最小人数，所有动作审计 |
+| Read-only Auditor | 只读审计和报告                               | 无写权限、导出受控               |
 
 ## 5.3 组织角色
 
-| 角色 | 档案 | 信息 | 成员 | 订单/账单 | 分析 |
-|---|---|---|---|---|---|
-| OWNER | 全部 | 全部 | 邀请/移除/转权 | 全部 | 查看 |
-| ADMIN | 编辑 | 全部 | 邀请/移除非 Owner | 查看/购买 | 查看 |
-| EDITOR | 编辑有限字段 | 创建/编辑/提交 | 无 | 无 | 查看自身内容 |
-| BILLING | 只读 | 只读 | 无 | 购买/发票/付款方式 | 财务报告 |
-| ANALYST | 只读 | 只读 | 无 | 只读 | 查看/导出受控数据 |
+| 角色    | 档案         | 信息           | 成员              | 订单/账单          | 分析              |
+| ------- | ------------ | -------------- | ----------------- | ------------------ | ----------------- |
+| OWNER   | 全部         | 全部           | 邀请/移除/转权    | 全部               | 查看              |
+| ADMIN   | 编辑         | 全部           | 邀请/移除非 Owner | 查看/购买          | 查看              |
+| EDITOR  | 编辑有限字段 | 创建/编辑/提交 | 无                | 无                 | 查看自身内容      |
+| BILLING | 只读         | 只读           | 无                | 购买/发票/付款方式 | 财务报告          |
+| ANALYST | 只读         | 只读           | 无                | 只读               | 查看/导出受控数据 |
 
 组织中必须始终至少有一个 Owner。Owner 转移和组织删除需要近期认证；Billing 不能通过修改内容间接获得审核权限。
 
@@ -584,7 +586,7 @@
 
 ---
 
-<!-- source: docs/06-domain-and-data-model.md -->
+<!-- source: docs\06-domain-and-data-model.md -->
 
 # 06. 领域与数据模型
 
@@ -592,22 +594,22 @@
 
 模块化单体按业务能力而不是技术层划分。建议 API 内部模块如下：
 
-| 模块 | 责任 | 拥有的核心数据 |
-|---|---|---|
-| Identity | 用户、身份提供方、会话、验证、账户状态 | users, identities, auth_sessions |
-| Organizations | 商家/服务商/供应商组织与成员 | organizations, memberships |
-| Taxonomy | 地区、分类、动态表单、别名 | regions, categories |
-| Listings | 五类信息、详情扩展、版本、生命周期 | listings, *_details, listing_media |
-| Media | 预签名上传、扫描、变体、访问策略 | media metadata / object keys |
-| Search | 索引投影、查询、同义词、热词 | OpenSearch indices, search config |
-| Messaging | 会话、参与者、消息、屏蔽 | conversations, participants, messages |
-| Trust | 商家/师傅档案、验证、评价 | business_profiles, provider_profiles, reviews |
-| Moderation | 规则命中、举报、案件、动作、申诉 | reports, moderation_cases/actions |
-| Notifications | 模板、偏好、站内/邮件/短信投递 | notifications, delivery attempts |
-| Commerce | SKU、订单、支付、退款、积分账本 | orders, payments, wallet_entries |
-| Advertising | 活动、素材、库存、排期、履约 | ad_campaigns, creatives, placements |
-| Analytics | 事件契约、聚合指标、实验 | event stream / warehouse projections |
-| Admin/Audit | 后台授权、配置、审计 | audit_logs, config versions |
+| 模块          | 责任                                   | 拥有的核心数据                                |
+| ------------- | -------------------------------------- | --------------------------------------------- |
+| Identity      | 用户、身份提供方、会话、验证、账户状态 | users, identities, auth_sessions              |
+| Organizations | 商家/服务商/供应商组织与成员           | organizations, memberships                    |
+| Taxonomy      | 地区、分类、动态表单、别名             | regions, categories                           |
+| Listings      | 五类信息、详情扩展、版本、生命周期     | listings, *_details, listing_media            |
+| Media         | 预签名上传、扫描、变体、访问策略       | media metadata / object keys                  |
+| Search        | 索引投影、查询、同义词、热词           | OpenSearch indices, search config             |
+| Messaging     | 会话、参与者、消息、屏蔽               | conversations, participants, messages         |
+| Trust         | 商家/师傅档案、验证、评价              | business_profiles, provider_profiles, reviews |
+| Moderation    | 规则命中、举报、案件、动作、申诉       | reports, moderation_cases/actions             |
+| Notifications | 模板、偏好、站内/邮件/短信投递         | notifications, delivery attempts              |
+| Commerce      | SKU、订单、支付、退款、积分账本        | orders, payments, wallet_entries              |
+| Advertising   | 活动、素材、库存、排期、履约           | ad_campaigns, creatives, placements           |
+| Analytics     | 事件契约、聚合指标、实验               | event stream / warehouse projections          |
+| Admin/Audit   | 后台授权、配置、审计                   | audit_logs, config versions                   |
 
 模块可在同一数据库中使用独立 repository 和 service 边界。禁止把“同库”理解为可任意跨表写入。
 
@@ -659,6 +661,8 @@ Organization 是可多人管理的商业主体。商家、师傅团队和供应�
 - 地理：PostGIS geometry/geography 用于半径和边界查询；Prisma 不支持部分能力时通过 SQL repository 封装。
 - 审计：业务表的 `updatedAt` 不替代审计日志。
 
+当前 `ListingGeoRepository` 是地理读取的唯一基础封装：它查询由公开模糊经纬度生成的 `geography(Point, 4326)`，使用 `ST_DWithin`（米）筛选、`ST_Distance`（英里）返回距离，并限制最大 250 英里/100 条。Repository 不返回经纬度或私有地址，且对状态、审核、过期、删除、地区与分类有效性做防御性过滤。调用方不得绕过该边界直接拼接地理 SQL。
+
 ## 6.4 索引策略
 
 基础索引在 Prisma Schema 与 `packages/database/prisma/sql/post_schema_constraints.sql` 中给出。扩展迁移只安装 `pg_trgm`/`postgis`；后置 SQL 必须合并到首个建表迁移之后，再根据查询计划验证：
@@ -708,6 +712,13 @@ Organization 是可多人管理的商业主体。商家、师傅团队和供应�
 
 大表 `CREATE INDEX CONCURRENTLY`、长事务和锁风险需在迁移 Runbook 中说明。Prisma migration 可结合手写 SQL，但必须保留可审查文件。首个迁移的推荐步骤是：先用 `--create-only` 生成建表 SQL，再把 `post_schema_constraints.sql` 放到相关表创建之后；不得在表存在前运行后置约束。
 
+Gate 0 CI 同时执行两类迁移保护：
+
+- `pnpm db:migrate:safety` 静态阻断未说明的 drop/truncate/update/delete/rename、收紧非空和新增
+  required column；例外必须在 SQL 中给出原因与恢复方案，供审核追踪。
+- `pnpm db:upgrade:check` 从版本化的上一兼容基线重放到当前状态，并用合成 sentinel 验证已有
+  数据未丢失。空库 `prisma migrate deploy` 仍单独执行，二者不能互相替代。
+
 ## 6.8 备份与恢复
 
 - RDS 自动备份与 PITR；生产建议至少 15 分钟恢复点目标。
@@ -717,7 +728,7 @@ Organization 是可多人管理的商业主体。商家、师傅团队和供应�
 
 ---
 
-<!-- source: docs/07-system-architecture.md -->
+<!-- source: docs\07-system-architecture.md -->
 
 # 07. 系统架构
 
@@ -830,14 +841,14 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 
 缓存只用于可重建数据：
 
-| 数据 | 建议 | 失效 |
-|---|---|---|
-| 分类/城市/首页配置 | 5–30 分钟 + 版本键 | 配置发布事件 |
-| 公开详情 | 30–120 秒 | Listing 变更事件 |
-| 聚合页 | 30–300 秒 | tag + TTL |
-| 会话/权限 | 极短或不缓存 | 账号/角色变更主动失效 |
-| 热门搜索 | 5–15 分钟 | 滚动计算 |
-| 限流计数 | Redis 原子操作 | 窗口自然过期 |
+| 数据               | 建议               | 失效                  |
+| ------------------ | ------------------ | --------------------- |
+| 分类/城市/首页配置 | 5–30 分钟 + 版本键 | 配置发布事件          |
+| 公开详情           | 30–120 秒          | Listing 变更事件      |
+| 聚合页             | 30–300 秒          | tag + TTL             |
+| 会话/权限          | 极短或不缓存       | 账号/角色变更主动失效 |
+| 热门搜索           | 5–15 分钟          | 滚动计算              |
+| 限流计数           | Redis 原子操作     | 窗口自然过期          |
 
 不得缓存完整私密联系方式到共享公开缓存；缓存 key 必须包含语言、城市、授权范围等维度。
 
@@ -870,7 +881,7 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 
 ---
 
-<!-- source: docs/08-api-and-integrations.md -->
+<!-- source: docs\08-api-and-integrations.md -->
 
 # 08. API 与外部集成
 
@@ -1002,9 +1013,50 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 - 失败可重放，处理器幂等；
 - 指标覆盖签名失败、积压、处理延迟和永久失败。
 
+## 8.12 Gate 0 HTTP 基线
+
+- Fastify 通用 JSON 请求体默认限制为 1 MiB，可通过受校验的
+  `API_BODY_LIMIT_BYTES` 在 1–10 MiB 范围内调整；上传和 webhook 端点使用后续任务定义的更窄限制。
+- `X-Request-Id` 只接受最长 128 字符的安全字符集，不合规值会替换为 UUID；所有响应回传
+  `X-Request-Id`。
+- DTO 对未知字段和未知 query 参数返回 400；字段错误放在 RFC 9457 Problem Details 的
+  `errors` map 中。
+- CORS 仅允许配置的 Web/Admin origin 并允许凭据。带会话 Cookie 的修改请求必须同时具有受信
+  `Origin`；webhook 路由不使用 Cookie，后续由签名与重放保护负责。
+- Problem Details 不返回 stack、provider 原始错误或查询字符串，错误响应设置
+  `Cache-Control: no-store`。
+
+## 8.13 Gate 0 OpenAPI 契约基线
+
+- `openapi/openapi.yaml` 是唯一 REST 契约事实源；API 启动时读取该文件，Swagger UI、
+  `/docs/openapi.json` 与 `/docs/openapi.yaml` 均从同一文档提供，不再从装饰器生成另一份子集。
+- Redocly 在本地 `pnpm openapi:lint` 和 CI 中执行 OpenAPI 3.1、引用、operationId 与结构校验。
+  所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
+  项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
+  liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
+- 契约测试解析并解引用文档，校验 31 个 path、52 个 schema、38 个唯一 operationId，
+  验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
+- API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
+
+## 8.14 契约生成方向
+
+方向固定为 **OpenAPI → TypeScript 类型 → 运行时适配器**：
+
+1. 只在 `openapi/openapi.yaml` 中定义公共 HTTP 结构；运行 `pnpm openapi:generate` 生成
+   `packages/contracts/src/generated/openapi.ts`，该文件禁止手改。
+2. `@socal/contracts` 从生成的 `components`/`operations` 导出稳定别名。Zod 仅作为运行时输入
+   适配器，并以生成类型作为 `ZodType` 输出约束；不能另写一套独立接口。
+3. Nest Controller 对已实现请求直接使用共享 Zod schema 与生成类型，不再维护 Swagger
+   装饰器 DTO。Swagger 仍只服务 canonical OpenAPI。
+4. `pnpm openapi:check` 在本地与 CI 重新生成到内存并检测提交文件漂移；OpenAPI 改动若未重新
+   生成会阻断质量门。
+
+数据库模型和内部领域对象不从 OpenAPI 生成；它们通过显式 application mapping 隔离，避免把
+私有字段意外暴露为公共响应。
+
 ---
 
-<!-- source: docs/09-search-and-ranking.md -->
+<!-- source: docs\09-search-and-ranking.md -->
 
 # 09. 搜索、推荐与排序
 
@@ -1108,7 +1160,7 @@ natural_score =
 
 ---
 
-<!-- source: docs/10-ui-ux-design-system.md -->
+<!-- source: docs\10-ui-ux-design-system.md -->
 
 # 10. UI/UX 与设计系统
 
@@ -1139,7 +1191,7 @@ natural_score =
 --radius-sm: 6px;
 --radius-md: 10px;
 --radius-lg: 16px;
---shadow-card: 0 2px 12px rgba(24, 39, 75, .06);
+--shadow-card: 0 2px 12px rgba(24, 39, 75, 0.06);
 ```
 
 实际 token 放在共享 UI 包，并以语义名而非页面特定名使用。深色模式不是 MVP，但颜色对比和系统放大必须通过。
@@ -1158,13 +1210,13 @@ natural_score =
 
 建议断点（组件应根据内容而非设备名称判断）：
 
-| 范围 | 策略 |
-|---|---|
-| ≥1440 | 三栏门户：首页左快速发布、中主内容、右运营栏 |
-| 1200–1439 | 收窄侧栏、部分模块重排 |
-| 768–1199 | 双栏或单栏，右栏下沉，导航可横向滚动 |
-| <768 | 单栏、底部/紧凑导航、快捷发布入口固定可达 |
-| <480 | 表单和卡片完全单列，避免横向数据表 |
+| 范围      | 策略                                         |
+| --------- | -------------------------------------------- |
+| ≥1440     | 三栏门户：首页左快速发布、中主内容、右运营栏 |
+| 1200–1439 | 收窄侧栏、部分模块重排                       |
+| 768–1199  | 双栏或单栏，右栏下沉，导航可横向滚动         |
+| <768      | 单栏、底部/紧凑导航、快捷发布入口固定可达    |
+| <480      | 表单和卡片完全单列，避免横向数据表           |
 
 移动首页优先顺序：搜索/地区 → 快速发布 → 核心分类 → 最新信息 → 城市/商家 → 运营模块。热门榜、行情和门户性模块可折叠或下沉。
 
@@ -1217,7 +1269,7 @@ Button、IconButton、Link、Input、Textarea、Select/Combobox、Checkbox/Radio
 
 ---
 
-<!-- source: docs/11-content-workflows-and-moderation.md -->
+<!-- source: docs\11-content-workflows-and-moderation.md -->
 
 # 11. 内容工作流、风控与审核
 
@@ -1323,7 +1375,7 @@ PUBLISHED
 
 ---
 
-<!-- source: docs/12-monetization-payments-ads.md -->
+<!-- source: docs\12-monetization-payments-ads.md -->
 
 # 12. 商业化、支付、广告与积分
 
@@ -1331,18 +1383,20 @@ PUBLISHED
 
 商业化不能破坏内容质量和用户信任。所有付费曝光必须：先通过内容政策、明确标识、可证明履约、支持退款/争议处理，并与自然排序指标分开。
 
+平台从正式公开上线日起的前 12 个自然月保持全站免费，不创建真实资金订单、不发起扣款，也不要求用户保存付款方式。免费期结束后仍不得按日期自动切换为收费；只有价格、条款、退款、税务、支付生产验证和运营准备全部通过，才可通过服务端 Feature Flag 审计启用。详见 ADR-0006。
+
 ## 12.2 产品 SKU
 
-| 产品 | 计费方式 | 履约 |
-|---|---|---|
-| 信息刷新 | 单次/包 | 更新受控排序时间，不修改原发布时间事实 |
-| 分类置顶 | 时段 | 在指定城市+分类的置顶槽位 |
-| 推荐信息 | 时段/展示 | 融合位，标“推广” |
-| 首页广告 | 固定日期/库存 | 指定模块、设备和城市 |
-| 列表 Banner | 展示/时段 | 受频控和素材审核 |
-| 商家套餐 | 月/年订阅 | 档案增强、信息额度、分析等 |
-| 师傅套餐 | 月/年订阅 | 推荐资格、线索工具等 |
-| 积分包 | 一次性 | 钱包 CREDIT，按规则消费/过期 |
+| 产品        | 计费方式      | 履约                                   |
+| ----------- | ------------- | -------------------------------------- |
+| 信息刷新    | 单次/包       | 更新受控排序时间，不修改原发布时间事实 |
+| 分类置顶    | 时段          | 在指定城市+分类的置顶槽位              |
+| 推荐信息    | 时段/展示     | 融合位，标“推广”                       |
+| 首页广告    | 固定日期/库存 | 指定模块、设备和城市                   |
+| 列表 Banner | 展示/时段     | 受频控和素材审核                       |
+| 商家套餐    | 月/年订阅     | 档案增强、信息额度、分析等             |
+| 师傅套餐    | 月/年订阅     | 推荐资格、线索工具等                   |
+| 积分包      | 一次性        | 钱包 CREDIT，按规则消费/过期           |
 
 首期避免复杂实时竞价。库存、价格和权益版本化；订单保存购买时快照，后续改价不影响历史订单。
 
@@ -1419,9 +1473,20 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 
 订单转化、支付成功、履约启动时长、广告填充、有效曝光/点击、推广后的有效联系增量、退款/争议、商家续费、违规广告率。不能只优化营收而忽略举报、跳出和自然内容受损。
 
+## 12.12 自动充值预留
+
+未来资源名预留为 `/v1/billing/auto-top-up-policy`。该路径在 `COM-006` 完成前不写入 OpenAPI、不得注册路由。届时采用应用端口隔离业务策略与 Stripe 等 provider adapter，并满足：
+
+- 用户逐人明确 opt-in，策略变更使用版本/ETag；支持立即暂停和删除。
+- 配置阈值、固定充值额、周期/金额上限与币种；服务端实施硬上限和异常限频。
+- 仅保存 provider payment-method reference，不接触或记录原始卡号/CVC。
+- 每次触发创建独立 Order/Payment，以策略版本和触发窗口生成稳定幂等键。
+- 签名 webhook、重放防护、乱序处理、失败退避、通知、对账和全局 kill switch 必须先通过测试。
+- 免费期和未启用商业化时，服务端即使收到旧任务或重试也必须拒绝扣款。
+
 ---
 
-<!-- source: docs/13-seo-i18n-accessibility.md -->
+<!-- source: docs\13-seo-i18n-accessibility.md -->
 
 # 13. SEO、国际化与可访问性
 
@@ -1431,16 +1496,16 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 
 ## 13.2 可索引页面矩阵
 
-| 页面 | 默认策略 |
-|---|---|
-| 首页、城市首页 | index, follow |
-| 主分类城市聚合页 | 运营白名单后 index |
-| 高质量已发布详情 | index，满足质量/新鲜度阈值 |
-| 任意站内搜索与复杂筛选 | noindex, follow + canonical |
-| 草稿、预览、账户、消息、订单 | noindex, nofollow |
-| 管理后台/API | 禁止抓取 + 鉴权 |
-| 过期详情 | 视替代内容 410、404 或保留 noindex 页面 |
-| 下架/删除 | 404/410，不泄露原因 |
+| 页面                         | 默认策略                                |
+| ---------------------------- | --------------------------------------- |
+| 首页、城市首页               | index, follow                           |
+| 主分类城市聚合页             | 运营白名单后 index                      |
+| 高质量已发布详情             | index，满足质量/新鲜度阈值              |
+| 任意站内搜索与复杂筛选       | noindex, follow + canonical             |
+| 草稿、预览、账户、消息、订单 | noindex, nofollow                       |
+| 管理后台/API                 | 禁止抓取 + 鉴权                         |
+| 过期详情                     | 视替代内容 410、404 或保留 noindex 页面 |
+| 下架/删除                    | 404/410，不泄露原因                     |
 
 ## 13.3 元数据
 
@@ -1517,7 +1582,7 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 
 ---
 
-<!-- source: docs/14-security-privacy-compliance.md -->
+<!-- source: docs\14-security-privacy-compliance.md -->
 
 # 14. 安全、隐私与合规
 
@@ -1534,18 +1599,18 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 
 ## 14.2 威胁模型摘要
 
-| 威胁 | 典型场景 | 主要控制 |
-|---|---|---|
-| 账户接管 | OTP 猜测、凭据填充、会话盗窃 | 限频、风险验证、Secure session、设备撤销、MFA |
-| IDOR/越权 | 修改他人信息、查看会话/订单 | 对象级 policy、查询约束、负面测试 |
-| 发布诈骗 | 低价房、假工作、外部押金 | 风险评分、验证、重复检测、消息警告、举报 |
-| 批量抓取 | 抓手机号、商家数据、列表 | 受控联系展示、速率、WAF、行为检测 |
-| 上传攻击 | 恶意文件、脚本、图像解析漏洞 | quarantine、扫描、重编码、独立域、CSP |
-| 注入/XSS/SSRF | 用户正文、URL、后台预览 | 参数化查询、输出编码、URL allowlist、网络隔离 |
-| 支付伪造 | 假回调、重放、重复履约 | webhook 签名、事件唯一、幂等账本 |
-| 内部滥用 | 后台查隐私、改账 | 最小权限、MFA、双人审批、不可变审计 |
-| 供应链 | 恶意依赖/镜像 | lockfile、签名/扫描、最小镜像、升级流程 |
-| DDoS/机器人 | 搜索、登录、消息、上传 | CDN/WAF、分层限流、挑战、配额、降级 |
+| 威胁          | 典型场景                     | 主要控制                                      |
+| ------------- | ---------------------------- | --------------------------------------------- |
+| 账户接管      | OTP 猜测、凭据填充、会话盗窃 | 限频、风险验证、Secure session、设备撤销、MFA |
+| IDOR/越权     | 修改他人信息、查看会话/订单  | 对象级 policy、查询约束、负面测试             |
+| 发布诈骗      | 低价房、假工作、外部押金     | 风险评分、验证、重复检测、消息警告、举报      |
+| 批量抓取      | 抓手机号、商家数据、列表     | 受控联系展示、速率、WAF、行为检测             |
+| 上传攻击      | 恶意文件、脚本、图像解析漏洞 | quarantine、扫描、重编码、独立域、CSP         |
+| 注入/XSS/SSRF | 用户正文、URL、后台预览      | 参数化查询、输出编码、URL allowlist、网络隔离 |
+| 支付伪造      | 假回调、重放、重复履约       | webhook 签名、事件唯一、幂等账本              |
+| 内部滥用      | 后台查隐私、改账             | 最小权限、MFA、双人审批、不可变审计           |
+| 供应链        | 恶意依赖/镜像                | lockfile、签名/扫描、最小镜像、升级流程       |
+| DDoS/机器人   | 搜索、登录、消息、上传       | CDN/WAF、分层限流、挑战、配额、降级           |
 
 每个高风险功能在实现任务中补充具体数据流和滥用用例。
 
@@ -1593,11 +1658,11 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 
 ## 14.8 PII 分类
 
-| 等级 | 示例 | 控制 |
-|---|---|---|
-| Public | 显示名、公开商家资料、公开信息 | 内容政策与完整性 |
-| Internal | 风险分、运营备注、聚合指标 | 员工最小权限 |
-| Confidential | 邮箱、手机号、精确地址、消息 | 字段级输出策略、加密、审计 |
+| 等级              | 示例                             | 控制                       |
+| ----------------- | -------------------------------- | -------------------------- |
+| Public            | 显示名、公开商家资料、公开信息   | 内容政策与完整性           |
+| Internal          | 风险分、运营备注、聚合指标       | 员工最小权限               |
+| Confidential      | 邮箱、手机号、精确地址、消息     | 字段级输出策略、加密、审计 |
 | Highly Restricted | 身份证件、付款争议证据、恢复凭据 | 独立存储、双重授权、短保留 |
 
 日志和分析默认不得包含 Confidential/Highly Restricted 原文。IP 采用必要时的截断/散列和短期保留。
@@ -1639,7 +1704,7 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 
 ---
 
-<!-- source: docs/15-performance-reliability.md -->
+<!-- source: docs\15-performance-reliability.md -->
 
 # 15. 性能、容量与可靠性
 
@@ -1647,20 +1712,20 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 
 下列是首期 SLO/预算，Beta 前须压测校准：
 
-| 指标 | 目标 |
-|---|---|
-| 公开 Web/API 可用性 | 99.9% / 月 |
-| 后台可用性 | 99.5% / 月 |
-| API GET p95/p99 | 300ms / 900ms |
-| API mutation p95/p99 | 700ms / 2s |
-| OpenSearch p95 | 450ms |
-| 首页 LCP p75 | 2.5s |
-| INP p75 | 200ms |
-| CLS p75 | 0.1 |
-| 下架传播至搜索 p95 | 10s |
-| 一般索引新鲜度 p95 | 60s |
-| 通知入队 p95 | 30s |
-| RPO / RTO | 15m / 2h |
+| 指标                 | 目标          |
+| -------------------- | ------------- |
+| 公开 Web/API 可用性  | 99.9% / 月    |
+| 后台可用性           | 99.5% / 月    |
+| API GET p95/p99      | 300ms / 900ms |
+| API mutation p95/p99 | 700ms / 2s    |
+| OpenSearch p95       | 450ms         |
+| 首页 LCP p75         | 2.5s          |
+| INP p75              | 200ms         |
+| CLS p75              | 0.1           |
+| 下架传播至搜索 p95   | 10s           |
+| 一般索引新鲜度 p95   | 60s           |
+| 通知入队 p95         | 30s           |
+| RPO / RTO            | 15m / 2h      |
 
 SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍需端到端监控。
 
@@ -1745,19 +1810,19 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 
 ---
 
-<!-- source: docs/16-infrastructure-devops.md -->
+<!-- source: docs\16-infrastructure-devops.md -->
 
 # 16. 基础设施、环境与 DevOps
 
 ## 16.1 环境
 
-| 环境 | 用途 | 数据 |
-|---|---|---|
-| local | 单人开发，Docker Compose 依赖 | 生成/种子数据 |
-| preview | PR 临时 Web/Admin，API 可共享或隔离 | 合成数据 |
-| dev | 团队集成 | 合成/匿名数据 |
-| staging | 生产等价、迁移/压测/演练 | 合成或严格去标识 |
-| production | 用户服务 | 真实数据 |
+| 环境       | 用途                                | 数据             |
+| ---------- | ----------------------------------- | ---------------- |
+| local      | 单人开发，Docker Compose 依赖       | 生成/种子数据    |
+| preview    | PR 临时 Web/Admin，API 可共享或隔离 | 合成数据         |
+| dev        | 团队集成                            | 合成/匿名数据    |
+| staging    | 生产等价、迁移/压测/演练            | 合成或严格去标识 |
+| production | 用户服务                            | 真实数据         |
 
 生产与非生产使用独立云账号/项目、网络、密钥和数据。禁止把生产数据库快照直接恢复到开发。
 
@@ -1810,6 +1875,18 @@ PR：
 
 主分支：构建签名镜像、推 ECR、部署 dev；通过 Gate 后提升同一 artifact 到 staging/prod，不重新构建。
 
+### 16.5.1 GitHub 合并保护
+
+远程仓库创建后，`main` ruleset/branch protection 至少要求以下两个 GitHub Actions check：
+
+- `Static, contracts, tests, and build`
+- `Build non-root application images`
+
+同时要求 pull request、解决全部 review conversation，并禁止普通贡献者绕过。当前个人私有仓库只有一名
+维护者，不能要求作者自我批准；增加第二维护者后必须再开启至少一名批准者、CODEOWNERS 审查和推送新提交后
+撤销过期批准。平台管理员应保存一次失败 PR 被阻止和一次完整绿色 PR 可合并的证据。本地
+`pnpm ci:workflow:check` 只能验证 workflow 内容，不能替代 GitHub 执行和 ruleset 证据。
+
 ## 16.6 CD 与发布
 
 - 数据库采用向前兼容迁移，先 migration job 再应用 rollout。
@@ -1846,7 +1923,7 @@ Terraform 是云资源事实源；禁止长期手工改生产。紧急控制台�
 
 ---
 
-<!-- source: docs/17-observability-analytics.md -->
+<!-- source: docs\17-observability-analytics.md -->
 
 # 17. 可观测性与产品分析
 
@@ -1946,9 +2023,13 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 
 分析标识尊重 consent/opt-out；不跨目的滥用。原始事件短期保留，聚合长期保留；删除请求要能解除/删除用户标识。第三方分析脚本需安全、隐私和性能评审。
 
+## 17.10 当前实施基线
+
+`OBS-001` 的结构日志、Prometheus RED/Worker 指标、W3C Trace 传播、OTLP 导出接口和 PII 脱敏测试记录在 [`observability-baseline.md`](./docs/observability-baseline.md)。Dashboard、SLO、告警、Collector 部署和正式采样策略属于 `OBS-002`/发布 Gate，不在本基础切片中伪造完成。
+
 ---
 
-<!-- source: docs/18-testing-quality.md -->
+<!-- source: docs\18-testing-quality.md -->
 
 # 18. 测试与质量工程
 
@@ -1958,17 +2039,17 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 
 ## 18.2 测试层级
 
-| 层级 | 范围 | 工具方向 |
-|---|---|---|
-| Unit | 纯规则、排序、价格、状态机、policy | Vitest/Jest 等 |
-| Component | UI 状态、表单、无障碍 | Testing Library + axe |
-| Repository Integration | Prisma/SQL/PostGIS 真实行为 | PostgreSQL 容器 |
-| API Integration | Nest 模块、auth、validation、Problem Details | Fastify inject/supertest |
-| Contract | OpenAPI 请求/响应与消费者 | schema validator/generated client |
-| Worker | 幂等、重试、乱序、DLQ | Redis + fake adapters |
-| E2E | 搜索、发布、审核、消息、支付测试模式 | Playwright |
-| Performance | 延迟、吞吐、耐久、积压 | k6/等价 |
-| Security | SAST、DAST、依赖、授权负面、上传/webhook | CI + 专项测试 |
+| 层级                   | 范围                                         | 工具方向                          |
+| ---------------------- | -------------------------------------------- | --------------------------------- |
+| Unit                   | 纯规则、排序、价格、状态机、policy           | Vitest/Jest 等                    |
+| Component              | UI 状态、表单、无障碍                        | Testing Library + axe             |
+| Repository Integration | Prisma/SQL/PostGIS 真实行为                  | PostgreSQL 容器                   |
+| API Integration        | Nest 模块、auth、validation、Problem Details | Fastify inject/supertest          |
+| Contract               | OpenAPI 请求/响应与消费者                    | schema validator/generated client |
+| Worker                 | 幂等、重试、乱序、DLQ                        | Redis + fake adapters             |
+| E2E                    | 搜索、发布、审核、消息、支付测试模式         | Playwright                        |
+| Performance            | 延迟、吞吐、耐久、积压                       | k6/等价                           |
+| Security               | SAST、DAST、依赖、授权负面、上传/webhook     | CI + 专项测试                     |
 
 ## 18.3 必测领域不变式
 
@@ -2033,9 +2114,65 @@ PR 必须通过静态检查、typecheck、lint、unit、contract、关键 integr
 
 关注 escaped defects、回滚率、变更失败率、MTTR、flaky rate、审核事故、权限漏洞和支付对账差异，而非单一代码覆盖率。核心领域分支可设较高覆盖要求，但测试可读性和行为价值优先。
 
+## 18.11 Gate 0 测试基线
+
+根目录 `vitest.config.ts` 将 Web、Admin、API、Worker、Config、Contracts、Database 和 UI
+配置为八个具名 test project。DOM project 使用 jsdom 和 Testing Library；服务与纯 TypeScript
+package 使用 Node 环境。常用命令：
+
+```bash
+pnpm test:unit
+pnpm test
+pnpm test:watch
+```
+
+`pnpm test` 同时生成 V8 coverage、`reports/test-results/junit.xml` 和
+`reports/test-results/results.json`。报告是验证证据，不是通过降低断言质量来追求的覆盖率目标。
+CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.json` 和 ESLint。
+
+## 18.12 种子与测试工厂
+
+`packages/database/src/testing/factories.ts` 只生成带随机 UUID、`example.invalid` 身份和明确 synthetic 文案的测试输入，默认 Listing 状态为 `DRAFT`。Repository 集成测试通过 `DATABASE_INTEGRATION_URL` 连接专用测试库；CI 在迁移完成后运行，测试自行清理其稳定 ID 范围。
+
+`pnpm db:seed:validate` 是无数据库的种子契约检查。`seed-database.integration.test.ts` 在真实 PostgreSQL 中连续执行两次导入并验证无重复；不得用生产数据或生产数据库替换这些 fixture。
+
+## 18.13 Repository 集成隔离
+
+统一框架、数据库 URL 防误用规则、事务回滚示例和显式命令见 [`database-integration-testing.md`](./docs/database-integration-testing.md)。每个测试必须通过同一个 `TransactionClient` 完成准备、Repository 调用和断言；成功与失败路径均由框架回滚。CI 设置 `DATABASE_INTEGRATION_URL`，因此不允许把 integration skip 当成 Gate 通过。
+
+## 18.14 迁移兼容测试
+
+数据库迁移另有 `db:migrate:safety` 静态破坏性 SQL 检查和 `db:upgrade:check` 上一兼容基线升级
+检查。升级检查只接受明确的隔离数据库，创建并清理独立临时数据库，不读取生产快照或真实数据。
+
+## 18.15 Gate 0 Playwright 基线
+
+根目录 `playwright.config.ts` 用生产构建的 standalone Web 和编译后的 API 执行 smoke，不依赖开发服务器，
+也不连接真实 PostgreSQL、Redis 或 OpenSearch。测试固定使用 `127.0.0.1:3100` 与
+`127.0.0.1:4100`，不会复用或占用默认开发端口；Web/API 进程由 Playwright 启停。
+
+当前基线同时运行 Desktop Chrome 与 Pixel 7 两个项目，验证：
+
+- `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
+- API health 返回可追踪 request ID；
+- 运行时提供包含 31 个 path 的唯一 OpenAPI 文档；
+- 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
+
+首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
+
+```bash
+pnpm test:e2e:install
+pnpm test:e2e
+pnpm test:e2e:ci
+```
+
+`test:e2e` 先执行全仓构建；`test:e2e:ci` 只用于质量构建已完成的 CI job。standalone 构建不会自动携带
+`public` 和 `.next/static`，因此两条路径都先运行 `scripts/prepare-standalone-runtime.mjs`。
+HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`；CI 即使失败也上传报告。
+
 ---
 
-<!-- source: docs/19-delivery-roadmap.md -->
+<!-- source: docs\19-delivery-roadmap.md -->
 
 # 19. 交付路线与里程碑
 
@@ -2122,7 +2259,7 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 
 ---
 
-<!-- source: docs/20-operations-runbook.md -->
+<!-- source: docs\20-operations-runbook.md -->
 
 # 20. 运营与故障处置 Runbook
 
@@ -2134,12 +2271,12 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 
 ## 20.2 事件分级
 
-| 等级 | 示例 | 响应 |
-|---|---|---|
-| Sev0 | 大规模账户/支付/数据完整性事故 | 立即全员、冻结风险写入、最高负责人 |
-| Sev1 | 公开站不可用、RDS 故障、支付重复、重大隐私泄露 | 5–15 分钟确认，持续指挥 |
-| Sev2 | 搜索不可用、队列严重积压、部分功能失败 | 30 分钟内处理 |
-| Sev3 | 单 provider、非关键任务、个别错误升高 | 工作时段处理 |
+| 等级 | 示例                                           | 响应                               |
+| ---- | ---------------------------------------------- | ---------------------------------- |
+| Sev0 | 大规模账户/支付/数据完整性事故                 | 立即全员、冻结风险写入、最高负责人 |
+| Sev1 | 公开站不可用、RDS 故障、支付重复、重大隐私泄露 | 5–15 分钟确认，持续指挥            |
+| Sev2 | 搜索不可用、队列严重积压、部分功能失败         | 30 分钟内处理                      |
+| Sev3 | 单 provider、非关键任务、个别错误升高          | 工作时段处理                       |
 
 先保护用户和数据，再恢复服务；不为降低错误率而删除证据。
 
@@ -2228,34 +2365,34 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 
 ---
 
-<!-- source: docs/21-risk-register.md -->
+<!-- source: docs\21-risk-register.md -->
 
 # 21. 风险登记册
 
 风险分值使用 Likelihood（1–5）× Impact（1–5）。分值和 owner 在项目启动后由团队确认；此表是初始基线。
 
-| ID | 风险 | L | I | 分值 | 缓解 | 触发/指标 | Owner |
-|---|---|---:|---:|---:|---|---|---|
-| R-01 | 虚假招聘/租房诈骗伤害用户与品牌 | 4 | 5 | 20 | 分层验证、重复检测、消息提示、举报、快速下架 | 确认诈骗率、退款/投诉、举报集中 | Trust & Safety |
-| R-02 | 内容供给不足，门户看似丰富但数据空 | 4 | 4 | 16 | 城市/分类灰度、种子合作方、供给运营、不要伪造统计 | 有效信息数、城市覆盖、首联时间 | Product/Growth |
-| R-03 | 分类信息低质/重复导致 SEO 惩罚 | 4 | 4 | 16 | 去重、质量阈值、索引白名单、过期策略 | 薄页、软404、重复 canonical | SEO/Product |
-| R-04 | 审核队列超出运营能力 | 4 | 4 | 16 | 风险分层、自动批准+抽检、SLA、类别灰度 | oldest case、SLA、误杀 | Ops |
-| R-05 | 对象级越权泄露消息/订单/地址 | 3 | 5 | 15 | policy、repository 约束、负面测试、渗透 | IDOR 测试、异常访问 | Security/Backend |
-| R-06 | 支付重复或推广重复履约 | 3 | 5 | 15 | webhook receipt、幂等、账本、对账 | ledger 差异、重复 fulfillment | Commerce |
-| R-07 | 设想图过度信息密集，移动端不可用 | 4 | 3 | 12 | 移动优先排序、用户测试、可访问性预算 | 发布完成率、CWV、误触 | Design/Frontend |
-| R-08 | 中英搜索相关性差 | 4 | 3 | 12 | 别名/同义词、标注集、查询分析、运营词典 | 零结果、改写率、MRR | Search |
-| R-09 | OpenSearch/Redis 运维复杂和成本高 | 3 | 4 | 12 | 托管、容量控制、fallback、可重建 | 成本、heap、积压 | Platform |
-| R-10 | 第三方短信/邮件/地图/支付故障 | 3 | 4 | 12 | 适配器、timeout、重试、降级、provider status | error/latency、配额 | Platform |
-| R-11 | 加州隐私/营销/住房/就业合规遗漏 | 3 | 5 | 15 | 法律审查、Feature Flag、政策规则、数据请求 | 投诉、政策变化 | Legal/Product |
-| R-12 | 身份/执照材料泄露 | 2 | 5 | 10 | 独立私有桶、KMS、短保留、访问审计 | 非授权读取、保留超期 | Security/Ops |
-| R-13 | 团队过早微服务化导致延迟 | 3 | 4 | 12 | ADR、模块化单体、拆分触发证据 | 服务数量、发布/故障成本 | Architect |
-| R-14 | 数据迁移锁表或不可回滚 | 3 | 4 | 12 | expand-contract、staging 演练、分批回填 | 锁、migration duration | Data/Platform |
-| R-15 | 旧站数据权属/质量不明 | 3 | 4 | 12 | 导入审计、同意/来源、去重、隔离 | 无来源记录、投诉 | Product/Legal |
-| R-16 | 广告破坏自然结果信任 | 3 | 4 | 12 | 明示推广、槽位上限、相关性/政策门槛 | 举报、跳出、自然联系下降 | Ads/Product |
-| R-17 | 恶意抓取联系方式 | 4 | 4 | 16 | 站内消息优先、受控 reveal、频控、WAF | reveal 速率、爬虫模式 | Security/Growth |
-| R-18 | 分析采集过度或数据质量差 | 3 | 4 | 12 | schema、consent、服务端事实、保留 | PII scan、事件异常 | Data/Privacy |
-| R-19 | 关键人员/运营单点 | 3 | 3 | 9 | Runbook、轮值、权限分散、培训 | 未处理告警、休假阻塞 | Management |
-| R-20 | 首页真实指标延迟/错误造成误导 | 3 | 3 | 9 | 定义口径、更新时间、无数据则隐藏 | 对账差异、用户投诉 | Product/Data |
+| ID   | 风险                               |   L |   I | 分值 | 缓解                                              | 触发/指标                       | Owner            |
+| ---- | ---------------------------------- | --: | --: | ---: | ------------------------------------------------- | ------------------------------- | ---------------- |
+| R-01 | 虚假招聘/租房诈骗伤害用户与品牌    |   4 |   5 |   20 | 分层验证、重复检测、消息提示、举报、快速下架      | 确认诈骗率、退款/投诉、举报集中 | Trust & Safety   |
+| R-02 | 内容供给不足，门户看似丰富但数据空 |   4 |   4 |   16 | 城市/分类灰度、种子合作方、供给运营、不要伪造统计 | 有效信息数、城市覆盖、首联时间  | Product/Growth   |
+| R-03 | 分类信息低质/重复导致 SEO 惩罚     |   4 |   4 |   16 | 去重、质量阈值、索引白名单、过期策略              | 薄页、软404、重复 canonical     | SEO/Product      |
+| R-04 | 审核队列超出运营能力               |   4 |   4 |   16 | 风险分层、自动批准+抽检、SLA、类别灰度            | oldest case、SLA、误杀          | Ops              |
+| R-05 | 对象级越权泄露消息/订单/地址       |   3 |   5 |   15 | policy、repository 约束、负面测试、渗透           | IDOR 测试、异常访问             | Security/Backend |
+| R-06 | 支付重复或推广重复履约             |   3 |   5 |   15 | webhook receipt、幂等、账本、对账                 | ledger 差异、重复 fulfillment   | Commerce         |
+| R-07 | 设想图过度信息密集，移动端不可用   |   4 |   3 |   12 | 移动优先排序、用户测试、可访问性预算              | 发布完成率、CWV、误触           | Design/Frontend  |
+| R-08 | 中英搜索相关性差                   |   4 |   3 |   12 | 别名/同义词、标注集、查询分析、运营词典           | 零结果、改写率、MRR             | Search           |
+| R-09 | OpenSearch/Redis 运维复杂和成本高  |   3 |   4 |   12 | 托管、容量控制、fallback、可重建                  | 成本、heap、积压                | Platform         |
+| R-10 | 第三方短信/邮件/地图/支付故障      |   3 |   4 |   12 | 适配器、timeout、重试、降级、provider status      | error/latency、配额             | Platform         |
+| R-11 | 加州隐私/营销/住房/就业合规遗漏    |   3 |   5 |   15 | 法律审查、Feature Flag、政策规则、数据请求        | 投诉、政策变化                  | Legal/Product    |
+| R-12 | 身份/执照材料泄露                  |   2 |   5 |   10 | 独立私有桶、KMS、短保留、访问审计                 | 非授权读取、保留超期            | Security/Ops     |
+| R-13 | 团队过早微服务化导致延迟           |   3 |   4 |   12 | ADR、模块化单体、拆分触发证据                     | 服务数量、发布/故障成本         | Architect        |
+| R-14 | 数据迁移锁表或不可回滚             |   3 |   4 |   12 | expand-contract、staging 演练、分批回填           | 锁、migration duration          | Data/Platform    |
+| R-15 | 旧站数据权属/质量不明              |   3 |   4 |   12 | 导入审计、同意/来源、去重、隔离                   | 无来源记录、投诉                | Product/Legal    |
+| R-16 | 广告破坏自然结果信任               |   3 |   4 |   12 | 明示推广、槽位上限、相关性/政策门槛               | 举报、跳出、自然联系下降        | Ads/Product      |
+| R-17 | 恶意抓取联系方式                   |   4 |   4 |   16 | 站内消息优先、受控 reveal、频控、WAF              | reveal 速率、爬虫模式           | Security/Growth  |
+| R-18 | 分析采集过度或数据质量差           |   3 |   4 |   12 | schema、consent、服务端事实、保留                 | PII scan、事件异常              | Data/Privacy     |
+| R-19 | 关键人员/运营单点                  |   3 |   3 |    9 | Runbook、轮值、权限分散、培训                     | 未处理告警、休假阻塞            | Management       |
+| R-20 | 首页真实指标延迟/错误造成误导      |   3 |   3 |    9 | 定义口径、更新时间、无数据则隐藏                  | 对账差异、用户投诉              | Product/Data     |
 
 ## 21.1 风险治理
 
@@ -2267,7 +2404,7 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 
 ---
 
-<!-- source: docs/22-acceptance-criteria.md -->
+<!-- source: docs\22-acceptance-criteria.md -->
 
 # 22. 验收标准与 Definition of Done
 
@@ -2358,7 +2495,7 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 
 ---
 
-<!-- source: docs/23-content-taxonomy.md -->
+<!-- source: docs\23-content-taxonomy.md -->
 
 # 23. 内容分类与动态表单
 
@@ -2456,7 +2593,7 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 
 ---
 
-<!-- source: docs/24-data-retention.md -->
+<!-- source: docs\24-data-retention.md -->
 
 # 24. 数据保留、归档与删除
 
@@ -2472,26 +2609,26 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 
 ## 24.2 初始保留表
 
-| 数据 | 在线保留 | 归档/删除建议 | 说明 |
-|---|---|---|---|
-| 活跃用户资料 | 账户期间 | 删除请求后去标识 | 阻塞未结订单/争议 |
-| 会话 token | 到期/撤销后 30 天内元数据 | 删除 token hash | 安全调查最小化 |
-| OTP | 10 分钟有效 | 24 小时内删除/聚合 | 不记录明文 |
-| Listing 当前快照 | 活跃+过期窗口 | 2–3 年后归档/去标识 | 类别政策可不同 |
-| Listing revisions | 2 年 | 聚合/删除 | 审核与争议 |
-| 公共媒体 | 资源期间+删除缓冲 | 30–90 天清理 | S3 version 生命周期 |
-| 身份/执照原件 | 验证所需+最短周期 | 30–90 天或法律批准期限 | 结论与到期可更久 |
-| Messages | 12–24 个月 | 删除/去标识 | 用户设置与举报 hold |
-| 举报/审核证据 | 案件结束后 1–3 年 | 删除敏感证据，保留结论 | 高风险类别另定 |
-| Audit logs | 1–7 年分层 | WORM/归档 | 财务/安全动作更久 |
-| 订单/支付/账本 | 7 年基线 | 加密归档 | 财税确认 |
-| 原始 Stripe webhook | 30–90 天 | 保留摘要/哈希 | 不存多余支付数据 |
-| 通知内容 | 90–180 天 | 状态聚合 | 退订证据可更久 |
-| IP/设备风险数据 | 30–180 天 | 聚合/轮换 hash | 风险与隐私平衡 |
-| 原始分析事件 | 13 个月或更短 | 聚合长期保留 | consent/delete |
-| 搜索 query | 30–90 天去敏 | 低频删除、聚合 | 防止个人信息泄漏 |
-| 应用日志 | 14–90 天 | 分层冷存储 | 级别和环境不同 |
-| 备份 | 35 天+月度策略 | 自动过期 | 恢复受严格限制 |
+| 数据                | 在线保留                  | 归档/删除建议          | 说明                |
+| ------------------- | ------------------------- | ---------------------- | ------------------- |
+| 活跃用户资料        | 账户期间                  | 删除请求后去标识       | 阻塞未结订单/争议   |
+| 会话 token          | 到期/撤销后 30 天内元数据 | 删除 token hash        | 安全调查最小化      |
+| OTP                 | 10 分钟有效               | 24 小时内删除/聚合     | 不记录明文          |
+| Listing 当前快照    | 活跃+过期窗口             | 2–3 年后归档/去标识    | 类别政策可不同      |
+| Listing revisions   | 2 年                      | 聚合/删除              | 审核与争议          |
+| 公共媒体            | 资源期间+删除缓冲         | 30–90 天清理           | S3 version 生命周期 |
+| 身份/执照原件       | 验证所需+最短周期         | 30–90 天或法律批准期限 | 结论与到期可更久    |
+| Messages            | 12–24 个月                | 删除/去标识            | 用户设置与举报 hold |
+| 举报/审核证据       | 案件结束后 1–3 年         | 删除敏感证据，保留结论 | 高风险类别另定      |
+| Audit logs          | 1–7 年分层                | WORM/归档              | 财务/安全动作更久   |
+| 订单/支付/账本      | 7 年基线                  | 加密归档               | 财税确认            |
+| 原始 Stripe webhook | 30–90 天                  | 保留摘要/哈希          | 不存多余支付数据    |
+| 通知内容            | 90–180 天                 | 状态聚合               | 退订证据可更久      |
+| IP/设备风险数据     | 30–180 天                 | 聚合/轮换 hash         | 风险与隐私平衡      |
+| 原始分析事件        | 13 个月或更短             | 聚合长期保留           | consent/delete      |
+| 搜索 query          | 30–90 天去敏              | 低频删除、聚合         | 防止个人信息泄漏    |
+| 应用日志            | 14–90 天                  | 分层冷存储             | 级别和环境不同      |
+| 备份                | 35 天+月度策略            | 自动过期               | 恢复受严格限制      |
 
 ## 24.3 账户删除编排
 
@@ -2514,7 +2651,7 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 
 ---
 
-<!-- source: docs/25-team-operating-model.md -->
+<!-- source: docs\25-team-operating-model.md -->
 
 # 25. 团队协作与系统所有权
 
@@ -2533,18 +2670,18 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 
 ## 25.2 模块所有权
 
-| 模块 | Primary | Secondary |
-|---|---|---|
-| Web/SEO | Frontend | Growth/Backend |
-| Admin | Frontend | Ops/Backend |
-| Identity/Permissions | Backend | Security/QA |
-| Listings/Taxonomy | Backend | Product/Ops |
-| Search | Backend/Search | Growth/Platform |
-| Messaging/Trust | Backend | T&S/QA |
-| Commerce/Ads | Backend | Finance/Ad Ops |
-| Database/Migrations | Backend/Data | Platform |
-| Infra/Observability | Platform | Backend |
-| Policies/Moderation | T&S/Product | Legal/Backend |
+| 模块                 | Primary        | Secondary       |
+| -------------------- | -------------- | --------------- |
+| Web/SEO              | Frontend       | Growth/Backend  |
+| Admin                | Frontend       | Ops/Backend     |
+| Identity/Permissions | Backend        | Security/QA     |
+| Listings/Taxonomy    | Backend        | Product/Ops     |
+| Search               | Backend/Search | Growth/Platform |
+| Messaging/Trust      | Backend        | T&S/QA          |
+| Commerce/Ads         | Backend        | Finance/Ad Ops  |
+| Database/Migrations  | Backend/Data   | Platform        |
+| Infra/Observability  | Platform       | Backend         |
+| Policies/Moderation  | T&S/Product    | Legal/Backend   |
 
 每个 owner 维护代码、Runbook、Dashboard、SLO、Backlog 和文档。所有权不意味着单人可绕过审查。
 
@@ -2581,9 +2718,23 @@ Codex 适合按清晰任务生成实现、测试、迁移和文档，但关键�
 - 交付速度必须同时看变更失败率、MTTR、诈骗/误杀、用户任务完成率。
 - 临时手工操作应尽快转化为受控工具或 Runbook。
 
+## 25.7 GitHub 所有权与合并治理
+
+`.github/CODEOWNERS` 覆盖应用、契约、数据库 schema/迁移、基础设施、安全、商业化和 ADR。当前个人
+私有仓库的全部路径映射到真实维护者 `@songjiahang676-cell`，因此 GitHub 可以解析规则；建立 organization
+并增加第二维护者后，应按 25.2 的角色拆分为真实 team，并为关键路径启用 code-owner review。
+
+`.github/pull_request_template.md` 要求每个变更填写 Backlog ID、范围、契约/数据影响、授权/隐私/幂等、
+回滚、实际测试、未运行项、可观测和已知缺口。高风险检查不得以“不适用”掩盖实际影响；确实不在范围时
+应明确说明原因。
+
+`pnpm governance:check` 验证关键路径存在真实格式的 owner、没有遗留 `*-owners`/`*-maintainers`
+角色占位符，并检查 PR 模板必填审查项。个人仓库阶段由 required CI check 提供合并保护；至少有两名
+维护者后再启用 required approval 和 code-owner review，避免要求作者批准自己的 PR。
+
 ---
 
-<!-- source: docs/26-homepage-component-map.md -->
+<!-- source: docs\26-homepage-component-map.md -->
 
 # 26. 首页设想图组件映射
 
@@ -2591,29 +2742,29 @@ Codex 适合按清晰任务生成实现、测试、迁移和文档，但关键�
 
 ## 26.1 页面区域
 
-| 设想图区块 | 建议组件 | 数据源 | MVP 行为 |
-|---|---|---|---|
-| 品牌/地区/搜索/账户 | `GlobalHeader` | session、region、suggest API | 响应式、sticky（桌面） |
-| 主导航 | `PrimaryNav` | taxonomy/navigation config | Feature Flag 隐藏未上线频道 |
-| 左侧快速发布 | `QuickPublishRail` | listing type config | 未登录保存 return URL |
-| Hero | `HomepageHero` | homepage config | 品牌文案+授权图片，不用伪造 skyline |
-| Hero 统计 | `PlatformMetrics` | aggregate API | 有口径/更新时间；无真实数据隐藏 |
-| 热门搜索排行 | `TrendingSearches` | privacy-filtered trends | 城市/窗口，支持换一批 |
-| 热门城市 | `PopularRegions` | config + inventory | 跳转 canonical 城市页 |
-| 置顶信息 | `PinnedListings` | promotion query | 明确“置顶/推广” |
-| 17 个功能入口 | `ServiceDirectoryGrid` | nav config | 移动端优先核心入口 |
-| 最新招聘/房源/转让/二手 | `LatestListingModule` | listings API | 每块独立缓存/错误边界 |
-| 需求大厅 | `RequestBoard` | Phase 2 或服务需求模型 | MVP 可 Feature Flag 关闭 |
-| 行情中心 | `MarketInsights` | verified aggregate data | 无可靠样本不展示 |
-| 老板/行业专区 | `IndustryCollections` | editorial collection | 运营配置、SEO landing |
-| 跨境货源 | `SupplierSpotlight` | Phase 2/3 | 法律/审核通过后启用 |
-| 首页广告 | `AdPlacement` | ad delivery API | label、频控、fallback |
-| 优质商家 | `FeaturedBusinesses` | trust + editorial | 真实评分/验证 |
-| 推荐师傅 | `FeaturedProviders` | provider ranking | 不用头像/评分占位上线 |
-| 积分/增值服务 | `CommerceShortcuts` | SKU/entitlement | 未启用项隐藏 |
-| 平台保障 | `TrustStrip` | localized content config | 链接政策/帮助 |
-| 多角色后台入口 | `RolePortalLinks` | session permissions | 只显示有权限入口 |
-| 页脚 | `GlobalFooter` | config | 政策、联系、sitemap、备案按适用 |
+| 设想图区块              | 建议组件               | 数据源                       | MVP 行为                            |
+| ----------------------- | ---------------------- | ---------------------------- | ----------------------------------- |
+| 品牌/地区/搜索/账户     | `GlobalHeader`         | session、region、suggest API | 响应式、sticky（桌面）              |
+| 主导航                  | `PrimaryNav`           | taxonomy/navigation config   | Feature Flag 隐藏未上线频道         |
+| 左侧快速发布            | `QuickPublishRail`     | listing type config          | 未登录保存 return URL               |
+| Hero                    | `HomepageHero`         | homepage config              | 品牌文案+授权图片，不用伪造 skyline |
+| Hero 统计               | `PlatformMetrics`      | aggregate API                | 有口径/更新时间；无真实数据隐藏     |
+| 热门搜索排行            | `TrendingSearches`     | privacy-filtered trends      | 城市/窗口，支持换一批               |
+| 热门城市                | `PopularRegions`       | config + inventory           | 跳转 canonical 城市页               |
+| 置顶信息                | `PinnedListings`       | promotion query              | 明确“置顶/推广”                     |
+| 17 个功能入口           | `ServiceDirectoryGrid` | nav config                   | 移动端优先核心入口                  |
+| 最新招聘/房源/转让/二手 | `LatestListingModule`  | listings API                 | 每块独立缓存/错误边界               |
+| 需求大厅                | `RequestBoard`         | Phase 2 或服务需求模型       | MVP 可 Feature Flag 关闭            |
+| 行情中心                | `MarketInsights`       | verified aggregate data      | 无可靠样本不展示                    |
+| 老板/行业专区           | `IndustryCollections`  | editorial collection         | 运营配置、SEO landing               |
+| 跨境货源                | `SupplierSpotlight`    | Phase 2/3                    | 法律/审核通过后启用                 |
+| 首页广告                | `AdPlacement`          | ad delivery API              | label、频控、fallback               |
+| 优质商家                | `FeaturedBusinesses`   | trust + editorial            | 真实评分/验证                       |
+| 推荐师傅                | `FeaturedProviders`    | provider ranking             | 不用头像/评分占位上线               |
+| 积分/增值服务           | `CommerceShortcuts`    | SKU/entitlement              | 未启用项隐藏                        |
+| 平台保障                | `TrustStrip`           | localized content config     | 链接政策/帮助                       |
+| 多角色后台入口          | `RolePortalLinks`      | session permissions          | 只显示有权限入口                    |
+| 页脚                    | `GlobalFooter`         | config                       | 政策、联系、sitemap、备案按适用     |
 
 ## 26.2 推荐组件树
 
@@ -2697,7 +2848,7 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 
 ---
 
-<!-- source: docs/27-route-catalog.md -->
+<!-- source: docs\27-route-catalog.md -->
 
 # 27. 路由目录
 
@@ -2705,57 +2856,57 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 
 ## 27.1 公开 Web
 
-| Route | 模板/说明 | Auth | SEO |
-|---|---|---|---|
-| `/` | locale 选择/重定向 | 否 | noindex 或短页 |
-| `/[locale]` | 地域化首页 | 否 | index |
-| `/[locale]/search` | 全站搜索 | 否 | noindex |
-| `/[locale]/jobs` | 招聘频道 | 否 | index |
-| `/[locale]/jobs/[city]` | 城市招聘 | 否 | 白名单 index |
-| `/[locale]/jobs/[city]/[slugId]` | 招聘详情 | 否 | 条件 index |
-| `/[locale]/rentals...` | 租房列表/详情 | 否 | 同上 |
-| `/[locale]/transfers...` | 转让列表/详情 | 否 | 同上 |
-| `/[locale]/marketplace...` | 二手列表/详情 | 否 | 同上 |
-| `/[locale]/services...` | 服务信息列表/详情 | 否 | 同上 |
-| `/[locale]/providers` | 师傅目录 | 否 | index |
-| `/[locale]/providers/[slugId]` | 师傅档案 | 否 | 条件 index |
-| `/[locale]/businesses` | 商家目录 | 否 | index |
-| `/[locale]/businesses/[slug]` | 商家档案 | 否 | 条件 index |
-| `/[locale]/cities/[city]` | 城市门户 | 否 | index |
-| `/[locale]/deals` | 优惠（Phase 2） | 否 | Feature Flag |
-| `/[locale]/questions` | 问答（Phase 2） | 否 | Feature Flag |
-| `/[locale]/community` | 论坛（Phase 2） | 否 | Feature Flag |
-| `/[locale]/events` | 活动（Phase 2） | 否 | Feature Flag |
-| `/[locale]/suppliers` | 国内货源（Phase 2/3） | 否 | Feature Flag |
-| `/[locale]/help/*` | 帮助与安全 | 否 | index |
-| `/[locale]/policies/*` | 条款/隐私/内容/广告/退款 | 否 | index |
-| `/[locale]/about` | 关于 | 否 | index |
+| Route                            | 模板/说明                | Auth | SEO            |
+| -------------------------------- | ------------------------ | ---- | -------------- |
+| `/`                              | locale 选择/重定向       | 否   | noindex 或短页 |
+| `/[locale]`                      | 地域化首页               | 否   | index          |
+| `/[locale]/search`               | 全站搜索                 | 否   | noindex        |
+| `/[locale]/jobs`                 | 招聘频道                 | 否   | index          |
+| `/[locale]/jobs/[city]`          | 城市招聘                 | 否   | 白名单 index   |
+| `/[locale]/jobs/[city]/[slugId]` | 招聘详情                 | 否   | 条件 index     |
+| `/[locale]/rentals...`           | 租房列表/详情            | 否   | 同上           |
+| `/[locale]/transfers...`         | 转让列表/详情            | 否   | 同上           |
+| `/[locale]/marketplace...`       | 二手列表/详情            | 否   | 同上           |
+| `/[locale]/services...`          | 服务信息列表/详情        | 否   | 同上           |
+| `/[locale]/providers`            | 师傅目录                 | 否   | index          |
+| `/[locale]/providers/[slugId]`   | 师傅档案                 | 否   | 条件 index     |
+| `/[locale]/businesses`           | 商家目录                 | 否   | index          |
+| `/[locale]/businesses/[slug]`    | 商家档案                 | 否   | 条件 index     |
+| `/[locale]/cities/[city]`        | 城市门户                 | 否   | index          |
+| `/[locale]/deals`                | 优惠（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/questions`            | 问答（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/community`            | 论坛（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/events`               | 活动（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/suppliers`            | 国内货源（Phase 2/3）    | 否   | Feature Flag   |
+| `/[locale]/help/*`               | 帮助与安全               | 否   | index          |
+| `/[locale]/policies/*`           | 条款/隐私/内容/广告/退款 | 否   | index          |
+| `/[locale]/about`                | 关于                     | 否   | index          |
 
 五类详情路由可由统一内部 route builder 生成，公开 URL 保持垂直清晰。
 
 ## 27.2 发布与账户
 
-| Route | 说明 |
-|---|---|
-| `/[locale]/post` | 选择发布类型 |
-| `/[locale]/post/[type]/new` | 创建草稿/表单 |
-| `/[locale]/post/[type]/[id]/edit` | 编辑 |
-| `/[locale]/post/[type]/[id]/preview` | 私有预览 |
-| `/[locale]/account` | 总览 |
-| `/[locale]/account/listings` | 我的信息 |
-| `/[locale]/account/favorites` | 收藏 |
-| `/[locale]/account/messages` | 会话列表 |
-| `/[locale]/account/messages/[id]` | 会话 |
-| `/[locale]/account/notifications` | 通知 |
-| `/[locale]/account/orders` | 订单 |
-| `/[locale]/account/wallet` | 积分/信用 |
-| `/[locale]/account/organizations` | 组织与成员 |
-| `/[locale]/account/profile` | 资料 |
-| `/[locale]/account/verification` | 验证 |
-| `/[locale]/account/security` | 会话/MFA |
-| `/[locale]/account/privacy` | 数据请求/删除 |
-| `/[locale]/auth/login` | 登录 |
-| `/[locale]/auth/verify` | OTP 验证 |
+| Route                                | 说明          |
+| ------------------------------------ | ------------- |
+| `/[locale]/post`                     | 选择发布类型  |
+| `/[locale]/post/[type]/new`          | 创建草稿/表单 |
+| `/[locale]/post/[type]/[id]/edit`    | 编辑          |
+| `/[locale]/post/[type]/[id]/preview` | 私有预览      |
+| `/[locale]/account`                  | 总览          |
+| `/[locale]/account/listings`         | 我的信息      |
+| `/[locale]/account/favorites`        | 收藏          |
+| `/[locale]/account/messages`         | 会话列表      |
+| `/[locale]/account/messages/[id]`    | 会话          |
+| `/[locale]/account/notifications`    | 通知          |
+| `/[locale]/account/orders`           | 订单          |
+| `/[locale]/account/wallet`           | 积分/信用     |
+| `/[locale]/account/organizations`    | 组织与成员    |
+| `/[locale]/account/profile`          | 资料          |
+| `/[locale]/account/verification`     | 验证          |
+| `/[locale]/account/security`         | 会话/MFA      |
+| `/[locale]/account/privacy`          | 数据请求/删除 |
+| `/[locale]/auth/login`               | 登录          |
+| `/[locale]/auth/verify`              | OTP 验证      |
 
 ## 27.3 Admin
 
@@ -2795,7 +2946,7 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 
 ---
 
-<!-- source: docs/28-admin-console.md -->
+<!-- source: docs\28-admin-console.md -->
 
 # 28. 管理后台架构
 
@@ -2872,7 +3023,7 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 
 ---
 
-<!-- source: docs/29-migration-and-launch.md -->
+<!-- source: docs\29-migration-and-launch.md -->
 
 # 29. 数据迁移、内容冷启动与上线
 
@@ -2967,7 +3118,7 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 
 ---
 
-<!-- source: docs/30-reference-implementation.md -->
+<!-- source: docs\30-reference-implementation.md -->
 
 # 30. 参考实现说明
 

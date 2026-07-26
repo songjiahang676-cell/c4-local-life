@@ -82,6 +82,7 @@ COM-002,G5,COM,P0,Stripe Checkout/Payment/Webhook receipt,COM-001;API-005,签名
 COM-003,G5,COM,P0,不可变账本/钱包与对账,COM-002,余额可重算；唯一 source/idempotency；零差异,docs/12-monetization-payments-ads.md,todo
 COM-004,G5,COM,P0,推广履约、取消与退款,COM-003;LIST-005,内容合规；履约快照；部分退款；补偿,docs/12-monetization-payments-ads.md,todo
 COM-005,G5,COM,P1,订阅/套餐（Feature Flag）,COM-004,entitlement version、续费/取消/失败宽限,docs/12-monetization-payments-ads.md,todo
+COM-006,G5,COM,P1,自动充值策略与支付适配端口,COM-003;COM-005,默认关闭且显式同意；阈值/金额/周期上限；幂等订单；签名 webhook；暂停/关闭/对账,adr/0006-free-launch-year-and-deferred-auto-top-up.md;docs/12-monetization-payments-ads.md,todo
 ADS-001,G5,ADS,P0,广告位/固定库存/时间冲突,COM-001;TAX-003,不超卖；城市/设备/日期；reservation,docs/12-monetization-payments-ads.md,todo
 ADS-002,G5,ADS,P0,Campaign/Creative/审核/排期,ADS-001;MEDIA-002;MOD-001,素材变更重审；落地页安全；自动启停,docs/12-monetization-payments-ads.md,todo
 ADS-003,G5,ADS,P1,合格展示/点击/频控/报告,ADS-002;OBS-001,可视/机器人过滤；广告 label；raw/filtered/billable,docs/12-monetization-payments-ads.md,todo

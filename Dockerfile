@@ -9,7 +9,11 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /workspace
-RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -25,8 +29,10 @@ COPY packages/ui/package.json packages/ui/package.json
 RUN pnpm install --frozen-lockfile --strict-peer-dependencies
 
 FROM dependencies AS build
+ARG DATABASE_URL=postgresql://build:build@127.0.0.1:5432/socal_build?schema=public
 COPY . .
-RUN pnpm db:generate && pnpm build
+RUN DATABASE_URL="${DATABASE_URL}" pnpm db:generate \
+  && DATABASE_URL="${DATABASE_URL}" pnpm build
 
 FROM node:${NODE_VERSION}-bookworm-slim AS web-runtime
 ENV NODE_ENV=production
