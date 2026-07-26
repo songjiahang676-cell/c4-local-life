@@ -25,6 +25,7 @@
 - Accepted a 12-month free launch period and deferred, opt-in automatic wallet top-up behind Gate 5 contracts, safety controls and an explicit commercialization flag.
 - Fixed clean-container Prisma generation by supplying a non-secret build-only datasource URL and installing OpenSSL in the build base; the container contract now prevents regression.
 - Added hosted runtime-image smoke coverage that verifies the non-root user and readiness of Web, Admin, API and Worker; the API image now includes its contracts workspace dependency.
+- Recorded the fully green hosted Gate 0 quality/container run and the verified GitHub Free private-repository branch-protection limitation without weakening the merge policy.
 
 ## 0.1.0 — Architecture handoff package
 

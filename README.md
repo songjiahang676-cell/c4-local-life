@@ -117,14 +117,16 @@ pnpm test:e2e
 
 原始架构包静态验证详情见 [`VALIDATION_REPORT.md`](./VALIDATION_REPORT.md)；该报告保留交付时点，不代表当前动态工程状态。
 
-截至 2026-07-24，本机已经真实完成依赖锁定、Prisma 生成/校验、格式、TypeScript、ESLint、
+截至 2026-07-25，本机已经真实完成依赖锁定、Prisma 生成/校验、格式、TypeScript、ESLint、
 OpenAPI lint/生成漂移检查、单元/契约/真实 PostgreSQL 集成测试、数据库基线/升级验证、全部应用构建，
 以及 Chromium 桌面/移动端首页与 API smoke。逐项命令、失败修复和未运行项见
 [`tasks/WORKLOG.md`](./tasks/WORKLOG.md)。
 
-尚未验证的是 GitHub 托管 CI/分支保护和四应用容器真实构建运行：当前目录没有远程仓库/已认证 GitHub
-会话；本机虽已安装 Podman CLI，但没有可用 WSL provider，Hyper-V provider 又需要当前会话不具备的
-提升权限。Git for Windows Bash 配合本机 Python 已完成完整架构检查。仓库不会把仍缺失的外部证据标记为通过。
+GitHub Actions run `30186103447` 已在干净 Ubuntu 环境通过完整质量作业，并构建 Web、Admin、API、
+Worker 四个镜像；四个 runtime 均确认以 `node` 用户启动并通过 readiness。PR #1 保留了两个真实失败
+run 及其修复证据。尚未关闭的是 `main` 合并保护：当前个人 GitHub Free 账户对私有仓库 branch
+protection/ruleset API 返回 HTTP 403，必须升级 Pro 或由项目负责人明确同意公开仓库后才能配置。
+仓库不会为追求状态数字擅自改变可见性，也不会把该 Gate 标记为通过。
 
 ## 七、规划容量与服务目标
 

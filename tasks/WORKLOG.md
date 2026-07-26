@@ -246,3 +246,16 @@ Not run: Corrected hosted four-target build/runtime smoke awaits the next commit
 Observability: 无生产遥测变化；GitHub job logs retain the failed layer and corrected build evidence  
 Docs: Updated `docs/local-containers.md`、`CHANGELOG.md` and this worklog  
 Known gaps: Run 30185679624 failed before the first runtime target completed；all four corrected targets must build before FND-005 is done
+
+## Gate 0 — 托管质量、镜像与运行态证据
+
+Task: FND-005、FND-007（GitHub run 30186103447）；FND-003 外部治理证据  
+Changed: PR #1 now runs the complete quality gate and builds/starts all four application images；Backlog marks FND-005/FND-007 done while FND-003 and its dependent tasks remain todo  
+Contracts: OpenAPI remains 31 paths/52 schemas；Prisma remains 36 models/3 migrations；Backlog now has 101 tasks after COM-006 was added  
+Migrations: 无新增；empty deploy、previous-release upgrade、baseline drift and destructive SQL safety all passed  
+Security: Images run as `node`；runtime smoke uses only loopback ports and fictional configuration；no real secret/PII entered Actions；repository visibility was not changed  
+Tests run: GitHub run `30186103447` passed architecture、frozen install、governance/config/container/seed/OpenAPI contracts、format、Prisma、migration deploy/safety/upgrade/baseline、9 typechecks、9 lints、19 files/51 tests、7 builds、4 Playwright smoke cases、4 image builds and 4 runtime readiness checks；local `pnpm ci:quality` passed the same source state with real PostgreSQL integration  
+Not run: Enforced failed-merge check on `main` cannot be configured on this private repository under GitHub Free；branch protection and ruleset APIs both returned HTTP 403 requiring Pro or public visibility  
+Observability: Unit/coverage and Playwright reports retained 14 days；container failure/startup logs surface only on bounded CI failure；no production telemetry changed  
+Docs: Updated `README.md`、Gate status/checklist、infrastructure and team governance docs、`CHANGELOG.md` and this worklog  
+Known gaps: FND-003 remains `todo`；FND-008、DATA-004、API-002 and API-003 remain formally blocked by that dependency despite their implementation checks passing；Gate 1 must not start until merge protection is resolved

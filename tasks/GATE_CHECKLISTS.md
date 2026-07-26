@@ -2,10 +2,11 @@
 
 ## G0 Foundation
 
-- [ ] Lockfile、工具链、CI 可重复。
-- [ ] JSON/YAML/OpenAPI/Prisma/TypeScript/Lint/Build/Test 通过。
-- [ ] 容器/健康检查和 staging 最小部署。
-- [ ] Secret/配置/日志脱敏基线。
+- [x] Lockfile、工具链、托管 CI 可重复。
+- [x] JSON/YAML/OpenAPI/Prisma/TypeScript/Lint/Build/Test 通过。
+- [x] 四应用容器以非 root 启动并通过最小运行栈健康检查。
+- [x] Secret/配置/日志脱敏基线。
+- [ ] `main` 必须由 required checks 阻止失败合并（私有仓库的 GitHub Free 套餐限制）。
 
 ## G1 Identity / Taxonomy / Media
 

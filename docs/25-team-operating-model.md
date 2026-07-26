@@ -76,3 +76,6 @@ Codex 适合按清晰任务生成实现、测试、迁移和文档，但关键�
 `pnpm governance:check` 验证关键路径存在真实格式的 owner、没有遗留 `*-owners`/`*-maintainers`
 角色占位符，并检查 PR 模板必填审查项。个人仓库阶段由 required CI check 提供合并保护；至少有两名
 维护者后再启用 required approval 和 code-owner review，避免要求作者批准自己的 PR。
+
+当前真实 owner 映射和 PR 模板已在 PR #1 被 GitHub 解析；但个人 GitHub Free 套餐不允许为私有仓库
+配置 required checks。该外部限制不通过降低治理要求、伪造团队或擅自公开代码规避。

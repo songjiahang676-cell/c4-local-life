@@ -73,6 +73,12 @@ PR：
 撤销过期批准。平台管理员应保存一次失败 PR 被阻止和一次完整绿色 PR 可合并的证据。本地
 `pnpm ci:workflow:check` 只能验证 workflow 内容，不能替代 GitHub 执行和 ruleset 证据。
 
+当前私有仓库 `songjiahang676-cell/c4-local-life` 已由 PR #1 和 GitHub Actions run `30186103447`
+证明两项 check 可完整通过，早期 runs `30185510707`、`30185679624` 保留了失败证据。2026-07-25
+调用 branch protection 与 repository ruleset API 均返回 HTTP 403，明确要求升级 GitHub Pro 或将
+仓库设为 public。仓库可见性属于数据披露边界，未经项目负责人明确选择不得为了通过 Gate 自动公开；
+限制解除前 FND-003 保持 `todo`。
+
 ## 16.6 CD 与发布
 
 - 数据库采用向前兼容迁移，先 migration job 再应用 rollout。

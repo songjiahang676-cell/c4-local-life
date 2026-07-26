@@ -3,9 +3,9 @@ FND-001,G0,FND,P0,锁定依赖并建立可重复安装,,Node24/pnpm11 干净环�
 FND-002,G0,FND,P0,统一 TypeScript/ESLint/Prettier 配置,FND-001,所有 workspace 共用 strict 配置；format/lint/typecheck 可运行,AGENTS.md;docs/18-testing-quality.md,done
 FND-003,G0,FND,P0,建立 CI 质量流水线,FND-001;FND-002,PR 执行静态检查/契约/测试/构建并阻止失败合并,docs/16-infrastructure-devops.md,todo
 FND-004,G0,FND,P0,运行时配置 schema 与秘密管理接口,FND-001,缺失关键配置 fail fast；日志不输出 secret；环境文档完整,docs/14-security-privacy-compliance.md;docs/16-infrastructure-devops.md,done
-FND-005,G0,FND,P0,四应用容器与健康检查,FND-001,Web/Admin/API/Worker 镜像可构建；live/ready；非 root,docs/16-infrastructure-devops.md,todo
+FND-005,G0,FND,P0,四应用容器与健康检查,FND-001,Web/Admin/API/Worker 镜像可构建；live/ready；非 root,docs/16-infrastructure-devops.md,done
 FND-006,G0,FND,P1,建立 Vitest/Testing Library 基线,FND-002,每个 workspace 有最小测试并生成报告,docs/18-testing-quality.md,done
-FND-007,G0,FND,P1,建立 Playwright E2E 基线,FND-005,可在本地/CI 启动栈并通过首页/API smoke,docs/18-testing-quality.md,todo
+FND-007,G0,FND,P1,建立 Playwright E2E 基线,FND-005,可在本地/CI 启动栈并通过首页/API smoke,docs/18-testing-quality.md,done
 FND-008,G0,FND,P1,生成代码所有权与 PR 模板,FND-003,CODEOWNERS/PR 模板覆盖安全迁移测试项,docs/25-team-operating-model.md,todo
 DATA-001,G0,DATA,P0,Prisma schema 校验与首个迁移,FND-001,prisma validate/generate 通过；空库可迁移；首个建表迁移合并 post_schema_constraints.sql；关系/约束负例审查,docs/06-domain-and-data-model.md,done
 DATA-002,G0,DATA,P0,PostGIS/trigram 扩展与地理类型 repository,DATA-001,扩展可重复安装；半径查询集成测试通过,docs/06-domain-and-data-model.md,done
