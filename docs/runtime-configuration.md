@@ -23,21 +23,24 @@
 
 ## API 配置
 
-| 变量                   | 必需 | 敏感 | 用途                            |
-| ---------------------- | ---- | ---- | ------------------------------- |
-| `PORT`                 | 否   | 否   | API 监听端口，默认 4000         |
-| `API_BODY_LIMIT_BYTES` | 否   | 否   | 通用 JSON body 上限，默认 1 MiB |
-| `PUBLIC_WEB_URL`       | 是   | 否   | Web CORS 来源                   |
-| `PUBLIC_ADMIN_URL`     | 是   | 否   | Admin CORS 来源                 |
-| `DATABASE_URL`         | 是   | 是   | PostgreSQL 连接串               |
-| `DATABASE_POOL_MAX`    | 否   | 否   | 数据库连接池上限                |
-| `REDIS_URL`            | 是   | 可能 | Redis/BullMQ 连接串             |
-| `OPENSEARCH_NODE`      | 是   | 否   | OpenSearch 地址                 |
-| `OPENSEARCH_USERNAME`  | 否   | 是   | OpenSearch 用户名               |
-| `OPENSEARCH_PASSWORD`  | 否   | 是   | OpenSearch 密码                 |
-| `SESSION_SECRET`       | 是   | 是   | 会话签名秘密，至少 32 字节      |
-| `SESSION_COOKIE_NAME`  | 否   | 否   | 会话 Cookie 名称                |
-| `CSRF_SECRET`          | 是   | 是   | CSRF 防护秘密，至少 32 字节     |
+| 变量                             | 必需 | 敏感 | 用途                                      |
+| -------------------------------- | ---- | ---- | ----------------------------------------- |
+| `PORT`                           | 否   | 否   | API 监听端口，默认 4000                   |
+| `API_BODY_LIMIT_BYTES`           | 否   | 否   | 通用 JSON body 上限，默认 1 MiB           |
+| `PUBLIC_WEB_URL`                 | 是   | 否   | Web CORS 来源                             |
+| `PUBLIC_ADMIN_URL`               | 是   | 否   | Admin CORS 来源                           |
+| `DATABASE_URL`                   | 是   | 是   | PostgreSQL 连接串                         |
+| `DATABASE_POOL_MAX`              | 否   | 否   | 数据库连接池上限                          |
+| `REDIS_URL`                      | 是   | 可能 | Redis/BullMQ 连接串                       |
+| `OPENSEARCH_NODE`                | 是   | 否   | OpenSearch 地址                           |
+| `OPENSEARCH_USERNAME`            | 否   | 是   | OpenSearch 用户名                         |
+| `OPENSEARCH_PASSWORD`            | 否   | 是   | OpenSearch 密码                           |
+| `SESSION_SECRET`                 | 是   | 是   | 会话 token HMAC 秘密，至少 32 字节        |
+| `SESSION_COOKIE_NAME`            | 否   | 否   | 会话 Cookie 名称                          |
+| `SESSION_ABSOLUTE_TTL_SECONDS`   | 否   | 否   | 会话绝对期限，默认 30 天、最长 365 天     |
+| `SESSION_IDLE_TTL_SECONDS`       | 否   | 否   | 会话闲置期限，默认 7 天且不得超过绝对期限 |
+| `SESSION_TOUCH_INTERVAL_SECONDS` | 否   | 否   | 刷新闲置期限的最小间隔，默认 5 分钟       |
+| `CSRF_SECRET`                    | 是   | 是   | CSRF 防护秘密，至少 32 字节               |
 
 功能开关 `FEATURE_PAYMENTS`、`FEATURE_MESSAGING`、`FEATURE_COMMUNITY`、`FEATURE_CROSS_BORDER` 只接受 `true` 或 `false`。
 

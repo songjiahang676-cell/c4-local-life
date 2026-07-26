@@ -79,11 +79,17 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        /** Get the current session */
+        /**
+         * Get the current session
+         * @description Resolves the opaque host-only session cookie; never returns the bearer token or contact identifiers.
+         */
         readonly get: operations["getSession"];
         readonly put?: never;
         readonly post?: never;
-        /** Revoke the current session */
+        /**
+         * Revoke the current session
+         * @description Idempotently revokes the presented session and expires the host-only cookie.
+         */
         readonly delete: operations["logout"];
         readonly options?: never;
         readonly head?: never;
@@ -1330,6 +1336,8 @@ export interface operations {
             /** @description Current session */
             readonly 200: {
                 headers: {
+                    /** @description Session responses are never stored by shared or browser caches. */
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
@@ -1351,6 +1359,9 @@ export interface operations {
             /** @description Session revoked */
             readonly 204: {
                 headers: {
+                    /** @description Clears the Secure, HttpOnly, SameSite=Lax cookie scoped to /v1. */
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content?: never;

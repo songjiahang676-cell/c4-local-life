@@ -19,6 +19,7 @@
     "@nestjs/swagger": "11.4.6",
     "@socal/config": "workspace:*",
     "@socal/contracts": "workspace:*",
+    "@socal/database": "workspace:*",
     "@socal/observability": "workspace:*",
     "fastify": "5.10.0",
     "reflect-metadata": "0.2.2",

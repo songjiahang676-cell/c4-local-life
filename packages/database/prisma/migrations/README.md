@@ -6,6 +6,8 @@
    operators.
 2. `20260725044311_baseline` creates the Prisma-managed tables, relations, and indexes, then applies
    the reviewed PostGIS generated column, spatial/trigram/partial indexes, and check constraints.
+3. `20260725051500_region_group_type` adds the taxonomy region-group enum value.
+4. `20260726041310_auth_session_lifecycle` adds required idle-expiry and last-seen timestamps.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -56,6 +58,18 @@ without misclassifying it as a county or city.
   are not removed in place. If removal ever becomes necessary, first migrate all affected rows to
   another reviewed type, then replace the enum in a separate maintenance migration. Do not attempt
   an unsafe down migration during an incident.
+
+## `20260726041310_auth_session_lifecycle`
+
+Adds `idle_expires_at` and `last_seen_at` as required fields. Existing sessions receive the
+migration timestamp and intentionally become idle-expired, forcing one reauthentication after the
+security-boundary deployment instead of silently granting a new idle lifetime.
+
+- Roll forward: apply the additive migration before deploying the API that reads and refreshes the
+  fields; verify current-session, rotation and logout integration tests.
+- Rollback: the previous application ignores both columns, so roll back only the application and
+  retain the additive schema. Do not drop columns during incident response. The one-time session
+  invalidation is not reversed; users authenticate again, while user/profile data is unaffected.
 
 ## Roll-forward and recovery
 

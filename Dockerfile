@@ -73,6 +73,7 @@ COPY --from=build --chown=node:node /workspace/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=node:node /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=build --chown=node:node /workspace/packages/config ./packages/config
 COPY --from=build --chown=node:node /workspace/packages/contracts ./packages/contracts
+COPY --from=build --chown=node:node /workspace/packages/database ./packages/database
 COPY --from=build --chown=node:node /workspace/packages/observability ./packages/observability
 COPY --from=build --chown=node:node /workspace/openapi ./openapi
 USER node

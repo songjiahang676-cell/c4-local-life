@@ -44,28 +44,48 @@ const commonServerSchema = z.object({
   OTEL_SERVICE_VERSION: z.string().max(50).default("0.1.0"),
 });
 
-const apiEnvironmentSchema = commonServerSchema.extend({
-  PORT: positiveInteger(4000, 65_535),
-  API_BODY_LIMIT_BYTES: positiveInteger(1_048_576, 10_485_760),
-  PUBLIC_WEB_URL: z.string().url(),
-  PUBLIC_ADMIN_URL: z.string().url(),
-  DATABASE_URL: z.string().url(),
-  DATABASE_POOL_MAX: positiveInteger(20, 200),
-  REDIS_URL: z.string().url(),
-  OPENSEARCH_NODE: z.string().url(),
-  OPENSEARCH_USERNAME: z.string().optional().default(""),
-  OPENSEARCH_PASSWORD: optionalSecretSchema(),
-  SESSION_SECRET: secretSchema(32),
-  SESSION_COOKIE_NAME: z
-    .string()
-    .regex(/^[A-Za-z0-9_-]+$/)
-    .default("socal_session"),
-  CSRF_SECRET: secretSchema(32),
-  FEATURE_PAYMENTS: booleanValue(false),
-  FEATURE_MESSAGING: booleanValue(true),
-  FEATURE_COMMUNITY: booleanValue(false),
-  FEATURE_CROSS_BORDER: booleanValue(false),
-});
+const apiEnvironmentSchema = commonServerSchema
+  .extend({
+    PORT: positiveInteger(4000, 65_535),
+    API_BODY_LIMIT_BYTES: positiveInteger(1_048_576, 10_485_760),
+    PUBLIC_WEB_URL: z.string().url(),
+    PUBLIC_ADMIN_URL: z.string().url(),
+    DATABASE_URL: z.string().url(),
+    DATABASE_POOL_MAX: positiveInteger(20, 200),
+    REDIS_URL: z.string().url(),
+    OPENSEARCH_NODE: z.string().url(),
+    OPENSEARCH_USERNAME: z.string().optional().default(""),
+    OPENSEARCH_PASSWORD: optionalSecretSchema(),
+    SESSION_SECRET: secretSchema(32),
+    SESSION_COOKIE_NAME: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .default("socal_session"),
+    SESSION_ABSOLUTE_TTL_SECONDS: positiveInteger(2_592_000, 31_536_000),
+    SESSION_IDLE_TTL_SECONDS: positiveInteger(604_800, 2_592_000),
+    SESSION_TOUCH_INTERVAL_SECONDS: positiveInteger(300, 86_400),
+    CSRF_SECRET: secretSchema(32),
+    FEATURE_PAYMENTS: booleanValue(false),
+    FEATURE_MESSAGING: booleanValue(true),
+    FEATURE_COMMUNITY: booleanValue(false),
+    FEATURE_CROSS_BORDER: booleanValue(false),
+  })
+  .superRefine((value, context) => {
+    if (value.SESSION_IDLE_TTL_SECONDS > value.SESSION_ABSOLUTE_TTL_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["SESSION_IDLE_TTL_SECONDS"],
+        message: "Idle session lifetime cannot exceed the absolute lifetime",
+      });
+    }
+    if (value.SESSION_TOUCH_INTERVAL_SECONDS >= value.SESSION_IDLE_TTL_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["SESSION_TOUCH_INTERVAL_SECONDS"],
+        message: "Session touch interval must be shorter than the idle lifetime",
+      });
+    }
+  });
 
 const workerEnvironmentSchema = commonServerSchema.extend({
   REDIS_URL: z.string().url(),

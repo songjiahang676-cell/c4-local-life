@@ -19,6 +19,7 @@ import { LogController, type FastifyInstance, type FastifyRequest } from "fastif
 import { AppModule } from "./app.module";
 import { loadCanonicalOpenApiDocument } from "./common/openapi-document";
 import { ProblemDetailsFilter } from "./common/problem-details.filter";
+import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 
 const requestIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -32,6 +33,7 @@ type RequestObservabilityState = {
 
 export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger"> & {
   observability?: ObservabilityRuntime;
+  authSessionStore?: AuthSessionStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -91,7 +93,7 @@ export async function createApiApplication(
     logController: new LogController({ disableRequestLogging: true }),
   });
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register(environment),
+    AppModule.register(environment, options.authSessionStore),
     adapter,
     {
       logger:

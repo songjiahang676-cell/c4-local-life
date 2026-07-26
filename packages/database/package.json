@@ -3,10 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "types": "./src/index.ts",
+  "typesVersions": {
+    "*": {
+      "auth-session": [
+        "src/repositories/auth-session.repository.ts"
+      ]
+    }
+  },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./auth-session": {
+      "types": "./src/repositories/auth-session.repository.ts",
+      "require": "./dist/src/repositories/auth-session.repository.js",
+      "default": "./dist/src/repositories/auth-session.repository.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/write-runtime-package.cjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
