@@ -18,6 +18,7 @@ const environment = parseApiEnvironment({
   REDIS_URL: "redis://localhost:6379/0",
   OPENSEARCH_NODE: "https://search.example.invalid",
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
+  OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
   SESSION_ABSOLUTE_TTL_SECONDS: "1200",
   SESSION_IDLE_TTL_SECONDS: "600",
   SESSION_TOUCH_INTERVAL_SECONDS: "60",

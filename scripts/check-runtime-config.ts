@@ -19,6 +19,7 @@ const apiInput = {
   REDIS_URL: "redis://localhost:6379/0",
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "session-secret-value-that-is-long-enough",
+  OTP_SECRET: "otp-secret-value-that-is-long-enough",
   CSRF_SECRET: "csrf-secret-value-that-is-long-enough",
 };
 
@@ -29,9 +30,13 @@ assert.equal(apiEnvironment.SESSION_COOKIE_NAME, "socal_session");
 assert.equal(apiEnvironment.SESSION_ABSOLUTE_TTL_SECONDS, 2_592_000);
 assert.equal(apiEnvironment.SESSION_IDLE_TTL_SECONDS, 604_800);
 assert.equal(apiEnvironment.SESSION_TOUCH_INTERVAL_SECONDS, 300);
+assert.equal(apiEnvironment.OTP_TTL_SECONDS, 600);
+assert.equal(apiEnvironment.OTP_MAX_ATTEMPTS, 5);
 assert.equal(apiEnvironment.FEATURE_PAYMENTS, false);
 assert.equal(apiEnvironment.SESSION_SECRET.reveal(), apiInput.SESSION_SECRET);
+assert.equal(apiEnvironment.OTP_SECRET.reveal(), apiInput.OTP_SECRET);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.SESSION_SECRET), false);
+assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.OTP_SECRET), false);
 
 const workerEnvironment = parseWorkerEnvironment({
   NODE_ENV: "test",

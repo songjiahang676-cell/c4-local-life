@@ -47,7 +47,10 @@ export interface paths {
         };
         readonly get?: never;
         readonly put?: never;
-        /** Request an OTP challenge */
+        /**
+         * Request an OTP challenge
+         * @description Always returns the same accepted projection for valid input; account existence is never disclosed.
+         */
         readonly post: operations["requestOtp"];
         readonly delete?: never;
         readonly options?: never;
@@ -64,7 +67,10 @@ export interface paths {
         };
         readonly get?: never;
         readonly put?: never;
-        /** Verify an OTP challenge */
+        /**
+         * Verify an OTP challenge
+         * @description Invalid, expired, consumed, and unknown challenges share one generic response.
+         */
         readonly post: operations["verifyOtp"];
         readonly delete?: never;
         readonly options?: never;
@@ -620,6 +626,15 @@ export interface components {
             /** Format: uuid */
             readonly challengeId: string;
             readonly code: string;
+        };
+        readonly OtpAcceptedResponse: {
+            /** @constant */
+            readonly accepted: true;
+            readonly requestId: string;
+            /** Format: uuid */
+            readonly challengeId: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
         };
         readonly SessionResponse: {
             readonly data: components["schemas"]["Session"];
@@ -1225,6 +1240,8 @@ export interface components {
         readonly Cursor: string;
         readonly Limit: number;
         readonly IdempotencyKey: string;
+        /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+        readonly DeviceId: string;
     };
     requestBodies: never;
     headers: never;
@@ -1276,7 +1293,10 @@ export interface operations {
     readonly requestOtp: {
         readonly parameters: {
             readonly query?: never;
-            readonly header?: never;
+            readonly header: {
+                /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+                readonly "X-Device-Id": components["parameters"]["DeviceId"];
+            };
             readonly path?: never;
             readonly cookie?: never;
         };
@@ -1289,19 +1309,24 @@ export interface operations {
             /** @description OTP accepted for delivery; response never reveals account existence */
             readonly 202: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["AcceptedResponse"];
+                    readonly "application/json": components["schemas"]["OtpAcceptedResponse"];
                 };
             };
             readonly 429: components["responses"]["TooManyRequests"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
         };
     };
     readonly verifyOtp: {
         readonly parameters: {
             readonly query?: never;
-            readonly header?: never;
+            readonly header: {
+                /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+                readonly "X-Device-Id": components["parameters"]["DeviceId"];
+            };
             readonly path?: never;
             readonly cookie?: never;
         };
@@ -1315,6 +1340,7 @@ export interface operations {
             readonly 200: {
                 headers: {
                     readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
@@ -1322,6 +1348,7 @@ export interface operations {
                 };
             };
             readonly 400: components["responses"]["BadRequest"];
+            readonly 429: components["responses"]["TooManyRequests"];
         };
     };
     readonly getSession: {

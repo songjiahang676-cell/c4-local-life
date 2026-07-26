@@ -8,6 +8,8 @@
    the reviewed PostGIS generated column, spatial/trigram/partial indexes, and check constraints.
 3. `20260725051500_region_group_type` adds the taxonomy region-group enum value.
 4. `20260726041310_auth_session_lifecycle` adds required idle-expiry and last-seen timestamps.
+5. `20260726044453_otp_challenges` adds short-lived, single-consumption OTP challenges and abuse
+   indexes.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -70,6 +72,20 @@ security-boundary deployment instead of silently granting a new idle lifetime.
 - Rollback: the previous application ignores both columns, so roll back only the application and
   retain the additive schema. Do not drop columns during incident response. The one-time session
   invalidation is not reversed; users authenticate again, while user/profile data is unaffected.
+
+## `20260726044453_otp_challenges`
+
+Adds the OTP channel/purpose enums and an additive `otp_challenges` table. The code, IP, device and
+destination lookup values use domain-separated keyed hashes; the contact destination remains
+Confidential PII only for delivery and verified account binding. Challenges expire after ten
+minutes and must be deleted or aggregated within 24 hours by the maintenance retention workflow.
+
+- Roll forward: apply the additive migration before enabling `/auth/otp/request` and
+  `/auth/otp/verify`; verify account/IP/device limits, failed-attempt caps, device binding and
+  one-time consumption against PostgreSQL.
+- Rollback: disable the OTP routes and retain the additive table/enums through the retention
+  window. Do not drop the table during incident response. Existing sessions and user records are
+  independent and remain valid.
 
 ## Roll-forward and recovery
 

@@ -41,6 +41,15 @@
 | `SESSION_IDLE_TTL_SECONDS`       | 否   | 否   | 会话闲置期限，默认 7 天且不得超过绝对期限 |
 | `SESSION_TOUCH_INTERVAL_SECONDS` | 否   | 否   | 刷新闲置期限的最小间隔，默认 5 分钟       |
 | `CSRF_SECRET`                    | 是   | 是   | CSRF 防护秘密，至少 32 字节               |
+| `OTP_SECRET`                     | 是   | 是   | OTP、账号/IP/设备 HMAC 秘密，至少 32 字节 |
+| `OTP_TTL_SECONDS`                | 否   | 否   | OTP 有效期，默认 10 分钟、最长 30 分钟    |
+| `OTP_MAX_ATTEMPTS`               | 否   | 否   | 单个 challenge 最大失败次数，默认 5       |
+| `OTP_DESTINATION_LIMIT`          | 否   | 否   | 同账号窗口请求上限，默认 3                |
+| `OTP_DESTINATION_WINDOW_SECONDS` | 否   | 否   | 同账号限频窗口，默认 15 分钟              |
+| `OTP_IP_LIMIT`                   | 否   | 否   | 同 IP 窗口请求上限，默认 20               |
+| `OTP_IP_WINDOW_SECONDS`          | 否   | 否   | 同 IP 限频窗口，默认 1 小时               |
+| `OTP_DEVICE_LIMIT`               | 否   | 否   | 同设备窗口请求上限，默认 10               |
+| `OTP_DEVICE_WINDOW_SECONDS`      | 否   | 否   | 同设备限频窗口，默认 1 小时               |
 
 功能开关 `FEATURE_PAYMENTS`、`FEATURE_MESSAGING`、`FEATURE_COMMUNITY`、`FEATURE_CROSS_BORDER` 只接受 `true` 或 `false`。
 

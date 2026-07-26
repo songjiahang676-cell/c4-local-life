@@ -26,6 +26,7 @@ const child = spawn(process.execPath, ["apps/api/dist/main.js"], {
     REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379/0",
     OPENSEARCH_NODE: process.env.OPENSEARCH_NODE ?? "http://localhost:9200",
     SESSION_SECRET: process.env.SESSION_SECRET ?? "runtime-check-session-secret-at-least-32-bytes",
+    OTP_SECRET: process.env.OTP_SECRET ?? "runtime-check-otp-secret-at-least-32-bytes",
     CSRF_SECRET: process.env.CSRF_SECRET ?? "runtime-check-csrf-secret-at-least-32-bytes",
     OTEL_SERVICE_NAME: "socal-api-runtime-check",
     OTEL_SERVICE_VERSION: "test",

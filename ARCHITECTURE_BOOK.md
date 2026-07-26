@@ -962,9 +962,11 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 
 `AUTH-001` 已实现 `GET /auth/session` 与 `DELETE /auth/session`。前者从安全 Cookie 解析认证上下文，
 仅返回 OpenAPI `SessionResponse` 并设置 `Cache-Control: no-store`；后者通过应用服务幂等撤销数据库
-会话并返回同路径、同安全属性的过期 Cookie。OTP request/verify 仍属于 `AUTH-002`，当前切片不会暴露
-伪造的登录成功路径。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象授权
-继续由 `API-004` 的默认拒绝 Policy 完成。
+会话并返回同路径、同安全属性的过期 Cookie。`AUTH-002` 实现 `POST /auth/otp/request` 与
+`POST /auth/otp/verify`：请求返回 `challengeId` 和过期时间但不返回验证码或账号状态；验证成功后通过
+AUTH-001 的会话服务签发同一安全 Cookie。两个端点要求不含 PII 的 `X-Device-Id`，服务端只保存其
+HMAC，用于设备绑定和限频。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象
+授权继续由 `API-004` 的默认拒绝 Policy 完成。
 
 ## 8.6 响应投影
 
@@ -1000,6 +1002,11 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 ## 8.9 邮件、短信和通知
 
 定义端口：`EmailProvider`、`SmsProvider`、`PushProvider`。模板使用稳定 key、locale、版本和变量 schema。通知记录先写库，再由 Worker 发送；provider message id、attempt、失败分类和退订状态可追踪。
+
+OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 渗透进认证领域。当前未确认生产
+供应商时适配器 fail closed 并返回通用 503，不记录或回显验证码；测试通过捕获型适配器覆盖 EMAIL/SMS
+两条通道。生产投递适配器、重试和供应商回执仍由已规划的通知/Outbox 切片实现，不能用记录明文验证码
+或静默丢弃投递代替。
 
 营销与事务通知分开处理。短信/邮件退订不应阻断安全和订单必要通知，但必须遵守法律和用户偏好。
 
@@ -1628,6 +1635,16 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 - 管理员和高权限组织角色强制 MFA；敏感动作 step-up。
 - OAuth/OIDC 回调校验 state、nonce、PKCE 和精确 redirect URI。
 - 账户恢复比登录更敏感，需要冷却、通知和历史设备风险。
+
+`AUTH-002` 使用密码学安全的六位数字验证码，默认 10 分钟有效、最多失败 5 次、同账号/目的 15 分钟
+3 次、同设备每小时 10 次、同 IP 每小时 20 次。创建 challenge 时以排序后的 PostgreSQL advisory
+transaction lock 串行化三个限频键，避免并发绕过；新的同账号/目的 challenge 会使旧 challenge
+立即失效。验证码、账号查找键、IP 和设备标识只保存以独立 `OTP_SECRET` 做域分离的 HMAC-SHA256，
+验证码从不进入 HTTP 响应或日志。验证绑定请求设备、成功后原子一次消费，未知、过期、已消费、错误、
+跨设备和不可用账号共用同一错误投影。目标联系方式属于其他账号时，联系验证创建不可投递的 decoy，
+不泄露占用状态。challenge 中用于投递和建档的联系方式按 Confidential PII 管理，10 分钟失效并须在
+24 小时内由保留任务删除或聚合。客户端 IP 仅接受 loopback/VPC 私网可信反向代理提供的转发链；
+互联网来源不能用伪造 `X-Forwarded-For` 绕过 IP 限频，生产安全组仍须禁止绕过负载均衡器直连 API。
 
 ## 14.4 会话与 CSRF
 
@@ -2650,6 +2667,10 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 | 搜索 query          | 30–90 天去敏              | 低频删除、聚合         | 防止个人信息泄漏    |
 | 应用日志            | 14–90 天                  | 分层冷存储             | 级别和环境不同      |
 | 备份                | 35 天+月度策略            | 自动过期               | 恢复受严格限制      |
+
+`AUTH-002` 的 `otp_challenges` 在读取时强制 10 分钟失效，数据库只保留验证码、账号查找、IP 和设备标识的
+域分离 HMAC；投递/建档所需联系方式仍按 Confidential PII 管理。24 小时物理删除/聚合由 `PRIV-001`
+维护任务执行并监控，不能把在线过期误当作已经完成保留清理。
 
 ## 24.3 账户删除编排
 

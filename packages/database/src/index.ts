@@ -7,6 +7,15 @@ export {
   type AuthSessionRotateInput,
 } from "./repositories/auth-session.repository";
 export {
+  OtpChallengeRepository,
+  type OtpChallengeCreateInput,
+  type OtpChallengeCreateResult,
+  type OtpChallengeRepositoryOptions,
+  type OtpChallengeVerifyInput,
+  type OtpChallengeVerifyResult,
+  type OtpRateLimit,
+} from "./repositories/otp-challenge.repository";
+export {
   InvalidGeoQueryError,
   ListingGeoRepository,
   type ListingRadiusQuery,

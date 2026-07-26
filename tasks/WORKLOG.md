@@ -285,3 +285,25 @@ Not run: Local Docker runtime smoke（Docker CLI unavailable）；hosted require
 Observability: Existing correlated HTTP logs cover session endpoints without request headers/token/session hash/PII；no new high-cardinality session metric or token logging  
 Docs: Updated security/API/runtime configuration/migration operations、README、status、changelog、architecture book and this worklog  
 Known gaps: Hosted PR must prove clean Linux/container runtime；dual-key `SESSION_SECRET` rotation runbook and device/session listing remain later tasks；permissions stay empty until API-004
+
+## AUTH-002 — 邮箱/手机 OTP 请求与验证
+
+Task: AUTH-002 邮箱/手机 OTP 请求与验证
+
+Changed: Added PostgreSQL `OtpChallengeRepository`、EMAIL/SMS request and verify controllers、provider-neutral delivery port、minimal sign-in registration/profile creation、AUTH-001 session issuance、strict contact/device validation and CORS support；new challenge supersedes the previous live challenge for the same destination/purpose
+
+Contracts: OpenAPI remains 31 paths and grows from 52 to 53 schemas；`OtpAcceptedResponse` now returns the challenge UUID/expiry required by verify；both endpoints require `X-Device-Id`；generated contract types and Zod validators updated；Prisma grows from 36 to 37 models with `OtpChannel`/`OtpPurpose` enums
+
+Migrations: 有，`20260726044453_otp_challenges`；additive enum/table/index/FK migration；all 5 migrations replayed from an explicitly recreated empty database and previous-baseline upgrade preserved the sentinel；application rollback disables routes and retains the table through its short retention window，不执行 down/drop
+
+Security: Six-digit code uses `randomInt` and a dedicated domain-separated HMAC secret；raw code never enters DB、HTTP response or logs；destination/purpose、IP and device request limits are serialized with ordered PostgreSQL advisory transaction locks；verify is device-bound、single-use、five-attempt capped；unknown/expired/consumed/wrong/cross-device/unavailable subjects share one generic error；occupied contact verification produces a non-deliverable decoy；contact PII is private and short-lived
+
+Tests run: First real PostgreSQL run exposed Prisma's inability to deserialize advisory-lock `void` and was fixed with an explicit text cast；first full quality run exposed CRLF formatting after the branch switch and was fixed with the repository formatter；final `pnpm ci:quality` passed 9 typechecks、9 lints、24 files/81 tests（including 5 real PostgreSQL OTP tests）and 8 builds；API targeted suite passed 33 tests；database integration passed 31 tests；empty deploy、`db:baseline:check`、`db:upgrade:check` and migration safety passed；`pnpm observability:check` passed；`pnpm test:e2e:ci` passed Chromium desktop/mobile 4/4
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending；no real email/SMS provider credentials were supplied, so the default runtime adapter intentionally returns generic 503 while test adapters prove both channels
+
+Observability: Existing bounded route/status RED metrics expose 202/400/429/503 outcomes；correlated structured logs do not include body、destination、code、IP、device ID or hashes；no high-cardinality identifier metric added
+
+Docs: Updated API/security/retention/runtime configuration、migration operations、README、status、changelog、architecture book and this worklog
+
+Known gaps: Production email/SMS adapter、durable delivery/retry/receipt belong to the notification/Outbox tasks after provider selection；24-hour physical purge/aggregation is scheduled under PRIV-001；profile/session-device management continues in AUTH-003

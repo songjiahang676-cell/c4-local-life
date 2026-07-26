@@ -5,15 +5,26 @@ import { API_ENVIRONMENT } from "./common/api-environment.token";
 import { CsrfOriginGuard } from "./common/csrf-origin.guard";
 import { AuthModule } from "./modules/auth/auth.module";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
+import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
+import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import { HealthModule } from "./modules/health/health.module";
 import { ListingsModule } from "./modules/listings/listings.module";
 
 @Module({})
 export class AppModule {
-  static register(environment: ApiEnvironment, authSessionStore?: AuthSessionStore): DynamicModule {
+  static register(
+    environment: ApiEnvironment,
+    authSessionStore?: AuthSessionStore,
+    otpChallengeStore?: OtpChallengeStore,
+    otpDeliveryGateway?: OtpDeliveryGateway,
+  ): DynamicModule {
     return {
       module: AppModule,
-      imports: [AuthModule.register(environment, authSessionStore), HealthModule, ListingsModule],
+      imports: [
+        AuthModule.register(environment, authSessionStore, otpChallengeStore, otpDeliveryGateway),
+        HealthModule,
+        ListingsModule,
+      ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         { provide: APP_GUARD, useClass: CsrfOriginGuard },

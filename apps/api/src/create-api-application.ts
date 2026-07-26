@@ -20,8 +20,17 @@ import { AppModule } from "./app.module";
 import { loadCanonicalOpenApiDocument } from "./common/openapi-document";
 import { ProblemDetailsFilter } from "./common/problem-details.filter";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
+import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
+import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 
 const requestIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const trustedProxyNetworks = [
+  "127.0.0.0/8",
+  "::1/128",
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16",
+] as const;
 
 type RequestObservabilityState = {
   startedAt: bigint;
@@ -34,6 +43,8 @@ type RequestObservabilityState = {
 export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger"> & {
   observability?: ObservabilityRuntime;
   authSessionStore?: AuthSessionStore;
+  otpChallengeStore?: OtpChallengeStore;
+  otpDeliveryGateway?: OtpDeliveryGateway;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -86,14 +97,19 @@ export async function createApiApplication(
 ): Promise<NestFastifyApplication> {
   const observability = options.observability ?? createApiObservability(environment);
   const adapter = new FastifyAdapter({
-    trustProxy: true,
+    trustProxy: [...trustedProxyNetworks],
     requestIdHeader: false,
     genReqId: requestIdFromHeaders,
     bodyLimit: environment.API_BODY_LIMIT_BYTES,
     logController: new LogController({ disableRequestLogging: true }),
   });
   const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule.register(environment, options.authSessionStore),
+    AppModule.register(
+      environment,
+      options.authSessionStore,
+      options.otpChallengeStore,
+      options.otpDeliveryGateway,
+    ),
     adapter,
     {
       logger:
@@ -111,6 +127,7 @@ export async function createApiApplication(
     allowedHeaders: [
       "content-type",
       "x-request-id",
+      "x-device-id",
       "x-csrf-token",
       "idempotency-key",
       "if-match",

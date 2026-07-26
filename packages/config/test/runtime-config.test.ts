@@ -8,6 +8,7 @@ const validApiEnvironment = {
   REDIS_URL: "redis://localhost:6379/0",
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
+  OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
   CSRF_SECRET: "test-csrf-secret-with-more-than-32-bytes",
 };
 
@@ -22,7 +23,11 @@ describe("runtime configuration", () => {
     expect(environment.SESSION_IDLE_TTL_SECONDS).toBe(604_800);
     expect(environment.SESSION_TOUCH_INTERVAL_SECONDS).toBe(300);
     expect(environment.SESSION_SECRET).toBeInstanceOf(SecretValue);
+    expect(environment.OTP_SECRET).toBeInstanceOf(SecretValue);
+    expect(environment.OTP_TTL_SECONDS).toBe(600);
+    expect(environment.OTP_MAX_ATTEMPTS).toBe(5);
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
+    expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
   });
 
   it("fails fast without exposing a supplied value", () => {
@@ -54,6 +59,15 @@ describe("runtime configuration", () => {
         ...validApiEnvironment,
         SESSION_IDLE_TTL_SECONDS: "300",
         SESSION_TOUCH_INTERVAL_SECONDS: "300",
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("requires a domain-separated OTP secret", () => {
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        OTP_SECRET: validApiEnvironment.SESSION_SECRET,
       }),
     ).toThrow(RuntimeConfigError);
   });

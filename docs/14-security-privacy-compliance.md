@@ -37,6 +37,16 @@
 - OAuth/OIDC 回调校验 state、nonce、PKCE 和精确 redirect URI。
 - 账户恢复比登录更敏感，需要冷却、通知和历史设备风险。
 
+`AUTH-002` 使用密码学安全的六位数字验证码，默认 10 分钟有效、最多失败 5 次、同账号/目的 15 分钟
+3 次、同设备每小时 10 次、同 IP 每小时 20 次。创建 challenge 时以排序后的 PostgreSQL advisory
+transaction lock 串行化三个限频键，避免并发绕过；新的同账号/目的 challenge 会使旧 challenge
+立即失效。验证码、账号查找键、IP 和设备标识只保存以独立 `OTP_SECRET` 做域分离的 HMAC-SHA256，
+验证码从不进入 HTTP 响应或日志。验证绑定请求设备、成功后原子一次消费，未知、过期、已消费、错误、
+跨设备和不可用账号共用同一错误投影。目标联系方式属于其他账号时，联系验证创建不可投递的 decoy，
+不泄露占用状态。challenge 中用于投递和建档的联系方式按 Confidential PII 管理，10 分钟失效并须在
+24 小时内由保留任务删除或聚合。客户端 IP 仅接受 loopback/VPC 私网可信反向代理提供的转发链；
+互联网来源不能用伪造 `X-Forwarded-For` 绕过 IP 限频，生产安全组仍须禁止绕过负载均衡器直连 API。
+
 ## 14.4 会话与 CSRF
 
 - 随机会话 token，仅 cookie 保存；数据库存 hash。

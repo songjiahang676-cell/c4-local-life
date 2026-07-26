@@ -97,10 +97,14 @@ try {
         AND table_name = 'auth_sessions'
         AND column_name IN ('idle_expires_at', 'last_seen_at')`,
   );
+  const otpChallengeTable = await upgrade.query(
+    `SELECT to_regclass('public.otp_challenges') AS table_name`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
-    sessionLifecycleColumns.rowCount !== 2
+    sessionLifecycleColumns.rowCount !== 2 ||
+    otpChallengeTable.rows[0].table_name !== "otp_challenges"
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -113,6 +117,7 @@ try {
       appliedMigrationCount: upgradeMigrations.length,
       sentinelPreserved: true,
       sessionLifecycleColumns: sessionLifecycleColumns.rowCount,
+      otpChallengeTable: otpChallengeTable.rows[0].table_name,
     }),
   );
 } finally {
