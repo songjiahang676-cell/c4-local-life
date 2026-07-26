@@ -75,7 +75,10 @@ paths:
       tags: [Auth]
       security: []
       summary: Request an OTP challenge
+      description: Always returns the same accepted projection for valid input; account existence is never disclosed.
       operationId: requestOtp
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
       requestBody:
         required: true
         content:
@@ -85,18 +88,26 @@ paths:
       responses:
         "202":
           description: OTP accepted for delivery; response never reveals account existence
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcceptedResponse"
+                $ref: "#/components/schemas/OtpAcceptedResponse"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /auth/otp/verify:
     post:
       tags: [Auth]
       security: []
       summary: Verify an OTP challenge
+      description: Invalid, expired, consumed, and unknown challenges share one generic response.
       operationId: verifyOtp
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
       requestBody:
         required: true
         content:
@@ -110,12 +121,16 @@ paths:
             Set-Cookie:
               schema:
                 type: string
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/session:
     get:
       tags: [Auth]
@@ -922,6 +937,12 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 16, maxLength: 128 }
+    DeviceId:
+      name: X-Device-Id
+      in: header
+      required: true
+      description: Opaque client-generated installation identifier used only through a keyed hash for abuse controls.
+      schema: { type: string, minLength: 16, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" }
   responses:
     BadRequest:
       description: Invalid request
@@ -1035,6 +1056,7 @@ components:
     OtpRequest:
       type: object
       required: [channel, destination, purpose]
+      additionalProperties: false
       properties:
         channel: { type: string, enum: [SMS, EMAIL] }
         destination: { type: string, maxLength: 320 }
@@ -1043,9 +1065,19 @@ components:
     OtpVerifyRequest:
       type: object
       required: [challengeId, code]
+      additionalProperties: false
       properties:
         challengeId: { type: string, format: uuid }
         code: { type: string, pattern: '^\\d{6}$' }
+    OtpAcceptedResponse:
+      type: object
+      required: [accepted, requestId, challengeId, expiresAt]
+      additionalProperties: false
+      properties:
+        accepted: { type: boolean, const: true }
+        requestId: { type: string }
+        challengeId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
     SessionResponse:
       type: object
       required: [data]

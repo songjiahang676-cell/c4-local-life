@@ -11,6 +11,10 @@ import { canonicalOpenApiPath } from "../src/common/openapi-document";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
 import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
+import {
+  CapturingOtpDeliveryGateway,
+  MemoryOtpChallengeStore,
+} from "./support/memory-otp-challenge.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -38,6 +42,7 @@ const environment = parseApiEnvironment({
   REDIS_URL: "redis://localhost:6379/0",
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "contract-session-secret-with-more-than-32-bytes",
+  OTP_SECRET: "contract-otp-secret-with-more-than-32-bytes",
   CSRF_SECRET: "contract-csrf-secret-with-more-than-32-bytes",
 });
 
@@ -46,6 +51,7 @@ describe("canonical OpenAPI contract", () => {
   let server: FastifyInstance;
   let contract: DereferencedOpenApi;
   let sessions: AuthSessionService;
+  let otpDelivery: CapturingOtpDeliveryGateway;
   const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
 
   beforeAll(async () => {
@@ -56,9 +62,14 @@ describe("canonical OpenAPI contract", () => {
     contract = (await SwaggerParser.validate(
       canonicalOpenApiPath(),
     )) as unknown as DereferencedOpenApi;
+    const otpChallengeStore = new MemoryOtpChallengeStore();
+    otpChallengeStore.userId = "20000000-0000-4000-8000-000000000001";
+    otpDelivery = new CapturingOtpDeliveryGateway();
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore,
+      otpChallengeStore,
+      otpDeliveryGateway: otpDelivery,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -85,7 +96,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(31);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(52);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(53);
     expect(operationIds).toHaveLength(38);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -162,5 +173,38 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(200);
     expect(sessionSchema).toBeDefined();
     expect(ajv.validate(sessionSchema ?? false, response.json())).toBe(true);
+  });
+
+  it("validates OTP acceptance and verification responses against the contract", async () => {
+    const requested = await server.inject({
+      method: "POST",
+      url: "/v1/auth/otp/request",
+      headers: { "x-device-id": "contract-device-0001" },
+      payload: {
+        channel: "EMAIL",
+        destination: "contract-member@example.invalid",
+        purpose: "SIGN_IN",
+        locale: "en-US",
+      },
+    });
+    const accepted = requested.json<{ challengeId: string }>();
+    const code = otpDelivery.messages.at(-1)?.code;
+    const verified = await server.inject({
+      method: "POST",
+      url: "/v1/auth/otp/verify",
+      headers: { "x-device-id": "contract-device-0001" },
+      payload: { challengeId: accepted.challengeId, code },
+    });
+    const acceptedSchema =
+      contract.paths["/auth/otp/request"]?.post?.responses["202"]?.content?.["application/json"]
+        ?.schema;
+    const sessionSchema =
+      contract.paths["/auth/otp/verify"]?.post?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(requested.statusCode).toBe(202);
+    expect(verified.statusCode).toBe(200);
+    expect(ajv.validate(acceptedSchema ?? false, requested.json())).toBe(true);
+    expect(ajv.validate(sessionSchema ?? false, verified.json())).toBe(true);
   });
 });

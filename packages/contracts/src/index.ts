@@ -14,6 +14,9 @@ export type ListListingsQuery = NonNullable<operations["listListings"]["paramete
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
 export type Session = components["schemas"]["Session"];
 export type SessionResponse = components["schemas"]["SessionResponse"];
+export type OtpRequest = components["schemas"]["OtpRequest"];
+export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
+export type OtpAcceptedResponse = components["schemas"]["OtpAcceptedResponse"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -122,5 +125,37 @@ export const problemDetailsSchema: z.ZodType<ProblemDetails> = z
     instance: z.string(),
     requestId: z.string(),
     errors: z.record(z.string(), z.array(z.string())).optional(),
+  })
+  .strict();
+
+export const otpRequestSchema: z.ZodType<OtpRequest> = z
+  .object({
+    channel: z.enum(["SMS", "EMAIL"]),
+    destination: z.string().trim().min(1).max(320),
+    purpose: z.enum(["SIGN_IN", "VERIFY_CONTACT", "SENSITIVE_ACTION"]),
+    locale: localeSchema.default("zh-Hans"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.channel === "EMAIL" && !z.email().max(320).safeParse(value.destination).success) {
+      context.addIssue({
+        code: "custom",
+        path: ["destination"],
+        message: "Invalid email address",
+      });
+    }
+    if (value.channel === "SMS" && !/^\+[1-9]\d{7,14}$/.test(value.destination)) {
+      context.addIssue({
+        code: "custom",
+        path: ["destination"],
+        message: "Invalid E.164 phone number",
+      });
+    }
+  });
+
+export const otpVerifyRequestSchema: z.ZodType<OtpVerifyRequest> = z
+  .object({
+    challengeId: z.uuid(),
+    code: z.string().regex(/^\d{6}$/),
   })
   .strict();

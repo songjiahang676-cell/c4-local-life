@@ -42,6 +42,7 @@ try {
     "20260725044311_baseline",
     "20260725051500_region_group_type",
     "20260726041310_auth_session_lifecycle",
+    "20260726044453_otp_challenges",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -112,6 +113,28 @@ try {
     sessionLifecycleColumns.rows.some((column) => column.is_nullable !== "NO")
   ) {
     throw new Error("Required auth session lifecycle columns are missing or nullable");
+  }
+
+  const otpChallengeColumns = await client.query(
+    `SELECT column_name, is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'otp_challenges'
+        AND column_name IN (
+          'destination_hash',
+          'code_hash',
+          'ip_hash',
+          'device_hash',
+          'expires_at',
+          'failed_attempts'
+        )
+      ORDER BY column_name`,
+  );
+  if (
+    otpChallengeColumns.rowCount !== 6 ||
+    otpChallengeColumns.rows.some((column) => column.is_nullable !== "NO")
+  ) {
+    throw new Error("Required OTP challenge security columns are missing or nullable");
   }
 
   await client.query("BEGIN");
@@ -230,6 +253,7 @@ try {
       extensions: extensions.rows.map((row) => row.extname),
       customIndexes: customIndexes.rowCount,
       sessionLifecycleColumns: sessionLifecycleColumns.rows.map((column) => column.column_name),
+      otpChallengeColumns: otpChallengeColumns.rows.map((column) => column.column_name),
       negativeCases: 3,
     }),
   );

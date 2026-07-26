@@ -68,6 +68,7 @@ export default defineConfig({
         REDIS_URL: "redis://127.0.0.1:6379/15",
         OPENSEARCH_NODE: "http://127.0.0.1:9200",
         SESSION_SECRET: "e2e-session-secret-with-at-least-32-bytes",
+        OTP_SECRET: "e2e-otp-secret-with-at-least-32-bytes",
         CSRF_SECRET: "e2e-csrf-secret-with-at-least-32-bytes",
         OTEL_SERVICE_NAME: "socal-api-e2e",
         OTEL_SERVICE_VERSION: "test",

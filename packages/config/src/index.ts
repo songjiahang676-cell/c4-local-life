@@ -65,6 +65,15 @@ const apiEnvironmentSchema = commonServerSchema
     SESSION_IDLE_TTL_SECONDS: positiveInteger(604_800, 2_592_000),
     SESSION_TOUCH_INTERVAL_SECONDS: positiveInteger(300, 86_400),
     CSRF_SECRET: secretSchema(32),
+    OTP_SECRET: secretSchema(32),
+    OTP_TTL_SECONDS: positiveInteger(600, 1_800),
+    OTP_MAX_ATTEMPTS: positiveInteger(5, 20),
+    OTP_DESTINATION_LIMIT: positiveInteger(3, 100),
+    OTP_DESTINATION_WINDOW_SECONDS: positiveInteger(900, 86_400),
+    OTP_IP_LIMIT: positiveInteger(20, 1_000),
+    OTP_IP_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    OTP_DEVICE_LIMIT: positiveInteger(10, 500),
+    OTP_DEVICE_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
     FEATURE_PAYMENTS: booleanValue(false),
     FEATURE_MESSAGING: booleanValue(true),
     FEATURE_COMMUNITY: booleanValue(false),
@@ -83,6 +92,19 @@ const apiEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["SESSION_TOUCH_INTERVAL_SECONDS"],
         message: "Session touch interval must be shorter than the idle lifetime",
+      });
+    }
+    if (
+      value.OTP_SECRET instanceof SecretValue &&
+      value.SESSION_SECRET instanceof SecretValue &&
+      value.CSRF_SECRET instanceof SecretValue &&
+      (value.OTP_SECRET.reveal() === value.SESSION_SECRET.reveal() ||
+        value.OTP_SECRET.reveal() === value.CSRF_SECRET.reveal())
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["OTP_SECRET"],
+        message: "OTP secret must be distinct from session and CSRF secrets",
       });
     }
   });

@@ -16,6 +16,17 @@ enum UserStatus {
   DELETED
 }
 
+enum OtpChannel {
+  SMS
+  EMAIL
+}
+
+enum OtpPurpose {
+  SIGN_IN
+  VERIFY_CONTACT
+  SENSITIVE_ACTION
+}
+
 enum OrganizationType {
   MERCHANT
   SERVICE_PROVIDER
@@ -233,6 +244,7 @@ model User {
   providerProfile   ProviderProfile?
   identities        Identity[]
   sessions          AuthSession[]
+  otpChallenges     OtpChallenge[]
   memberships       OrganizationMembership[]
   listings          Listing[]
   favorites         Favorite[]
@@ -295,6 +307,30 @@ model AuthSession {
   @@index([userId, expiresAt])
   @@index([userId, idleExpiresAt])
   @@map("auth_sessions")
+}
+
+model OtpChallenge {
+  id              String      @id @default(uuid()) @db.Uuid
+  userId          String?     @map("user_id") @db.Uuid
+  channel         OtpChannel
+  destination     String      @db.VarChar(320)
+  destinationHash String      @map("destination_hash") @db.VarChar(128)
+  purpose         OtpPurpose
+  locale          String      @default("zh-Hans") @db.VarChar(16)
+  codeHash        String      @map("code_hash") @db.VarChar(128)
+  ipHash          String      @map("ip_hash") @db.VarChar(128)
+  deviceHash      String      @map("device_hash") @db.VarChar(128)
+  expiresAt       DateTime    @map("expires_at") @db.Timestamptz(6)
+  consumedAt      DateTime?   @map("consumed_at") @db.Timestamptz(6)
+  failedAttempts  Int         @default(0) @map("failed_attempts")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([destinationHash, purpose, createdAt(sort: Desc)])
+  @@index([ipHash, createdAt(sort: Desc)])
+  @@index([deviceHash, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("otp_challenges")
 }
 
 model Organization {

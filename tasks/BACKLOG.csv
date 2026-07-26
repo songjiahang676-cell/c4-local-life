@@ -1,4 +1,4 @@
-﻿id,gate,epic,priority,title,dependencies,acceptance,references,status
+id,gate,epic,priority,title,dependencies,acceptance,references,status
 FND-001,G0,FND,P0,锁定依赖并建立可重复安装,,Node24/pnpm11 干净环境 frozen install；提交 lockfile；记录版本,README.md;docs/30-reference-implementation.md,done
 FND-002,G0,FND,P0,统一 TypeScript/ESLint/Prettier 配置,FND-001,所有 workspace 共用 strict 配置；format/lint/typecheck 可运行,AGENTS.md;docs/18-testing-quality.md,done
 FND-003,G0,FND,P0,建立 CI 质量流水线,FND-001;FND-002,PR 执行静态检查/契约/测试/构建并阻止失败合并,docs/16-infrastructure-devops.md,done
@@ -21,7 +21,7 @@ API-005,G5,API,P0,通用幂等键存储与拦截器,DATA-001;API-001,相同 key 
 OBS-001,G0,OBS,P0,结构日志、基础指标和 OTel trace,FND-004;API-001,跨 HTTP/job 带 request/trace id；PII redaction 测试,docs/17-observability-analytics.md,done
 OBS-002,G6,OBS,P0,SLO Dashboard 与告警,OBS-001;REL-001,服务/依赖/队列/业务 dashboard；告警绑定 runbook,docs/17-observability-analytics.md,todo
 AUTH-001,G1,AUTH,P0,会话模型、认证上下文与 Cookie,DATA-001;API-001,token hash、rotation、expiry、logout、secure cookie 测试,docs/14-security-privacy-compliance.md,done
-AUTH-002,G1,AUTH,P0,邮箱/手机 OTP 请求与验证,AUTH-001,短效一次性、账号/IP/设备限频、不枚举账号,docs/14-security-privacy-compliance.md,todo
+AUTH-002,G1,AUTH,P0,邮箱/手机 OTP 请求与验证,AUTH-001,短效一次性、账号/IP/设备限频、不枚举账号,docs/14-security-privacy-compliance.md,done
 AUTH-003,G1,AUTH,P0,用户资料、会话设备与注销全部,AUTH-001,用户可管理资料/locale/设备；状态变更撤销会话,docs/04-user-journeys.md,todo
 AUTH-004,G1,AUTH,P1,密码与账户恢复（可选）,AUTH-002,强 KDF、恢复冷却、通知、负面测试,docs/14-security-privacy-compliance.md,todo
 AUTH-005,G1,AUTH,P0,后台 MFA/step-up,ADMIN-001;AUTH-001,Admin 强制 MFA；敏感动作近期认证,docs/14-security-privacy-compliance.md;docs/28-admin-console.md,todo

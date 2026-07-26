@@ -77,9 +77,11 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 
 `AUTH-001` 已实现 `GET /auth/session` 与 `DELETE /auth/session`。前者从安全 Cookie 解析认证上下文，
 仅返回 OpenAPI `SessionResponse` 并设置 `Cache-Control: no-store`；后者通过应用服务幂等撤销数据库
-会话并返回同路径、同安全属性的过期 Cookie。OTP request/verify 仍属于 `AUTH-002`，当前切片不会暴露
-伪造的登录成功路径。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象授权
-继续由 `API-004` 的默认拒绝 Policy 完成。
+会话并返回同路径、同安全属性的过期 Cookie。`AUTH-002` 实现 `POST /auth/otp/request` 与
+`POST /auth/otp/verify`：请求返回 `challengeId` 和过期时间但不返回验证码或账号状态；验证成功后通过
+AUTH-001 的会话服务签发同一安全 Cookie。两个端点要求不含 PII 的 `X-Device-Id`，服务端只保存其
+HMAC，用于设备绑定和限频。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象
+授权继续由 `API-004` 的默认拒绝 Policy 完成。
 
 ## 8.6 响应投影
 
@@ -115,6 +117,11 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 ## 8.9 邮件、短信和通知
 
 定义端口：`EmailProvider`、`SmsProvider`、`PushProvider`。模板使用稳定 key、locale、版本和变量 schema。通知记录先写库，再由 Worker 发送；provider message id、attempt、失败分类和退订状态可追踪。
+
+OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 渗透进认证领域。当前未确认生产
+供应商时适配器 fail closed 并返回通用 503，不记录或回显验证码；测试通过捕获型适配器覆盖 EMAIL/SMS
+两条通道。生产投递适配器、重试和供应商回执仍由已规划的通知/Outbox 切片实现，不能用记录明文验证码
+或静默丢弃投递代替。
 
 营销与事务通知分开处理。短信/邮件退订不应阻断安全和订单必要通知，但必须遵守法律和用户偏好。
 
