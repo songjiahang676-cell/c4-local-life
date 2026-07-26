@@ -1887,11 +1887,13 @@ PR：
 撤销过期批准。平台管理员应保存一次失败 PR 被阻止和一次完整绿色 PR 可合并的证据。本地
 `pnpm ci:workflow:check` 只能验证 workflow 内容，不能替代 GitHub 执行和 ruleset 证据。
 
-当前私有仓库 `songjiahang676-cell/c4-local-life` 已由 PR #1 和 GitHub Actions run `30186103447`
-证明两项 check 可完整通过，早期 runs `30185510707`、`30185679624` 保留了失败证据。2026-07-25
-调用 branch protection 与 repository ruleset API 均返回 HTTP 403，明确要求升级 GitHub Pro 或将
-仓库设为 public。仓库可见性属于数据披露边界，未经项目负责人明确选择不得为了通过 Gate 自动公开；
-限制解除前 FND-003 保持 `todo`。
+仓库 `songjiahang676-cell/c4-local-life` 已由 PR #1 和 GitHub Actions run `30186346943` 证明两项
+check 可完整通过，早期 runs `30185510707`、`30185679624` 保留了干净环境缺陷及修复证据。
+项目负责人于 2026-07-25 明确授权将仓库公开，随后 `main` branch protection 配置为：必须经 PR、
+两项 required checks、strict/up-to-date、解决全部 conversation、管理员不可绕过、禁止强推和删除。
+临时 PR #2/run `30187032798` 故意引入一个内部断链，质量检查失败且 GitHub 返回
+`mergeStateStatus=BLOCKED`；验证后 PR 已关闭、临时分支已删除。由此 FND-003 的失败阻止和绿色可合并
+两类外部证据均完整。
 
 ## 16.6 CD 与发布
 
@@ -2738,8 +2740,9 @@ Codex 适合按清晰任务生成实现、测试、迁移和文档，但关键�
 角色占位符，并检查 PR 模板必填审查项。个人仓库阶段由 required CI check 提供合并保护；至少有两名
 维护者后再启用 required approval 和 code-owner review，避免要求作者批准自己的 PR。
 
-当前真实 owner 映射和 PR 模板已在 PR #1 被 GitHub 解析；但个人 GitHub Free 套餐不允许为私有仓库
-配置 required checks。该外部限制不通过降低治理要求、伪造团队或擅自公开代码规避。
+当前真实 owner 映射和 PR 模板已在 PR #1 被 GitHub 解析。项目负责人明确授权仓库公开后，`main`
+已启用 required checks、PR、conversation resolution 和管理员不可绕过保护；PR #2 的失败检查被
+真实阻止合并。增加第二维护者后仍须启用至少一名独立批准者和 code-owner review。
 
 ---
 

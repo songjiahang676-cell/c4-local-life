@@ -124,9 +124,10 @@ OpenAPI lint/生成漂移检查、单元/契约/真实 PostgreSQL 集成测试�
 
 GitHub Actions run `30186103447` 已在干净 Ubuntu 环境通过完整质量作业，并构建 Web、Admin、API、
 Worker 四个镜像；四个 runtime 均确认以 `node` 用户启动并通过 readiness。PR #1 保留了两个真实失败
-run 及其修复证据。尚未关闭的是 `main` 合并保护：当前个人 GitHub Free 账户对私有仓库 branch
-protection/ruleset API 返回 HTTP 403，必须升级 Pro 或由项目负责人明确同意公开仓库后才能配置。
-仓库不会为追求状态数字擅自改变可见性，也不会把该 Gate 标记为通过。
+run 及其修复证据。项目负责人于 2026-07-25 明确授权公开仓库；`main` 随即启用必须经 PR、分支最新、
+两项 required checks、解决 review conversation、管理员不可绕过、禁止强推/删除的保护。临时 PR #2
+通过故意破坏内部链接产生真实失败 run `30187032798`，GitHub 报告合并状态 `BLOCKED`；测试 PR 和分支
+随后已关闭/删除。绿色 PR #1 的两项 required checks 均通过。
 
 ## 七、规划容量与服务目标
 

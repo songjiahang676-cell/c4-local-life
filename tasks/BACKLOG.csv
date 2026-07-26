@@ -1,21 +1,21 @@
 ﻿id,gate,epic,priority,title,dependencies,acceptance,references,status
 FND-001,G0,FND,P0,锁定依赖并建立可重复安装,,Node24/pnpm11 干净环境 frozen install；提交 lockfile；记录版本,README.md;docs/30-reference-implementation.md,done
 FND-002,G0,FND,P0,统一 TypeScript/ESLint/Prettier 配置,FND-001,所有 workspace 共用 strict 配置；format/lint/typecheck 可运行,AGENTS.md;docs/18-testing-quality.md,done
-FND-003,G0,FND,P0,建立 CI 质量流水线,FND-001;FND-002,PR 执行静态检查/契约/测试/构建并阻止失败合并,docs/16-infrastructure-devops.md,todo
+FND-003,G0,FND,P0,建立 CI 质量流水线,FND-001;FND-002,PR 执行静态检查/契约/测试/构建并阻止失败合并,docs/16-infrastructure-devops.md,done
 FND-004,G0,FND,P0,运行时配置 schema 与秘密管理接口,FND-001,缺失关键配置 fail fast；日志不输出 secret；环境文档完整,docs/14-security-privacy-compliance.md;docs/16-infrastructure-devops.md,done
 FND-005,G0,FND,P0,四应用容器与健康检查,FND-001,Web/Admin/API/Worker 镜像可构建；live/ready；非 root,docs/16-infrastructure-devops.md,done
 FND-006,G0,FND,P1,建立 Vitest/Testing Library 基线,FND-002,每个 workspace 有最小测试并生成报告,docs/18-testing-quality.md,done
 FND-007,G0,FND,P1,建立 Playwright E2E 基线,FND-005,可在本地/CI 启动栈并通过首页/API smoke,docs/18-testing-quality.md,done
-FND-008,G0,FND,P1,生成代码所有权与 PR 模板,FND-003,CODEOWNERS/PR 模板覆盖安全迁移测试项,docs/25-team-operating-model.md,todo
+FND-008,G0,FND,P1,生成代码所有权与 PR 模板,FND-003,CODEOWNERS/PR 模板覆盖安全迁移测试项,docs/25-team-operating-model.md,done
 DATA-001,G0,DATA,P0,Prisma schema 校验与首个迁移,FND-001,prisma validate/generate 通过；空库可迁移；首个建表迁移合并 post_schema_constraints.sql；关系/约束负例审查,docs/06-domain-and-data-model.md,done
 DATA-002,G0,DATA,P0,PostGIS/trigram 扩展与地理类型 repository,DATA-001,扩展可重复安装；半径查询集成测试通过,docs/06-domain-and-data-model.md,done
 DATA-003,G0,DATA,P1,种子与测试数据工厂,DATA-001,地区/分类/样例可幂等导入；测试不依赖生产数据,seed/README.md;docs/18-testing-quality.md,done
-DATA-004,G0,DATA,P1,数据库迁移 CI 与兼容检查,DATA-001;FND-003,空库和上一版本升级测试；检测破坏性 SQL,docs/16-infrastructure-devops.md;docs/18-testing-quality.md,todo
+DATA-004,G0,DATA,P1,数据库迁移 CI 与兼容检查,DATA-001;FND-003,空库和上一版本升级测试；检测破坏性 SQL,docs/16-infrastructure-devops.md;docs/18-testing-quality.md,done
 DATA-005,G6,DATA,P1,备份/PITR/恢复演练,REL-001,记录真实 RPO/RTO；恢复后可重新索引和重放,docs/15-performance-reliability.md;docs/20-operations-runbook.md,todo
 DATA-006,G0,DATA,P1,Repository 集成测试框架,DATA-001;FND-006,真实 PostgreSQL 测试隔离、事务/清理稳定,docs/18-testing-quality.md,done
 API-001,G0,API,P0,HTTP 基础中间件与 Problem Details,FND-002,requestId、validation、错误 envelope、body limit、CORS/CSRF 策略,docs/08-api-and-integrations.md,done
-API-002,G0,API,P0,OpenAPI serving/lint/schema test,API-001;FND-003,契约可解析；示例和实现 smoke 验证,openapi/openapi.yaml;docs/08-api-and-integrations.md,todo
-API-003,G0,API,P1,契约生成方向与共享类型,API-002,选定 OpenAPI↔Zod/DTO 单向生成；无手工三份漂移,docs/08-api-and-integrations.md,todo
+API-002,G0,API,P0,OpenAPI serving/lint/schema test,API-001;FND-003,契约可解析；示例和实现 smoke 验证,openapi/openapi.yaml;docs/08-api-and-integrations.md,done
+API-003,G0,API,P1,契约生成方向与共享类型,API-002,选定 OpenAPI↔Zod/DTO 单向生成；无手工三份漂移,docs/08-api-and-integrations.md,done
 API-004,G1,API,P1,Policy/Actor/RequestContext 框架,AUTH-001,默认拒绝；对象级授权测试 helper 可复用,docs/05-roles-and-permissions.md,todo
 API-005,G5,API,P0,通用幂等键存储与拦截器,DATA-001;API-001,相同 key 重放一致；payload 冲突 409；TTL/审计,docs/08-api-and-integrations.md,todo
 OBS-001,G0,OBS,P0,结构日志、基础指标和 OTel trace,FND-004;API-001,跨 HTTP/job 带 request/trace id；PII redaction 测试,docs/17-observability-analytics.md,done

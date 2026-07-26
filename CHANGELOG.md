@@ -26,6 +26,7 @@
 - Fixed clean-container Prisma generation by supplying a non-secret build-only datasource URL and installing OpenSSL in the build base; the container contract now prevents regression.
 - Added hosted runtime-image smoke coverage that verifies the non-root user and readiness of Web, Admin, API and Worker; the API image now includes its contracts workspace dependency.
 - Recorded the fully green hosted Gate 0 quality/container run and the verified GitHub Free private-repository branch-protection limitation without weakening the merge policy.
+- Published the repository with explicit owner authorization, enforced protected-branch checks for administrators, and proved the policy using a closed failing negative-control PR.
 
 ## 0.1.0 — Architecture handoff package
 

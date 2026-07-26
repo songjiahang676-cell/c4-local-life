@@ -259,3 +259,16 @@ Not run: Enforced failed-merge check on `main` cannot be configured on this priv
 Observability: Unit/coverage and Playwright reports retained 14 days；container failure/startup logs surface only on bounded CI failure；no production telemetry changed  
 Docs: Updated `README.md`、Gate status/checklist、infrastructure and team governance docs、`CHANGELOG.md` and this worklog  
 Known gaps: FND-003 remains `todo`；FND-008、DATA-004、API-002 and API-003 remain formally blocked by that dependency despite their implementation checks passing；Gate 1 must not start until merge protection is resolved
+
+## FND-003 — 公开仓库与强制合并保护完成
+
+Task: FND-003 建立 CI 质量流水线；解除 FND-008、DATA-004、API-002、API-003 依赖阻塞  
+Changed: With explicit owner authorization, changed `songjiahang676-cell/c4-local-life` from private to public；protected `main` with PR-only, strict required checks, conversation resolution, admin enforcement, and force-push/deletion denial  
+Contracts: OpenAPI/Prisma unchanged；Backlog statuses move all 17 Gate 0 tasks to done  
+Migrations: 无新增；existing empty deploy、upgrade compatibility、baseline and destructive SQL checks remain required  
+Security: Visibility change was explicit；credential scan/ignored `.env` controls remained green；branch protection applies to administrators and binds both checks to the GitHub Actions app  
+Tests run: PR #1/run `30186346943` passed both required jobs；temporary non-draft PR #2 intentionally added one broken internal link, run `30187032798` failed architecture validation, and GitHub reported `mergeStateStatus=BLOCKED`  
+Not run: Independent approval/code-owner review requires a second maintainer and is intentionally not self-approved  
+Observability: GitHub retains positive/negative check runs and closed PR #2 as audit evidence；temporary branch was deleted locally and remotely  
+Docs: Updated `README.md`、Gate status/checklist、infrastructure/team governance docs、architecture book、`CHANGELOG.md` and this worklog  
+Known gaps: PR #1 final head CI and protected merge remain before starting AUTH-001；no Gate 1 implementation has started early

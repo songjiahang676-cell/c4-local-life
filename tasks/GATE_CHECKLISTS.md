@@ -6,7 +6,7 @@
 - [x] JSON/YAML/OpenAPI/Prisma/TypeScript/Lint/Build/Test 通过。
 - [x] 四应用容器以非 root 启动并通过最小运行栈健康检查。
 - [x] Secret/配置/日志脱敏基线。
-- [ ] `main` 必须由 required checks 阻止失败合并（私有仓库的 GitHub Free 套餐限制）。
+- [x] `main` required checks 已用真实失败 PR 阻止合并、绿色 PR 可合并验证。
 
 ## G1 Identity / Taxonomy / Media
 
