@@ -207,3 +207,16 @@ Not run: GitHub-hosted PR execution, failed-merge blocking and branch/ruleset in
 Observability: Unit/coverage and Playwright reports upload on failure or success with 14-day retention; no production telemetry changed  
 Docs: Updated `docs/16-infrastructure-devops.md`, `docs/18-testing-quality.md`, ownership guidance and `CHANGELOG.md`  
 Known gaps: Repository owner must create/select the remote, map CODEOWNERS aliases, run one failing and one green PR, and require the two documented check names. FND-003 remains `todo` until that external evidence exists
+
+## FND-003 — 首次托管 CI 差异修复
+
+Task: FND-003 建立 CI 质量流水线（GitHub run 30185510707）  
+Changed: Vitest now resolves `@socal/contracts` directly to source like the other internal packages; Playwright artifact upload warns rather than creating a second failure when an earlier step prevents report generation  
+Contracts: OpenAPI/Prisma unchanged; test module resolution now works from a clean checkout without relying on stale local `dist` output  
+Migrations: 无  
+Security: No permission or runtime policy changes; GitHub token received only the additional `workflow` scope required to push the reviewed workflow file and remains in the OS keyring  
+Tests run: Hosted architecture, locked install, governance, configuration, container contract, seed, OpenAPI, formatting, Prisma migration/deploy/upgrade/baseline, TypeScript and lint steps passed before the clean-checkout test failure exposed the missing alias  
+Not run: Build, browser smoke and image build were skipped by the failed hosted test and will run on the corrected commit  
+Observability: Existing unit reports uploaded successfully; missing downstream Playwright output no longer obscures the primary failure  
+Docs: Updated `CHANGELOG.md` and this worklog  
+Known gaps: Await corrected hosted run and container job

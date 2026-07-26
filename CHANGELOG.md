@@ -21,6 +21,7 @@
 - Added a pinned Playwright/Chromium desktop-and-mobile baseline that boots production Web/API builds on isolated ports, validates localized homepage and API security smoke behavior, and retains CI reports.
 - Expanded CODEOWNERS and the pull request template across contracts, migrations, security, idempotency, tests and observability, with an executable CI governance contract and explicit role-alias mapping requirements.
 - Made the architecture checker repeatable after dependency/bootstrap output exists by selecting an available Python 3 runtime, excluding generated/dependency trees, and safely allowing an explicitly ignored local `.env`.
+- Fixed clean-checkout Vitest resolution for `@socal/contracts` and prevented an upstream test failure from being obscured by a secondary missing-Playwright-artifact error.
 
 ## 0.1.0 — Architecture handoff package
 

@@ -25,6 +25,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@socal/config": fileURLToPath(new URL("./packages/config/src/index.ts", import.meta.url)),
+      "@socal/contracts": fileURLToPath(
+        new URL("./packages/contracts/src/index.ts", import.meta.url),
+      ),
       "@socal/observability": fileURLToPath(
         new URL("./packages/observability/src/index.ts", import.meta.url),
       ),
