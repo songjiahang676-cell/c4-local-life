@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "locale": "zh-Hans",
+  "regionCode": "US-CA-SOCAL",
+  "slots": [
+    {
+      "key": "hero",
+      "kind": "HERO",
+      "enabled": true,
+      "source": {
+        "type": "CMS",
+        "entry": "homepage-hero"
+      },
+      "limit": 1,
+      "cacheTtlSeconds": 300
+    },
+    {
+      "key": "hot-searches",
+      "kind": "HOT_SEARCHES",
+      "enabled": true,
+      "source": {
+        "type": "ANALYTICS_TRENDING",
+        "windowHours": 24
+      },
+      "limit": 7,
+      "cacheTtlSeconds": 120
+    },
+    {
+      "key": "hot-cities",
+      "kind": "CITY_CHIPS",
+      "enabled": true,
+      "source": {
+        "type": "STATIC_REGION_CODES",
+        "values": [
+          "US-CA-LA",
+          "US-CA-IRVINE",
+          "US-CA-SGV",
+          "US-CA-MONTEREY-PARK",
+          "US-CA-ARCADIA",
+          "US-CA-WALNUT",
+          "US-CA-CITY-OF-INDUSTRY",
+          "US-CA-LONG-BEACH"
+        ]
+      },
+      "limit": 8,
+      "cacheTtlSeconds": 3600
+    },
+    {
+      "key": "jobs-latest",
+      "kind": "LISTING_FEED",
+      "enabled": true,
+      "source": {
+        "type": "SEARCH",
+        "filters": {
+          "listingType": "JOB",
+          "status": "PUBLISHED"
+        },
+        "sort": "NEWEST"
+      },
+      "limit": 5,
+      "cacheTtlSeconds": 60
+    },
+    {
+      "key": "rentals-latest",
+      "kind": "LISTING_FEED",
+      "enabled": true,
+      "source": {
+        "type": "SEARCH",
+        "filters": {
+          "listingType": "RENTAL",
+          "status": "PUBLISHED"
+        },
+        "sort": "NEWEST"
+      },
+      "limit": 5,
+      "cacheTtlSeconds": 60
+    },
+    {
+      "key": "transfers-latest",
+      "kind": "LISTING_FEED",
+      "enabled": true,
+      "source": {
+        "type": "SEARCH",
+        "filters": {
+          "listingType": "TRANSFER",
+          "status": "PUBLISHED"
+        },
+        "sort": "NEWEST"
+      },
+      "limit": 5,
+      "cacheTtlSeconds": 60
+    },
+    {
+      "key": "secondhand-latest",
+      "kind": "LISTING_FEED",
+      "enabled": true,
+      "source": {
+        "type": "SEARCH",
+        "filters": {
+          "listingType": "SECONDHAND",
+          "status": "PUBLISHED"
+        },
+        "sort": "NEWEST"
+      },
+      "limit": 5,
+      "cacheTtlSeconds": 60
+    },
+    {
+      "key": "homepage-right-ad",
+      "kind": "AD",
+      "enabled": true,
+      "source": {
+        "placementKey": "HOME_RIGHT_360X102"
+      },
+      "limit": 1,
+      "sponsoredDisclosure": true,
+      "cacheTtlSeconds": 30
+    },
+    {
+      "key": "businesses-featured",
+      "kind": "BUSINESS_CAROUSEL",
+      "enabled": true,
+      "source": {
+        "type": "FEATURED_VERIFIED"
+      },
+      "limit": 4,
+      "sponsoredDisclosure": true,
+      "cacheTtlSeconds": 300
+    },
+    {
+      "key": "providers-recommended",
+      "kind": "PROVIDER_CAROUSEL",
+      "enabled": true,
+      "source": {
+        "type": "QUALITY_AND_PROXIMITY"
+      },
+      "limit": 4,
+      "sponsoredDisclosure": false,
+      "cacheTtlSeconds": 300
+    },
+    {
+      "key": "price-center",
+      "kind": "PRICE_METRIC",
+      "enabled": true,
+      "source": {
+        "type": "ANALYTICS_AGGREGATE",
+        "dataset": "market-price-weekly"
+      },
+      "limit": 5,
+      "cacheTtlSeconds": 3600
+    },
+    {
+      "key": "cross-border-products",
+      "kind": "RESOURCE_PRODUCTS",
+      "enabled": false,
+      "source": {
+        "type": "SUPPLIER_CATALOG"
+      },
+      "limit": 3,
+      "sponsoredDisclosure": true,
+      "cacheTtlSeconds": 300
+    }
+  ]
+}

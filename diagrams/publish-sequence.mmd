@@ -1,0 +1,27 @@
+sequenceDiagram
+  actor U as User
+  participant W as Next.js Web
+  participant A as API
+  participant D as PostgreSQL
+  participant Q as Redis/BullMQ
+  participant K as Worker
+  participant S as OpenSearch
+  participant N as Notification Provider
+
+  U->>W: Submit listing form
+  W->>A: POST /v1/listings/{id}/submit + Idempotency-Key
+  A->>D: Begin transaction
+  A->>D: Validate ownership, form schema, plan and state
+  A->>D: Update listing to SUBMITTED
+  A->>D: Insert moderation case if needed
+  A->>D: Insert outbox events
+  A->>D: Commit
+  A-->>W: 202 transition response
+  K->>D: Poll/claim outbox row
+  K->>Q: Enqueue moderation/index/notification jobs
+  K->>D: Mark outbox published
+  K->>K: Automated text/image/risk checks
+  K->>D: Publish or leave pending review
+  K->>S: Upsert public search document when published
+  K->>N: Send status notification
+  W-->>U: Show submitted/published status

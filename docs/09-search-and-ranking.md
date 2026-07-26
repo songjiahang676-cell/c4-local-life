@@ -1,0 +1,99 @@
+# 09. 搜索、推荐与排序
+
+## 9.1 目标
+
+搜索要解决双语、本地、结构化筛选、新鲜度和信任问题，而不是只做标题模糊匹配。系统必须能解释付费结果、快速下架违规内容，并在 OpenSearch 故障时保留有限核心能力。
+
+## 9.2 索引设计
+
+建议按版本建立 alias：
+
+```text
+socal_local_listings_read  -> socal_local_listings_vN
+socal_local_listings_write -> socal_local_listings_vN
+```
+
+文档包含：
+
+- id/type/status、locale、title/summary/body；
+- category path、region path、城市别名；
+- 结构化价格、属性、发布时间、过期时间；
+- 模糊公开 geo point；
+- owner/org 的公开可信信号；
+- quality/trust/freshness 特征；
+- isSponsored、campaign/placement 引用；
+- content version 与 indexedAt。
+
+内部风险分、真实地址、电话/邮箱和审核备注绝不进入公开索引。
+
+## 9.3 文本分析
+
+- 中文：合适的中文分词插件/分析器在目标 OpenSearch 环境验证；若托管环境限制，使用预分词字段 + ngram/edge-ngram 组合。
+- 英文：标准/语言分析器、lowercase、词干和 stop words。
+- 拼音/别名：为城市、分类、品牌和常见服务维护运营词典，如“蒙市/Monterey Park/MPK”。
+- 同义词：版本化、审核、可回滚；避免把高歧义词全局合并。
+- 输入规范化：全半角、繁简映射（仅搜索）、大小写、空白、常见单位和数字格式。
+- typo 容忍：短词谨慎，手机号/邮编/型号不做宽松模糊。
+
+原始用户内容保持原样展示；搜索规范化不是内容翻译或改写。
+
+## 9.4 查询流程
+
+1. 解析语言、城市上下文和 query intent。
+2. 拼写/别名规范化，但保留原 query 用于分析。
+3. 构造 bool 查询：公开状态、未过期、分类/地区/价格等过滤。
+4. 多字段匹配：title > structured attributes > summary > body。
+5. 计算函数分：文本相关性、发布时间衰减、质量、可信、距离。
+6. 受控插入推广候选，明确标记且满足同样内容政策。
+7. 返回聚合 facets、纠错/建议和不透明 cursor。
+8. 记录去敏搜索事件和结果表现。
+
+## 9.5 排序模型
+
+首期可使用可解释线性/函数分数，不依赖 ML：
+
+```text
+natural_score =
+  0.45 * normalized_text_relevance
++ 0.18 * freshness_decay
++ 0.12 * listing_quality
++ 0.10 * publisher_trust
++ 0.08 * geo_proximity
++ 0.07 * engagement_quality
+- penalties
+```
+
+权重是起始假设，必须用离线标注和线上指标校准。`engagement_quality` 排除机器人、自己点击、误触和垃圾联系。处罚包括重复、低完整度、频繁编辑、举报确认、过期临近等。
+
+推广结果单独计算资格与 rank，融合策略设置每页/每屏上限、广告间隔和 label。付费不能让已过期、违规或与查询无关内容出现。
+
+## 9.6 索引同步
+
+- Listing 事务写入 Outbox 事件，包含 id、version、operation。
+- Worker 从 PostgreSQL 加载当前授权公开投影，不信任事件 payload 作为完整数据。
+- 使用外部 version/乐观策略，旧事件不能覆盖新状态。
+- 删除/下架优先高队列，目标 p95 10 秒内从搜索消失；一般更新目标 p95 60 秒。
+- 定时 reconciliation 比较数据库和索引版本，修复丢失/漂移。
+- 全量重建使用新索引、双写/追赶、校验、原子 alias 切换和旧索引保留窗口。
+
+## 9.7 PostgreSQL fallback
+
+`packages/database/sql/search_repository.sql` 提供有限 fallback：标题/正文 trigram/全文、状态/城市/分类过滤。它不替代 OpenSearch 的完整分词、facet 和规模能力。故障模式下应限制日期范围、结果数和复杂筛选，并明确提示。
+
+## 9.8 热门搜索与建议
+
+- 建议来源：运营词典、城市/分类、近期去敏查询、有效结果和点击质量。
+- 不展示低频可能含个人信息的原始查询。
+- 热门榜排除机器人、成人/违法/诈骗词和操纵流量。
+- 榜单带时间窗口和城市维度；不是伪造的“实时数字”。
+- 空查询建议优先城市、分类和安全内容。
+
+## 9.9 SEO 与站内搜索边界
+
+搜索组合页默认 `noindex,follow`。只有运营批准的城市+主分类聚合页生成稳定可索引页面。聚合页必须有独特介绍、足够有效内容、canonical 和过期处理，避免数百万薄页面。
+
+## 9.10 搜索质量评估
+
+离线：建立中英双语查询集和 relevance judgments，测 NDCG@10、MRR、Recall、零结果率。
+
+在线：搜索到详情率、有效联系率、筛选使用、改写率、快速返回、举报率和推广点击质量。A/B 实验必须有样本、停止规则和负面指标，不仅追点击率。

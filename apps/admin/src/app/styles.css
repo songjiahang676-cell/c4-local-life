@@ -1,0 +1,167 @@
+:root {
+  font-family: Inter, "Noto Sans SC", system-ui, sans-serif;
+  color: #162036;
+  background: #f4f7fb;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.adminShell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 230px 1fr;
+}
+.adminShell > aside {
+  background: #0c2b59;
+  color: white;
+  padding: 24px 16px;
+}
+.adminBrand {
+  font-size: 20px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 0 8px 24px;
+}
+.adminShell nav {
+  display: grid;
+  gap: 5px;
+}
+.adminShell nav a {
+  padding: 11px 13px;
+  border-radius: 8px;
+  color: #d9e6fa;
+  text-decoration: none;
+}
+.adminShell nav a.active,
+.adminShell nav a:hover {
+  background: #1c4a86;
+  color: white;
+}
+.adminContent {
+  padding: 28px;
+}
+.adminContent header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.adminContent h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.adminContent header p {
+  color: #718099;
+  margin: 6px 0 0;
+}
+.adminContent header button {
+  border: 1px solid #dbe3ef;
+  background: white;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 24px 0;
+}
+.metrics article,
+.panel {
+  background: white;
+  border: 1px solid #e2e8f1;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(40, 60, 100, 0.05);
+}
+.metrics article {
+  padding: 18px;
+}
+.metrics span,
+.metrics strong,
+.metrics small {
+  display: block;
+}
+.metrics span {
+  color: #6e7b90;
+}
+.metrics strong {
+  font-size: 28px;
+  margin: 8px 0;
+}
+.metrics small {
+  color: #16855c;
+}
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 14px;
+}
+.panel {
+  padding: 18px;
+}
+.panel h2 {
+  margin: 0 0 15px;
+  font-size: 17px;
+}
+.queue,
+.health {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 14px;
+  align-items: center;
+  border-top: 1px solid #edf0f5;
+  padding: 12px 0;
+}
+.queue button {
+  border: 0;
+  background: #edf4ff;
+  color: #1668dc;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.health {
+  grid-template-columns: 1fr auto;
+}
+.health strong {
+  color: #1675df;
+}
+.wide {
+  grid-column: 1/-1;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  text-align: left;
+  padding: 11px;
+  border-top: 1px solid #edf0f5;
+}
+th {
+  color: #667389;
+}
+@media (max-width: 900px) {
+  .adminShell {
+    grid-template-columns: 1fr;
+  }
+  .adminShell > aside {
+    display: none;
+  }
+  .adminContent {
+    padding: 16px;
+  }
+  .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .adminGrid {
+    grid-template-columns: 1fr;
+  }
+  .wide {
+    grid-column: auto;
+  }
+}

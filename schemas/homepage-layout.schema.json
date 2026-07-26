@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.socal.local/homepage-layout.schema.json",
+  "title": "Homepage operational layout",
+  "type": "object",
+  "required": ["version", "locale", "regionCode", "slots"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "locale": {
+      "enum": ["zh-Hans", "en-US"]
+    },
+    "regionCode": {
+      "type": "string"
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "kind", "enabled", "source", "limit"],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "HERO",
+              "HOT_SEARCHES",
+              "CITY_CHIPS",
+              "LISTING_FEED",
+              "BUSINESS_CAROUSEL",
+              "PROVIDER_CAROUSEL",
+              "AD",
+              "PRICE_METRIC",
+              "RESOURCE_PRODUCTS",
+              "PORTAL_LINKS"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "sponsoredDisclosure": {
+            "type": "boolean",
+            "default": false
+          },
+          "cacheTtlSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

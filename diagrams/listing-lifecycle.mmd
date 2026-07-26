@@ -1,0 +1,22 @@
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> Submitted: owner submits
+  Submitted --> AutoScreening
+  AutoScreening --> Published: low risk + rules pass
+  AutoScreening --> PendingReview: uncertain/high risk
+  AutoScreening --> Rejected: hard policy violation
+  PendingReview --> Published: moderator approves
+  PendingReview --> ChangesRequested: incomplete/repairable
+  PendingReview --> Rejected: violation
+  ChangesRequested --> Draft: owner edits
+  Published --> Suspended: report/risk/manual action
+  Suspended --> Published: restored
+  Published --> Expired: expiry job
+  Expired --> Published: renew + recheck
+  Draft --> Deleted: owner deletes
+  Published --> Archived: owner archives
+  Rejected --> Appealed: owner appeals
+  Appealed --> Published: appeal succeeds
+  Appealed --> Rejected: appeal denied
+  Archived --> [*]
+  Deleted --> [*]

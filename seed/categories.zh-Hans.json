@@ -1,0 +1,438 @@
+{
+  "version": 1,
+  "verticals": [
+    {
+      "type": "JOB",
+      "slug": "jobs",
+      "name": {
+        "zh-Hans": "招聘招工",
+        "en-US": "Jobs"
+      },
+      "lifetimeDays": 30,
+      "manualReview": "risk_based",
+      "children": [
+        {
+          "slug": "restaurant",
+          "name": {
+            "zh-Hans": "餐饮服务",
+            "en-US": "Restaurant & Food Service"
+          }
+        },
+        {
+          "slug": "warehouse-logistics",
+          "name": {
+            "zh-Hans": "仓库物流",
+            "en-US": "Warehouse & Logistics"
+          }
+        },
+        {
+          "slug": "retail-sales",
+          "name": {
+            "zh-Hans": "零售销售",
+            "en-US": "Retail & Sales"
+          }
+        },
+        {
+          "slug": "office-admin",
+          "name": {
+            "zh-Hans": "办公室/行政",
+            "en-US": "Office & Administration"
+          }
+        },
+        {
+          "slug": "driver-delivery",
+          "name": {
+            "zh-Hans": "司机配送",
+            "en-US": "Driver & Delivery"
+          }
+        },
+        {
+          "slug": "construction",
+          "name": {
+            "zh-Hans": "建筑装修",
+            "en-US": "Construction"
+          }
+        },
+        {
+          "slug": "beauty",
+          "name": {
+            "zh-Hans": "美容美甲",
+            "en-US": "Beauty"
+          }
+        },
+        {
+          "slug": "education",
+          "name": {
+            "zh-Hans": "教育培训",
+            "en-US": "Education"
+          }
+        },
+        {
+          "slug": "healthcare",
+          "name": {
+            "zh-Hans": "医疗护理",
+            "en-US": "Healthcare"
+          }
+        },
+        {
+          "slug": "technology",
+          "name": {
+            "zh-Hans": "科技互联网",
+            "en-US": "Technology"
+          }
+        },
+        {
+          "slug": "professional",
+          "name": {
+            "zh-Hans": "专业服务",
+            "en-US": "Professional Services"
+          }
+        }
+      ]
+    },
+    {
+      "type": "RENTAL",
+      "slug": "rentals",
+      "name": {
+        "zh-Hans": "房屋租售",
+        "en-US": "Housing"
+      },
+      "lifetimeDays": 30,
+      "manualReview": "risk_based",
+      "children": [
+        {
+          "slug": "room",
+          "name": {
+            "zh-Hans": "单间/分租",
+            "en-US": "Room & Shared Housing"
+          }
+        },
+        {
+          "slug": "apartment",
+          "name": {
+            "zh-Hans": "公寓",
+            "en-US": "Apartment"
+          }
+        },
+        {
+          "slug": "house",
+          "name": {
+            "zh-Hans": "独立屋",
+            "en-US": "House"
+          }
+        },
+        {
+          "slug": "condo-townhouse",
+          "name": {
+            "zh-Hans": "公寓产权房/联排",
+            "en-US": "Condo & Townhouse"
+          }
+        },
+        {
+          "slug": "commercial",
+          "name": {
+            "zh-Hans": "商铺/办公室",
+            "en-US": "Commercial"
+          }
+        },
+        {
+          "slug": "warehouse",
+          "name": {
+            "zh-Hans": "仓库",
+            "en-US": "Warehouse"
+          }
+        },
+        {
+          "slug": "parking-storage",
+          "name": {
+            "zh-Hans": "车位/储物",
+            "en-US": "Parking & Storage"
+          }
+        },
+        {
+          "slug": "wanted",
+          "name": {
+            "zh-Hans": "求租",
+            "en-US": "Housing Wanted"
+          }
+        }
+      ]
+    },
+    {
+      "type": "TRANSFER",
+      "slug": "transfers",
+      "name": {
+        "zh-Hans": "生意/店铺转让",
+        "en-US": "Business Transfers"
+      },
+      "lifetimeDays": 45,
+      "manualReview": "always",
+      "children": [
+        {
+          "slug": "restaurant",
+          "name": {
+            "zh-Hans": "餐馆转让",
+            "en-US": "Restaurant"
+          }
+        },
+        {
+          "slug": "beverage-dessert",
+          "name": {
+            "zh-Hans": "奶茶/甜品",
+            "en-US": "Beverage & Dessert"
+          }
+        },
+        {
+          "slug": "retail",
+          "name": {
+            "zh-Hans": "零售店",
+            "en-US": "Retail"
+          }
+        },
+        {
+          "slug": "beauty-salon",
+          "name": {
+            "zh-Hans": "美容美甲店",
+            "en-US": "Beauty & Salon"
+          }
+        },
+        {
+          "slug": "professional-office",
+          "name": {
+            "zh-Hans": "专业服务/办公室",
+            "en-US": "Professional Office"
+          }
+        },
+        {
+          "slug": "warehouse-manufacturing",
+          "name": {
+            "zh-Hans": "仓库/制造",
+            "en-US": "Warehouse & Manufacturing"
+          }
+        },
+        {
+          "slug": "franchise",
+          "name": {
+            "zh-Hans": "加盟项目",
+            "en-US": "Franchise"
+          }
+        },
+        {
+          "slug": "equipment",
+          "name": {
+            "zh-Hans": "商业设备",
+            "en-US": "Business Equipment"
+          }
+        }
+      ]
+    },
+    {
+      "type": "SECONDHAND",
+      "slug": "secondhand",
+      "name": {
+        "zh-Hans": "二手物品",
+        "en-US": "Marketplace"
+      },
+      "lifetimeDays": 45,
+      "manualReview": "risk_based",
+      "children": [
+        {
+          "slug": "furniture",
+          "name": {
+            "zh-Hans": "家具家居",
+            "en-US": "Furniture & Home"
+          }
+        },
+        {
+          "slug": "electronics",
+          "name": {
+            "zh-Hans": "手机数码",
+            "en-US": "Electronics"
+          }
+        },
+        {
+          "slug": "appliances",
+          "name": {
+            "zh-Hans": "家用电器",
+            "en-US": "Appliances"
+          }
+        },
+        {
+          "slug": "baby-kids",
+          "name": {
+            "zh-Hans": "母婴儿童",
+            "en-US": "Baby & Kids"
+          }
+        },
+        {
+          "slug": "vehicles-parts",
+          "name": {
+            "zh-Hans": "汽车用品/零件",
+            "en-US": "Auto Parts & Accessories"
+          }
+        },
+        {
+          "slug": "office-equipment",
+          "name": {
+            "zh-Hans": "办公设备",
+            "en-US": "Office Equipment"
+          }
+        },
+        {
+          "slug": "restaurant-equipment",
+          "name": {
+            "zh-Hans": "餐饮设备",
+            "en-US": "Restaurant Equipment"
+          }
+        },
+        {
+          "slug": "free",
+          "name": {
+            "zh-Hans": "免费赠送",
+            "en-US": "Free"
+          }
+        }
+      ]
+    },
+    {
+      "type": "SERVICE",
+      "slug": "services",
+      "name": {
+        "zh-Hans": "本地服务/找师傅",
+        "en-US": "Local Services"
+      },
+      "lifetimeDays": 90,
+      "manualReview": "risk_based",
+      "children": [
+        {
+          "slug": "remodeling",
+          "name": {
+            "zh-Hans": "装修翻新",
+            "en-US": "Remodeling"
+          }
+        },
+        {
+          "slug": "plumbing-electric",
+          "name": {
+            "zh-Hans": "水电维修",
+            "en-US": "Plumbing & Electrical"
+          }
+        },
+        {
+          "slug": "hvac",
+          "name": {
+            "zh-Hans": "空调暖气",
+            "en-US": "HVAC"
+          }
+        },
+        {
+          "slug": "painting-flooring",
+          "name": {
+            "zh-Hans": "油漆地板",
+            "en-US": "Painting & Flooring"
+          }
+        },
+        {
+          "slug": "moving-cleaning",
+          "name": {
+            "zh-Hans": "搬家清洁",
+            "en-US": "Moving & Cleaning"
+          }
+        },
+        {
+          "slug": "auto-service",
+          "name": {
+            "zh-Hans": "汽车服务",
+            "en-US": "Auto Service"
+          }
+        },
+        {
+          "slug": "accounting-legal",
+          "name": {
+            "zh-Hans": "会计法律",
+            "en-US": "Accounting & Legal"
+          }
+        },
+        {
+          "slug": "education-tutoring",
+          "name": {
+            "zh-Hans": "教育家教",
+            "en-US": "Education & Tutoring"
+          }
+        },
+        {
+          "slug": "beauty-wellness",
+          "name": {
+            "zh-Hans": "美容健康",
+            "en-US": "Beauty & Wellness"
+          }
+        },
+        {
+          "slug": "photography-events",
+          "name": {
+            "zh-Hans": "摄影活动",
+            "en-US": "Photography & Events"
+          }
+        },
+        {
+          "slug": "it-marketing",
+          "name": {
+            "zh-Hans": "网站/IT/营销",
+            "en-US": "IT & Marketing"
+          }
+        }
+      ]
+    }
+  ],
+  "communityCategories": [
+    {
+      "slug": "news",
+      "name": {
+        "zh-Hans": "新闻资讯",
+        "en-US": "News"
+      }
+    },
+    {
+      "slug": "questions",
+      "name": {
+        "zh-Hans": "本地问答",
+        "en-US": "Local Q&A"
+      }
+    },
+    {
+      "slug": "forum",
+      "name": {
+        "zh-Hans": "本地论坛",
+        "en-US": "Forum"
+      }
+    },
+    {
+      "slug": "events",
+      "name": {
+        "zh-Hans": "本地活动",
+        "en-US": "Events"
+      }
+    },
+    {
+      "slug": "deals",
+      "name": {
+        "zh-Hans": "商家优惠",
+        "en-US": "Deals"
+      }
+    },
+    {
+      "slug": "business-directory",
+      "name": {
+        "zh-Hans": "商家黄页",
+        "en-US": "Business Directory"
+      }
+    },
+    {
+      "slug": "cross-border",
+      "name": {
+        "zh-Hans": "国内货源/跨境资源",
+        "en-US": "Cross-border Resources"
+      }
+    }
+  ]
+}

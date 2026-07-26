@@ -1,0 +1,170 @@
+# 08. API 与外部集成
+
+## 8.1 API 原则
+
+- Base path：`/v1`，HTTPS only。
+- 风格：资源导向 REST；复杂行为使用清晰动作子资源，不用含糊 RPC 名称。
+- 契约：`openapi/openapi.yaml` 是事实源，生成客户端/测试可由其派生。
+- 编码：JSON UTF-8；日期时间 RFC 3339 UTC；货币带 currency。
+- 身份：Web 采用安全 Cookie 会话；外部/移动客户端未来可增加受限 OAuth/OIDC token。
+- 错误：`application/problem+json`，包含 `type`、`title`、`status`、`detail`、`instance`、`requestId`、可选字段错误。
+- 追踪：接受/生成 `traceparent` 和 `X-Request-Id`。
+
+## 8.2 版本策略
+
+`/v1` 只做向后兼容增量：新增可选字段、端点或枚举前必须考虑旧客户端。删除/重命名/改变语义属于破坏性变更，需新版本、迁移窗口和弃用头。数据库版本不直接暴露为 API 版本。
+
+## 8.3 分页、筛选和排序
+
+### Cursor 分页
+
+高变动列表使用不透明 cursor：
+
+```json
+{
+  "items": [],
+  "pageInfo": {
+    "nextCursor": "opaque",
+    "hasNextPage": true
+  }
+}
+```
+
+cursor 编码稳定排序字段和唯一 ID，需签名/校验，不能接受客户端任意 SQL 片段。
+
+### 过滤
+
+- 使用明确白名单参数，如 `regionId`、`categoryId`、`priceMin`。
+- 多值使用重复参数或约定数组格式，并写入 OpenAPI。
+- 未知筛选返回 400，不静默忽略造成误解。
+- 管理后台报表可用 offset，但必须限制最大页、日期范围和导出大小。
+
+### 排序
+
+公开排序只允许产品定义值：`relevance`、`newest`、`price_asc`、`price_desc`、`distance`。付费权重不伪装成纯自然排序。
+
+## 8.4 并发与幂等
+
+- 可编辑资源返回 `version`/ETag；更新要求 `If-Match` 或版本字段。
+- 冲突返回 409，并提供当前版本摘要。
+- 订单、付款、退款、推广购买、批量后台任务要求 `Idempotency-Key`。
+- 幂等记录绑定 actor、endpoint、request hash；相同 key 不同 payload 返回冲突。
+- webhook 以 provider event ID 唯一去重；同步返回不视为支付成功事实。
+
+## 8.5 主要端点组
+
+OpenAPI 已定义核心端点，实施时保持下列模块：
+
+```text
+/auth/*
+/me, /me/sessions, /me/preferences
+/regions, /categories, /homepage
+/listings, /listings/{id}, /listings/{id}/submit|publish|archive
+/listings/{id}/media, /media/uploads
+/search/listings, /search/suggestions
+/favorites
+/conversations, /conversations/{id}/messages
+/businesses, /providers, /reviews
+/reports
+/notifications
+/orders, /payments, /wallet
+/ads/campaigns, /ads/placements
+/admin/moderation/*, /admin/users/*, /admin/config/*
+/webhooks/stripe
+```
+
+状态变更尽量用子资源或动作端点清晰表达，不允许客户端直接 PATCH 任意 `status`。
+
+## 8.6 响应投影
+
+不同场景使用明确 DTO：
+
+- `ListingSummary`：列表安全字段，不含联系方式、内部风险分。
+- `ListingDetail`：详情公开字段和授权后视图。
+- `ListingOwnerView`：草稿、审核原因、指标和管理动作。
+- `ListingModerationView`：快照、规则命中、关联风险，仅审核员可见。
+
+不要直接序列化 Prisma 模型；这样可避免新增数据库字段意外泄漏。
+
+## 8.7 上传 API
+
+1. 客户端请求 upload intent，声明用途、mime、大小、hash。
+2. API 校验配额和类型，返回短效预签名 URL/object key。
+3. 客户端直传私有 quarantine bucket/prefix。
+4. 回调或对象事件进入扫描队列。
+5. 扫描、解码、重编码、去 EXIF、生成变体。
+6. 状态 `READY` 后才能绑定公开信息；公开使用独立 CDN 域和不可执行 content-type。
+
+服务端不信任扩展名或客户端 MIME。文档/验证材料永不进入公共媒体路径。
+
+## 8.8 Stripe 集成
+
+- API 创建内部 Order，再创建 Checkout Session/Payment Intent，metadata 只放内部引用，不放敏感数据。
+- webhook endpoint 使用原始请求体验证签名。
+- 先持久化 receipt，再异步处理；重复事件返回成功但不重复履约。
+- 付款成功状态只来自受信 webhook/主动查询，不来自浏览器 return URL。
+- 退款与 dispute 更新 Order、Payment、Ledger 和广告/推广履约。
+- provider 超时采用幂等 key 和查询恢复，不盲目重复创建支付。
+
+## 8.9 邮件、短信和通知
+
+定义端口：`EmailProvider`、`SmsProvider`、`PushProvider`。模板使用稳定 key、locale、版本和变量 schema。通知记录先写库，再由 Worker 发送；provider message id、attempt、失败分类和退订状态可追踪。
+
+营销与事务通知分开处理。短信/邮件退订不应阻断安全和订单必要通知，但必须遵守法律和用户偏好。
+
+## 8.10 地图/地理编码
+
+通过 `GeocodingProvider` 隔离供应商。只存完成业务所需的规范化地址和坐标；公开输出按 location precision 模糊。对同一地址做缓存和配额保护；用户输入不能直接作为地图 HTML。
+
+## 8.11 Webhook 安全
+
+所有外部 webhook：
+
+- 专用路由和最小 body limit；
+- 签名、时间戳和重放窗口校验；
+- provider event id 唯一约束；
+- 原始 payload 加密/限时保留；
+- 快速 ACK，业务异步；
+- 失败可重放，处理器幂等；
+- 指标覆盖签名失败、积压、处理延迟和永久失败。
+
+## 8.12 Gate 0 HTTP 基线
+
+- Fastify 通用 JSON 请求体默认限制为 1 MiB，可通过受校验的
+  `API_BODY_LIMIT_BYTES` 在 1–10 MiB 范围内调整；上传和 webhook 端点使用后续任务定义的更窄限制。
+- `X-Request-Id` 只接受最长 128 字符的安全字符集，不合规值会替换为 UUID；所有响应回传
+  `X-Request-Id`。
+- DTO 对未知字段和未知 query 参数返回 400；字段错误放在 RFC 9457 Problem Details 的
+  `errors` map 中。
+- CORS 仅允许配置的 Web/Admin origin 并允许凭据。带会话 Cookie 的修改请求必须同时具有受信
+  `Origin`；webhook 路由不使用 Cookie，后续由签名与重放保护负责。
+- Problem Details 不返回 stack、provider 原始错误或查询字符串，错误响应设置
+  `Cache-Control: no-store`。
+
+## 8.13 Gate 0 OpenAPI 契约基线
+
+- `openapi/openapi.yaml` 是唯一 REST 契约事实源；API 启动时读取该文件，Swagger UI、
+  `/docs/openapi.json` 与 `/docs/openapi.yaml` 均从同一文档提供，不再从装饰器生成另一份子集。
+- Redocly 在本地 `pnpm openapi:lint` 和 CI 中执行 OpenAPI 3.1、引用、operationId 与结构校验。
+  所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
+  项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
+  liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
+- 契约测试解析并解引用文档，校验 31 个 path、52 个 schema、38 个唯一 operationId，
+  验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
+- API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
+
+## 8.14 契约生成方向
+
+方向固定为 **OpenAPI → TypeScript 类型 → 运行时适配器**：
+
+1. 只在 `openapi/openapi.yaml` 中定义公共 HTTP 结构；运行 `pnpm openapi:generate` 生成
+   `packages/contracts/src/generated/openapi.ts`，该文件禁止手改。
+2. `@socal/contracts` 从生成的 `components`/`operations` 导出稳定别名。Zod 仅作为运行时输入
+   适配器，并以生成类型作为 `ZodType` 输出约束；不能另写一套独立接口。
+3. Nest Controller 对已实现请求直接使用共享 Zod schema 与生成类型，不再维护 Swagger
+   装饰器 DTO。Swagger 仍只服务 canonical OpenAPI。
+4. `pnpm openapi:check` 在本地与 CI 重新生成到内存并检测提交文件漂移；OpenAPI 改动若未重新
+   生成会阻断质量门。
+
+数据库模型和内部领域对象不从 OpenAPI 生成；它们通过显式 application mapping 隔离，避免把
+私有字段意外暴露为公共响应。

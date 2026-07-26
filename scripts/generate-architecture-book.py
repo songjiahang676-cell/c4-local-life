@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+docs = sorted((root / "docs").glob("[0-9][0-9]-*.md"))
+header = """# 南加生活网完整网站架构书\n\n> 本文件由 `scripts/generate-architecture-book.py` 从 `docs/00-*.md` 至 `docs/30-*.md` 合并生成。分章节文件是维护事实源。\n\n"""
+parts = [header]
+for path in docs:
+    parts.append(f"\n---\n\n<!-- source: {path.relative_to(root)} -->\n\n")
+    parts.append(path.read_text(encoding="utf-8").strip())
+    parts.append("\n")
+(root / "ARCHITECTURE_BOOK.md").write_text("".join(parts), encoding="utf-8")
+print(f"Generated ARCHITECTURE_BOOK.md from {len(docs)} chapters")

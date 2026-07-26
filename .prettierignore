@@ -1,0 +1,9 @@
+.next
+.turbo
+coverage
+dist
+generated
+node_modules
+packages/database/generated
+ARCHITECTURE_BOOK.md
+MANIFEST.sha256

@@ -1,0 +1,33 @@
+{
+  "name": "@socal/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "tsx prisma/seed.ts",
+    "seed:validate": "tsx src/seed/validate-seed.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test --max-warnings=0",
+    "test": "vitest run --config ../../vitest.config.ts --project @socal/database --reporter=default"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.0",
+    "@prisma/client": "7.9.0",
+    "dotenv": "17.2.3",
+    "pg": "8.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.9",
+    "@types/pg": "8.15.6",
+    "prisma": "7.9.0",
+    "typescript": "catalog:"
+  }
+}

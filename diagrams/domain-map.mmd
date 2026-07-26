@@ -1,0 +1,28 @@
+flowchart LR
+  IAM[Identity & Access] --> ORG[Organizations]
+  TAX[Taxonomy & Geo] --> LST[Listings]
+  IAM --> LST
+  ORG --> LST
+  LST --> MED[Media]
+  LST --> SRCH[Search & Discovery]
+  LST --> ENG[Favorites, Reviews, Messaging]
+  IAM --> ENG
+  ENG --> MOD[Trust, Safety & Moderation]
+  LST --> MOD
+  ORG --> ADS[Ads & Promotion]
+  ORG --> BILL[Billing & Wallet]
+  ADS --> BILL
+  LST --> ADS
+  LST --> SEO[SEO & Publishing]
+  LST --> NOTIF[Notifications]
+  MOD --> NOTIF
+  BILL --> NOTIF
+  OPS[Admin & Operations] --> MOD
+  OPS --> ADS
+  OPS --> TAX
+  OUTBOX[Transactional Outbox] --> SRCH
+  OUTBOX --> NOTIF
+  OUTBOX --> ANALYTICS[Analytics]
+  LST --> OUTBOX
+  BILL --> OUTBOX
+  MOD --> OUTBOX

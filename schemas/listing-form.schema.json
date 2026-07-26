@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.socal.local/listing-form.schema.json",
+  "title": "Dynamic listing form definition",
+  "type": "object",
+  "required": ["categoryId", "version", "fields"],
+  "properties": {
+    "categoryId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "publicationPolicy": {
+      "$ref": "#/$defs/publicationPolicy"
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "type": "object",
+      "required": ["zh-Hans", "en-US"],
+      "properties": {
+        "zh-Hans": {
+          "type": "string"
+        },
+        "en-US": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "option": {
+      "type": "object",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/localizedText"
+        }
+      },
+      "additionalProperties": false
+    },
+    "field": {
+      "type": "object",
+      "required": ["key", "type", "label", "required", "filterable", "searchable", "sortOrder"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_]{1,79}$"
+        },
+        "type": {
+          "enum": [
+            "TEXT",
+            "TEXTAREA",
+            "NUMBER",
+            "MONEY",
+            "SELECT",
+            "MULTISELECT",
+            "BOOLEAN",
+            "DATE",
+            "LOCATION",
+            "PHONE",
+            "EMAIL"
+          ]
+        },
+        "label": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "helpText": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "filterable": {
+          "type": "boolean"
+        },
+        "searchable": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "minLength": {
+              "type": "integer"
+            },
+            "maxLength": {
+              "type": "integer"
+            },
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "visibility": {
+          "enum": ["PUBLIC", "OWNER_ONLY", "MODERATOR_ONLY"]
+        },
+        "sortOrder": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicationPolicy": {
+      "type": "object",
+      "properties": {
+        "defaultLifetimeDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "manualReviewRequired": {
+          "type": "boolean"
+        },
+        "phoneVerificationRequired": {
+          "type": "boolean"
+        },
+        "maxMedia": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "allowExactAddress": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

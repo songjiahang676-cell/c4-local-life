@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "note": "Seed centroids are placeholders for development. Production must import verified GIS data and ZIP boundaries.",
+  "country": {
+    "code": "US",
+    "name": {
+      "zh-Hans": "美国",
+      "en-US": "United States"
+    }
+  },
+  "state": {
+    "code": "US-CA",
+    "name": {
+      "zh-Hans": "加利福尼亚州",
+      "en-US": "California"
+    },
+    "timezone": "America/Los_Angeles"
+  },
+  "metros": [
+    {
+      "code": "US-CA-SOCAL",
+      "type": "REGION_GROUP",
+      "name": {
+        "zh-Hans": "南加州",
+        "en-US": "Southern California"
+      },
+      "children": [
+        {
+          "code": "US-CA-LA",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "洛杉矶",
+            "en-US": "Los Angeles"
+          },
+          "centroid": {
+            "latitude": 34.0522,
+            "longitude": -118.2437
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-IRVINE",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "尔湾",
+            "en-US": "Irvine"
+          },
+          "centroid": {
+            "latitude": 33.6846,
+            "longitude": -117.8265
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-SGV",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "圣盖博谷",
+            "en-US": "San Gabriel Valley"
+          },
+          "centroid": {
+            "latitude": 34.0953,
+            "longitude": -118.127
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-MONTEREY-PARK",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "蒙特利公园",
+            "en-US": "Monterey Park"
+          },
+          "centroid": {
+            "latitude": 34.0625,
+            "longitude": -118.1228
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-ARCADIA",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "阿凯迪亚",
+            "en-US": "Arcadia"
+          },
+          "centroid": {
+            "latitude": 34.1397,
+            "longitude": -118.0353
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-WALNUT",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "核桃市",
+            "en-US": "Walnut"
+          },
+          "centroid": {
+            "latitude": 34.0203,
+            "longitude": -117.8653
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-CITY-OF-INDUSTRY",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "工业市",
+            "en-US": "City of Industry"
+          },
+          "centroid": {
+            "latitude": 34.0197,
+            "longitude": -117.9587
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-LONG-BEACH",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "长滩",
+            "en-US": "Long Beach"
+          },
+          "centroid": {
+            "latitude": 33.7701,
+            "longitude": -118.1937
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-ROWLAND-HEIGHTS",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "罗兰岗",
+            "en-US": "Rowland Heights"
+          },
+          "centroid": {
+            "latitude": 33.9761,
+            "longitude": -117.9053
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-ALHAMBRA",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "阿罕布拉",
+            "en-US": "Alhambra"
+          },
+          "centroid": {
+            "latitude": 34.0953,
+            "longitude": -118.127
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-PASADENA",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "帕萨迪纳",
+            "en-US": "Pasadena"
+          },
+          "centroid": {
+            "latitude": 34.1478,
+            "longitude": -118.1445
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-TORRANCE",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "托伦斯",
+            "en-US": "Torrance"
+          },
+          "centroid": {
+            "latitude": 33.8358,
+            "longitude": -118.3406
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-RIVERSIDE",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "河滨",
+            "en-US": "Riverside"
+          },
+          "centroid": {
+            "latitude": 33.9806,
+            "longitude": -117.3755
+          },
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "code": "US-CA-SAN-DIEGO",
+          "type": "CITY",
+          "name": {
+            "zh-Hans": "圣地亚哥",
+            "en-US": "San Diego"
+          },
+          "centroid": {
+            "latitude": 32.7157,
+            "longitude": -117.1611
+          },
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    }
+  ]
+}

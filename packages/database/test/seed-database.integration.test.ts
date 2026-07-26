@@ -1,0 +1,95 @@
+import { loadSeedData } from "../src/seed/seed-data";
+import { seedDatabaseInTransaction } from "../src/seed/seed-database";
+import { stableSeedUuid } from "../src/seed/stable-id";
+import {
+  createIntegrationDatabase,
+  type IntegrationDatabase,
+} from "../src/testing/integration-database";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+const databaseUrl = process.env.DATABASE_INTEGRATION_URL ?? "";
+const integration = describe.skipIf(databaseUrl.length === 0);
+
+integration("idempotent database seed", () => {
+  let database: IntegrationDatabase;
+  let seed: Awaited<ReturnType<typeof loadSeedData>>;
+
+  function listingIds(): string[] {
+    return seed.listings.listings.map((listing, index) =>
+      stableSeedUuid(`listing:${listing.type}:${index}`),
+    );
+  }
+
+  function categoryIds(): string[] {
+    return [
+      ...seed.categories.verticals.flatMap((vertical) => [
+        stableSeedUuid(`category:${vertical.type}:${vertical.slug}`),
+        ...vertical.children.map((child) =>
+          stableSeedUuid(`category:${vertical.type}:${vertical.slug}:${child.slug}`),
+        ),
+      ]),
+      ...seed.categories.communityCategories.map((category) =>
+        stableSeedUuid(`category:COMMUNITY:${category.slug}`),
+      ),
+    ];
+  }
+
+  function regionIds(): string[] {
+    return [
+      stableSeedUuid(`region:${seed.regions.country.code}`),
+      stableSeedUuid(`region:${seed.regions.state.code}`),
+      ...seed.regions.metros.flatMap((metro) => [
+        stableSeedUuid(`region:${metro.code}`),
+        ...metro.children.map((city) => stableSeedUuid(`region:${city.code}`)),
+      ]),
+    ];
+  }
+
+  beforeAll(async () => {
+    seed = await loadSeedData();
+    database = createIntegrationDatabase(databaseUrl);
+  });
+
+  afterAll(async () => {
+    await database?.close();
+  });
+
+  it("imports the same stable taxonomy and synthetic drafts twice without duplicates", async () => {
+    await database.withRollback(async (transaction) => {
+      const first = await seedDatabaseInTransaction(transaction, seed);
+      const second = await seedDatabaseInTransaction(transaction, seed);
+
+      expect(second).toEqual(first);
+      expect(first).toMatchObject({
+        regions: regionIds().length,
+        categories: categoryIds().length,
+        listings: listingIds().length,
+        users: 1,
+      });
+      await expect(transaction.region.count({ where: { id: { in: regionIds() } } })).resolves.toBe(
+        regionIds().length,
+      );
+      await expect(
+        transaction.category.count({ where: { id: { in: categoryIds() } } }),
+      ).resolves.toBe(categoryIds().length);
+      await expect(
+        transaction.listing.count({ where: { id: { in: listingIds() } } }),
+      ).resolves.toBe(listingIds().length);
+
+      const listings = await transaction.listing.findMany({
+        where: { id: { in: listingIds() } },
+        select: { status: true, moderationStatus: true, title: true, publishedAt: true },
+      });
+      expect(listings).toHaveLength(5);
+      expect(
+        listings.every(
+          (listing) =>
+            listing.status === "DRAFT" &&
+            listing.moderationStatus === "NOT_REVIEWED" &&
+            listing.title.startsWith("[示例]") &&
+            listing.publishedAt === null,
+        ),
+      ).toBe(true);
+    });
+  });
+});

@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+.next/
+dist/
+build/
+coverage/
+reports/
+.turbo/
+.generated/
+packages/database/generated/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+*.tsbuildinfo
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# local infrastructure
+.minio/
+.opensearch/
+.postgres/
