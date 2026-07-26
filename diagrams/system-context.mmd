@@ -1,0 +1,18 @@
+C4Context
+  title 南加生活网 — System Context
+  Person(visitor, "访客/会员", "浏览、搜索、发布、收藏、沟通")
+  Person(merchant, "商家/师傅/供应商", "管理资料、发布服务、购买增值服务")
+  Person(operator, "运营/审核/客服/财务", "审核内容、处理举报、广告、订单和配置")
+  System(platform, "南加生活网", "南加州华人本地分类信息、商家、服务与社区平台")
+  System_Ext(payment, "Stripe", "支付、订阅、退款和 webhook")
+  System_Ext(emailSms, "Email/SMS providers", "验证码和通知")
+  System_Ext(maps, "Map/Geocoding provider", "地址解析、地图和距离")
+  System_Ext(cdn, "CDN/WAF", "静态资源、图片加速、边缘防护")
+
+  Rel(visitor, platform, "HTTPS")
+  Rel(merchant, platform, "HTTPS")
+  Rel(operator, platform, "HTTPS + MFA")
+  Rel(platform, payment, "HTTPS/webhooks")
+  Rel(platform, emailSms, "HTTPS/SMTP")
+  Rel(platform, maps, "HTTPS")
+  Rel(platform, cdn, "Origin traffic")

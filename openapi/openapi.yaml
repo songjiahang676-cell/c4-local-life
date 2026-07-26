@@ -1,0 +1,1740 @@
+openapi: 3.1.0
+info:
+  title: 南加生活网 API
+  version: 0.1.0
+  description: |
+    面向网站、管理后台及未来移动端的 REST API 合同。
+    所有写操作必须支持幂等性、审计和统一 Problem Details 错误格式。
+servers:
+  - url: http://localhost:4000/v1
+    description: Local
+  - url: https://api.staging.example.com/v1
+    description: Staging placeholder
+security:
+  - sessionCookie: []
+tags:
+  - name: Health
+    description: Process liveness and dependency readiness
+  - name: Auth
+    description: Authentication challenges and sessions
+  - name: Taxonomy
+    description: Regions, categories, and dynamic form definitions
+  - name: Search
+    description: Public search and query suggestions
+  - name: Listings
+    description: Classified listing lifecycle and public views
+  - name: Media
+    description: Quarantined media upload and processing
+  - name: Engagement
+    description: Favorites, reviews, and other trust interactions
+  - name: Messaging
+    description: Private conversations and messages
+  - name: Businesses
+    description: Business directory resources
+  - name: Providers
+    description: Service provider directory resources
+  - name: Reports
+    description: User reports and abuse intake
+  - name: Billing
+    description: Orders, payment sessions, and provider webhooks
+  - name: Ads
+    description: Advertising placements and campaigns
+  - name: Admin
+    description: Authorized operator and moderation workflows
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      security: []
+      summary: Get process liveness
+      operationId: getLiveness
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /health/ready:
+    get:
+      tags: [Health]
+      security: []
+      summary: Get dependency readiness
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Required dependencies are reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Request an OTP challenge
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpRequest"
+      responses:
+        "202":
+          description: OTP accepted for delivery; response never reveals account existence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Verify an OTP challenge
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerifyRequest"
+      responses:
+        "200":
+          description: Authenticated session established
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: Get the current session
+      operationId: getSession
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [Auth]
+      summary: Revoke the current session
+      operationId: logout
+      responses:
+        "204":
+          description: Session revoked
+  /regions:
+    get:
+      tags: [Taxonomy]
+      security: []
+      summary: List supported regions
+      operationId: listRegions
+      parameters:
+        - name: parentCode
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/RegionType"
+        - name: activeOnly
+          in: query
+          schema: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Region tree or children
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Region"
+  /categories:
+    get:
+      tags: [Taxonomy]
+      security: []
+      summary: List supported categories
+      operationId: listCategories
+      parameters:
+        - name: vertical
+          in: query
+          schema:
+            $ref: "#/components/schemas/ListingType"
+        - name: parentId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Category tree
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+  /categories/{categoryId}/form-schema:
+    get:
+      tags: [Taxonomy]
+      security: []
+      summary: Get a category form schema
+      operationId: getCategoryFormSchema
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      responses:
+        "200":
+          description: Versioned dynamic form definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryFormSchema"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /search:
+    get:
+      tags: [Search]
+      security: []
+      summary: Search public content
+      operationId: searchContent
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ListingType"
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: regionCode
+          in: query
+          schema: { type: string }
+        - name: latitude
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: longitude
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: radiusMiles
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: minPrice
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: maxPrice
+          in: query
+          schema: { type: number, minimum: 0 }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [RELEVANCE, NEWEST, PRICE_ASC, PRICE_DESC, DISTANCE]
+            default: RELEVANCE
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Search results and facets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+  /search/suggestions:
+    get:
+      tags: [Search]
+      security: []
+      summary: Get search suggestions
+      operationId: getSearchSuggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 50 }
+        - name: regionCode
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Query, category, city, and entity suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    maxItems: 10
+                    items:
+                      $ref: "#/components/schemas/SearchSuggestion"
+  /listings:
+    get:
+      tags: [Listings]
+      security: []
+      summary: List visible listings
+      operationId: listListings
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ListingType"
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: regionCode
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Non-public status filters require ownership or operator permissions
+          schema:
+            $ref: "#/components/schemas/ContentStatus"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Cursor-paginated listings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Listings]
+      summary: Create a draft listing
+      operationId: createListing
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateListingRequest"
+      responses:
+        "201":
+          description: Draft listing created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /listings/{listingId}:
+    get:
+      tags: [Listings]
+      security: []
+      summary: Get a visible listing
+      operationId: getListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      responses:
+        "200":
+          description: Listing detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Listings]
+      summary: Update an owned listing
+      operationId: updateListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+        - name: If-Match
+          in: header
+          required: true
+          description: Optimistic concurrency version, for example W/"12"
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/UpdateListingRequest"
+      responses:
+        "200":
+          description: Updated listing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Listing"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Listings]
+      summary: Soft-delete an owned listing
+      operationId: deleteListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      responses:
+        "204":
+          description: Listing soft-deleted and removed from search
+  /listings/{listingId}/submit:
+    post:
+      tags: [Listings]
+      summary: Submit a listing for moderation
+      operationId: submitListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Listing entered automated/manual review workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTransitionResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /listings/{listingId}/renew:
+    post:
+      tags: [Listings]
+      summary: Renew an eligible listing
+      operationId: renewListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Listing expiration extended according to policy/plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTransitionResponse"
+        "402":
+          description: Paid renewal required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /media/uploads:
+    post:
+      tags: [Media]
+      summary: Create a media upload intent
+      operationId: createMediaUpload
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUploadRequest"
+      responses:
+        "201":
+          description: Presigned upload created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUploadResponse"
+        "413":
+          description: File too large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+  /media/{mediaId}/complete:
+    post:
+      tags: [Media]
+      summary: Complete a media upload
+      operationId: completeMediaUpload
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "202":
+          description: Scan and derivative generation queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+  /favorites:
+    get:
+      tags: [Engagement]
+      summary: List the current user's favorites
+      operationId: listFavorites
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: User favorites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingCollection"
+  /favorites/{listingId}:
+    put:
+      tags: [Engagement]
+      summary: Add a listing to favorites
+      operationId: addFavorite
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      responses:
+        "204":
+          description: Favorite is present; idempotent
+    delete:
+      tags: [Engagement]
+      summary: Remove a listing from favorites
+      operationId: removeFavorite
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+      responses:
+        "204":
+          description: Favorite removed; idempotent
+  /conversations:
+    get:
+      tags: [Messaging]
+      summary: List the current user's conversations
+      operationId: listConversations
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: User conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationCollection"
+    post:
+      tags: [Messaging]
+      summary: Create or reuse a conversation
+      operationId: createConversation
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConversationRequest"
+      responses:
+        "201":
+          description: Existing or newly created conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Conversation"
+  /conversations/{conversationId}/messages:
+    get:
+      tags: [Messaging]
+      summary: List conversation messages
+      operationId: listMessages
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Conversation messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageCollection"
+    post:
+      tags: [Messaging]
+      summary: Send a conversation message
+      operationId: sendMessage
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Message accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Message"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /businesses:
+    get:
+      tags: [Businesses]
+      security: []
+      summary: List public businesses
+      operationId: listBusinesses
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: regionCode
+          in: query
+          schema: { type: string }
+        - name: verifiedOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Business directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessCollection"
+  /businesses/{businessId}:
+    get:
+      tags: [Businesses]
+      security: []
+      summary: Get a public business
+      operationId: getBusiness
+      parameters:
+        - name: businessId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Business profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Business"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /providers:
+    get:
+      tags: [Providers]
+      security: []
+      summary: List public service providers
+      operationId: listProviders
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: regionCode
+          in: query
+          schema: { type: string }
+        - name: verifiedOnly
+          in: query
+          schema: { type: boolean, default: true }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Service provider directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderCollection"
+  /reviews:
+    post:
+      tags: [Engagement]
+      summary: Create a review
+      operationId: createReview
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+      responses:
+        "201":
+          description: Review submitted for moderation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /reports:
+    post:
+      tags: [Reports]
+      summary: Submit a user report
+      operationId: createReport
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "202":
+          description: Report accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedResponse"
+  /billing/checkout-sessions:
+    post:
+      tags: [Billing]
+      summary: Create a hosted checkout session
+      operationId: createCheckoutSession
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckoutRequest"
+      responses:
+        "201":
+          description: Hosted checkout session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSessionResponse"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /billing/webhooks/stripe:
+    post:
+      tags: [Billing]
+      security: []
+      summary: Receive a signed Stripe webhook
+      operationId: receiveStripeWebhook
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Event accepted or already processed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /ads/placements:
+    get:
+      tags: [Ads]
+      security: []
+      summary: List public ad placements
+      operationId: listAdPlacements
+      responses:
+        "200":
+          description: Public placement inventory metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdPlacement"
+  /ads/campaigns:
+    post:
+      tags: [Ads]
+      summary: Create a draft ad campaign
+      operationId: createAdCampaign
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "201":
+          description: Draft campaign created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AdCampaign"
+  /admin/moderation/cases:
+    get:
+      tags: [Admin]
+      summary: List moderation cases
+      operationId: listModerationCases
+      parameters:
+        - name: queue
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
+        - name: minPriority
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 100 }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Operator moderation queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationCaseCollection"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/moderation/cases/{caseId}/actions:
+    post:
+      tags: [Admin]
+      summary: Apply a moderation action
+      operationId: actOnModerationCase
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationActionRequest"
+      responses:
+        "200":
+          description: Action committed with audit log and outbox event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowTransitionResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: socal_session
+  parameters:
+    ListingId:
+      name: listingId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string, maxLength: 512 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    PayloadTooLarge:
+      description: Request body exceeds the endpoint limit
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: Permission denied
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: Resource not found or not visible
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Conflict:
+      description: State or optimistic concurrency conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    UnprocessableEntity:
+      description: Business validation failed
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    ServiceUnavailable:
+      description: Required dependency or feature is unavailable
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, timestamp]
+      examples:
+        - status: ok
+          service: api
+          timestamp: "2026-07-24T12:00:00.000Z"
+      properties:
+        status: { type: string, const: ok }
+        service: { type: string }
+        timestamp: { type: string, format: date-time }
+    ReadinessResponse:
+      type: object
+      required: [status, checks]
+      examples:
+        - status: ok
+          checks:
+            process: ok
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        checks:
+          type: object
+          additionalProperties: { type: string }
+    AcceptedResponse:
+      type: object
+      required: [accepted, requestId]
+      properties:
+        accepted: { type: boolean, const: true }
+        requestId: { type: string }
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail, instance, requestId]
+      examples:
+        - type: https://api.socal.local/problems/validation
+          title: Bad Request
+          status: 400
+          detail: Request validation failed
+          instance: /v1/listings
+          requestId: 00000000-0000-4000-8000-000000000001
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string }
+        requestId: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    OtpRequest:
+      type: object
+      required: [channel, destination, purpose]
+      properties:
+        channel: { type: string, enum: [SMS, EMAIL] }
+        destination: { type: string, maxLength: 320 }
+        purpose: { type: string, enum: [SIGN_IN, VERIFY_CONTACT, SENSITIVE_ACTION] }
+        locale: { type: string, enum: [zh-Hans, en-US], default: zh-Hans }
+    OtpVerifyRequest:
+      type: object
+      required: [challengeId, code]
+      properties:
+        challengeId: { type: string, format: uuid }
+        code: { type: string, pattern: '^\\d{6}$' }
+    SessionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: "#/components/schemas/Session"
+    Session:
+      type: object
+      required: [user, expiresAt, permissions]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        expiresAt: { type: string, format: date-time }
+        permissions:
+          type: array
+          items: { type: string }
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationSummary"
+    UserSummary:
+      type: object
+      required: [id, displayName, locale, status]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        avatarUrl: { type: [string, "null"], format: uri }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        status: { type: string, enum: [ACTIVE, LIMITED, SUSPENDED] }
+        verificationBadges:
+          type: array
+          items: { type: string }
+    OrganizationSummary:
+      type: object
+      required: [id, type, displayName, slug, role]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [MERCHANT, SERVICE_PROVIDER, SUPPLIER, MEDIA, INTERNAL] }
+        displayName: { type: string }
+        slug: { type: string }
+        role: { type: string, enum: [OWNER, ADMIN, EDITOR, BILLING, ANALYST] }
+    RegionType:
+      type: string
+      enum: [COUNTRY, STATE, COUNTY, CITY, NEIGHBORHOOD, ZIP_CODE]
+    Region:
+      type: object
+      required: [id, code, type, name, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: [string, "null"], format: uuid }
+        code: { type: string }
+        type:
+          $ref: "#/components/schemas/RegionType"
+        slug: { type: string }
+        name:
+          type: object
+          required: [zh-Hans, en-US]
+          properties:
+            zh-Hans: { type: string }
+            en-US: { type: string }
+        timezone: { type: string }
+        centroid:
+          $ref: "#/components/schemas/GeoPoint"
+    ListingType:
+      type: string
+      enum: [JOB, RENTAL, TRANSFER, SECONDHAND, SERVICE]
+    ContentStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, PUBLISHED, EXPIRED, ARCHIVED, SUSPENDED, DELETED]
+    ModerationStatus:
+      type: string
+      enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED]
+    Category:
+      type: object
+      required: [id, slug, name, formSchemaVersion, active]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: [string, "null"], format: uuid }
+        vertical:
+          oneOf:
+            - $ref: "#/components/schemas/ListingType"
+            - type: "null"
+        slug: { type: string }
+        name:
+          type: object
+          required: [zh-Hans, en-US]
+          properties:
+            zh-Hans: { type: string }
+            en-US: { type: string }
+        iconKey: { type: [string, "null"] }
+        formSchemaVersion: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+    CategoryFormSchema:
+      type: object
+      required: [categoryId, version, fields]
+      properties:
+        categoryId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormField"
+    FormField:
+      type: object
+      required: [key, type, label, required, filterable]
+      properties:
+        key: { type: string }
+        type:
+          {
+            type: string,
+            enum:
+              [
+                TEXT,
+                TEXTAREA,
+                NUMBER,
+                MONEY,
+                SELECT,
+                MULTISELECT,
+                BOOLEAN,
+                DATE,
+                LOCATION,
+                PHONE,
+                EMAIL,
+              ],
+          }
+        label:
+          type: object
+          additionalProperties: { type: string }
+        required: { type: boolean }
+        filterable: { type: boolean }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value: { type: string }
+              label:
+                type: object
+                additionalProperties: { type: string }
+        validation:
+          type: object
+          additionalProperties: true
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }
+        currency: { type: string, const: USD }
+        unit:
+          {
+            type: [string, "null"],
+            enum: [FIXED, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY, SQFT, NEGOTIABLE, FREE, null],
+          }
+    GeoPoint:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+    Listing:
+      type: object
+      required:
+        [
+          id,
+          type,
+          status,
+          moderationStatus,
+          title,
+          slug,
+          body,
+          region,
+          category,
+          owner,
+          attributes,
+          createdAt,
+          updatedAt,
+          version,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        status:
+          $ref: "#/components/schemas/ContentStatus"
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, maxLength: 120 }
+        slug: { type: string }
+        summary: { type: [string, "null"], maxLength: 240 }
+        body: { type: string, maxLength: 10000 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/Region"
+        category:
+          $ref: "#/components/schemas/Category"
+        location:
+          type: object
+          properties:
+            precision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT] }
+            point:
+              oneOf:
+                - $ref: "#/components/schemas/GeoPoint"
+                - type: "null"
+        owner:
+          $ref: "#/components/schemas/UserSummary"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/OrganizationSummary"
+            - type: "null"
+        attributes:
+          type: object
+          additionalProperties: true
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+        stats:
+          type: object
+          properties:
+            views: { type: integer, minimum: 0 }
+            favorites: { type: integer, minimum: 0 }
+            inquiries: { type: integer, minimum: 0 }
+        sponsored: { type: boolean, default: false }
+        featuredUntil: { type: [string, "null"], format: date-time }
+        publishedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    CreateListingRequest:
+      type: object
+      additionalProperties: false
+      required: [type, categoryId, regionCode, title, body]
+      properties:
+        type:
+          $ref: "#/components/schemas/ListingType"
+        locale: { type: string, enum: [zh-Hans, en-US], default: zh-Hans }
+        categoryId: { type: string, format: uuid }
+        regionCode: { type: string, minLength: 2, maxLength: 80 }
+        title: { type: string, minLength: 5, maxLength: 120 }
+        summary: { type: string, maxLength: 240 }
+        body: { type: string, minLength: 20, maxLength: 10000 }
+        price:
+          $ref: "#/components/schemas/Money"
+        location:
+          type: object
+          properties:
+            precision:
+              { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT], default: CITY }
+            point:
+              $ref: "#/components/schemas/GeoPoint"
+        attributes:
+          type: object
+          additionalProperties: true
+          default: {}
+        mediaIds:
+          type: array
+          maxItems: 20
+          default: []
+          items: { type: string, format: uuid }
+        contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL], default: IN_APP }
+    UpdateListingRequest:
+      type: object
+      properties:
+        categoryId: { type: string, format: uuid }
+        regionCode: { type: string }
+        title: { type: string, minLength: 5, maxLength: 120 }
+        summary: { type: [string, "null"], maxLength: 240 }
+        body: { type: string, minLength: 20, maxLength: 10000 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        location:
+          type: object
+          additionalProperties: true
+        attributes:
+          type: object
+          additionalProperties: true
+        mediaIds:
+          type: array
+          maxItems: 20
+          items: { type: string, format: uuid }
+        contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
+    ListingCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Listing"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    SearchResponse:
+      type: object
+      required: [data, page, facets, tookMs]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Listing"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        facets:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              required: [value, count]
+              properties:
+                value: { type: string }
+                count: { type: integer, minimum: 0 }
+        correctedQuery: { type: [string, "null"] }
+        tookMs: { type: integer, minimum: 0 }
+    SearchSuggestion:
+      type: object
+      required: [type, label, value]
+      properties:
+        type: { type: string, enum: [QUERY, CATEGORY, REGION, BUSINESS, PROVIDER] }
+        label: { type: string }
+        value: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    CursorPage:
+      type: object
+      required: [hasMore]
+      properties:
+        nextCursor: { type: [string, "null"] }
+        hasMore: { type: boolean }
+    Media:
+      type: object
+      required: [id, kind, status, url]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [IMAGE, VIDEO, DOCUMENT] }
+        status: { type: string, enum: [UPLOADING, SCANNING, READY, REJECTED, DELETED] }
+        url: { type: string, format: uri }
+        thumbnailUrl: { type: [string, "null"], format: uri }
+        width: { type: [integer, "null"] }
+        height: { type: [integer, "null"] }
+        altText: { type: [string, "null"] }
+    CreateUploadRequest:
+      type: object
+      required: [filename, mimeType, byteSize, purpose]
+      properties:
+        filename: { type: string, maxLength: 255 }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp, application/pdf] }
+        byteSize: { type: integer, minimum: 1, maximum: 20971520 }
+        purpose:
+          { type: string, enum: [LISTING_MEDIA, AVATAR, BUSINESS_LOGO, AD_CREATIVE, VERIFICATION] }
+    CreateUploadResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [mediaId, uploadUrl, method, headers, expiresAt]
+          properties:
+            mediaId: { type: string, format: uuid }
+            uploadUrl: { type: string, format: uri }
+            method: { type: string, const: PUT }
+            headers:
+              type: object
+              additionalProperties: { type: string }
+            expiresAt: { type: string, format: date-time }
+    WorkflowTransitionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [resourceId, previousStatus, currentStatus, occurredAt]
+          properties:
+            resourceId: { type: string, format: uuid }
+            previousStatus: { type: string }
+            currentStatus: { type: string }
+            occurredAt: { type: string, format: date-time }
+            caseId: { type: [string, "null"], format: uuid }
+    Conversation:
+      type: object
+      required: [id, status, participants, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        listing:
+          oneOf:
+            - $ref: "#/components/schemas/Listing"
+            - type: "null"
+        status: { type: string, enum: [ACTIVE, BLOCKED, CLOSED] }
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummary"
+        lastMessage:
+          oneOf:
+            - $ref: "#/components/schemas/Message"
+            - type: "null"
+        unreadCount: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+    ConversationCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    CreateConversationRequest:
+      type: object
+      required: [recipientUserId]
+      properties:
+        recipientUserId: { type: string, format: uuid }
+        listingId: { type: [string, "null"], format: uuid }
+        initialMessage: { type: string, minLength: 1, maxLength: 2000 }
+    Message:
+      type: object
+      required: [id, conversationId, sender, kind, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid }
+        sender:
+          $ref: "#/components/schemas/UserSummary"
+        kind: { type: string, enum: [TEXT, IMAGE, SYSTEM] }
+        body: { type: [string, "null"] }
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/Media"
+        status: { type: string, enum: [SENT, DELIVERED, READ, DELETED] }
+        createdAt: { type: string, format: date-time }
+    MessageCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    SendMessageRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [TEXT, IMAGE] }
+        body: { type: string, maxLength: 2000 }
+        mediaIds:
+          type: array
+          maxItems: 5
+          items: { type: string, format: uuid }
+    Business:
+      type: object
+      required: [id, displayName, slug, verificationStatus, rating]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        slug: { type: string }
+        logoUrl: { type: [string, "null"], format: uri }
+        description: { type: [string, "null"] }
+        verificationStatus:
+          { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+        category:
+          oneOf:
+            - $ref: "#/components/schemas/Category"
+            - type: "null"
+        region:
+          oneOf:
+            - $ref: "#/components/schemas/Region"
+            - type: "null"
+        rating:
+          type: object
+          required: [average, count]
+          properties:
+            average: { type: string }
+            count: { type: integer, minimum: 0 }
+        contact:
+          type: object
+          additionalProperties: true
+        openingHours:
+          type: object
+          additionalProperties: true
+    BusinessCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Business"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    Provider:
+      type: object
+      required: [user, serviceCategory, primaryRegion, verificationStatus, rating]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/OrganizationSummary"
+            - type: "null"
+        serviceCategory:
+          $ref: "#/components/schemas/Category"
+        primaryRegion:
+          $ref: "#/components/schemas/Region"
+        verificationStatus:
+          { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+        serviceRadiusMiles: { type: integer, minimum: 1, maximum: 200 }
+        rating:
+          type: object
+          required: [average, count]
+          properties:
+            average: { type: string }
+            count: { type: integer, minimum: 0 }
+    ProviderCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Provider"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    CreateReviewRequest:
+      type: object
+      required: [targetType, targetId, rating]
+      properties:
+        targetType: { type: string, enum: [BUSINESS, PROVIDER, LISTING] }
+        targetId: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: string, maxLength: 120 }
+        body: { type: string, maxLength: 4000 }
+    Review:
+      type: object
+      required: [id, author, targetType, targetId, rating, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        author:
+          $ref: "#/components/schemas/UserSummary"
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: [string, "null"] }
+        body: { type: [string, "null"] }
+        status: { type: string, enum: [PENDING, PUBLISHED, HIDDEN, REMOVED] }
+        verifiedInteraction: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    CreateReportRequest:
+      type: object
+      required: [targetType, targetId, reasonCode]
+      properties:
+        targetType:
+          { type: string, enum: [LISTING, MESSAGE, REVIEW, USER, BUSINESS, PROVIDER, FORUM_POST] }
+        targetId: { type: string, format: uuid }
+        reasonCode: { type: string, maxLength: 80 }
+        details: { type: string, maxLength: 2000 }
+    CreateCheckoutRequest:
+      type: object
+      required: [productCode, subjectType, subjectId, returnUrl]
+      properties:
+        productCode:
+          {
+            type: string,
+            enum:
+              [
+                LISTING_BOOST_7D,
+                LISTING_PIN_7D,
+                MERCHANT_PRO_MONTHLY,
+                PROVIDER_PRO_MONTHLY,
+                POINTS_100,
+                AD_CAMPAIGN,
+              ],
+          }
+        subjectType: { type: string, enum: [USER, ORGANIZATION, LISTING, CAMPAIGN] }
+        subjectId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 100, default: 1 }
+        returnUrl: { type: string, format: uri }
+    CheckoutSessionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [orderId, checkoutUrl, expiresAt]
+          properties:
+            orderId: { type: string, format: uuid }
+            checkoutUrl: { type: string, format: uri }
+            expiresAt: { type: string, format: date-time }
+    AdPlacement:
+      type: object
+      required: [id, key, name, dimensions, allowedFormats, maxActive]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        name:
+          type: object
+          additionalProperties: { type: string }
+        dimensions:
+          type: object
+          additionalProperties: true
+        allowedFormats:
+          type: array
+          items: { type: string }
+        maxActive: { type: integer, minimum: 1 }
+    CreateCampaignRequest:
+      type: object
+      required: [organizationId, placementId, name, startsAt, endsAt, destinationUrl]
+      properties:
+        organizationId: { type: string, format: uuid }
+        placementId: { type: string, format: uuid }
+        name: { type: string, minLength: 2, maxLength: 160 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        targeting:
+          type: object
+          additionalProperties: true
+        budget:
+          $ref: "#/components/schemas/Money"
+        headline: { type: string, maxLength: 120 }
+        body: { type: string, maxLength: 500 }
+        mediaId: { type: [string, "null"], format: uuid }
+        destinationUrl: { type: string, format: uri }
+    AdCampaign:
+      type: object
+      required: [id, organizationId, placementId, name, status, startsAt, endsAt]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        placementId: { type: string, format: uuid }
+        name: { type: string }
+        status:
+          {
+            type: string,
+            enum:
+              [DRAFT, PENDING_APPROVAL, SCHEDULED, ACTIVE, PAUSED, COMPLETED, REJECTED, CANCELLED],
+          }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        targeting:
+          type: object
+          additionalProperties: true
+    ModerationCase:
+      type: object
+      required: [id, targetType, targetId, queue, priority, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        reportId: { type: [string, "null"], format: uuid }
+        targetType: { type: string }
+        targetId: { type: string, format: uuid }
+        queue: { type: string }
+        priority: { type: integer, minimum: 0, maximum: 100 }
+        status: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
+        assignedTo:
+          oneOf:
+            - $ref: "#/components/schemas/UserSummary"
+            - type: "null"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationCaseCollection:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationCase"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+    ModerationActionRequest:
+      type: object
+      required: [action, reasonCode]
+      properties:
+        action:
+          {
+            type: string,
+            enum:
+              [
+                APPROVE,
+                REJECT,
+                SUSPEND,
+                RESTORE,
+                REQUEST_CHANGES,
+                ESCALATE,
+                DISMISS_REPORT,
+                WARN_USER,
+                SUSPEND_USER,
+              ],
+          }
+        reasonCode: { type: string, maxLength: 80 }
+        note: { type: string, maxLength: 2000 }
+        expectedCaseVersion: { type: integer, minimum: 1 }

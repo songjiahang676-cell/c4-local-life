@@ -1,0 +1,19 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  "@prisma/engines": true
+  "@scarf/scarf": false
+  esbuild: true
+  msgpackr-extract: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+
+catalog:
+  typescript: 5.9.3
+  react: 19.2.7
+  react-dom: 19.2.7
+  next: 16.2.10
+  zod: 4.4.3

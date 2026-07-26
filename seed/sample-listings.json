@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "disclaimer": "Synthetic development data only.",
+  "listings": [
+    {
+      "type": "JOB",
+      "categorySlug": "restaurant",
+      "regionCode": "US-CA-IRVINE",
+      "title": "中餐厅招聘前厅服务员",
+      "summary": "全职或兼职，需合法工作身份。",
+      "body": "工作内容包含接待、点单和日常清洁。薪资按经验面议，提供员工餐。",
+      "price": {
+        "amount": "20.00",
+        "currency": "USD",
+        "unit": "HOURLY"
+      },
+      "attributes": {
+        "employmentType": "FULL_TIME",
+        "language": "中文/英文"
+      }
+    },
+    {
+      "type": "RENTAL",
+      "categorySlug": "room",
+      "regionCode": "US-CA-IRVINE",
+      "title": "尔湾安静社区主卧招租",
+      "summary": "独立卫浴，近超市和高速。",
+      "body": "适合单人居住，禁止吸烟，水电网按人数分摊。具体地址在双方确认后提供。",
+      "price": {
+        "amount": "1200.00",
+        "currency": "USD",
+        "unit": "MONTHLY"
+      },
+      "attributes": {
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "furnished": true
+      }
+    },
+    {
+      "type": "TRANSFER",
+      "categorySlug": "beverage-dessert",
+      "regionCode": "US-CA-MONTEREY-PARK",
+      "title": "蒙市奶茶店整体转让",
+      "summary": "设备齐全，可直接营业。",
+      "body": "店面位于商业区，租约和设备清单需线下核验。平台不对营业数据作保证。",
+      "price": {
+        "amount": "68000.00",
+        "currency": "USD",
+        "unit": "FIXED"
+      },
+      "attributes": {
+        "includesInventory": true
+      }
+    },
+    {
+      "type": "SECONDHAND",
+      "categorySlug": "furniture",
+      "regionCode": "US-CA-ARCADIA",
+      "title": "九成新三人位沙发",
+      "summary": "无宠物无烟家庭自取。",
+      "body": "购入一年，日常使用痕迹轻微。请通过站内消息预约看货。",
+      "price": {
+        "amount": "180.00",
+        "currency": "USD",
+        "unit": "FIXED"
+      },
+      "attributes": {
+        "condition": "LIKE_NEW"
+      }
+    },
+    {
+      "type": "SERVICE",
+      "categorySlug": "plumbing-electric",
+      "regionCode": "US-CA-SGV",
+      "title": "本地持证水电维修服务",
+      "summary": "圣盖博谷及周边可上门。",
+      "body": "提供预约维修与紧急服务。报价以现场评估为准，执照与保险信息需通过平台验证。",
+      "price": {
+        "amount": "120.00",
+        "currency": "USD",
+        "unit": "HOURLY"
+      },
+      "attributes": {
+        "serviceRadiusMiles": 25,
+        "insured": true
+      }
+    }
+  ]
+}

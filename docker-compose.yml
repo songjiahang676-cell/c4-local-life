@@ -1,0 +1,166 @@
+name: socal-life-platform
+
+services:
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      target: web-runtime
+    environment:
+      API_BASE_URL: http://api:4000/v1
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  admin:
+    profiles: ["app"]
+    build:
+      context: .
+      target: admin-runtime
+    environment:
+      API_BASE_URL: http://api:4000/v1
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      target: api-runtime
+    env_file:
+      - .env
+    environment:
+      APP_ENV: local
+      DATABASE_URL: postgresql://socal:socal_dev_password@postgres:5432/socal?schema=public
+      NODE_ENV: production
+      OPENSEARCH_NODE: http://opensearch:9200
+      OTEL_SERVICE_NAME: socal-api
+      PUBLIC_ADMIN_URL: http://localhost:3001
+      PUBLIC_WEB_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      target: worker-runtime
+    env_file:
+      - .env
+    environment:
+      APP_ENV: local
+      NODE_ENV: production
+      OTEL_SERVICE_NAME: socal-worker
+      REDIS_URL: redis://redis:6379/0
+      WORKER_HEALTH_PORT: 4001
+    ports:
+      - "4001:4001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  postgres:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: socal
+      POSTGRES_USER: socal
+      POSTGRES_PASSWORD: socal_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socal -d socal"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.5
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  postgres_data:
+  redis_data:
+  opensearch_data:
+  minio_data:

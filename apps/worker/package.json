@@ -1,0 +1,25 @@
+{
+  "name": "@socal/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "pnpm --filter @socal/config build && pnpm --filter @socal/observability build",
+    "dev": "tsx --env-file=../../.env watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts --project @socal/worker --reporter=default"
+  },
+  "dependencies": {
+    "@socal/config": "workspace:*",
+    "@socal/observability": "workspace:*",
+    "bullmq": "5.80.9",
+    "ioredis": "5.11.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.9",
+    "tsx": "4.23.1",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,22 @@
+# The current private repository has one maintainer. Keep every critical route
+# assigned to a real GitHub identity; split these entries into role teams when
+# an organization and a second maintainer are introduced.
+* @songjiahang676-cell
+
+/.github/ @songjiahang676-cell
+/apps/web/ @songjiahang676-cell
+/apps/admin/ @songjiahang676-cell
+/apps/api/ @songjiahang676-cell
+/apps/worker/ @songjiahang676-cell
+/packages/contracts/ @songjiahang676-cell
+/packages/database/ @songjiahang676-cell
+/packages/database/prisma/schema.prisma @songjiahang676-cell
+/packages/database/prisma/migrations/ @songjiahang676-cell
+/openapi/ @songjiahang676-cell
+/infra/ @songjiahang676-cell
+/SECURITY.md @songjiahang676-cell
+/.env.example @songjiahang676-cell
+/docs/14-security-privacy-compliance.md @songjiahang676-cell
+/docs/12-monetization-payments-ads.md @songjiahang676-cell
+/docs/11-content-workflows-and-moderation.md @songjiahang676-cell
+/adr/ @songjiahang676-cell

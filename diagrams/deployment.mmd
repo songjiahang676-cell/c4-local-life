@@ -1,0 +1,30 @@
+flowchart TB
+  user[Browser / Future App] --> cf[Cloudflare DNS + CDN + WAF]
+  cf --> web[Public Web
+ECS Fargate or Vercel-compatible runtime]
+  cf --> admin[Admin Web
+restricted hostname]
+  web --> alb[Private/API ALB]
+  admin --> alb
+  alb --> api1[API task AZ-a]
+  alb --> api2[API task AZ-b]
+  api1 --> rds[(RDS PostgreSQL Multi-AZ)]
+  api2 --> rds
+  api1 --> redis[(ElastiCache Redis/Valkey)]
+  api2 --> redis
+  worker1[Worker task AZ-a] --> redis
+  worker2[Worker task AZ-b] --> redis
+  worker1 --> rds
+  worker2 --> rds
+  worker1 --> os[(Managed OpenSearch)]
+  worker2 --> os
+  api1 --> s3[(S3 media bucket)]
+  api2 --> s3
+  s3 --> cf
+  api1 --> stripe[Stripe]
+  worker1 --> comms[SES/SNS or provider]
+  api1 --> otel[OTel Collector]
+  worker1 --> otel
+  otel --> monitor[CloudWatch/Grafana/Sentry-compatible backend]
+  backup[Automated backups + PITR + cross-region copy] --- rds
+  backup --- s3

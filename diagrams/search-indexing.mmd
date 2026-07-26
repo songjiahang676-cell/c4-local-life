@@ -1,0 +1,17 @@
+flowchart LR
+  tx[Listing transaction] --> outbox[(outbox_events)]
+  outbox --> dispatcher[Outbox dispatcher]
+  dispatcher --> queue[platform-events queue]
+  queue --> projector[Search projector]
+  projector --> read[Read canonical listing + category + region + org]
+  read --> normalize[Normalize Unicode, bilingual fields, pinyin/synonyms, geo]
+  normalize --> version{Event version >= indexed version?}
+  version -- No --> drop[Drop stale event]
+  version -- Yes --> index[(OpenSearch public-content-vN)]
+  index --> alias[public-content alias]
+  alias --> query[Search API]
+  query --> rank[Text relevance + proximity + freshness + quality]
+  rank --> sponsored[Insert clearly labeled sponsored slots]
+  sponsored --> response[Facets + cursor results]
+  dead[Dead-letter queue] <-- retries exhausted --> projector
+  reconcile[Nightly reconciliation] --> read

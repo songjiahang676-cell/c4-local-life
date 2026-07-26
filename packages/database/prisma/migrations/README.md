@@ -1,0 +1,71 @@
+# Migration operations
+
+## Baseline order
+
+1. `0000_extensions` installs `pg_trgm` and `postgis` before any schema references their types or
+   operators.
+2. `20260725044311_baseline` creates the Prisma-managed tables, relations, and indexes, then applies
+   the reviewed PostGIS generated column, spatial/trigram/partial indexes, and check constraints.
+
+The unsupported geography field and custom indexes are also represented in `schema.prisma`.
+`prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
+development migration cannot silently remove them.
+
+## Apply and verify
+
+Use a dedicated empty database:
+
+```bash
+pnpm db:validate
+pnpm db:generate
+pnpm db:migrate:safety
+pnpm --filter @socal/database exec prisma migrate deploy
+pnpm --filter @socal/database exec prisma migrate status
+pnpm db:upgrade:check
+pnpm db:baseline:check
+```
+
+`db:baseline:check` verifies the completed migration records, extensions, generated geography,
+custom indexes, check-constraint failures, and a foreign-key failure. Its fixture transaction is
+always rolled back.
+
+`db:migrate:safety` scans every migration for destructive schema/data operations. A reviewed
+exception must use the exact form below and must describe both intent and recovery:
+
+```sql
+-- migration-safety: allow DROP_COLUMN reason="contract completed after two releases" rollback="restore from retained shadow column"
+```
+
+The directive does not make a migration safe by itself; it makes the risk visible to code review.
+Unannotated drops, truncates, data updates/deletes, renames, `SET NOT NULL`, and required-column
+additions fail CI.
+
+`db:upgrade:check` creates a disposable database, applies migrations through
+`prisma/compatibility/previous-release.json`, inserts a synthetic sentinel, applies every newer
+migration, verifies the sentinel and current schema expectation, and drops the database. Update
+the compatibility baseline only when a version is actually promoted; do not move it forward merely
+to make a failing migration pass.
+
+## `20260725051500_region_group_type`
+
+Adds `REGION_GROUP` to `RegionType` so the delivered `US-CA-SOCAL` taxonomy node is represented
+without misclassifying it as a county or city.
+
+- Roll forward: deploy the additive enum migration before running `db:seed`.
+- Rollback: application code can stop writing/reading `REGION_GROUP`, but PostgreSQL enum values
+  are not removed in place. If removal ever becomes necessary, first migrate all affected rows to
+  another reviewed type, then replace the enum in a separate maintenance migration. Do not attempt
+  an unsafe down migration during an incident.
+
+## Roll-forward and recovery
+
+- Production migrations are forward-only. Correct a released migration with a new reviewed
+  migration; never edit an already-applied production file.
+- Back up and test restore before the first production baseline and before destructive changes.
+- If deployment fails before application traffic, fix the cause and use Prisma's documented
+  `migrate resolve` flow only after comparing the actual database state and migration logs.
+- Do not drop `postgis` or `pg_trgm` during application rollback; extensions can be shared and their
+  removal is destructive.
+- For an empty disposable development database only, rollback means dropping and recreating that
+  dedicated database, then replaying the migrations. Never apply that procedure to a database with
+  user or audit data.

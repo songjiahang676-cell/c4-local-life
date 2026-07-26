@@ -1,0 +1,138 @@
+# 18. 测试与质量工程
+
+## 18.1 测试策略
+
+测试以风险为导向，不追求虚假的覆盖率数字。核心目标是保护领域不变式、权限、状态机、幂等、数据迁移、契约和关键用户旅程。
+
+## 18.2 测试层级
+
+| 层级                   | 范围                                         | 工具方向                          |
+| ---------------------- | -------------------------------------------- | --------------------------------- |
+| Unit                   | 纯规则、排序、价格、状态机、policy           | Vitest/Jest 等                    |
+| Component              | UI 状态、表单、无障碍                        | Testing Library + axe             |
+| Repository Integration | Prisma/SQL/PostGIS 真实行为                  | PostgreSQL 容器                   |
+| API Integration        | Nest 模块、auth、validation、Problem Details | Fastify inject/supertest          |
+| Contract               | OpenAPI 请求/响应与消费者                    | schema validator/generated client |
+| Worker                 | 幂等、重试、乱序、DLQ                        | Redis + fake adapters             |
+| E2E                    | 搜索、发布、审核、消息、支付测试模式         | Playwright                        |
+| Performance            | 延迟、吞吐、耐久、积压                       | k6/等价                           |
+| Security               | SAST、DAST、依赖、授权负面、上传/webhook     | CI + 专项测试                     |
+
+## 18.3 必测领域不变式
+
+- Listing 类型与 detail 匹配；非法状态转换失败。
+- 过期/下架/删除内容不出现在公开 API/搜索。
+- 重大编辑重新审核，旧事件不能覆盖新版本。
+- 组织角色和对象所有权不可跨越。
+- 会话仅参与者可读；屏蔽后不能发送。
+- 评价资格、唯一性和编辑窗口。
+- webhook 重复/乱序不产生重复账本或履约。
+- 钱包条目不可变，余额与条目对账。
+- 广告库存无超卖，暂停立即传播。
+- 删除请求覆盖搜索、缓存和媒体清理任务。
+
+## 18.4 授权测试
+
+为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。
+
+## 18.5 契约测试
+
+- OpenAPI 在 CI 解析、lint，示例响应验证。
+- 实现响应通过 schema 验证；错误格式统一。
+- 共享 Zod 契约与 OpenAPI 避免手工漂移，选择一个生成/同步方向并记录。
+- 外部 provider 使用记录的官方 fixture/模拟 server，覆盖 timeout、429、5xx、签名失败和字段新增。
+
+## 18.6 数据库迁移测试
+
+- 从空库应用全部 migration。
+- 从上一个发布快照升级，并运行旧/新应用兼容测试。
+- 检查不可为空、唯一、外键和自定义 SQL 约束。
+- 大回填在代表性数据上测时长、锁和可恢复。
+- 回滚优先应用 roll-forward；若提供 down，必须验证不会丢失未备份数据。
+
+## 18.7 E2E 核心场景
+
+1. 访客搜索→登录→收藏→联系。
+2. 用户创建草稿→上传→提交→运营批准→搜索可见。
+3. 运营拒绝→用户修订→重新提交。
+4. 发布者编辑重大字段→重新审核。
+5. 消息屏蔽/举报。
+6. 商家创建组织、邀请 Editor、购买推广（Stripe test）。
+7. webhook 重放不重复履约。
+8. 过期任务移除公开结果。
+9. 账户删除请求和撤销/执行。
+10. 中英文、移动宽度和键盘操作。
+
+## 18.8 测试数据
+
+- 使用 factories/fixtures 生成，不依赖生产数据。
+- 时间、UUID、provider response 可控制。
+- 测试区分 LA/Orange County、语言、角色和风险状态。
+- 敏感示例使用明显虚构 `example.invalid`、555 号码等。
+- 每个测试独立或明确事务清理，避免顺序依赖。
+
+## 18.9 CI Gate
+
+PR 必须通过静态检查、typecheck、lint、unit、contract、关键 integration 和 build。主分支/夜间运行完整 integration、E2E、扫描和迁移测试。发布候选运行 staging smoke、性能阈值和安全清单。
+
+不得通过 `skip`, `only`, 降低阈值或关闭 strict 来绕过失败。Flaky test 必须有 owner、隔离标签和修复期限。
+
+## 18.10 质量指标
+
+关注 escaped defects、回滚率、变更失败率、MTTR、flaky rate、审核事故、权限漏洞和支付对账差异，而非单一代码覆盖率。核心领域分支可设较高覆盖要求，但测试可读性和行为价值优先。
+
+## 18.11 Gate 0 测试基线
+
+根目录 `vitest.config.ts` 将 Web、Admin、API、Worker、Config、Contracts、Database 和 UI
+配置为八个具名 test project。DOM project 使用 jsdom 和 Testing Library；服务与纯 TypeScript
+package 使用 Node 环境。常用命令：
+
+```bash
+pnpm test:unit
+pnpm test
+pnpm test:watch
+```
+
+`pnpm test` 同时生成 V8 coverage、`reports/test-results/junit.xml` 和
+`reports/test-results/results.json`。报告是验证证据，不是通过降低断言质量来追求的覆盖率目标。
+CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.json` 和 ESLint。
+
+## 18.12 种子与测试工厂
+
+`packages/database/src/testing/factories.ts` 只生成带随机 UUID、`example.invalid` 身份和明确 synthetic 文案的测试输入，默认 Listing 状态为 `DRAFT`。Repository 集成测试通过 `DATABASE_INTEGRATION_URL` 连接专用测试库；CI 在迁移完成后运行，测试自行清理其稳定 ID 范围。
+
+`pnpm db:seed:validate` 是无数据库的种子契约检查。`seed-database.integration.test.ts` 在真实 PostgreSQL 中连续执行两次导入并验证无重复；不得用生产数据或生产数据库替换这些 fixture。
+
+## 18.13 Repository 集成隔离
+
+统一框架、数据库 URL 防误用规则、事务回滚示例和显式命令见 [`database-integration-testing.md`](./database-integration-testing.md)。每个测试必须通过同一个 `TransactionClient` 完成准备、Repository 调用和断言；成功与失败路径均由框架回滚。CI 设置 `DATABASE_INTEGRATION_URL`，因此不允许把 integration skip 当成 Gate 通过。
+
+## 18.14 迁移兼容测试
+
+数据库迁移另有 `db:migrate:safety` 静态破坏性 SQL 检查和 `db:upgrade:check` 上一兼容基线升级
+检查。升级检查只接受明确的隔离数据库，创建并清理独立临时数据库，不读取生产快照或真实数据。
+
+## 18.15 Gate 0 Playwright 基线
+
+根目录 `playwright.config.ts` 用生产构建的 standalone Web 和编译后的 API 执行 smoke，不依赖开发服务器，
+也不连接真实 PostgreSQL、Redis 或 OpenSearch。测试固定使用 `127.0.0.1:3100` 与
+`127.0.0.1:4100`，不会复用或占用默认开发端口；Web/API 进程由 Playwright 启停。
+
+当前基线同时运行 Desktop Chrome 与 Pixel 7 两个项目，验证：
+
+- `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
+- API health 返回可追踪 request ID；
+- 运行时提供包含 31 个 path 的唯一 OpenAPI 文档；
+- 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
+
+首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
+
+```bash
+pnpm test:e2e:install
+pnpm test:e2e
+pnpm test:e2e:ci
+```
+
+`test:e2e` 先执行全仓构建；`test:e2e:ci` 只用于质量构建已完成的 CI job。standalone 构建不会自动携带
+`public` 和 `.next/static`，因此两条路径都先运行 `scripts/prepare-standalone-runtime.mjs`。
+HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`；CI 即使失败也上传报告。

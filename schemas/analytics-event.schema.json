@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.socal.local/analytics-event.schema.json",
+  "title": "Product analytics event",
+  "type": "object",
+  "required": ["eventId", "eventName", "occurredAt", "anonymousId", "context", "properties"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventName": {
+      "enum": [
+        "page_viewed",
+        "search_submitted",
+        "search_result_clicked",
+        "listing_viewed",
+        "listing_publish_started",
+        "listing_submitted",
+        "listing_published",
+        "contact_reveal_clicked",
+        "conversation_started",
+        "message_sent",
+        "favorite_added",
+        "report_submitted",
+        "ad_impression",
+        "ad_clicked",
+        "checkout_started",
+        "purchase_completed"
+      ]
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "anonymousId": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "userId": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "sessionId": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "context": {
+      "type": "object",
+      "required": ["locale", "app", "path"],
+      "properties": {
+        "locale": {
+          "enum": ["zh-Hans", "en-US"]
+        },
+        "app": {
+          "enum": ["web", "admin", "api", "mobile"]
+        },
+        "path": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "referrer": {
+          "type": ["string", "null"],
+          "maxLength": 2048
+        },
+        "regionCode": {
+          "type": ["string", "null"],
+          "maxLength": 80
+        },
+        "experimentAssignments": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
