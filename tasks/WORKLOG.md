@@ -272,3 +272,16 @@ Not run: Independent approval/code-owner review requires a second maintainer and
 Observability: GitHub retains positive/negative check runs and closed PR #2 as audit evidence；temporary branch was deleted locally and remotely  
 Docs: Updated `README.md`、Gate status/checklist、infrastructure/team governance docs、architecture book、`CHANGELOG.md` and this worklog  
 Known gaps: PR #1 final head CI and protected merge remain before starting AUTH-001；no Gate 1 implementation has started early
+
+## AUTH-001 — 会话模型、认证上下文与 Cookie
+
+Task: AUTH-001 会话模型、认证上下文与 Cookie  
+Changed: Added Prisma-backed session lifecycle Repository；256-bit opaque token + domain-separated HMAC；absolute/idle expiry and bounded touch；atomic rotation/revoke；Fastify auth context Guard；`GET/DELETE /v1/auth/session`；hardened host-only Cookie；database package runtime build boundary  
+Contracts: OpenAPI remains 31 paths/52 schemas；documented current-session no-store and logout Set-Cookie headers；regenerated shared OpenAPI types；Prisma `AuthSession` adds required `idleExpiresAt`/`lastSeenAt` and index  
+Migrations: 有，`20260726041310_auth_session_lifecycle`；empty deploy and previous-baseline upgrade passed；existing sessions intentionally idle-expire once；application rollback retains additive columns and requires reauthentication，不执行 down/drop  
+Security: Raw session/IP never persisted or returned；Cookie is host-only、Secure、HttpOnly、SameSite=Lax、Path=/v1；duplicate/malformed Cookie rejected；foreign-origin logout blocked；absolute/idle expiry、suspended/deleted/profile-missing fail closed；response excludes email/phone/hash  
+Tests run: `scripts/check-architecture.sh` passed（101 tasks、36 models、31 paths、52 schemas）；empty `socal_empty` replayed all 4 migrations and `db:baseline:check` passed；`db:upgrade:check` passed；`pnpm ci:quality` passed with 9 typechecks、9 lints、22 files/66 tests（including 4 real PostgreSQL auth repository tests）、8 builds；`pnpm observability:check` started the compiled API and passed；`pnpm test:e2e:ci` passed Chromium desktop/mobile 4/4  
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；hosted required-check/container jobs pending；OTP request/verify intentionally deferred to AUTH-002  
+Observability: Existing correlated HTTP logs cover session endpoints without request headers/token/session hash/PII；no new high-cardinality session metric or token logging  
+Docs: Updated security/API/runtime configuration/migration operations、README、status、changelog、architecture book and this worklog  
+Known gaps: Hosted PR must prove clean Linux/container runtime；dual-key `SESSION_SECRET` rotation runbook and device/session listing remain later tasks；permissions stay empty until API-004

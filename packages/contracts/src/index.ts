@@ -12,6 +12,8 @@ export type CreateListingInput = components["schemas"]["CreateListingRequest"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
+export type Session = components["schemas"]["Session"];
+export type SessionResponse = components["schemas"]["SessionResponse"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([

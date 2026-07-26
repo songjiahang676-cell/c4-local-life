@@ -57,7 +57,7 @@ for (const [serviceName, target] of Object.entries(applications)) {
 const apiTargetStart = dockerfileSource.indexOf(" AS api-runtime");
 const workerTargetStart = dockerfileSource.indexOf(" AS worker-runtime");
 const apiTargetSource = dockerfileSource.slice(apiTargetStart, workerTargetStart);
-for (const workspacePackage of ["config", "contracts", "observability"]) {
+for (const workspacePackage of ["config", "contracts", "database", "observability"]) {
   if (
     !apiTargetSource.includes(
       `/workspace/packages/${workspacePackage} ./packages/${workspacePackage}`,

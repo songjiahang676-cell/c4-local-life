@@ -960,6 +960,12 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 
 状态变更尽量用子资源或动作端点清晰表达，不允许客户端直接 PATCH 任意 `status`。
 
+`AUTH-001` 已实现 `GET /auth/session` 与 `DELETE /auth/session`。前者从安全 Cookie 解析认证上下文，
+仅返回 OpenAPI `SessionResponse` 并设置 `Cache-Control: no-store`；后者通过应用服务幂等撤销数据库
+会话并返回同路径、同安全属性的过期 Cookie。OTP request/verify 仍属于 `AUTH-002`，当前切片不会暴露
+伪造的登录成功路径。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象授权
+继续由 `API-004` 的默认拒绝 Policy 完成。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：
@@ -1630,6 +1636,13 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 - 登录后旋转会话；权限提升、密码/邮箱/手机号变更后撤销相关会话。
 - 修改请求使用 SameSite + CSRF token/origin 检查；不要以 CORS 代替 CSRF。
 - 会话有绝对过期和闲置过期；用户可查看/撤销设备。
+
+`AUTH-001` 当前实现使用 256-bit 随机 base64url bearer token，Cookie 之外不返回 token；数据库只保存
+以 `SESSION_SECRET` 做域分离 HMAC-SHA256 后的摘要。Cookie 为 host-only、`Secure`、`HttpOnly`、
+`SameSite=Lax`、`Path=/v1`，重复同名 Cookie 按无效凭据处理。默认绝对期限 30 天、闲置期限 7 天，
+最多每 5 分钟刷新一次闲置时间且绝不越过绝对期限。登录/权限提升调用原子 rotation；退出幂等撤销。
+`SUSPENDED`、`DELETED`、已软删或缺少完整 profile 的用户 fail closed，响应投影不包含邮箱、手机号、
+token hash 或 IP hash。首次部署闲置期限字段时现有会话统一失效并要求重新认证。
 
 ## 14.5 授权
 

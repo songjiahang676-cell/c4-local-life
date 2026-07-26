@@ -45,6 +45,13 @@
 - 修改请求使用 SameSite + CSRF token/origin 检查；不要以 CORS 代替 CSRF。
 - 会话有绝对过期和闲置过期；用户可查看/撤销设备。
 
+`AUTH-001` 当前实现使用 256-bit 随机 base64url bearer token，Cookie 之外不返回 token；数据库只保存
+以 `SESSION_SECRET` 做域分离 HMAC-SHA256 后的摘要。Cookie 为 host-only、`Secure`、`HttpOnly`、
+`SameSite=Lax`、`Path=/v1`，重复同名 Cookie 按无效凭据处理。默认绝对期限 30 天、闲置期限 7 天，
+最多每 5 分钟刷新一次闲置时间且绝不越过绝对期限。登录/权限提升调用原子 rotation；退出幂等撤销。
+`SUSPENDED`、`DELETED`、已软删或缺少完整 profile 的用户 fail closed，响应投影不包含邮箱、手机号、
+token hash 或 IP hash。首次部署闲置期限字段时现有会话统一失效并要求重新认证。
+
 ## 14.5 授权
 
 - 默认拒绝；后端 policy 基于 actor/action/resource/context。

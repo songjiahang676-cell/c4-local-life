@@ -75,6 +75,12 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 
 状态变更尽量用子资源或动作端点清晰表达，不允许客户端直接 PATCH 任意 `status`。
 
+`AUTH-001` 已实现 `GET /auth/session` 与 `DELETE /auth/session`。前者从安全 Cookie 解析认证上下文，
+仅返回 OpenAPI `SessionResponse` 并设置 `Cache-Control: no-store`；后者通过应用服务幂等撤销数据库
+会话并返回同路径、同安全属性的过期 Cookie。OTP request/verify 仍属于 `AUTH-002`，当前切片不会暴露
+伪造的登录成功路径。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象授权
+继续由 `API-004` 的默认拒绝 Policy 完成。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：

@@ -120,10 +120,15 @@ paths:
     get:
       tags: [Auth]
       summary: Get the current session
+      description: Resolves the opaque host-only session cookie; never returns the bearer token or contact identifiers.
       operationId: getSession
       responses:
         "200":
           description: Current session
+          headers:
+            Cache-Control:
+              description: Session responses are never stored by shared or browser caches.
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
@@ -133,10 +138,17 @@ paths:
     delete:
       tags: [Auth]
       summary: Revoke the current session
+      description: Idempotently revokes the presented session and expires the host-only cookie.
       operationId: logout
       responses:
         "204":
           description: Session revoked
+          headers:
+            Set-Cookie:
+              description: Clears the Secure, HttpOnly, SameSite=Lax cookie scoped to /v1.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
   /regions:
     get:
       tags: [Taxonomy]
@@ -875,6 +887,7 @@ components:
       type: apiKey
       in: cookie
       name: socal_session
+      description: Opaque 256-bit bearer token; host-only, Secure, HttpOnly, SameSite=Lax, Path=/v1. Only its HMAC is persisted.
   parameters:
     ListingId:
       name: listingId

@@ -1,5 +1,12 @@
 export { prisma } from "./client";
 export {
+  AuthSessionRepository,
+  type AuthSessionCreateInput,
+  type AuthSessionPrincipal,
+  type AuthSessionRepositoryOptions,
+  type AuthSessionRotateInput,
+} from "./repositories/auth-session.repository";
+export {
   InvalidGeoQueryError,
   ListingGeoRepository,
   type ListingRadiusQuery,

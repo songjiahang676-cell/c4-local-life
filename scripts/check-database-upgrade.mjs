@@ -90,7 +90,18 @@ try {
       WHERE type.typname = 'RegionType'
         AND value.enumlabel = 'REGION_GROUP'`,
   );
-  if (sentinel.rowCount !== 1 || enumValue.rowCount !== 1) {
+  const sessionLifecycleColumns = await upgrade.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'auth_sessions'
+        AND column_name IN ('idle_expires_at', 'last_seen_at')`,
+  );
+  if (
+    sentinel.rowCount !== 1 ||
+    enumValue.rowCount !== 1 ||
+    sessionLifecycleColumns.rowCount !== 2
+  ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
 
@@ -101,6 +112,7 @@ try {
       priorMigrationCount: priorMigrations.length,
       appliedMigrationCount: upgradeMigrations.length,
       sentinelPreserved: true,
+      sessionLifecycleColumns: sessionLifecycleColumns.rowCount,
     }),
   );
 } finally {

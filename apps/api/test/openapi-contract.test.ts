@@ -9,6 +9,8 @@ import { parse } from "yaml";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { canonicalOpenApiPath } from "../src/common/openapi-document";
 import { createApiApplication } from "../src/create-api-application";
+import { AuthSessionService } from "../src/modules/auth/auth-session.service";
+import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -43,14 +45,20 @@ describe("canonical OpenAPI contract", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
   let contract: DereferencedOpenApi;
+  let sessions: AuthSessionService;
   const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
 
   beforeAll(async () => {
+    const authSessionStore = new MemoryAuthSessionStore();
+    authSessionStore.registerSubject(
+      buildActiveSubject({ id: "20000000-0000-4000-8000-000000000001" }),
+    );
     contract = (await SwaggerParser.validate(
       canonicalOpenApiPath(),
     )) as unknown as DereferencedOpenApi;
     app = await createApiApplication(environment, {
       logger: false,
+      authSessionStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -61,6 +69,7 @@ describe("canonical OpenAPI contract", () => {
     await app.init();
     server = app.getHttpAdapter().getInstance();
     await server.ready();
+    sessions = app.get(AuthSessionService);
   });
 
   afterAll(async () => {
@@ -138,5 +147,20 @@ describe("canonical OpenAPI contract", () => {
     expect(invalidResponse.statusCode).toBe(400);
     expect(ajv.validate(healthSchema ?? false, healthResponse.json())).toBe(true);
     expect(ajv.validate(problemSchema ?? false, invalidResponse.json())).toBe(true);
+  });
+
+  it("validates the implemented current-session projection against the contract", async () => {
+    const issued = await sessions.issueSession("20000000-0000-4000-8000-000000000001", {});
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/auth/session",
+      headers: { cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}` },
+    });
+    const sessionSchema =
+      contract.paths["/auth/session"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+
+    expect(response.statusCode).toBe(200);
+    expect(sessionSchema).toBeDefined();
+    expect(ajv.validate(sessionSchema ?? false, response.json())).toBe(true);
   });
 });

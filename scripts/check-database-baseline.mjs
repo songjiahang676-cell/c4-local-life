@@ -41,6 +41,7 @@ try {
     "0000_extensions",
     "20260725044311_baseline",
     "20260725051500_region_group_type",
+    "20260726041310_auth_session_lifecycle",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -96,6 +97,21 @@ try {
   );
   if (customIndexes.rowCount !== 3) {
     throw new Error("One or more custom listing indexes are missing");
+  }
+
+  const sessionLifecycleColumns = await client.query(
+    `SELECT column_name, is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'auth_sessions'
+        AND column_name IN ('idle_expires_at', 'last_seen_at')
+      ORDER BY column_name`,
+  );
+  if (
+    sessionLifecycleColumns.rowCount !== 2 ||
+    sessionLifecycleColumns.rows.some((column) => column.is_nullable !== "NO")
+  ) {
+    throw new Error("Required auth session lifecycle columns are missing or nullable");
   }
 
   await client.query("BEGIN");
@@ -213,6 +229,7 @@ try {
       migrations: migrations.rows.map((row) => row.migration_name),
       extensions: extensions.rows.map((row) => row.extname),
       customIndexes: customIndexes.rowCount,
+      sessionLifecycleColumns: sessionLifecycleColumns.rows.map((column) => column.column_name),
       negativeCases: 3,
     }),
   );

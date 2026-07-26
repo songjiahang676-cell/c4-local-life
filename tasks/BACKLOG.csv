@@ -20,7 +20,7 @@ API-004,G1,API,P1,Policy/Actor/RequestContext 框架,AUTH-001,默认拒绝；对
 API-005,G5,API,P0,通用幂等键存储与拦截器,DATA-001;API-001,相同 key 重放一致；payload 冲突 409；TTL/审计,docs/08-api-and-integrations.md,todo
 OBS-001,G0,OBS,P0,结构日志、基础指标和 OTel trace,FND-004;API-001,跨 HTTP/job 带 request/trace id；PII redaction 测试,docs/17-observability-analytics.md,done
 OBS-002,G6,OBS,P0,SLO Dashboard 与告警,OBS-001;REL-001,服务/依赖/队列/业务 dashboard；告警绑定 runbook,docs/17-observability-analytics.md,todo
-AUTH-001,G1,AUTH,P0,会话模型、认证上下文与 Cookie,DATA-001;API-001,token hash、rotation、expiry、logout、secure cookie 测试,docs/14-security-privacy-compliance.md,todo
+AUTH-001,G1,AUTH,P0,会话模型、认证上下文与 Cookie,DATA-001;API-001,token hash、rotation、expiry、logout、secure cookie 测试,docs/14-security-privacy-compliance.md,done
 AUTH-002,G1,AUTH,P0,邮箱/手机 OTP 请求与验证,AUTH-001,短效一次性、账号/IP/设备限频、不枚举账号,docs/14-security-privacy-compliance.md,todo
 AUTH-003,G1,AUTH,P0,用户资料、会话设备与注销全部,AUTH-001,用户可管理资料/locale/设备；状态变更撤销会话,docs/04-user-journeys.md,todo
 AUTH-004,G1,AUTH,P1,密码与账户恢复（可选）,AUTH-002,强 KDF、恢复冷却、通知、负面测试,docs/14-security-privacy-compliance.md,todo
