@@ -77,7 +77,18 @@ for (const target of ["web-runtime", "admin-runtime", "api-runtime", "worker-run
 if (!containerRunScripts.includes("docker build --target")) {
   throw new Error("CI container build job must execute docker build --target");
 }
+for (const healthPath of [
+  "/health/ready",
+  "/v1/health/ready",
+  "docker image inspect",
+  "socal-api-runtime:ci",
+  "socal-worker-runtime:ci",
+]) {
+  if (!containerRunScripts.includes(healthPath)) {
+    throw new Error(`CI container runtime smoke is missing ${healthPath}`);
+  }
+}
 
 console.log(
-  `CI workflow checks passed: ${requiredCommands.length} quality commands and four container targets are enforced.`,
+  `CI workflow checks passed: ${requiredCommands.length} quality commands and four build/runtime smoke targets are enforced.`,
 );

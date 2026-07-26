@@ -178,3 +178,69 @@ jobs:
           for target in web-runtime admin-runtime api-runtime worker-runtime; do
             docker build --target "$target" --tag "socal-${target}:ci" .
           done
+
+      - name: Smoke non-root runtime images and health endpoints
+        run: |
+          set -euo pipefail
+          network="socal-runtime-smoke"
+          containers="socal-web socal-admin socal-api socal-worker socal-redis"
+
+          cleanup() {
+            docker rm --force $containers >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          wait_for_health() {
+            container="$1"
+            url="$2"
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --show-error "$url"; then
+                echo
+                return 0
+              fi
+              if [ "$(docker inspect --format '{{.State.Running}}' "$container")" != "true" ]; then
+                docker logs "$container"
+                return 1
+              fi
+              sleep 1
+            done
+            docker logs "$container"
+            return 1
+          }
+
+          for target in web-runtime admin-runtime api-runtime worker-runtime; do
+            test "$(docker image inspect --format '{{.Config.User}}' "socal-${target}:ci")" = "node"
+          done
+
+          docker network create "$network"
+          docker run --detach --name socal-redis --network "$network" redis:8.4-alpine
+          docker run --detach --name socal-web --network "$network" \
+            --publish 127.0.0.1:3000:3000 socal-web-runtime:ci
+          docker run --detach --name socal-admin --network "$network" \
+            --publish 127.0.0.1:3001:3001 socal-admin-runtime:ci
+          docker run --detach --name socal-api --network "$network" \
+            --publish 127.0.0.1:4000:4000 \
+            --env APP_ENV=test \
+            --env APP_NAME=socal-api-container-smoke \
+            --env LOG_LEVEL=info \
+            --env PUBLIC_WEB_URL=http://localhost:3000 \
+            --env PUBLIC_ADMIN_URL=http://localhost:3001 \
+            --env DATABASE_URL=postgresql://socal:socal@database.invalid:5432/socal?schema=public \
+            --env REDIS_URL=redis://socal-redis:6379/0 \
+            --env OPENSEARCH_NODE=http://opensearch.invalid:9200 \
+            --env SESSION_SECRET=ci-session-secret-container-smoke-0001 \
+            --env CSRF_SECRET=ci-csrf-secret-container-smoke-000001 \
+            socal-api-runtime:ci
+          docker run --detach --name socal-worker --network "$network" \
+            --publish 127.0.0.1:4001:4001 \
+            --env APP_ENV=test \
+            --env APP_NAME=socal-worker-container-smoke \
+            --env LOG_LEVEL=info \
+            --env REDIS_URL=redis://socal-redis:6379/0 \
+            socal-worker-runtime:ci
+
+          wait_for_health socal-web http://127.0.0.1:3000/health/ready
+          wait_for_health socal-admin http://127.0.0.1:3001/health/ready
+          wait_for_health socal-api http://127.0.0.1:4000/v1/health/ready
+          wait_for_health socal-worker http://127.0.0.1:4001/health/ready

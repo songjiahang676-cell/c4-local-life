@@ -45,4 +45,7 @@ docker compose down
 ```
 
 The static contract check is useful when Docker is unavailable. It does not replace an actual image
-build; CI builds all four targets and local completion evidence must state whether Docker ran.
+build; CI builds all four targets, asserts their configured user is `node`, starts the four runtime
+images on loopback-only ports, and waits for each readiness endpoint. The Worker smoke includes an
+isolated Redis container so its readiness is dependency-aware. Local completion evidence must state
+whether Docker ran.

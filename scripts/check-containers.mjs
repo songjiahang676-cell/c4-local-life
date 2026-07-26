@@ -54,6 +54,19 @@ for (const [serviceName, target] of Object.entries(applications)) {
   }
 }
 
+const apiTargetStart = dockerfileSource.indexOf(" AS api-runtime");
+const workerTargetStart = dockerfileSource.indexOf(" AS worker-runtime");
+const apiTargetSource = dockerfileSource.slice(apiTargetStart, workerTargetStart);
+for (const workspacePackage of ["config", "contracts", "observability"]) {
+  if (
+    !apiTargetSource.includes(
+      `/workspace/packages/${workspacePackage} ./packages/${workspacePackage}`,
+    )
+  ) {
+    throw new Error(`API runtime image must include workspace package ${workspacePackage}`);
+  }
+}
+
 if (!/^\.env$/m.test(dockerignoreSource) || !/^node_modules$/m.test(dockerignoreSource)) {
   throw new Error(".dockerignore must exclude local secrets and dependencies");
 }

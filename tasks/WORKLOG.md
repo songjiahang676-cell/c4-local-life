@@ -237,12 +237,12 @@ Known gaps: 正式上线时间、收费价格、支付条款、退款、税务�
 ## FND-005 — 首次托管容器构建差异修复
 
 Task: FND-005 四应用容器与健康检查（GitHub run 30185679624）  
-Changed: Build stage installs OpenSSL and supplies a fixed loopback-only Prisma datasource URL to generation/compilation; container contract asserts the placeholder and `.env` exclusion  
+Changed: Build stage installs OpenSSL and supplies a fixed loopback-only Prisma datasource URL to generation/compilation；API runtime includes its contracts workspace；CI now starts all four images, verifies `node` user and waits for readiness；container contracts prevent regression  
 Contracts: OpenAPI/Prisma unchanged；runtime configuration contract unchanged  
 Migrations: 无  
 Security: No secret enters the Docker context or image；the placeholder cannot address a remote database；runtime still fails fast without deployment-provided configuration  
 Tests run: Hosted quality job passed locked install、architecture/contracts、migration/baseline/upgrade、typecheck、lint、51 tests、7 builds and 4 Playwright smoke cases；local `pnpm containers:check`、`pnpm ci:workflow:check`、`pnpm governance:check`、`pnpm format:check` and full `scripts/check-architecture.sh` passed after the fix  
-Not run: Corrected hosted four-target build awaits the next commit  
+Not run: Corrected hosted four-target build/runtime smoke awaits the next commit  
 Observability: 无生产遥测变化；GitHub job logs retain the failed layer and corrected build evidence  
 Docs: Updated `docs/local-containers.md`、`CHANGELOG.md` and this worklog  
 Known gaps: Run 30185679624 failed before the first runtime target completed；all four corrected targets must build before FND-005 is done
