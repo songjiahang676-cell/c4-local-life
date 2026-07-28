@@ -7,13 +7,13 @@
 - Gate：G1 Identity / Taxonomy / Media
 - 目标：安全身份上下文、主数据、动态表单和隔离上传
 - 进度：11/13 个 G1 任务、28/101 个总任务完成
-- 风险：AUTH-004 本地验收已通过，仍需受保护 PR 的托管质量/容器检查；真实短信/邮件通知适配器由 NOTIF-001/EVT-001 提供
+- 风险：AUTH-004 的本地与受保护托管检查均已通过，PR #14 待合并；真实短信/邮件通知适配器由 NOTIF-001/EVT-001 提供
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status     | Notes                                                              |
-| -------- | -------------------- | ---------- | ----------------- | ---------- | ------------------------------------------------------------------ |
-| AUTH-004 | @songjiahang676-cell | 2026-07-28 | protected task PR | validating | 可选密码登录/恢复/全会话撤销；48 files/179 tests 通过；等待托管 CI |
+| Task     | Owner                | Started    | Target            | Status         | Notes                                                                         |
+| -------- | -------------------- | ---------- | ----------------- | -------------- | ----------------------------------------------------------------------------- |
+| AUTH-004 | @songjiahang676-cell | 2026-07-28 | protected task PR | ready-to-merge | 可选密码登录/恢复/全会话撤销；PR #14 / run `30402574230` 两项受保护检查均通过 |
 
 ## Gate Evidence
 
@@ -65,12 +65,13 @@
 | AUTH-004 local quality          | `pnpm ci:quality` + password tests | passed：48 files / 179 tests / 8 builds                 | 2026-07-28 |
 | AUTH-004 database lifecycle     | deploy + integration + baseline    | 12 migrations；52 DB tests；13 constraint negatives     | 2026-07-28 |
 | AUTH-004 browser/runtime        | Chromium desktop/mobile + runtime  | 6/6 E2E；API observability check passed                 | 2026-07-28 |
+| AUTH-004 protected checks       | PR #14 / run `30402574230`         | quality + non-root images passed；ready to merge        | 2026-07-28 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 本地验收完成。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 的 PR #14 受保护检查已通过并待合并。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。
