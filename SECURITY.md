@@ -9,6 +9,8 @@
 ## 安全基线
 
 - 所有生产流量使用 TLS；管理后台和内部运维入口强制 MFA。
+- 平台角色使用可到期/撤销且保留 grant/revoke provenance 的服务端授权；Admin 导航不是权限边界，
+  普通或受限账号在 API 返回通用 403。MFA 未完成时所有特权动作保持关闭。
 - 会话使用 Secure、HttpOnly、SameSite Cookie；不把长效令牌存放在浏览器 Local Storage。
 - 密码使用经过评审的内存困难 KDF；OTP 限频、一次性消费并短时有效。
 - 全部资源执行后端对象级授权；前端显示控制不是授权。

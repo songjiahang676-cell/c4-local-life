@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import {
   accountSelfServicePermissions,
   activeUserPolicyActions,
+  adminPolicyActions,
   organizationPolicyActions,
   ownerOrOrganizationPolicy,
   PolicyService,
@@ -18,6 +19,7 @@ export function createPolicyService(): PolicyService {
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.mediaUploadCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
+  policies.register(adminPolicyActions.consoleAccess, requireActiveActorPermissionPolicy);
   policies.register(
     organizationPolicyActions.profileRead,
     ownerOrOrganizationPolicy({

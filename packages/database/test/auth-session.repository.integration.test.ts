@@ -85,6 +85,66 @@ integration("AuthSessionRepository with PostgreSQL", () => {
     });
   });
 
+  it("projects only current platform roles and observes revocation on the next request", async () => {
+    await database.withRollback(async (transaction) => {
+      const userId = randomUUID();
+      const now = new Date("2026-07-28T20:30:00.000Z");
+      const tokenHash = "9".repeat(64);
+      await createSubject(transaction, userId);
+      await transaction.platformRoleAssignment.createMany({
+        data: [
+          {
+            userId,
+            role: "SUPPORT",
+            scope: { regions: ["los-angeles"] },
+            reasonCode: "SYNTHETIC_ACTIVE_GRANT",
+            grantedById: userId,
+            grantedAt: new Date(now.getTime() - 10_000),
+          },
+          {
+            userId,
+            role: "MODERATOR",
+            reasonCode: "SYNTHETIC_EXPIRED_GRANT",
+            grantedById: userId,
+            grantedAt: new Date(now.getTime() - 20_000),
+            expiresAt: new Date(now.getTime() - 1_000),
+          },
+          {
+            userId,
+            role: "FINANCE",
+            reasonCode: "SYNTHETIC_REVOKED_GRANT",
+            grantedById: userId,
+            grantedAt: new Date(now.getTime() - 20_000),
+            revokedAt: new Date(now.getTime() - 1_000),
+            revokedById: userId,
+          },
+        ],
+      });
+      const repository = new AuthSessionRepository(transaction);
+      await repository.create(createInput(userId, tokenHash, now));
+
+      const current = await repository.findActiveByTokenHash(
+        tokenHash,
+        new Date(now.getTime() + 1_000),
+      );
+      expect(current?.platformRoles).toEqual(["SUPPORT"]);
+      expect(current).not.toHaveProperty("user.platformRoles.0.scope");
+
+      await transaction.platformRoleAssignment.updateMany({
+        where: { userId, role: "SUPPORT", revokedAt: null },
+        data: {
+          revokedAt: new Date(now.getTime() + 2_000),
+          revokedById: userId,
+        },
+      });
+      const afterRevocation = await repository.findActiveByTokenHash(
+        tokenHash,
+        new Date(now.getTime() + 3_000),
+      );
+      expect(afterRevocation?.platformRoles).toEqual([]);
+    });
+  });
+
   it("rotates in one transaction and makes replay of the old token a no-op", async () => {
     await database.withRollback(async (transaction) => {
       const userId = randomUUID();

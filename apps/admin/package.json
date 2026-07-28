@@ -11,6 +11,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project @socal/admin --reporter=default"
   },
   "dependencies": {
+    "@socal/contracts": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

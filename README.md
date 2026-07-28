@@ -136,10 +136,12 @@ Gate 0 最终 head run `30187153269` 通过后，PR #1 已按保护规则合并�
 合并为 `9c66b87`。`API-004` 通过 PR #6 / run `30386104555` 合并为 `0af5f99`；`ORG-001` 通过
 PR #7 / run `30388093140` 的完整质量和四应用非 root 镜像检查合并为 `ab09c81`；`TAX-001` 通过
 PR #8 / run `30389838047` 合并为 `d622f74`；`TAX-002` 通过 PR #9 / run `30391936500` 合并为
-`59218aa`，合并后 main run `30392308720` 亦通过。当前 `MEDIA-001` 已实现认证/幂等的私有
-quarantine intent、owner 并发配额、MIME/大小/SHA-256 校验、五分钟 S3/MinIO 签名和验证文档
-fail-closed；本地真实 PostgreSQL 套件 46/46、全仓 40 个测试文件共 146 项测试及 8 个构建通过，
-受保护托管检查通过前不进入 MEDIA-002。
+`59218aa`，合并后 main run `30392308720` 亦通过。`MEDIA-001` 通过 PR #10 / run
+`30393901014` 合并为 `aadddcf`；main run `30394324273` 的完整质量和四应用非 root 容器检查亦通过。
+当前 `ADMIN-001` 已实现独立 Admin app、同源 allowlist BFF、可到期/撤销且保留 provenance 的平台
+角色、服务端 RBAC 导航、通用 401/403、no-store/noindex 与 nonce CSP。MFA/step-up 未完成前 API
+明确关闭特权动作，不提供真实后台数据或写入口。本地真实 PostgreSQL 47 项、全仓 41 个文件共 152 项
+测试、8 个构建和 Chromium 桌面/移动 6/6 smoke 已通过；受保护托管检查通过前不进入 AUTH-005。
 
 ## 七、规划容量与服务目标
 

@@ -16,6 +16,9 @@
    Categories.
 8. `20260728190935_category_form_schema_versions` adds append-only dynamic form history,
    materialized field metadata, and the Listing schema-version stamp.
+9. `20260728201500_media_upload_intents` adds owner-scoped, idempotent quarantine upload intents.
+10. `20260728203000_admin_platform_roles` adds auditable, expiring platform-role grants for the
+    independent Admin boundary.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -147,6 +150,20 @@ advisory transaction lock while evaluating exact retry and quotas.
 - Rollback: disable the route and let outstanding five-minute URLs expire while retaining metadata.
   Physical removal requires stopped writers, object cleanup from a backed-up manifest, and the
   migration-local `ROLLBACK.md`; corrective roll-forward is preferred.
+
+## `20260728203000_admin_platform_roles`
+
+Adds eight explicit platform roles and an append-only assignment table with grant/revocation
+provenance, optional JSON-object scope, expiry and revocation coherence checks, and one current
+grant per user/role. Session resolution reads only unrevoked, unexpired grants on every request;
+role history is never copied into client-managed claims.
+
+- Roll forward: apply before enabling `/admin/session`; grant roles only through a reviewed
+  administrative workflow with a reason code and least-privilege scope. Verify ordinary users and
+  inactive accounts receive 403 even if they present a valid session.
+- Rollback: disable the Admin route and redeploy the previous application while retaining the
+  additive enum/table. Do not drop grant history during incident response. See the migration-local
+  `ROLLBACK.md` for the stopped-writer physical recovery sequence.
 
 ## Roll-forward and recovery
 

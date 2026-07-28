@@ -80,6 +80,13 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 - 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
 - `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助、`listing:draft:create` 和 `media:upload:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿和媒体上传 intent POST 已由各自 Policy 动作强制执行。
 
+`ADMIN-001` 将平台角色与组织角色分开持久化到 `platform_role_assignments`。每条授权保留 reason、
+grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
+未过期授权，不把客户端 claims 当作事实。`admin:console:access` 只授予 ACTIVE 且至少有一个有效平台
+角色的 Actor。`GET /admin/session` 再次执行服务端 Policy，并只返回安全用户投影、去重后的角色和服务端
+计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。当前
+`security.privilegedActionsAllowed=false`，在 `AUTH-005` 完成 MFA/step-up 前没有后台数据或写动作开放。
+
 ## 5.6 权限测试最小矩阵
 
 每个资源至少测试：未登录、资源拥有者、同组织不同角色、无关普通用户、受限用户、正确后台角色、错误后台角色、跨组织 ID、已删除/下架状态、批量接口部分越权。默认拒绝，未知动作不得隐式放行。

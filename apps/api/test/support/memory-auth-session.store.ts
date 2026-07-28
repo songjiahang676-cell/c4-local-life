@@ -9,6 +9,7 @@ import type {
   UserProfileUpdateInput,
   UserProfileUpdateResult,
 } from "@socal/database/auth-session";
+import type { PlatformRole } from "@socal/contracts";
 import type { AuthSessionStore } from "../../src/modules/auth/auth-session.store";
 
 type StoredSession = {
@@ -25,6 +26,7 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
   readonly #profiles = new Map<string, UserProfileProjection>();
   readonly #activeRegionIds = new Set<string>();
   readonly #organizationsByUser = new Map<string, AuthSessionPrincipal["organizations"]>();
+  readonly #platformRolesByUser = new Map<string, PlatformRole[]>();
 
   registerSubject(user: AuthSessionPrincipal["user"]): void {
     this.#subjects.set(user.id, user);
@@ -53,6 +55,12 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
     this.#organizationsByUser.set(userId, organizations);
   }
 
+  registerPlatformRole(userId: string, role: PlatformRole): void {
+    const roles = this.#platformRolesByUser.get(userId) ?? [];
+    if (!roles.includes(role)) roles.push(role);
+    this.#platformRolesByUser.set(userId, roles);
+  }
+
   clear(): void {
     this.createInputs.length = 0;
     this.lookupHashes.length = 0;
@@ -61,6 +69,7 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
     this.#profiles.clear();
     this.#activeRegionIds.clear();
     this.#organizationsByUser.clear();
+    this.#platformRolesByUser.clear();
   }
 
   findActiveByTokenHash(tokenHash: string, now: Date): Promise<AuthSessionPrincipal | null> {
@@ -94,6 +103,7 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
       organizations: (this.#organizationsByUser.get(input.userId) ?? []).map((organization) => ({
         ...organization,
       })),
+      platformRoles: [...(this.#platformRolesByUser.get(input.userId) ?? [])],
     };
     this.#sessions.set(input.tokenHash, {
       tokenHash: input.tokenHash,

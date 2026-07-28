@@ -649,6 +649,27 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/admin/session": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Resolve the current operator console session
+         * @description Returns only the current operator's active platform roles and server-computed workspace
+         *     navigation. This bootstrap endpoint does not grant privileged data access or satisfy MFA.
+         */
+        readonly get: operations["getAdminSession"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/admin/moderation/cases": {
         readonly parameters: {
             readonly query?: never;
@@ -777,7 +798,31 @@ export interface components {
             /** Format: date-time */
             readonly expiresAt: string;
             readonly permissions: readonly string[];
+            readonly platformRoles: readonly components["schemas"]["PlatformRole"][];
             readonly organizations?: readonly components["schemas"]["OrganizationSummary"][];
+        };
+        /** @enum {string} */
+        readonly PlatformRole: "SUPPORT" | "MODERATOR" | "SENIOR_MODERATOR" | "AD_OPS" | "FINANCE" | "TAXONOMY_ADMIN" | "PLATFORM_ADMIN" | "READ_ONLY_AUDITOR";
+        readonly AdminNavigationItem: {
+            /** @enum {string} */
+            readonly key: "moderation" | "people" | "taxonomy" | "commerce" | "ads" | "audit" | "system";
+            /** @enum {string} */
+            readonly href: "/admin/moderation/listings" | "/admin/users" | "/admin/taxonomy/categories" | "/admin/commerce/orders" | "/admin/ads/campaigns" | "/admin/audit" | "/admin/system/health";
+        };
+        readonly AdminSecurityState: {
+            /** @constant */
+            readonly mfaRequired: true;
+            /** @description Remains false until AUTH-005 establishes and verifies an MFA-bound Admin session. */
+            readonly privilegedActionsAllowed: boolean;
+        };
+        readonly AdminSession: {
+            readonly operator: components["schemas"]["UserSummary"];
+            readonly roles: readonly components["schemas"]["PlatformRole"][];
+            readonly navigation: readonly components["schemas"]["AdminNavigationItem"][];
+            readonly security: components["schemas"]["AdminSecurityState"];
+        };
+        readonly AdminSessionResponse: {
+            readonly data: components["schemas"]["AdminSession"];
         };
         readonly MyProfileResponse: {
             readonly data: components["schemas"]["MyProfile"];
@@ -2676,6 +2721,29 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    readonly getAdminSession: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Authorized operator console projection */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminSessionResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
         };
     };
     readonly listModerationCases: {

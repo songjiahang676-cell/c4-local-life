@@ -90,6 +90,14 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
 角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
 
+`ADMIN-001` 把平台角色保存在独立、可撤销/到期且带 grant/revoke provenance 的表中，认证 Repository
+每次请求读取当前有效授权，避免长效客户端 claims 造成降权延迟。Admin API 对 guest 返回 401，对普通
+ACTIVE 或 LIMITED 员工账号返回同样不泄露内部角色的 403；所有结果包括错误都 no-store。Admin app
+只使用同源 allowlist BFF，设置 nonce-based script CSP、frame denial、no-referrer、noindex 和
+Permissions-Policy，并且从服务端返回的导航渲染入口。OTP 只能建立普通 Session；在 `AUTH-005`
+完成 MFA/step-up 前，服务端明确返回 `privilegedActionsAllowed=false`，本切片不开放任何后台数据、
+导出或写动作，不能把 UI 隐藏当作授权。
+
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
 控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID

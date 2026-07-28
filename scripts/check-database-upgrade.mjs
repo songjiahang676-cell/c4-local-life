@@ -143,6 +143,22 @@ try {
             AND indexname = 'media_assets_owner_id_idempotency_key_key'
        ) AS owner_idempotency`,
   );
+  const platformRoleStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.platform_role_assignments') AS assignments,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'platform_role_assignments_one_active_role'
+       ) AS one_active_role,
+       (
+         SELECT count(*)::integer
+           FROM pg_enum value
+           JOIN pg_type type ON type.oid = value.enumtypid
+          WHERE type.typname = 'PlatformRole'
+       ) AS enum_value_count`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -157,7 +173,10 @@ try {
     !categoryFormSchemaStorage.rows[0].listing_version ||
     !categoryFormSchemaStorage.rows[0].immutable_trigger ||
     mediaUploadStorage.rows[0].media_assets !== "media_assets" ||
-    !mediaUploadStorage.rows[0].owner_idempotency
+    !mediaUploadStorage.rows[0].owner_idempotency ||
+    platformRoleStorage.rows[0].assignments !== "platform_role_assignments" ||
+    !platformRoleStorage.rows[0].one_active_role ||
+    platformRoleStorage.rows[0].enum_value_count !== 8
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -176,6 +195,7 @@ try {
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
       categoryFormSchemaStorage: true,
       mediaUploadStorage: true,
+      platformRoleStorage: true,
     }),
   );
 } finally {

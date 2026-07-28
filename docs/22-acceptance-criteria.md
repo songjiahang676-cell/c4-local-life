@@ -31,6 +31,12 @@
 - 管理后台强制 MFA；普通用户无法访问任何 Admin API。
 - 账户删除请求存在冷静期、阻塞条件和审计。
 
+`ADMIN-001` 前置验收：独立 Admin app 具有 noindex/no-store、严格 script CSP、中文/英文、移动/键盘
+状态；guest 可看到登录边界，普通或 LIMITED 账户的 `GET /admin/session` 返回通用 403，只有 ACTIVE
+且具有当前有效平台角色的 Session 获得服务端计算导航。其安全投影必须保持
+`privilegedActionsAllowed=false`，直到 `AUTH-005` 真实完成 MFA/step-up；因此本切片不能被当作上面
+“后台强制 MFA”最终验收已经完成。
+
 ## 22.4 Listing 验收
 
 对五种类型逐项：

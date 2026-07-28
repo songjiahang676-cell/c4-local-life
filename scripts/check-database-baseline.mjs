@@ -47,6 +47,7 @@ try {
     "20260728184415_taxonomy_aliases",
     "20260728190935_category_form_schema_versions",
     "20260728201500_media_upload_intents",
+    "20260728203000_admin_platform_roles",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -73,7 +74,8 @@ try {
             to_regclass('public.region_aliases') AS region_aliases,
             to_regclass('public.category_aliases') AS category_aliases,
             to_regclass('public.category_form_schema_versions') AS category_form_schema_versions,
-            to_regclass('public.media_assets') AS media_assets`,
+            to_regclass('public.media_assets') AS media_assets,
+            to_regclass('public.platform_role_assignments') AS platform_role_assignments`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -230,6 +232,36 @@ try {
   );
   if (!mediaUploadStorage.rows[0]?.owner_idempotency || !mediaUploadStorage.rows[0]?.owner_fk) {
     throw new Error("Media upload ownership or idempotency controls are missing");
+  }
+
+  const platformRoleStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'platform_role_assignments_one_active_role'
+       ) AS one_active_role,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'platform_role_assignments'
+            AND constraint_type = 'FOREIGN KEY'
+       ) AS foreign_key_count,
+       (
+         SELECT count(*)::integer
+           FROM pg_enum value
+           JOIN pg_type type ON type.oid = value.enumtypid
+          WHERE type.typname = 'PlatformRole'
+       ) AS enum_value_count`,
+  );
+  if (
+    !platformRoleStorage.rows[0]?.one_active_role ||
+    platformRoleStorage.rows[0]?.foreign_key_count !== 3 ||
+    platformRoleStorage.rows[0]?.enum_value_count !== 8
+  ) {
+    throw new Error("Platform role uniqueness, provenance, or enum controls are missing");
   }
 
   await client.query("BEGIN");
@@ -408,6 +440,60 @@ try {
      )`,
     "23514",
   );
+  await client.query(
+    `INSERT INTO platform_role_assignments (
+       id, user_id, role, scope, reason_code, granted_by_id
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000013',
+       '00000000-0000-4000-8000-000000000001',
+       'MODERATOR',
+       '{"regions":["US-CA-SOCAL"]}'::jsonb,
+       'BASELINE_TEST',
+       '00000000-0000-4000-8000-000000000001'
+     )`,
+  );
+  await expectSqlState(
+    "platform role active uniqueness",
+    `INSERT INTO platform_role_assignments (
+       id, user_id, role, reason_code
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000014',
+       '00000000-0000-4000-8000-000000000001',
+       'MODERATOR',
+       'BASELINE_DUPLICATE'
+     )`,
+    "23505",
+  );
+  await expectSqlState(
+    "platform role object scope",
+    `INSERT INTO platform_role_assignments (
+       id, user_id, role, scope, reason_code
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000015',
+       '00000000-0000-4000-8000-000000000001',
+       'SUPPORT',
+       '[]'::jsonb,
+       'BASELINE_SCOPE'
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "platform role revocation provenance",
+    `INSERT INTO platform_role_assignments (
+       id, user_id, role, reason_code, revoked_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000016',
+       '00000000-0000-4000-8000-000000000001',
+       'FINANCE',
+       'BASELINE_REVOCATION',
+       now()
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -450,7 +536,8 @@ try {
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
       categoryFormSchemaStorage: true,
       mediaUploadStorage: true,
-      negativeCases: 6,
+      platformRoleStorage: true,
+      negativeCases: 9,
     }),
   );
 } finally {

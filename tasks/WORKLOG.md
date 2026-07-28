@@ -439,3 +439,25 @@ Observability: Existing correlated HTTP telemetry covers 201/400/401/403/409/413
 Docs: Updated domain/data、roles/policy、API/integrations、security/privacy、runtime config、infrastructure/local containers、acceptance、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: MEDIA-002 owns completion/object HEAD、magic-byte/decoder/antivirus、scan queue、re-encode/EXIF removal、variants and READY/REJECTED binding；MEDIA-003 owns restricted verification bucket/KMS/approvals/retention；API-005 later generalizes idempotency storage；production Terraform bucket policy/IAM/lifecycle and a real MinIO/S3 PUT smoke remain required；the first full checks correctly exposed OpenAPI generated drift、a type-only lint issue and Prisma void lock deserialization，all repaired before the final passing runs
+
+## ADMIN-001 — Admin shell、登录与 RBAC 导航
+
+Task: ADMIN-001 Admin shell、登录、RBAC 导航
+
+Changed: Replaced the Admin placeholder with an independent responsive bilingual shell、OTP sign-in/denied/error/empty states、same-origin allowlist BFF and server-generated workspace navigation；added `AdminModule`/`GET /admin/session`、current platform roles in Session/Actor、and auditable `PlatformRoleAssignment` persistence with expiry/revocation provenance；all workspaces remain inside the modular monolith
+
+Contracts: OpenAPI grows from 37 to 38 paths、46 to 47 operations and 70 to 75 schemas；Session now requires server-derived `platformRoles`，and the new strict `AdminSessionResponse` returns only the safe operator projection、ordered roles、navigation and MFA gate；generated TypeScript updated；Prisma grows from 41 to 42 models with eight explicit `PlatformRole` values
+
+Migrations: 有，`20260728203000_admin_platform_roles` additively creates the enum/table、three provenance FKs、object-scope/expiry/revocation checks、current-role uniqueness and lookup indexes；all 10 migrations deployed to local PostgreSQL，status/upgrade/baseline passed；rollback disables Admin and retains role history，with stopped-writer/export/drop steps documented only for exceptional physical removal
+
+Security: ACTIVE + current unrevoked/unexpired platform role is required on every request；ordinary ACTIVE and role-bearing LIMITED users receive generic no-store 403，guest receives 401，and responses exclude email/phone/token/trust/scope；Admin BFF permits only auth/admin-session paths and sanitizes headers/upstream failures；Admin pages use noindex、no-store、no-referrer、frame denial、Permissions-Policy and per-request nonce CSP；the API sets `mfaRequired=true` and `privilegedActionsAllowed=false` so OTP sign-in cannot expose privileged data/actions before AUTH-005
+
+Tests run: Initial targeted run exposed one ambiguous heading selector、type-only lint findings and a Nest sibling-module DI failure；the session-safe identity was moved into the global request accessor and all were repaired；API 14 files/71 tests and Admin 3 tests passed；migration safety、deploy/status、previous-release upgrade and baseline passed with 10 migrations and 9 database negative cases；real PostgreSQL integration passed 14 files/47 tests including role expiry/revocation next-request behavior；architecture passed 101 tasks/42 models/38 paths/75 schemas/36 JSON；`pnpm ci:quality` passed 9 typechecks、9 lints、41/41 files、152/152 tests and 8 builds；observability runtime passed；the first production Chromium run correctly found static prerendering prevented Next nonce injection and CSP blocked hydration，so Admin rendering was made dynamic without weakening CSP；final desktop/mobile E2E passed 6/6 and in-app browser inspection confirmed Chinese/English login、no overflow、no console errors、noindex and localized document language/title
+
+Not run: Local Docker runtime image/Compose smoke，because this host has no Docker CLI；no real staff OTP was sent and no production staff account/role was created；protected hosted Linux quality and four-image jobs pending
+
+Observability: Existing correlated bounded route/status telemetry covers Admin 200/401/403 without roles、scope、identity or internal denial reasons as labels；global `/v1/admin/*` response hook applies no-store even to errors；no privileged business data exists in this slice
+
+Docs: Updated roles/permissions、domain/data、API/integrations、security/privacy、acceptance、Admin architecture、runtime configuration、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: AUTH-005 must add real Admin MFA/step-up/recent-auth and only then allow privileged reads/writes；role grant/revoke UI/API、scope enforcement per resource、immutable `AuditLog` writes、SSO、two-person approvals and real workspaces remain their planned tasks；bootstrap grants require a reviewed maintenance procedure；local Docker smoke and hosted protected checks remain
