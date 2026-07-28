@@ -53,7 +53,12 @@ describe("Admin MFA cryptography", () => {
     expect(encrypted).not.toContain(secret);
     expect(decryptTotpSecret(encrypted, masterSecret)).toBe(secret);
 
-    const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith("A") ? "B" : "A"}`;
+    const parts = encrypted.split(".");
+    const authenticationTag = Buffer.from(parts[3] ?? "", "base64url");
+    authenticationTag[0] = (authenticationTag[0] ?? 0) ^ 1;
+    const tampered = [parts[0], parts[1], parts[2], authenticationTag.toString("base64url")].join(
+      ".",
+    );
     expect(() => decryptTotpSecret(tampered, masterSecret)).toThrow();
   });
 
