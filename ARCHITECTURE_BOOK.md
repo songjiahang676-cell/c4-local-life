@@ -597,7 +597,7 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 - 控制器使用 `@RequirePolicy("<domain>:<resource>:<action>")` 声明动作；全局 `AuthorizationGuard` 在进入控制器前执行已注册规则。未声明动作的公共路由不被误拦截，但任何未注册动作、重复注册或规则异常都失败关闭。
 - `PolicyService` 返回内部 allow/deny 与稳定原因码；HTTP 边界只向未登录用户返回通用 401，向其他拒绝返回通用 403，不泄露资源、角色或组织是否存在。
 - 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
-- `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助和 `listing:draft:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿 POST 已由同名 Policy 动作强制执行。
+- `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助、`listing:draft:create` 和 `media:upload:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿和媒体上传 intent POST 已由各自 Policy 动作强制执行。
 
 ## 5.6 权限测试最小矩阵
 
@@ -693,6 +693,15 @@ display name、受控头像、角色和加入时间，不读取邮箱、手机�
 避免多端编辑静默覆盖；联系方式和内部信任状态不属于自助资料 DTO。会话只保存 bearer token 的域分离
 HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
 用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
+
+### Media 聚合
+
+`MediaAsset` 在任何业务资源绑定前记录上传所有权、用途、类型、声明字节数、SHA-256、私有 bucket/key、
+短效过期时间和 owner 范围幂等键。对象键只能是服务端生成的
+`quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
+advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
+字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
+Listing 投影，MEDIA-002/LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
 
 ### Conversation 聚合
 
@@ -1083,6 +1092,18 @@ Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMI
 6. 状态 `READY` 后才能绑定公开信息；公开使用独立 CDN 域和不可执行 content-type。
 
 服务端不信任扩展名或客户端 MIME。文档/验证材料永不进入公共媒体路径。
+
+`MEDIA-001` 已实现 `POST /media/uploads`：仅 ACTIVE 会话具有 `media:upload:create`，请求必须携带
+16–128 字符、仅含字母数字及 `._:-` 的 `Idempotency-Key`，以及安全文件名、白名单 MIME、声明字节数和小写十六进制
+SHA-256。API 在 owner 级数据库锁内执行 exact retry、最多 20 个未过期 intent 和滚动 24 小时默认
+200 MiB 配额；Avatar/Logo 单文件另限 8 MiB，其余已启用图片限 20 MiB。响应是五分钟 `no-store`
+S3/MinIO PUT URL，并把 Content-Type、Content-Length、checksum、hash metadata 和服务端加密作为
+签名要求。bucket 与不含文件名的 `quarantine/` key 只由服务端配置/生成。`VERIFICATION` 在
+MEDIA-003 独立受限桶、KMS 与访问审批完成前返回 422；PDF 不会回退进入普通媒体隔离区。
+
+当前切片只签发并审计 intent。`POST /media/{mediaId}/complete`、对象 HEAD/magic-byte 复核、
+扫描/解码/转码、去 EXIF、变体和 READY/REJECTED 生命周期属于 MEDIA-002，不能把 intent 成功误认为
+对象已上传或可公开。
 
 ## 8.8 Stripe 集成
 
@@ -1812,6 +1833,15 @@ schema version 验证，不能信任前端表单隐藏或当前版本替代历�
 - 下载响应设置正确 Content-Type、Content-Disposition、nosniff 和缓存策略。
 - 对象删除采用异步清单和重试，数据库状态与对象生命周期对账。
 
+`MEDIA-001` 的 quarantine intent 使用认证 ACTIVE actor 和后端 Policy；数据库在 owner 级事务锁内
+防止并发绕过活动数量/滚动字节配额，并以 `owner + Idempotency-Key + request hash` 阻止跨用户重放和
+同键换 payload。对象 key 只含随机 UUID，不含原始文件名、用户 ID 或 PII；客户端不能提交 bucket/key。
+五分钟 PUT 签名绑定声明长度、白名单 MIME、SHA-256 checksum/metadata 和 SSE，响应及所有错误均
+`no-store`，HTTP 遥测不记录 body、签名 URL、hash、对象 key 或幂等键。私有 bucket 本地启动时显式
+设置 anonymous `none`；生产仍须以独立 S3 bucket policy、Block Public Access、最小任务角色和
+生命周期规则落实。此阶段不接受 SVG/HTML、视频或验证文件；文件内容真实性和恶意载荷仍必须由
+MEDIA-002 的 magic-byte/解码/杀毒/重编码完成，UPLOADING 不得用于公开页面。
+
 ## 14.8 PII 分类
 
 | 等级              | 示例                             | 控制                       |
@@ -1999,6 +2029,11 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 - ECR：镜像仓库，开启扫描和不可变标签。
 
 Terraform 蓝图见 `infra/terraform/`。生产实施前需要成本、安全和网络评审。
+
+MEDIA-001 只接入 `private quarantine` 端口：API 任务角色仅需针对该 bucket 的受限
+`PutObject`/后续 `HeadObject` 权限，必须启用 Block Public Access、默认加密和短期未完成上传清理。
+public-derived 与 restricted-verification 不能通过同一前缀策略假装隔离；其 Terraform/IAM、KMS、
+访问审计和保留规则分别由 MEDIA-002/003 完成。本地 Compose 的一次性 `minio-init` 只建立私有开发桶。
 
 ## 16.3 网络
 
@@ -2616,6 +2651,10 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - Owner/组织成员权限正确；他人不能读取草稿或审核原因。
 - 并发编辑返回 409 而非静默覆盖。
 - 详情不泄露精确地址/联系方式/风险字段。
+
+Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
+滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
+决定 bucket/key；普通媒体路径拒绝 SVG/HTML 和验证文档；原始对象在 READY 前没有公共 URL。
 
 ## 22.5 搜索验收
 

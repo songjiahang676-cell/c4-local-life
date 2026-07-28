@@ -65,6 +65,15 @@ display name、受控头像、角色和加入时间，不读取邮箱、手机�
 HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
 用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
 
+### Media 聚合
+
+`MediaAsset` 在任何业务资源绑定前记录上传所有权、用途、类型、声明字节数、SHA-256、私有 bucket/key、
+短效过期时间和 owner 范围幂等键。对象键只能是服务端生成的
+`quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
+advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
+字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
+Listing 投影，MEDIA-002/LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+
 ### Conversation 聚合
 
 会话可关联一个 Listing，参与者集合固定受控；消息追加写入，编辑/删除保留时间戳。阻塞状态影响发送权限，不泄露封禁策略细节。

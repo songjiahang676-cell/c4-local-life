@@ -719,6 +719,10 @@ paths:
     post:
       tags: [Media]
       summary: Create a media upload intent
+      description: |
+        Reserves quota and returns a five-minute direct-upload target in private quarantine.
+        The caller must send the declared content type, length and SHA-256 checksum headers exactly.
+        Verification documents remain disabled until the separate restricted-storage workflow ships.
       operationId: createMediaUpload
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -731,16 +735,29 @@ paths:
       responses:
         "201":
           description: Presigned upload created
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "413":
-          description: File too large
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /media/{mediaId}/complete:
     post:
       tags: [Media]
@@ -1179,7 +1196,11 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      schema: { type: string, minLength: 16, maxLength: 128 }
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]+$"
     DeviceId:
       name: X-Device-Id
       in: header
@@ -1200,7 +1221,7 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetails"
     PayloadTooLarge:
-      description: Request body exceeds the endpoint limit
+      description: Request body or declared upload exceeds the endpoint limit
       content:
         application/problem+json:
           schema:
@@ -1882,11 +1903,19 @@ components:
         altText: { type: [string, "null"] }
     CreateUploadRequest:
       type: object
-      required: [filename, mimeType, byteSize, purpose]
+      required: [filename, mimeType, byteSize, sha256, purpose]
       properties:
-        filename: { type: string, maxLength: 255 }
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Used only for client display and validation; never trusted as an object key.
         mimeType: { type: string, enum: [image/jpeg, image/png, image/webp, application/pdf] }
         byteSize: { type: integer, minimum: 1, maximum: 20971520 }
+        sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Lowercase hexadecimal SHA-256 of the complete file.
         purpose:
           { type: string, enum: [LISTING_MEDIA, AVATAR, BUSINESS_LOGO, AD_CREATIVE, VERIFICATION] }
     CreateUploadResponse:

@@ -395,7 +395,12 @@ export interface paths {
         };
         readonly get?: never;
         readonly put?: never;
-        /** Create a media upload intent */
+        /**
+         * Create a media upload intent
+         * @description Reserves quota and returns a five-minute direct-upload target in private quarantine.
+         *     The caller must send the declared content type, length and SHA-256 checksum headers exactly.
+         *     Verification documents remain disabled until the separate restricted-storage workflow ships.
+         */
         readonly post: operations["createMediaUpload"];
         readonly delete?: never;
         readonly options?: never;
@@ -1129,10 +1134,13 @@ export interface components {
             readonly altText?: string | null;
         };
         readonly CreateUploadRequest: {
+            /** @description Used only for client display and validation; never trusted as an object key. */
             readonly filename: string;
             /** @enum {string} */
             readonly mimeType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
             readonly byteSize: number;
+            /** @description Lowercase hexadecimal SHA-256 of the complete file. */
+            readonly sha256: string;
             /** @enum {string} */
             readonly purpose: "LISTING_MEDIA" | "AVATAR" | "BUSINESS_LOGO" | "AD_CREATIVE" | "VERIFICATION";
         };
@@ -1402,7 +1410,7 @@ export interface components {
                 readonly "application/problem+json": components["schemas"]["ProblemDetails"];
             };
         };
-        /** @description Request body exceeds the endpoint limit */
+        /** @description Request body or declared upload exceeds the endpoint limit */
         readonly PayloadTooLarge: {
             headers: {
                 readonly [name: string]: unknown;
@@ -2225,21 +2233,21 @@ export interface operations {
             /** @description Presigned upload created */
             readonly 201: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
                     readonly "application/json": components["schemas"]["CreateUploadResponse"];
                 };
             };
-            /** @description File too large */
-            readonly 413: {
-                headers: {
-                    readonly [name: string]: unknown;
-                };
-                content: {
-                    readonly "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 413: components["responses"]["PayloadTooLarge"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+            readonly 429: components["responses"]["TooManyRequests"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
         };
     };
     readonly completeMediaUpload: {

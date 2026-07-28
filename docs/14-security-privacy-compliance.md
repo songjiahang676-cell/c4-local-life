@@ -119,6 +119,15 @@ schema version 验证，不能信任前端表单隐藏或当前版本替代历�
 - 下载响应设置正确 Content-Type、Content-Disposition、nosniff 和缓存策略。
 - 对象删除采用异步清单和重试，数据库状态与对象生命周期对账。
 
+`MEDIA-001` 的 quarantine intent 使用认证 ACTIVE actor 和后端 Policy；数据库在 owner 级事务锁内
+防止并发绕过活动数量/滚动字节配额，并以 `owner + Idempotency-Key + request hash` 阻止跨用户重放和
+同键换 payload。对象 key 只含随机 UUID，不含原始文件名、用户 ID 或 PII；客户端不能提交 bucket/key。
+五分钟 PUT 签名绑定声明长度、白名单 MIME、SHA-256 checksum/metadata 和 SSE，响应及所有错误均
+`no-store`，HTTP 遥测不记录 body、签名 URL、hash、对象 key 或幂等键。私有 bucket 本地启动时显式
+设置 anonymous `none`；生产仍须以独立 S3 bucket policy、Block Public Access、最小任务角色和
+生命周期规则落实。此阶段不接受 SVG/HTML、视频或验证文件；文件内容真实性和恶意载荷仍必须由
+MEDIA-002 的 magic-byte/解码/杀毒/重编码完成，UPLOADING 不得用于公开页面。
+
 ## 14.8 PII 分类
 
 | 等级              | 示例                             | 控制                       |

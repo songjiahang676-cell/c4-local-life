@@ -15,6 +15,9 @@
       "organization": [
         "src/repositories/organization.repository.ts"
       ],
+      "media": [
+        "src/repositories/media-asset.repository.ts"
+      ],
       "taxonomy": [
         "src/taxonomy.ts"
       ]
@@ -36,6 +39,11 @@
       "types": "./src/repositories/organization.repository.ts",
       "require": "./dist/src/repositories/organization.repository.js",
       "default": "./dist/src/repositories/organization.repository.js"
+    },
+    "./media": {
+      "types": "./src/repositories/media-asset.repository.ts",
+      "require": "./dist/src/repositories/media-asset.repository.js",
+      "default": "./dist/src/repositories/media-asset.repository.js"
     },
     "./taxonomy": {
       "types": "./src/taxonomy.ts",

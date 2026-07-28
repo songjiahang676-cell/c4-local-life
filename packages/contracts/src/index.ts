@@ -50,6 +50,8 @@ export type FormPublicationPolicy = components["schemas"]["FormPublicationPolicy
 export type GetCategoryFormSchemaQuery = NonNullable<
   operations["getCategoryFormSchema"]["parameters"]["query"]
 >;
+export type CreateUploadRequest = components["schemas"]["CreateUploadRequest"];
+export type CreateUploadResponse = components["schemas"]["CreateUploadResponse"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -68,6 +70,47 @@ export const contentStatusSchema: z.ZodType<ContentStatus> = z.enum([
   "SUSPENDED",
   "DELETED",
 ]);
+
+const safeUploadFilenameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine(
+    (value) =>
+      value !== "." &&
+      value !== ".." &&
+      !/[\\/]/.test(value) &&
+      !Array.from(value).some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return (
+          codePoint <= 0x1f ||
+          (codePoint >= 0x7f && codePoint <= 0x9f) ||
+          (codePoint >= 0x202a && codePoint <= 0x202e) ||
+          (codePoint >= 0x2066 && codePoint <= 0x2069)
+        );
+      }),
+    "Filename contains unsupported characters",
+  );
+
+export const createUploadRequestSchema: z.ZodType<CreateUploadRequest> = z
+  .object({
+    filename: safeUploadFilenameSchema,
+    mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+    byteSize: z.number().int().min(1).max(20_971_520),
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    purpose: z.enum(["LISTING_MEDIA", "AVATAR", "BUSINESS_LOGO", "AD_CREATIVE", "VERIFICATION"]),
+  })
+  .strict();
+
+export const idempotencyKeySchema = z
+  .string()
+  .min(16)
+  .max(128)
+  .regex(
+    /^[A-Za-z0-9._:-]+$/,
+    "Idempotency-Key must contain only letters, digits, dot, underscore, colon or hyphen",
+  );
 
 export const moneySchema: z.ZodType<Money> = z
   .object({

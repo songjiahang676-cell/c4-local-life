@@ -41,7 +41,7 @@
     "db:seed:validate": "pnpm --filter @socal/database seed:validate",
     "db:test:integration": "node scripts/run-database-integration-tests.mjs",
     "db:studio": "pnpm --filter @socal/database prisma:studio",
-    "infra:up": "docker compose up -d postgres redis opensearch minio mailpit",
+    "infra:up": "docker compose up -d postgres redis opensearch minio minio-init mailpit",
     "infra:down": "docker compose down",
     "app:up": "docker compose --profile app up --build",
     "app:down": "docker compose down",

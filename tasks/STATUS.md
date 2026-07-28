@@ -6,14 +6,14 @@
 
 - Gate：G1 Identity / Taxonomy / Media
 - 目标：安全身份上下文、主数据、动态表单和隔离上传
-- 进度：7/13 个 G1 任务、24/101 个总任务完成
-- 风险：TAX-002 本地验收已通过，仍需受保护 PR 的托管质量/容器检查
+- 进度：8/13 个 G1 任务、25/101 个总任务完成
+- 风险：MEDIA-001 本地验收已通过，仍需受保护 PR 的托管质量/容器检查
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target            | Status     | Notes                                                   |
-| ------- | -------------------- | ---------- | ----------------- | ---------- | ------------------------------------------------------- |
-| TAX-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | validating | 表单版本/发布/回滚/36 files/131 tests 通过；等待托管 CI |
+| Task      | Owner                | Started    | Target            | Status     | Notes                                                                 |
+| --------- | -------------------- | ---------- | ----------------- | ---------- | --------------------------------------------------------------------- |
+| MEDIA-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | validating | 私有 quarantine intent/配额/签名/40 files/146 tests 通过；等待托管 CI |
 
 ## Gate Evidence
 
@@ -47,12 +47,16 @@
 | TAX-001 protected merge         | PR #8 / run `30389838047`          | merged `d622f74`；quality + non-root images passed   | 2026-07-28 |
 | TAX-002 local quality           | `pnpm ci:quality` + form tests     | passed：36 files / 131 tests / 8 builds              | 2026-07-28 |
 | TAX-002 database lifecycle      | deploy + seed + baseline + upgrade | 8 migrations；42 DB tests；58 schemas / 93 fields    | 2026-07-28 |
+| TAX-002 protected merge         | PR #9 / run `30391936500`          | merged `59218aa`；quality + non-root images passed   | 2026-07-28 |
+| TAX-002 final main quality      | GitHub Actions run `30392308720`   | merged head quality passed                           | 2026-07-28 |
+| MEDIA-001 local quality         | `pnpm ci:quality` + upload tests   | passed：40 files / 146 tests / 8 builds              | 2026-07-28 |
+| MEDIA-001 database lifecycle    | deploy + integration + baseline    | 9 migrations；46 DB tests；quota concurrency passed  | 2026-07-28 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001 已由受保护 PR #3/#4/#5/#6/#7/#8 合并；TAX-002 本地验收完成。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002 已由受保护 PR #3/#4/#5/#6/#7/#8/#9 合并；MEDIA-001 本地验收完成。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。

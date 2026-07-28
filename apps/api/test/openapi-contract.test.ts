@@ -16,6 +16,7 @@ import {
   MemoryOtpChallengeStore,
 } from "./support/memory-otp-challenge.store";
 import { MemoryOrganizationStore } from "./support/memory-organization.store";
+import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-media.store";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 
 type JsonSchema = Record<string, unknown>;
@@ -140,6 +141,8 @@ describe("canonical OpenAPI contract", () => {
       otpChallengeStore,
       otpDeliveryGateway: otpDelivery,
       organizationStore,
+      mediaStore: new MemoryMediaStore(),
+      mediaObjectStorage: new CapturingMediaObjectStorage(),
       taxonomyStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
@@ -358,6 +361,33 @@ describe("canonical OpenAPI contract", () => {
     expect(ajv.validate(createSchema ?? false, created.json())).toBe(true);
     expect(ajv.validate(organizationSchema ?? false, organization.json())).toBe(true);
     expect(ajv.validate(membersSchema ?? false, members.json())).toBe(true);
+  });
+
+  it("validates the implemented private upload-intent projection against the contract", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/media/uploads",
+      headers: {
+        cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}`,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "contract-media-upload-0001",
+      },
+      payload: {
+        filename: "contract-photo.webp",
+        mimeType: "image/webp",
+        byteSize: 1_024,
+        sha256: "a".repeat(64),
+        purpose: "LISTING_MEDIA",
+      },
+    });
+    const schema =
+      contract.paths["/media/uploads"]?.post?.responses["201"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(response.statusCode).toBe(201);
+    expect(schema).toBeDefined();
+    expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
   });
 
   it("validates implemented region and category trees against the contract", async () => {

@@ -10,6 +10,9 @@ import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
 import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import { HealthModule } from "./modules/health/health.module";
 import { ListingsModule } from "./modules/listings/listings.module";
+import type { MediaObjectStorage } from "./modules/media/media-object-storage";
+import { MediaModule } from "./modules/media/media.module";
+import type { MediaStore } from "./modules/media/media.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
@@ -24,6 +27,8 @@ export class AppModule {
     otpDeliveryGateway?: OtpDeliveryGateway,
     organizationStore?: OrganizationStore,
     taxonomyStore?: TaxonomyStore,
+    mediaStore?: MediaStore,
+    mediaObjectStorage?: MediaObjectStorage,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -32,6 +37,7 @@ export class AppModule {
         AuthModule.register(environment, authSessionStore, otpChallengeStore, otpDeliveryGateway),
         HealthModule,
         ListingsModule,
+        MediaModule.register(environment, mediaStore, mediaObjectStorage),
         OrganizationsModule.register(environment, organizationStore),
         TaxonomyModule.register(environment, taxonomyStore),
       ],

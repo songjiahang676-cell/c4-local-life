@@ -26,6 +26,10 @@ describe("runtime configuration", () => {
     expect(environment.OTP_SECRET).toBeInstanceOf(SecretValue);
     expect(environment.OTP_TTL_SECONDS).toBe(600);
     expect(environment.OTP_MAX_ATTEMPTS).toBe(5);
+    expect(environment.S3_QUARANTINE_BUCKET).toBe("socal-media-quarantine-local");
+    expect(environment.MEDIA_UPLOAD_URL_TTL_SECONDS).toBe(300);
+    expect(environment.MEDIA_UPLOAD_MAX_ACTIVE).toBe(20);
+    expect(environment.MEDIA_UPLOAD_DAILY_BYTES).toBe(209_715_200);
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
   });
@@ -68,6 +72,15 @@ describe("runtime configuration", () => {
       parseApiEnvironment({
         ...validApiEnvironment,
         OTP_SECRET: validApiEnvironment.SESSION_SECRET,
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("requires object-storage static credentials as a pair", () => {
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        S3_ACCESS_KEY: "local-access-key",
       }),
     ).toThrow(RuntimeConfigError);
   });

@@ -46,6 +46,7 @@ try {
     "20260728090000_account_management",
     "20260728184415_taxonomy_aliases",
     "20260728190935_category_form_schema_versions",
+    "20260728201500_media_upload_intents",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -71,7 +72,8 @@ try {
             to_regclass('public.orders') AS orders,
             to_regclass('public.region_aliases') AS region_aliases,
             to_regclass('public.category_aliases') AS category_aliases,
-            to_regclass('public.category_form_schema_versions') AS category_form_schema_versions`,
+            to_regclass('public.category_form_schema_versions') AS category_form_schema_versions,
+            to_regclass('public.media_assets') AS media_assets`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -208,6 +210,26 @@ try {
     !formSchemaStorage.rows[0]?.immutable_trigger
   ) {
     throw new Error("Category form schema version storage or immutability controls are missing");
+  }
+
+  const mediaUploadStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_owner_id_idempotency_key_key'
+       ) AS owner_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_owner_id_fkey'
+            AND constraint_type = 'FOREIGN KEY'
+       ) AS owner_fk`,
+  );
+  if (!mediaUploadStorage.rows[0]?.owner_idempotency || !mediaUploadStorage.rows[0]?.owner_fk) {
+    throw new Error("Media upload ownership or idempotency controls are missing");
   }
 
   await client.query("BEGIN");
@@ -363,6 +385,29 @@ try {
      )`,
     "23505",
   );
+  await expectSqlState(
+    "media quarantine object key and hash checks",
+    `INSERT INTO media_assets (
+       id, owner_id, purpose, kind, bucket, object_key, mime_type, byte_size,
+       sha256, idempotency_key, request_hash, upload_expires_at, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000012',
+       '00000000-0000-4000-8000-000000000001',
+       'LISTING_MEDIA',
+       'IMAGE',
+       'socal-test-quarantine',
+       'public/original-name.svg',
+       'image/svg+xml',
+       100,
+       repeat('A', 64),
+       'baseline-media-negative',
+       repeat('b', 64),
+       now() + interval '5 minutes',
+       now()
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -404,7 +449,8 @@ try {
       accountStateTrigger: true,
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
       categoryFormSchemaStorage: true,
-      negativeCases: 5,
+      mediaUploadStorage: true,
+      negativeCases: 6,
     }),
   );
 } finally {

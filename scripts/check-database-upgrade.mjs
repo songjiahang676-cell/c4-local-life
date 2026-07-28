@@ -133,6 +133,16 @@ try {
             AND NOT tgisinternal
        ) AS immutable_trigger`,
   );
+  const mediaUploadStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.media_assets') AS media_assets,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_owner_id_idempotency_key_key'
+       ) AS owner_idempotency`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -145,7 +155,9 @@ try {
     taxonomyAliasTables.rows[0].category_aliases !== "category_aliases" ||
     categoryFormSchemaStorage.rows[0].versions !== "category_form_schema_versions" ||
     !categoryFormSchemaStorage.rows[0].listing_version ||
-    !categoryFormSchemaStorage.rows[0].immutable_trigger
+    !categoryFormSchemaStorage.rows[0].immutable_trigger ||
+    mediaUploadStorage.rows[0].media_assets !== "media_assets" ||
+    !mediaUploadStorage.rows[0].owner_idempotency
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -163,6 +175,7 @@ try {
       accountStateTrigger: true,
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
       categoryFormSchemaStorage: true,
+      mediaUploadStorage: true,
     }),
   );
 } finally {

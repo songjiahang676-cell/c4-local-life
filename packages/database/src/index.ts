@@ -22,6 +22,13 @@ export {
   type NearbyPublishedListing,
 } from "./repositories/listing-geo.repository";
 export {
+  MediaAssetRepository,
+  type MediaAssetRepositoryOptions,
+  type MediaUploadIntentRecord,
+  type ReserveMediaUploadIntentInput,
+  type ReserveMediaUploadIntentResult,
+} from "./repositories/media-asset.repository";
+export {
   OrganizationRepository,
   type CreateOwnedOrganizationInput,
   type CreateOwnedOrganizationResult,
