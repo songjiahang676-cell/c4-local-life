@@ -351,3 +351,25 @@ Observability: Existing correlated route/status logs cover generic 401/403 witho
 Docs: Updated roles/permissions、API/integrations、security/privacy、README、changelog、architecture book、status and this worklog
 
 Known gaps: Organization action/role matrix is intentionally next in ORG-001；platform/admin roles、step-up and two-person approval remain ADMIN-001/AUTH-005；authorization decision caching is intentionally absent until invalidation workflows exist
+
+## ORG-001 — 组织与成员角色 / Policy
+
+Task: ORG-001 组织与成员角色/Policy
+
+Changed: Added Organizations API module、application service/store boundary and PostgreSQL `OrganizationRepository`；`POST /organizations` atomically creates Organization + initial OWNER and treats the globally unique slug as a payload-checked retry handle；member-scoped detail and OWNER/ADMIN member pagination use current database membership；registered explicit profile/listing/member/billing/analytics actions for OWNER/Admin/Editor/Billing/Analyst
+
+Contracts: OpenAPI grows from 34 to 37 paths and 58 to 65 schemas with create/detail/member-list operations、Organization/Member DTOs、UUID parameter and generated TypeScript；strict Zod rejects INTERNAL organizations、over-posted status/verification/role、unsafe text/slug and offset pagination；Prisma remains 37 models because Organization/Membership were already in the baseline
+
+Migrations: 无；existing baseline tables/enums/indexes are used，so rollback is application/contract revert only and no data-destructive step exists
+
+Security: ACTIVE actor is rechecked inside the create transaction；Organization and initial OWNER are written atomically；same Owner + exact payload retry returns the resource while other payload/owner conflicts；object reads include actor membership in Repository queries；Policy replaces the request-start role with the current Repository role；member SQL additionally requires OWNER/ADMIN and returns only user UUID、display name、controlled avatar、role and joined time；cross-org/unknown IDs share generic 404；LIMITED and wrong-role actors receive generic 403；member cursor is domain-separated HMAC bound to actor + organization；client cannot create INTERNAL or set status/verification/role
+
+Tests run: Contract targeted 3 files/10 tests passed；API targeted typecheck/lint and 9 files/52 tests passed；role matrix covers all five roles across profile read/edit/manage、listing write、member read/manage、billing manage and analytics read；HTTP abuse tests cover guest、LIMITED owner、wrong roles、cross-org/unknown IDs、INTERNAL/over-posting and cross-actor cursor replay；`DATABASE_INTEGRATION_URL` forced 11 files/36 real PostgreSQL tests for atomic Owner、exact retry/payload conflict、inactive actor、scope/pagination and analyst/outsider denial；first HTTP run correctly exposed an over-specific test expectation and was repaired to assert the existing generic 404；final `pnpm ci:quality` passed 9 typechecks、9 lints、30/30 files、111/111 tests and 8 builds（80.95% statements、83.25% lines）；post-checks correctly exposed stale 34-path/58-schema scale assertions in both observability and E2E validators, which were updated to the canonical 37 paths/65 schemas；final `pnpm.cmd observability:check` passed and `pnpm.cmd test:e2e:ci` passed Chromium desktop/mobile 4/4；the full architecture validator passed 101 tasks/37 models/37 paths/65 schemas after supplying PyYAML/jsonschema through a temporary Python path；the direct `pnpm` PowerShell shim was blocked by the host execution policy before running E2E, so all actual package commands use the equivalent `pnpm.cmd`
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending
+
+Observability: Existing correlated bounded route/status telemetry covers organization 201/200/400/401/403/404/409 without request bodies、member identity labels、cursor values or internal deny reasons
+
+Docs: Updated product role implementation、domain model、API/integrations、security/privacy、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: ORG-002 owns invitation、accept/revoke、role mutation、at-least-one-Owner concurrency during member changes and step-up Owner transfer；public business/provider profiles remain TRUST-001；generic Idempotency-Key storage remains API-005，while organization creation uses exact slug/payload retry semantics

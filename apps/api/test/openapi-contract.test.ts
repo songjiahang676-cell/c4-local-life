@@ -15,6 +15,7 @@ import {
   CapturingOtpDeliveryGateway,
   MemoryOtpChallengeStore,
 } from "./support/memory-otp-challenge.store";
+import { MemoryOrganizationStore } from "./support/memory-organization.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -45,6 +46,8 @@ const environment = parseApiEnvironment({
   OTP_SECRET: "contract-otp-secret-with-more-than-32-bytes",
   CSRF_SECRET: "contract-csrf-secret-with-more-than-32-bytes",
 });
+const contractUserId = "20000000-0000-4000-8000-000000000001";
+const contractOrganizationId = "40000000-0000-4000-8000-000000000001";
 
 describe("canonical OpenAPI contract", () => {
   let app: NestFastifyApplication;
@@ -56,20 +59,52 @@ describe("canonical OpenAPI contract", () => {
 
   beforeAll(async () => {
     const authSessionStore = new MemoryAuthSessionStore();
-    authSessionStore.registerSubject(
-      buildActiveSubject({ id: "20000000-0000-4000-8000-000000000001" }),
+    authSessionStore.registerSubject(buildActiveSubject({ id: contractUserId }));
+    authSessionStore.registerOrganization(contractUserId, {
+      id: contractOrganizationId,
+      type: "MERCHANT",
+      displayName: "Contract Organization",
+      slug: "contract-organization",
+      role: "OWNER",
+    });
+    const organizationStore = new MemoryOrganizationStore();
+    const organizationTimestamp = new Date("2026-07-28T18:00:00.000Z");
+    organizationStore.registerForUser(
+      contractUserId,
+      {
+        id: contractOrganizationId,
+        type: "MERCHANT",
+        displayName: "Contract Organization",
+        legalName: null,
+        slug: "contract-organization",
+        status: "ACTIVE",
+        verificationStatus: "UNVERIFIED",
+        role: "OWNER",
+        createdAt: organizationTimestamp,
+        updatedAt: organizationTimestamp,
+      },
+      [
+        {
+          userId: contractUserId,
+          displayName: "Contract User",
+          avatarUrl: null,
+          role: "OWNER",
+          joinedAt: organizationTimestamp,
+        },
+      ],
     );
     contract = (await SwaggerParser.validate(
       canonicalOpenApiPath(),
     )) as unknown as DereferencedOpenApi;
     const otpChallengeStore = new MemoryOtpChallengeStore();
-    otpChallengeStore.userId = "20000000-0000-4000-8000-000000000001";
+    otpChallengeStore.userId = contractUserId;
     otpDelivery = new CapturingOtpDeliveryGateway();
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore,
       otpChallengeStore,
       otpDeliveryGateway: otpDelivery,
+      organizationStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -95,9 +130,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(34);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(58);
-    expect(operationIds).toHaveLength(43);
+    expect(Object.keys(contract.paths)).toHaveLength(37);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(65);
+    expect(operationIds).toHaveLength(46);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -134,8 +169,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(34);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(34);
+    expect(Object.keys(servedJson.paths)).toHaveLength(37);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(37);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -167,7 +202,7 @@ describe("canonical OpenAPI contract", () => {
   });
 
   it("validates the implemented current-session projection against the contract", async () => {
-    const issued = await sessions.issueSession("20000000-0000-4000-8000-000000000001", {});
+    const issued = await sessions.issueSession(contractUserId, {});
     const response = await server.inject({
       method: "GET",
       url: "/v1/auth/session",
@@ -215,7 +250,7 @@ describe("canonical OpenAPI contract", () => {
   });
 
   it("validates profile and session-device projections against the contract", async () => {
-    const issued = await sessions.issueSession("20000000-0000-4000-8000-000000000001", {
+    const issued = await sessions.issueSession(contractUserId, {
       userAgent: "Contract Browser",
     });
     const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
@@ -241,5 +276,51 @@ describe("canonical OpenAPI contract", () => {
     expect(profile.headers.etag).toBe('"profile-v1"');
     expect(ajv.validate(profileSchema ?? false, profile.json())).toBe(true);
     expect(ajv.validate(devicesSchema ?? false, devices.json())).toBe(true);
+  });
+
+  it("validates organization creation, detail, and member projections against the contract", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const [created, organization, members] = await Promise.all([
+      server.inject({
+        method: "POST",
+        url: "/v1/organizations",
+        headers: { cookie, origin: environment.PUBLIC_WEB_URL },
+        payload: {
+          type: "SERVICE_PROVIDER",
+          displayName: "Contract Service Team",
+          legalName: null,
+          slug: "contract-service-team",
+        },
+      }),
+      server.inject({
+        method: "GET",
+        url: `/v1/organizations/${contractOrganizationId}`,
+        headers: { cookie },
+      }),
+      server.inject({
+        method: "GET",
+        url: `/v1/organizations/${contractOrganizationId}/members`,
+        headers: { cookie },
+      }),
+    ]);
+    const createSchema =
+      contract.paths["/organizations"]?.post?.responses["201"]?.content?.["application/json"]
+        ?.schema;
+    const organizationSchema =
+      contract.paths["/organizations/{organizationId}"]?.get?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+    const membersSchema =
+      contract.paths["/organizations/{organizationId}/members"]?.get?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+
+    expect(created.statusCode).toBe(201);
+    expect(organization.statusCode).toBe(200);
+    expect(members.statusCode).toBe(200);
+    expect(ajv.validate(createSchema ?? false, created.json())).toBe(true);
+    expect(ajv.validate(organizationSchema ?? false, organization.json())).toBe(true);
+    expect(ajv.validate(membersSchema ?? false, members.json())).toBe(true);
   });
 });

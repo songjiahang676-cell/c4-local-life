@@ -2,18 +2,69 @@ import { Global, Module } from "@nestjs/common";
 import {
   accountSelfServicePermissions,
   activeUserPolicyActions,
+  organizationPolicyActions,
+  ownerOrOrganizationPolicy,
   PolicyService,
   requireActiveActorPermissionPolicy,
   requireActorPermissionPolicy,
 } from "./policy";
 import { RequestContextAccessor } from "./request-context";
 
-function createPolicyService(): PolicyService {
+export function createPolicyService(): PolicyService {
   const policies = new PolicyService();
   for (const action of accountSelfServicePermissions) {
     policies.register(action, requireActorPermissionPolicy);
   }
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
+  policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
+  policies.register(
+    organizationPolicyActions.profileRead,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR", "BILLING", "ANALYST"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.profileEditContent,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.profileManage,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.listingsWrite,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.membersRead,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.membersManage,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.billingManage,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "BILLING"],
+    }),
+  );
+  policies.register(
+    organizationPolicyActions.analyticsRead,
+    ownerOrOrganizationPolicy({
+      organizationRoles: ["OWNER", "ADMIN", "BILLING", "ANALYST"],
+    }),
+  );
   return policies;
 }
 

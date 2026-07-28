@@ -24,6 +24,7 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
   readonly #subjects = new Map<string, AuthSessionPrincipal["user"]>();
   readonly #profiles = new Map<string, UserProfileProjection>();
   readonly #activeRegionIds = new Set<string>();
+  readonly #organizationsByUser = new Map<string, AuthSessionPrincipal["organizations"]>();
 
   registerSubject(user: AuthSessionPrincipal["user"]): void {
     this.#subjects.set(user.id, user);
@@ -43,6 +44,15 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
     this.#activeRegionIds.add(regionId);
   }
 
+  registerOrganization(
+    userId: string,
+    organization: AuthSessionPrincipal["organizations"][number],
+  ): void {
+    const organizations = this.#organizationsByUser.get(userId) ?? [];
+    organizations.push({ ...organization });
+    this.#organizationsByUser.set(userId, organizations);
+  }
+
   clear(): void {
     this.createInputs.length = 0;
     this.lookupHashes.length = 0;
@@ -50,6 +60,7 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
     this.#subjects.clear();
     this.#profiles.clear();
     this.#activeRegionIds.clear();
+    this.#organizationsByUser.clear();
   }
 
   findActiveByTokenHash(tokenHash: string, now: Date): Promise<AuthSessionPrincipal | null> {
@@ -80,7 +91,9 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
         createdAt: input.now,
       },
       user,
-      organizations: [],
+      organizations: (this.#organizationsByUser.get(input.userId) ?? []).map((organization) => ({
+        ...organization,
+      })),
     };
     this.#sessions.set(input.tokenHash, {
       tokenHash: input.tokenHash,

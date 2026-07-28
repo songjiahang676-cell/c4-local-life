@@ -605,6 +605,24 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 
 可复用测试 helper 位于 `apps/api/test/support/policy-matrix.ts`。新资源应以表驱动矩阵验证 allow/deny 和原因码，并至少包含跨组织、错误角色、受限账户、删除资源和缺失资源负例；HTTP 测试另外断言外部错误不会暴露内部 deny reason。
 
+`ORG-001` 把组织角色落为以下显式动作；未列出的组合默认拒绝：
+
+| 动作                          | OWNER | ADMIN | EDITOR | BILLING | ANALYST |
+| ----------------------------- | ----- | ----- | ------ | ------- | ------- |
+| `organization:profile:read`   | ✓     | ✓     | ✓      | ✓       | ✓       |
+| `organization:profile:edit`   | ✓     | ✓     | ✓      | —       | —       |
+| `organization:profile:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:listings:write` | ✓     | ✓     | ✓      | —       | —       |
+| `organization:members:read`   | ✓     | ✓     | —      | —       | —       |
+| `organization:members:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:billing:manage` | ✓     | —     | —      | ✓       | —       |
+| `organization:analytics:read` | ✓     | ✓     | —      | ✓       | ✓       |
+
+`profile:edit` 只代表公开档案内容，不能修改 legal identity、状态或验证结论；这些字段必须走
+`profile:manage` 或后续专用审核动作。当前 API 只开放创建、成员范围详情以及 OWNER/ADMIN 的成员只读列表，
+没有提前实现 ORG-002 的邀请、移除、角色变更或 Owner 转移。每次对象授权使用 Repository 返回的当前
+membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。
+
 ---
 
 <!-- source: docs\06-domain-and-data-model.md -->
@@ -661,6 +679,13 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 Organization 是可多人管理的商业主体。商家、师傅团队和供应商共享成员模型，但对应 profile/verification 能力不同。
 
 不变式：至少一名 Owner；slug 唯一；被暂停组织不能创建新公开内容；删除组织前必须处理信息、订单和 Owner 关系。
+
+`ORG-001` 的创建 Repository 在单一 PostgreSQL 事务中验证 ACTIVE actor、插入 Organization 并插入
+初始 OWNER membership；任何一步失败都不留下无 Owner 组织。slug 是全局唯一的稳定重试句柄：同一 Owner
+以完全相同的 payload 重试返回原资源，换 Owner 或不同 payload 返回冲突。成员范围读取把
+`actorUserId + organizationId` 放入查询条件；成员列表还在 SQL 中要求当前角色为 OWNER/ADMIN，并只投影
+display name、受控头像、角色和加入时间，不读取邮箱、手机号或内部风险字段。邀请、移除、角色变更、
+至少一名 Owner 的并发维护及 step-up Owner 转移属于 ORG-002。
 
 ### Identity 聚合
 
@@ -1009,6 +1034,13 @@ Controller。`POST /listings` 的现有 Session 要求现在由 `listing:draft:c
 明确声明未登录 401 和无权限/受限账户 403。`Session.permissions` 是服务端生成的 UI capability hint，
 不替代每次请求的 Policy，也不接受客户端回传。对象级 action 必须在 Repository scoped query 后以最小
 resource context 评估，未知 action 或规则异常失败关闭。
+
+`ORG-001` 新增 `POST /organizations`、`GET /organizations/{organizationId}` 和
+`GET /organizations/{organizationId}/members`。创建仅允许 ACTIVE 用户和可创建的四类外部组织，
+服务端原子建立初始 OWNER；`INTERNAL`、状态、验证结论和角色不能由客户端 over-post。详情使用成员范围
+Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMIN 可读，采用 actor + organization
+绑定的域分离 HMAC cursor，并排除联系方式、账号状态、验证材料和风险字段。当前切片不提供成员写接口；
+邀请、撤销和 Owner 转移保持在 ORG-002。
 
 ## 8.6 响应投影
 
@@ -1724,6 +1756,12 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 内部 deny reason 不进入通用 401/403。跨组织、错误角色、受限账户和缺失资源由可复用矩阵持续做负面测试。
 `POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
 403，避免已有写端点在框架接入后继续绕过服务端权限。
+
+`ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
+`INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
+跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
+成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
+角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
 
 ## 14.6 输入、输出和内容安全
 

@@ -11,6 +11,7 @@
   "include": [
     "src/repositories/auth-session.repository.ts",
     "src/repositories/otp-challenge.repository.ts",
+    "src/repositories/organization.repository.ts",
     "generated/prisma/**/*.ts"
   ],
   "exclude": ["test", "dist"]

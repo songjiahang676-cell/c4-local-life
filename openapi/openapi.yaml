@@ -17,6 +17,8 @@ tags:
     description: Process liveness and dependency readiness
   - name: Auth
     description: Authentication challenges and sessions
+  - name: Organizations
+    description: Authenticated organization ownership and member-scoped management
   - name: Taxonomy
     description: Regions, categories, and dynamic form definitions
   - name: Search
@@ -277,6 +279,92 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /organizations:
+    post:
+      tags: [Organizations]
+      summary: Create an organization owned by the current user
+      description: Atomically creates the organization and its initial OWNER membership. The requested slug is the stable retry handle; an exact owner retry returns the original resource.
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationRequest"
+      responses:
+        "201":
+          description: Organization and initial OWNER membership created, or the exact owner retry returned
+          headers:
+            Location:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /organizations/{organizationId}:
+    get:
+      tags: [Organizations]
+      summary: Get an organization visible to the current member
+      description: Uses a membership-scoped repository query so unknown and cross-organization identifiers share one 404 response.
+      operationId: getMyOrganization
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+      responses:
+        "200":
+          description: Member-safe organization projection
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /organizations/{organizationId}/members:
+    get:
+      tags: [Organizations]
+      summary: List organization members for OWNER or ADMIN
+      description: Returns only display identity, role, and join time; contact identifiers and account risk fields are excluded.
+      operationId: listOrganizationMembers
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Cursor-paginated member projection
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /regions:
     get:
       tags: [Taxonomy]
@@ -1044,6 +1132,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Cursor:
       name: cursor
       in: query
@@ -1290,12 +1383,96 @@ components:
     OrganizationSummary:
       type: object
       required: [id, type, displayName, slug, role]
+      additionalProperties: false
       properties:
         id: { type: string, format: uuid }
-        type: { type: string, enum: [MERCHANT, SERVICE_PROVIDER, SUPPLIER, MEDIA, INTERNAL] }
+        type:
+          $ref: "#/components/schemas/OrganizationType"
         displayName: { type: string }
         slug: { type: string }
-        role: { type: string, enum: [OWNER, ADMIN, EDITOR, BILLING, ANALYST] }
+        role:
+          $ref: "#/components/schemas/MembershipRole"
+    OrganizationType:
+      type: string
+      enum: [MERCHANT, SERVICE_PROVIDER, SUPPLIER, MEDIA, INTERNAL]
+    MembershipRole:
+      type: string
+      enum: [OWNER, ADMIN, EDITOR, BILLING, ANALYST]
+    CreateOrganizationRequest:
+      type: object
+      required: [type, displayName, slug]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [MERCHANT, SERVICE_PROVIDER, SUPPLIER, MEDIA]
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        legalName: { type: [string, "null"], minLength: 1, maxLength: 200 }
+        slug:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    Organization:
+      type: object
+      required:
+        [
+          id,
+          type,
+          displayName,
+          legalName,
+          slug,
+          status,
+          verificationStatus,
+          role,
+          createdAt,
+          updatedAt,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/OrganizationType"
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        legalName: { type: [string, "null"], maxLength: 200 }
+        slug: { type: string, minLength: 3, maxLength: 140 }
+        status: { type: string, enum: [ACTIVE, LIMITED, SUSPENDED] }
+        verificationStatus:
+          type: string
+          enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED]
+        role:
+          $ref: "#/components/schemas/MembershipRole"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrganizationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/Organization"
+    OrganizationMember:
+      type: object
+      required: [userId, displayName, avatarUrl, role, joinedAt]
+      additionalProperties: false
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        avatarUrl: { type: [string, "null"], format: uri }
+        role:
+          $ref: "#/components/schemas/MembershipRole"
+        joinedAt: { type: string, format: date-time }
+    OrganizationMemberCollection:
+      type: object
+      required: [data, pageInfo]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationMember"
+        pageInfo:
+          $ref: "#/components/schemas/CursorPage"
     RegionType:
       type: string
       enum: [COUNTRY, STATE, COUNTY, CITY, NEIGHBORHOOD, ZIP_CODE]
