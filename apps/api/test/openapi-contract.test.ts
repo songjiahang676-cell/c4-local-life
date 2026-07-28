@@ -95,9 +95,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(31);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(53);
-    expect(operationIds).toHaveLength(38);
+    expect(Object.keys(contract.paths)).toHaveLength(34);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(58);
+    expect(operationIds).toHaveLength(43);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -134,8 +134,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(31);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(31);
+    expect(Object.keys(servedJson.paths)).toHaveLength(34);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(34);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -206,5 +206,34 @@ describe("canonical OpenAPI contract", () => {
     expect(verified.statusCode).toBe(200);
     expect(ajv.validate(acceptedSchema ?? false, requested.json())).toBe(true);
     expect(ajv.validate(sessionSchema ?? false, verified.json())).toBe(true);
+  });
+
+  it("validates profile and session-device projections against the contract", async () => {
+    const issued = await sessions.issueSession("20000000-0000-4000-8000-000000000001", {
+      userAgent: "Contract Browser",
+    });
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const [profile, devices] = await Promise.all([
+      server.inject({
+        method: "GET",
+        url: "/v1/me",
+        headers: { cookie },
+      }),
+      server.inject({
+        method: "GET",
+        url: "/v1/me/sessions",
+        headers: { cookie },
+      }),
+    ]);
+    const profileSchema =
+      contract.paths["/me"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+    const devicesSchema =
+      contract.paths["/me/sessions"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+
+    expect(profile.statusCode).toBe(200);
+    expect(devices.statusCode).toBe(200);
+    expect(profile.headers.etag).toBe('"profile-v1"');
+    expect(ajv.validate(profileSchema ?? false, profile.json())).toBe(true);
+    expect(ajv.validate(devicesSchema ?? false, devices.json())).toBe(true);
   });
 });

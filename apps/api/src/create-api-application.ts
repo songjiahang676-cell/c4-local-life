@@ -103,6 +103,12 @@ export async function createApiApplication(
     bodyLimit: environment.API_BODY_LIMIT_BYTES,
     logController: new LogController({ disableRequestLogging: true }),
   });
+  const fastify: FastifyInstance = adapter.getInstance();
+  fastify.addContentTypeParser(
+    "application/merge-patch+json",
+    { parseAs: "string" },
+    fastify.getDefaultJsonParser("ignore", "ignore"),
+  );
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register(
       environment,
@@ -140,7 +146,6 @@ export async function createApiApplication(
   app.useGlobalFilters(new ProblemDetailsFilter());
   app.enableShutdownHooks();
 
-  const fastify: FastifyInstance = app.getHttpAdapter().getInstance();
   const requestStates = new WeakMap<FastifyRequest, RequestObservabilityState>();
   fastify.addHook("onRequest", (request, _reply, done) => {
     observability.metrics.httpRequestStarted();

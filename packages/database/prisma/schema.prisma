@@ -269,6 +269,7 @@ model UserProfile {
   preferredLocale String   @default("zh-Hans") @map("preferred_locale") @db.VarChar(16)
   bio             String?  @db.VarChar(500)
   homeRegionId    String?  @map("home_region_id") @db.Uuid
+  version         Int      @default(1)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)

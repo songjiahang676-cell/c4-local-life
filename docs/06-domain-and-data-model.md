@@ -51,6 +51,13 @@ Organization 是可多人管理的商业主体。商家、师傅团队和供应�
 
 不变式：至少一名 Owner；slug 唯一；被暂停组织不能创建新公开内容；删除组织前必须处理信息、订单和 Owner 关系。
 
+### Identity 聚合
+
+`User`、`UserProfile` 与 `AuthSession` 构成认证后的账户管理边界。资料通过递增 `version` 做乐观并发，
+避免多端编辑静默覆盖；联系方式和内部信任状态不属于自助资料 DTO。会话只保存 bearer token 的域分离
+HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
+用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
+
 ### Conversation 聚合
 
 会话可关联一个 Listing，参与者集合固定受控；消息追加写入，编辑/删除保留时间戳。阻塞状态影响发送权限，不泄露封禁策略细节。

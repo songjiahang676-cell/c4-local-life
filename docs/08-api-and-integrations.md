@@ -83,6 +83,14 @@ AUTH-001 的会话服务签发同一安全 Cookie。两个端点要求不含 PII
 HMAC，用于设备绑定和限频。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象
 授权继续由 `API-004` 的默认拒绝 Policy 完成。
 
+`AUTH-003` 实现 `GET/PATCH /me`、`GET/DELETE /me/sessions` 与
+`DELETE /me/sessions/{sessionId}`。资料响应只包含显示名、简介、locale、首选地区、受控头像引用、
+版本和更新时间；邮箱、手机号及内部信任字段不进入 DTO。资料更新只接受
+`application/merge-patch+json` 白名单字段，要求强 `If-Match` ETag，并以 profile version 原子检测
+并发冲突。会话列表按最近活动时间稳定排序，cursor 用 `SESSION_SECRET` 域分离 HMAC 签名并绑定用户；
+投影不含 bearer token、token/IP hash。单会话撤销查询始终绑定 actor user ID，未知/他人 ID 与已撤销
+ID 共用幂等 204；注销全部撤销全部会话并清除当前 Cookie。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：

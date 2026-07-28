@@ -10,6 +10,8 @@
 4. `20260726041310_auth_session_lifecycle` adds required idle-expiry and last-seen timestamps.
 5. `20260726044453_otp_challenges` adds short-lived, single-consumption OTP challenges and abuse
    indexes.
+6. `20260728090000_account_management` adds optimistic profile versions and enforces session
+   revocation after user status/deletion changes.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -86,6 +88,20 @@ minutes and must be deleted or aggregated within 24 hours by the maintenance ret
 - Rollback: disable the OTP routes and retain the additive table/enums through the retention
   window. Do not drop the table during incident response. Existing sessions and user records are
   independent and remain valid.
+
+## `20260728090000_account_management`
+
+Adds a required profile `version` with a constant default and an `AFTER UPDATE` trigger that revokes
+all unrevoked sessions whenever a user's status or soft-deletion marker changes. The trigger keeps
+the authentication invariant intact even when a later Admin/deletion workflow owns the state
+transition; it never exposes or copies token/IP hashes.
+
+- Roll forward: apply before enabling `/me` profile updates or session-device management; verify
+  stale ETags conflict, session identifiers stay user-scoped, and direct status/deletion changes set
+  `revoked_at`.
+- Rollback: roll back the application while retaining the additive version column and trigger. The
+  previous application ignores `version`, and conservative session revocation remains safe. Do not
+  drop either during incident response.
 
 ## Roll-forward and recovery
 

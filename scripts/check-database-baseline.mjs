@@ -43,6 +43,7 @@ try {
     "20260725051500_region_group_type",
     "20260726041310_auth_session_lifecycle",
     "20260726044453_otp_challenges",
+    "20260728090000_account_management",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -135,6 +136,27 @@ try {
     otpChallengeColumns.rows.some((column) => column.is_nullable !== "NO")
   ) {
     throw new Error("Required OTP challenge security columns are missing or nullable");
+  }
+
+  const profileVersionColumn = await client.query(
+    `SELECT is_nullable, column_default
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'user_profiles'
+        AND column_name = 'version'`,
+  );
+  const accountStateTrigger = await client.query(
+    `SELECT 1
+       FROM pg_trigger
+      WHERE tgname = 'users_revoke_sessions_after_state_change'
+        AND NOT tgisinternal`,
+  );
+  if (
+    profileVersionColumn.rowCount !== 1 ||
+    profileVersionColumn.rows[0].is_nullable !== "NO" ||
+    accountStateTrigger.rowCount !== 1
+  ) {
+    throw new Error("Account-management profile version or session-revocation trigger is missing");
   }
 
   await client.query("BEGIN");
@@ -244,6 +266,33 @@ try {
      )`,
     "23503",
   );
+
+  await client.query(
+    `INSERT INTO auth_sessions (
+       id, user_id, token_hash, expires_at, idle_expires_at, last_seen_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000008',
+       '00000000-0000-4000-8000-000000000001',
+       repeat('a', 64),
+       now() + interval '1 hour',
+       now() + interval '30 minutes',
+       now()
+     )`,
+  );
+  await client.query(
+    `UPDATE users
+        SET status = 'SUSPENDED'
+      WHERE id = '00000000-0000-4000-8000-000000000001'`,
+  );
+  const stateRevokedSession = await client.query(
+    `SELECT revoked_at
+       FROM auth_sessions
+      WHERE id = '00000000-0000-4000-8000-000000000008'`,
+  );
+  if (stateRevokedSession.rowCount !== 1 || !stateRevokedSession.rows[0]?.revoked_at) {
+    throw new Error("User status change did not revoke the active session");
+  }
   await client.query("ROLLBACK");
 
   console.log(
@@ -254,6 +303,8 @@ try {
       customIndexes: customIndexes.rowCount,
       sessionLifecycleColumns: sessionLifecycleColumns.rows.map((column) => column.column_name),
       otpChallengeColumns: otpChallengeColumns.rows.map((column) => column.column_name),
+      profileVersionColumn: true,
+      accountStateTrigger: true,
       negativeCases: 3,
     }),
   );

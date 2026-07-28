@@ -135,9 +135,13 @@ integration("AuthSessionRepository with PostgreSQL", () => {
         where: { id: userId },
         data: { status: UserStatus.SUSPENDED },
       });
+      const stateRevoked = await transaction.authSession.findUniqueOrThrow({
+        where: { tokenHash: secondHash },
+      });
       expect(
         await repository.findActiveByTokenHash(secondHash, new Date("2026-07-25T12:01:00.000Z")),
       ).toBeNull();
+      expect(stateRevoked.revokedAt).not.toBeNull();
     });
   });
 
@@ -166,6 +170,132 @@ integration("AuthSessionRepository with PostgreSQL", () => {
 
       expect(persisted.lastSeenAt.toISOString()).toBe(touchAt.toISOString());
       expect(persisted.idleExpiresAt.toISOString()).toBe(input.expiresAt.toISOString());
+    });
+  });
+
+  it("updates the safe profile projection with optimistic concurrency and active regions", async () => {
+    await database.withRollback(async (transaction) => {
+      const userId = randomUUID();
+      const activeRegionId = randomUUID();
+      const inactiveRegionId = randomUUID();
+      await createSubject(transaction, userId);
+      await transaction.region.createMany({
+        data: [
+          {
+            id: activeRegionId,
+            type: "CITY",
+            code: `TEST-ACTIVE-${activeRegionId}`,
+            slug: `active-${activeRegionId}`,
+            nameZhHans: "测试活跃地区",
+            nameEn: "Synthetic active region",
+            isActive: true,
+          },
+          {
+            id: inactiveRegionId,
+            type: "CITY",
+            code: `TEST-INACTIVE-${inactiveRegionId}`,
+            slug: `inactive-${inactiveRegionId}`,
+            nameZhHans: "测试停用地区",
+            nameEn: "Synthetic inactive region",
+            isActive: false,
+          },
+        ],
+      });
+      const repository = new AuthSessionRepository(transaction);
+
+      const initial = await repository.findProfile(userId);
+      const updated = await repository.updateProfile({
+        userId,
+        expectedVersion: 1,
+        displayName: "Updated Repository User",
+        bio: "Synthetic profile update",
+        preferredLocale: "en-US",
+        homeRegionId: activeRegionId,
+      });
+      const stale = await repository.updateProfile({
+        userId,
+        expectedVersion: 1,
+        displayName: "Stale",
+      });
+      const invalidRegion = await repository.updateProfile({
+        userId,
+        expectedVersion: 2,
+        homeRegionId: inactiveRegionId,
+      });
+
+      expect(initial).toMatchObject({
+        id: userId,
+        displayName: "Synthetic Repository User",
+        version: 1,
+      });
+      expect(initial).not.toHaveProperty("email");
+      expect(updated).toMatchObject({
+        kind: "updated",
+        profile: {
+          id: userId,
+          displayName: "Updated Repository User",
+          bio: "Synthetic profile update",
+          preferredLocale: "en-US",
+          homeRegionId: activeRegionId,
+          version: 2,
+        },
+      });
+      expect(stale).toEqual({ kind: "conflict" });
+      expect(invalidRegion).toEqual({ kind: "invalid_region" });
+    });
+  });
+
+  it("paginates and revokes only user-owned active sessions", async () => {
+    await database.withRollback(async (transaction) => {
+      const userId = randomUUID();
+      const foreignUserId = randomUUID();
+      const base = new Date("2026-07-25T12:00:00.000Z");
+      await createSubject(transaction, userId);
+      await createSubject(transaction, foreignUserId);
+      const repository = new AuthSessionRepository(transaction);
+      const first = await repository.create(createInput(userId, "3".repeat(64), base));
+      const second = await repository.create(
+        createInput(userId, "4".repeat(64), new Date(base.getTime() + 1_000)),
+      );
+      const foreign = await repository.create(
+        createInput(foreignUserId, "5".repeat(64), new Date(base.getTime() + 2_000)),
+      );
+      const now = new Date(base.getTime() + 3_000);
+
+      const firstPage = await repository.listActiveSessions({
+        userId,
+        now,
+        limit: 1,
+      });
+      const secondPage = await repository.listActiveSessions({
+        userId,
+        now,
+        limit: 1,
+        cursor: firstPage.nextCursor ?? undefined,
+      });
+
+      expect(firstPage.items.map((session) => session.id)).toEqual([second?.session.id]);
+      expect(firstPage.nextCursor).not.toBeNull();
+      expect(secondPage.items.map((session) => session.id)).toEqual([first?.session.id]);
+      expect(secondPage.nextCursor).toBeNull();
+      expect(JSON.stringify(firstPage)).not.toContain("4".repeat(64));
+
+      await repository.revokeSessionForUser(userId, foreign?.session.id ?? randomUUID(), now);
+      expect(
+        await repository.findActiveByTokenHash("5".repeat(64), new Date(now.getTime() + 1)),
+      ).not.toBeNull();
+
+      await repository.revokeSessionForUser(userId, second?.session.id ?? randomUUID(), now);
+      expect(
+        await repository.findActiveByTokenHash("4".repeat(64), new Date(now.getTime() + 1)),
+      ).toBeNull();
+      expect(await repository.revokeAllSessionsForUser(userId, now)).toBe(1);
+      expect(
+        await repository.findActiveByTokenHash("3".repeat(64), new Date(now.getTime() + 1)),
+      ).toBeNull();
+      expect(
+        await repository.findActiveByTokenHash("5".repeat(64), new Date(now.getTime() + 1)),
+      ).not.toBeNull();
     });
   });
 });

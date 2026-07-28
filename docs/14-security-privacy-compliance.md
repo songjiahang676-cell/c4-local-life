@@ -62,6 +62,13 @@ transaction lock 串行化三个限频键，避免并发绕过；新的同账号
 `SUSPENDED`、`DELETED`、已软删或缺少完整 profile 的用户 fail closed，响应投影不包含邮箱、手机号、
 token hash 或 IP hash。首次部署闲置期限字段时现有会话统一失效并要求重新认证。
 
+`AUTH-003` 增加用户自助资料和设备会话边界。资料修改要求强 ETag/version，拒绝未知字段、控制字符、
+双向文本控制符、任意头像 URL 和停用地区；返回投影不包含联系方式或内部风险字段。活跃会话列表使用
+用户绑定的签名 cursor，只返回 session UUID、清理后的 User-Agent 与生命周期时间，不返回 token、
+token/IP hash。撤销 session 的数据库条件同时包含 `userId + sessionId`，避免 IDOR；未知、外部和已撤销
+ID 均幂等 204。当前会话/注销全部同步返回过期 Cookie。`users.status` 或 `deleted_at` 变化由数据库
+trigger 立即设置全部未撤销会话的 `revoked_at`，避免后来 Admin/删除工作流绕过身份层不变量。
+
 ## 14.5 授权
 
 - 默认拒绝；后端 policy 基于 actor/action/resource/context。

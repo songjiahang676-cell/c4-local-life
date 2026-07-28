@@ -53,6 +53,57 @@ export type AuthSessionRepositoryOptions = {
   poolMaximum?: number;
 };
 
+export type UserProfileProjection = {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  preferredLocale: string;
+  homeRegionId: string | null;
+  version: number;
+  updatedAt: Date;
+};
+
+export type UserProfileUpdateInput = {
+  userId: string;
+  expectedVersion: number;
+  displayName?: string;
+  bio?: string | null;
+  preferredLocale?: "zh-Hans" | "en-US";
+  homeRegionId?: string | null;
+};
+
+export type UserProfileUpdateResult =
+  | { kind: "updated"; profile: UserProfileProjection }
+  | { kind: "conflict" }
+  | { kind: "invalid_region" }
+  | { kind: "not_found" };
+
+export type SessionListCursor = {
+  id: string;
+  lastSeenAt: Date;
+};
+
+export type ActiveSessionDevice = {
+  id: string;
+  userAgent: string | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+  expiresAt: Date;
+};
+
+export type UserSessionListInput = {
+  userId: string;
+  now: Date;
+  limit: number;
+  cursor?: SessionListCursor;
+};
+
+export type UserSessionListResult = {
+  items: ActiveSessionDevice[];
+  nextCursor: SessionListCursor | null;
+};
+
 type SessionClient = PrismaClient | Prisma.TransactionClient;
 
 const activeSessionInclude = {
@@ -133,6 +184,32 @@ function isRepositoryOptions(
   target: SessionClient | AuthSessionRepositoryOptions,
 ): target is AuthSessionRepositoryOptions {
   return "connectionString" in target;
+}
+
+function earlierDate(first: Date, second: Date): Date {
+  return first.getTime() <= second.getTime() ? first : second;
+}
+
+function mapProfile(row: {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  preferredLocale: string;
+  homeRegionId: string | null;
+  version: number;
+  updatedAt: Date;
+}): UserProfileProjection {
+  return {
+    id: row.userId,
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
+    bio: row.bio,
+    preferredLocale: row.preferredLocale,
+    homeRegionId: row.homeRegionId,
+    version: row.version,
+    updatedAt: row.updatedAt,
+  };
 }
 
 export class AuthSessionRepository {
@@ -246,6 +323,139 @@ export class AuthSessionRepository {
       data: { revokedAt: now },
     });
     return result.count === 1;
+  }
+
+  async findProfile(userId: string): Promise<UserProfileProjection | null> {
+    const row = await this.#client.userProfile.findFirst({
+      where: {
+        userId,
+        user: {
+          deletedAt: null,
+          status: { in: [...usableUserStatuses] },
+        },
+      },
+    });
+    return row ? mapProfile(row) : null;
+  }
+
+  updateProfile(input: UserProfileUpdateInput): Promise<UserProfileUpdateResult> {
+    return this.#transaction(async (transaction) => {
+      if (input.homeRegionId) {
+        const region = await transaction.region.findFirst({
+          where: { id: input.homeRegionId, isActive: true },
+          select: { id: true },
+        });
+        if (!region) return { kind: "invalid_region" };
+      }
+
+      const updated = await transaction.userProfile.updateMany({
+        where: {
+          userId: input.userId,
+          version: input.expectedVersion,
+          user: {
+            deletedAt: null,
+            status: { in: [...usableUserStatuses] },
+          },
+        },
+        data: {
+          ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+          ...(input.bio === undefined ? {} : { bio: input.bio }),
+          ...(input.preferredLocale === undefined
+            ? {}
+            : { preferredLocale: input.preferredLocale }),
+          ...(input.homeRegionId === undefined ? {} : { homeRegionId: input.homeRegionId }),
+          version: { increment: 1 },
+        },
+      });
+      if (updated.count === 1) {
+        const profile = await transaction.userProfile.findUniqueOrThrow({
+          where: { userId: input.userId },
+        });
+        return { kind: "updated", profile: mapProfile(profile) };
+      }
+
+      const exists = await transaction.userProfile.findFirst({
+        where: {
+          userId: input.userId,
+          user: {
+            deletedAt: null,
+            status: { in: [...usableUserStatuses] },
+          },
+        },
+        select: { userId: true },
+      });
+      return exists ? { kind: "conflict" } : { kind: "not_found" };
+    });
+  }
+
+  async listActiveSessions(input: UserSessionListInput): Promise<UserSessionListResult> {
+    const rows = await this.#client.authSession.findMany({
+      where: {
+        userId: input.userId,
+        revokedAt: null,
+        expiresAt: { gt: input.now },
+        idleExpiresAt: { gt: input.now },
+        user: {
+          deletedAt: null,
+          status: { in: [...usableUserStatuses] },
+        },
+        ...(input.cursor
+          ? {
+              OR: [
+                { lastSeenAt: { lt: input.cursor.lastSeenAt } },
+                {
+                  lastSeenAt: input.cursor.lastSeenAt,
+                  id: { lt: input.cursor.id },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ lastSeenAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+      select: {
+        id: true,
+        userAgent: true,
+        createdAt: true,
+        lastSeenAt: true,
+        expiresAt: true,
+        idleExpiresAt: true,
+      },
+    });
+    const hasMore = rows.length > input.limit;
+    const page = hasMore ? rows.slice(0, input.limit) : rows;
+    const last = page.at(-1);
+    return {
+      items: page.map((row) => ({
+        id: row.id,
+        userAgent: row.userAgent,
+        createdAt: row.createdAt,
+        lastSeenAt: row.lastSeenAt,
+        expiresAt: earlierDate(row.expiresAt, row.idleExpiresAt),
+      })),
+      nextCursor:
+        hasMore && last
+          ? {
+              id: last.id,
+              lastSeenAt: last.lastSeenAt,
+            }
+          : null,
+    };
+  }
+
+  async revokeSessionForUser(userId: string, sessionId: string, now: Date): Promise<void> {
+    await this.#client.authSession.updateMany({
+      where: { id: sessionId, userId, revokedAt: null },
+      data: { revokedAt: now },
+    });
+  }
+
+  async revokeAllSessionsForUser(userId: string, now: Date): Promise<number> {
+    const revoked = await this.#client.authSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    return revoked.count;
   }
 
   close(): Promise<void> {

@@ -2,6 +2,8 @@ import { type DynamicModule, Module, type Provider } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import type { ApiEnvironment } from "@socal/config";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { AccountController } from "./account.controller";
+import { AccountService } from "./account.service";
 import { AuthContextAccessor } from "./auth-context";
 import { AuthContextGuard } from "./auth-context.guard";
 import { AuthSessionService } from "./auth-session.service";
@@ -41,7 +43,7 @@ export class AuthModule {
 
     return {
       module: AuthModule,
-      controllers: [AuthController, OtpController],
+      controllers: [AuthController, OtpController, AccountController],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...storeProviders,
@@ -52,11 +54,12 @@ export class AuthModule {
         },
         AuthContextAccessor,
         AuthSessionService,
+        AccountService,
         OtpService,
         AuthContextGuard,
         { provide: APP_GUARD, useExisting: AuthContextGuard },
       ],
-      exports: [AuthContextAccessor, AuthSessionService, OtpService],
+      exports: [AuthContextAccessor, AuthSessionService, AccountService, OtpService],
     };
   }
 }

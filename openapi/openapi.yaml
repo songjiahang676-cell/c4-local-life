@@ -164,6 +164,119 @@ paths:
               schema: { type: string }
             Cache-Control:
               schema: { type: string, const: no-store }
+  /me:
+    get:
+      tags: [Auth]
+      summary: Get the current user's profile
+      description: Returns only the authenticated user's profile projection; contact identifiers and internal trust fields are excluded.
+      operationId: getMyProfile
+      responses:
+        "200":
+          description: Current profile
+          headers:
+            ETag:
+              description: Strong profile version tag required by profile updates.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags: [Auth]
+      summary: Update the current user's profile
+      description: Updates a whitelisted profile projection using optimistic concurrency; contact and account-status fields cannot be changed here.
+      operationId: updateMyProfile
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/UpdateMyProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          headers:
+            ETag:
+              description: New strong profile version tag.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /me/sessions:
+    get:
+      tags: [Auth]
+      summary: List the current user's active session devices
+      description: Returns bounded session metadata without bearer tokens, token hashes, IP hashes, or contact identifiers.
+      operationId: listMySessions
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Cursor-paginated active sessions
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDeviceCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [Auth]
+      summary: Revoke all of the current user's sessions
+      description: Atomically revokes every active session for the authenticated user and expires the presented cookie.
+      operationId: logoutAllSessions
+      responses:
+        "204":
+          description: All sessions revoked
+          headers:
+            Set-Cookie:
+              description: Clears the Secure, HttpOnly, SameSite=Lax cookie scoped to /v1.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /me/sessions/{sessionId}:
+    delete:
+      tags: [Auth]
+      summary: Revoke one of the current user's session devices
+      description: Idempotently revokes only a session owned by the authenticated user; foreign and unknown identifiers share the same response.
+      operationId: revokeMySession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "204":
+          description: Session no longer active
+          headers:
+            Set-Cookie:
+              description: Present only when the revoked session is the current session.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /regions:
     get:
       tags: [Taxonomy]
@@ -924,6 +1037,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Cursor:
       name: cursor
       in: query
@@ -943,6 +1061,12 @@ components:
       required: true
       description: Opaque client-generated installation identifier used only through a keyed hash for abuse controls.
       schema: { type: string, minLength: 16, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Strong ETag returned with the current resource version.
+      schema: { type: string, maxLength: 80 }
   responses:
     BadRequest:
       description: Invalid request
@@ -1098,6 +1222,57 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/OrganizationSummary"
+    MyProfileResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/MyProfile"
+    MyProfile:
+      type: object
+      required: [id, displayName, avatarUrl, bio, preferredLocale, homeRegionId, version, updatedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        avatarUrl: { type: [string, "null"], format: uri }
+        bio: { type: [string, "null"], maxLength: 500 }
+        preferredLocale: { type: string, enum: [zh-Hans, en-US] }
+        homeRegionId: { type: [string, "null"], format: uuid }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+    UpdateMyProfileRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 80 }
+        bio: { type: [string, "null"], maxLength: 500 }
+        preferredLocale: { type: string, enum: [zh-Hans, en-US] }
+        homeRegionId: { type: [string, "null"], format: uuid }
+    SessionDeviceCollection:
+      type: object
+      required: [data, pageInfo]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionDevice"
+        pageInfo:
+          $ref: "#/components/schemas/CursorPage"
+    SessionDevice:
+      type: object
+      required: [id, current, userAgent, createdAt, lastSeenAt, expiresAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        current: { type: boolean }
+        userAgent: { type: [string, "null"], maxLength: 512 }
+        createdAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
     UserSummary:
       type: object
       required: [id, displayName, locale, status]

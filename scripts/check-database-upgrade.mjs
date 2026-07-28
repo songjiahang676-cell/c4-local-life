@@ -100,11 +100,27 @@ try {
   const otpChallengeTable = await upgrade.query(
     `SELECT to_regclass('public.otp_challenges') AS table_name`,
   );
+  const profileVersionColumn = await upgrade.query(
+    `SELECT is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'user_profiles'
+        AND column_name = 'version'`,
+  );
+  const accountStateTrigger = await upgrade.query(
+    `SELECT 1
+       FROM pg_trigger
+      WHERE tgname = 'users_revoke_sessions_after_state_change'
+        AND NOT tgisinternal`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
     sessionLifecycleColumns.rowCount !== 2 ||
-    otpChallengeTable.rows[0].table_name !== "otp_challenges"
+    otpChallengeTable.rows[0].table_name !== "otp_challenges" ||
+    profileVersionColumn.rowCount !== 1 ||
+    profileVersionColumn.rows[0].is_nullable !== "NO" ||
+    accountStateTrigger.rowCount !== 1
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -118,6 +134,8 @@ try {
       sentinelPreserved: true,
       sessionLifecycleColumns: sessionLifecycleColumns.rowCount,
       otpChallengeTable: otpChallengeTable.rows[0].table_name,
+      profileVersionColumn: true,
+      accountStateTrigger: true,
     }),
   );
 } finally {

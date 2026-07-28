@@ -17,6 +17,12 @@ export type SessionResponse = components["schemas"]["SessionResponse"];
 export type OtpRequest = components["schemas"]["OtpRequest"];
 export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
 export type OtpAcceptedResponse = components["schemas"]["OtpAcceptedResponse"];
+export type MyProfile = components["schemas"]["MyProfile"];
+export type MyProfileResponse = components["schemas"]["MyProfileResponse"];
+export type UpdateMyProfileRequest = components["schemas"]["UpdateMyProfileRequest"];
+export type SessionDevice = components["schemas"]["SessionDevice"];
+export type SessionDeviceCollection = components["schemas"]["SessionDeviceCollection"];
+export type ListMySessionsQuery = NonNullable<operations["listMySessions"]["parameters"]["query"]>;
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -157,5 +163,70 @@ export const otpVerifyRequestSchema: z.ZodType<OtpVerifyRequest> = z
   .object({
     challengeId: z.uuid(),
     code: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+
+function isBidirectionalControl(codePoint: number): boolean {
+  return (
+    (codePoint >= 0x202a && codePoint <= 0x202e) || (codePoint >= 0x2066 && codePoint <= 0x2069)
+  );
+}
+
+function hasUnsupportedDisplayNameCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return (
+      codePoint <= 0x1f ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      isBidirectionalControl(codePoint)
+    );
+  });
+}
+
+function hasUnsupportedBioCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const allowedWhitespace = codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d;
+    return (
+      (codePoint <= 0x1f && !allowedWhitespace) ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      isBidirectionalControl(codePoint)
+    );
+  });
+}
+
+export const updateMyProfileSchema: z.ZodType<UpdateMyProfileRequest> = z
+  .object({
+    displayName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .refine((value) => !hasUnsupportedDisplayNameCharacter(value), {
+        message: "Display name contains unsupported characters",
+      })
+      .optional(),
+    bio: z
+      .string()
+      .trim()
+      .max(500)
+      .refine((value) => !hasUnsupportedBioCharacter(value), {
+        message: "Bio contains unsupported characters",
+      })
+      .nullable()
+      .optional(),
+    preferredLocale: localeSchema.optional(),
+    homeRegionId: z.uuid().nullable().optional(),
+  })
+  .strict()
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    path: [],
+    message: "At least one profile field is required",
+  });
+
+export const listMySessionsQuerySchema: z.ZodType<ListMySessionsQuery> = z
+  .object({
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();

@@ -307,3 +307,25 @@ Observability: Existing bounded route/status RED metrics expose 202/400/429/503 
 Docs: Updated API/security/retention/runtime configuration、migration operations、README、status、changelog、architecture book and this worklog
 
 Known gaps: Production email/SMS adapter、durable delivery/retry/receipt belong to the notification/Outbox tasks after provider selection；24-hour physical purge/aggregation is scheduled under PRIV-001；profile/session-device management continues in AUTH-003
+
+## AUTH-003 — 用户资料、会话设备与注销全部
+
+Task: AUTH-003 用户资料、会话设备与注销全部
+
+Changed: Added authenticated `AccountController`/`AccountService`、safe self-profile read/update、JSON Merge Patch parser、signed cursor active-session listing、user-scoped single-session revoke and revoke-all；extended the PostgreSQL identity repository and memory adapter；account-state changes now enforce session revocation at the database boundary
+
+Contracts: OpenAPI grows from 31 to 34 paths and 53 to 58 schemas；added `GET/PATCH /me`、`GET/DELETE /me/sessions`、`DELETE /me/sessions/{sessionId}`、strong profile ETag/If-Match、generated TypeScript and Zod validation；Prisma remains 37 models and adds `UserProfile.version`
+
+Migrations: 有，`20260728090000_account_management`；additive required profile version with reviewed constant-default exception plus `users.status/deleted_at` session-revocation trigger；all 6 migrations replayed on a newly recreated empty database，previous-baseline upgrade preserved the sentinel；rollback retains the additive column/trigger while the previous application ignores version
+
+Security: Profile DTO excludes contact/trust fields and rejects unknown fields、control/bidirectional characters、arbitrary avatar URL and inactive region；strong ETag prevents lost updates；session cursor is domain-separated HMAC signed and user-bound；session read never returns token/token hash/IP hash；revoke query is scoped by actor user ID and unknown/foreign/already-revoked IDs share idempotent 204；current/all revoke clears the hardened Cookie；CSRF origin enforcement remains active；database trigger prevents later state workflows from bypassing revocation
+
+Tests run: `pnpm ci:quality` with real PostgreSQL passed 9 typechecks、9 lints、26/26 test files、92/92 tests and 8 builds（79.60% statements、81.83% lines）；contract/API targeted suite passed 15 tests；database integration passed 10 files/33 tests；an explicitly recreated empty database deployed all 6 migrations and passed baseline checks；previous-baseline upgrade、migration safety、`pnpm observability:check` passed；`pnpm test:e2e:ci` passed Chromium desktop/mobile 4/4；initial runtime/E2E scale assertions correctly failed at the old path count and were updated to validate 34 paths/58 schemas
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending
+
+Observability: Existing bounded route/status RED metrics cover profile/session 200/204/400/401/403/409/422 outcomes；correlated structured logs omit bodies、profile text、session/token/IP hashes and cursor values；no high-cardinality identity metric added
+
+Docs: Updated user journey、domain model、API/security/retention、migration operations、README、changelog、status、architecture book and this worklog
+
+Known gaps: Avatar mutation waits for the Gate 1 quarantined media capability；session metadata physical purge remains PRIV-001；account deletion orchestration and Admin status UI remain their planned tasks；hosted PR must prove clean Linux and non-root images
