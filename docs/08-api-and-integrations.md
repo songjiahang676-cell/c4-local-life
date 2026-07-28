@@ -138,6 +138,18 @@ Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMI
 
 服务端不信任扩展名或客户端 MIME。文档/验证材料永不进入公共媒体路径。
 
+`MEDIA-001` 已实现 `POST /media/uploads`：仅 ACTIVE 会话具有 `media:upload:create`，请求必须携带
+16–128 字符、仅含字母数字及 `._:-` 的 `Idempotency-Key`，以及安全文件名、白名单 MIME、声明字节数和小写十六进制
+SHA-256。API 在 owner 级数据库锁内执行 exact retry、最多 20 个未过期 intent 和滚动 24 小时默认
+200 MiB 配额；Avatar/Logo 单文件另限 8 MiB，其余已启用图片限 20 MiB。响应是五分钟 `no-store`
+S3/MinIO PUT URL，并把 Content-Type、Content-Length、checksum、hash metadata 和服务端加密作为
+签名要求。bucket 与不含文件名的 `quarantine/` key 只由服务端配置/生成。`VERIFICATION` 在
+MEDIA-003 独立受限桶、KMS 与访问审批完成前返回 422；PDF 不会回退进入普通媒体隔离区。
+
+当前切片只签发并审计 intent。`POST /media/{mediaId}/complete`、对象 HEAD/magic-byte 复核、
+扫描/解码/转码、去 EXIF、变体和 READY/REJECTED 生命周期属于 MEDIA-002，不能把 intent 成功误认为
+对象已上传或可公开。
+
 ## 8.8 Stripe 集成
 
 - API 创建内部 Order，再创建 Checkout Session/Payment Intent，metadata 只放内部引用，不放敏感数据。

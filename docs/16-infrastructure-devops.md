@@ -30,6 +30,11 @@
 
 Terraform 蓝图见 `infra/terraform/`。生产实施前需要成本、安全和网络评审。
 
+MEDIA-001 只接入 `private quarantine` 端口：API 任务角色仅需针对该 bucket 的受限
+`PutObject`/后续 `HeadObject` 权限，必须启用 Block Public Access、默认加密和短期未完成上传清理。
+public-derived 与 restricted-verification 不能通过同一前缀策略假装隔离；其 Terraform/IAM、KMS、
+访问审计和保留规则分别由 MEDIA-002/003 完成。本地 Compose 的一次性 `minio-init` 只建立私有开发桶。
+
 ## 16.3 网络
 
 - 公开子网仅 ALB/NAT（若使用）；应用、数据库、Redis、OpenSearch 在私有子网。

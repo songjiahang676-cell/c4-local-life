@@ -12,5 +12,6 @@ for path in docs:
     chapter = re.sub(r"\]\(\./([^)]+)\)", r"](./docs/\1)", chapter)
     parts.append(chapter)
     parts.append("\n")
-(root / "ARCHITECTURE_BOOK.md").write_text("".join(parts), encoding="utf-8")
+with (root / "ARCHITECTURE_BOOK.md").open("w", encoding="utf-8", newline="\n") as output:
+    output.write("".join(parts))
 print(f"Generated ARCHITECTURE_BOOK.md from {len(docs)} chapters")

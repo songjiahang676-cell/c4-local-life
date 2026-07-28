@@ -34,6 +34,9 @@ const secretSchema = (minimumLength = 1) =>
 const optionalSecretSchema = () =>
   z.preprocess((value) => (value === "" ? undefined : value), secretSchema().optional());
 
+const optionalStringSchema = () =>
+  z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional());
+
 const commonServerSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema,
   APP_ENV: applicationEnvironmentSchema,
@@ -56,6 +59,18 @@ const apiEnvironmentSchema = commonServerSchema
     OPENSEARCH_NODE: z.string().url(),
     OPENSEARCH_USERNAME: z.string().optional().default(""),
     OPENSEARCH_PASSWORD: optionalSecretSchema(),
+    S3_ENDPOINT: z.string().url().optional().or(z.literal("")).default(""),
+    S3_REGION: z.string().min(1).max(64).default("us-west-2"),
+    S3_QUARANTINE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("socal-media-quarantine-local"),
+    S3_ACCESS_KEY: optionalStringSchema(),
+    S3_SECRET_KEY: optionalSecretSchema(),
+    S3_FORCE_PATH_STYLE: booleanValue(false),
+    MEDIA_UPLOAD_URL_TTL_SECONDS: positiveInteger(300, 900),
+    MEDIA_UPLOAD_MAX_ACTIVE: positiveInteger(20, 100),
+    MEDIA_UPLOAD_DAILY_BYTES: positiveInteger(209_715_200, 10_737_418_240),
     SESSION_SECRET: secretSchema(32),
     SESSION_COOKIE_NAME: z
       .string()
@@ -105,6 +120,13 @@ const apiEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["OTP_SECRET"],
         message: "OTP secret must be distinct from session and CSRF secrets",
+      });
+    }
+    if (Boolean(value.S3_ACCESS_KEY) !== Boolean(value.S3_SECRET_KEY)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY"],
+        message: "S3 access key and secret key must be supplied together",
       });
     }
   });

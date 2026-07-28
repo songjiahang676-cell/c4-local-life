@@ -23,6 +23,8 @@ import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
 import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
+import type { MediaObjectStorage } from "./modules/media/media-object-storage";
+import type { MediaStore } from "./modules/media/media.store";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
 
 const requestIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -49,6 +51,8 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   otpDeliveryGateway?: OtpDeliveryGateway;
   organizationStore?: OrganizationStore;
   taxonomyStore?: TaxonomyStore;
+  mediaStore?: MediaStore;
+  mediaObjectStorage?: MediaObjectStorage;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -121,6 +125,8 @@ export async function createApiApplication(
       options.otpDeliveryGateway,
       options.organizationStore,
       options.taxonomyStore,
+      options.mediaStore,
+      options.mediaObjectStorage,
     ),
     adapter,
     {

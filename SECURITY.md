@@ -12,7 +12,8 @@
 - 会话使用 Secure、HttpOnly、SameSite Cookie；不把长效令牌存放在浏览器 Local Storage。
 - 密码使用经过评审的内存困难 KDF；OTP 限频、一次性消费并短时有效。
 - 全部资源执行后端对象级授权；前端显示控制不是授权。
-- 上传采用预签名、类型/大小限制、恶意文件扫描、图像解码重编码和独立域名分发。
+- 上传采用认证/幂等/配额、短效校验和长度绑定的私有 quarantine 预签名；公开前必须完成 magic-byte、
+  恶意文件扫描、图像解码重编码/去 EXIF，并通过独立无 Cookie 域名分发。
 - 支付数据由支付服务商托管；平台不保存完整卡号和 CVC。
 - 密钥存入云 Secret Manager/KMS，禁止写入镜像、日志或仓库。
 - 依赖、容器、IaC、SAST、secret scanning 和 DAST 纳入 CI/CD。

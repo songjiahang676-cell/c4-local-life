@@ -22,6 +22,12 @@ The application profile starts Web on 3000, Admin on 3001, API on 4000, and the 
 listener on 4001, together with their local infrastructure dependencies. To start only the
 infrastructure dependencies, continue to use `pnpm infra:up`.
 
+The one-shot `minio-init` service waits for MinIO, creates
+`S3_QUARANTINE_BUCKET` (default `socal-media-quarantine-local`) idempotently and applies
+`anonymous none`. The API uses the internal `http://minio:9000` endpoint while the host keeps
+`http://localhost:9000`. Do not reuse this development bootstrap as production provisioning;
+production bucket policy, Block Public Access, encryption and lifecycle are Terraform-owned.
+
 Health endpoints:
 
 | Process | Liveness          | Readiness          |

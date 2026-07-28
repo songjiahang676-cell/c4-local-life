@@ -417,3 +417,25 @@ Observability: Existing bounded route/status telemetry covers public schema 200/
 Docs: Updated dynamic taxonomy、domain/data、API/integrations、security/privacy、seed、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: `ADMIN-001` must expose the existing management lifecycle behind SSO/MFA/RBAC rather than adding anonymous TAX writes；`LIST-001/002` must call exact-version attribute validation when real Listing persistence replaces the current skeleton；production category templates、moderation policy and search mappings still require owner/operations approval；hosted protected PR must prove clean Linux and non-root images
+
+## MEDIA-001 — 上传 intent 与 quarantine
+
+Task: MEDIA-001 上传 intent 与 quarantine
+
+Changed: Added `MediaModule` with Controller → application service → store/object-storage ports；`POST /media/uploads` reserves owner-scoped upload metadata and returns a five-minute S3/MinIO PUT；`MediaAssetRepository` serializes exact idempotency and two quota layers with a PostgreSQL owner advisory transaction lock；AWS SigV4 adapter binds length、MIME、SHA-256 checksum/hash metadata and SSE；Compose adds an idempotent private MinIO quarantine bucket bootstrap
+
+Contracts: OpenAPI remains 37 paths/46 operations/70 schemas，but `CreateUploadRequest` now requires lowercase SHA-256 and the operation declares authentication、validation、conflict、size、purpose、quota and storage failures；generated TypeScript and strict Zod reject traversal/control/bidi filenames、unknown fields、uppercase/malformed hashes and over-posted bucket/key；Prisma grows from 40 to 41 models with `MediaAsset` plus `MediaPurpose`
+
+Migrations: `20260728201500_media_upload_intents` additively creates `media_assets`、purpose enum、owner FK、opaque-key/hash/size checks、owner-idempotency uniqueness and quota indexes；all 9 migrations deployed；application rollback disables the route and waits out five-minute URLs while retaining evidence；physical removal requires stopped writers、backup and quarantine object cleanup，documented in migration-local `ROLLBACK.md`
+
+Security: Only ACTIVE sessions receive and pass `media:upload:create`；Cookie writes retain trusted-Origin enforcement；idempotency is bound to owner + canonical request hash and rejects comma-joined duplicate header values；the database lock prevents concurrent count/byte quota bypass；object keys contain random UUIDs and never filename/user ID；client cannot choose bucket/key；signed PUT requires declared content length/type/checksum/hash metadata/SSE；responses/errors are no-store and provider failures are sanitized；SVG/HTML/video are not accepted，and PDF/VERIFICATION fail closed until MEDIA-003 provides the restricted bucket/KMS/access boundary
+
+Tests run: Targeted contracts passed 6 files/18 tests and API passed 13 files/68 tests；S3 unit verifies path-style SigV4 expiry and signed headers；HTTP abuse cases cover guest/LIMITED/cross-site、changed idempotency payload、unsafe hash/filename/unknown fields、purpose size、verification rejection、quota Retry-After and hidden provider failure；real PostgreSQL passed 14 files/46 tests including exact replay/conflict、inactive actor、database negative constraints and two simultaneous max-one reservations yielding exactly one success；migration deploy、safety、baseline (6 negative cases) and previous-release upgrade passed；final `pnpm ci:quality` passed 9 typechecks、9 lints、40/40 files、146/146 tests and 8 builds（80.61% statements、82.93% lines）；architecture passed 101 tasks/41 models/37 paths/70 schemas/36 JSON；observability runtime and Chromium desktop/mobile E2E passed 4/4
+
+Not run: Local Docker/MinIO runtime PUT smoke，because this host has no Docker CLI；protected hosted Linux quality and four-image jobs pending
+
+Observability: Existing correlated HTTP telemetry covers 201/400/401/403/409/413/422/429/503 with bounded method/route/status labels；request body、signed URL、object key、hash、filename、idempotency key and provider error are never added to logs or metric labels
+
+Docs: Updated domain/data、roles/policy、API/integrations、security/privacy、runtime config、infrastructure/local containers、acceptance、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: MEDIA-002 owns completion/object HEAD、magic-byte/decoder/antivirus、scan queue、re-encode/EXIF removal、variants and READY/REJECTED binding；MEDIA-003 owns restricted verification bucket/KMS/approvals/retention；API-005 later generalizes idempotency storage；production Terraform bucket policy/IAM/lifecycle and a real MinIO/S3 PUT smoke remain required；the first full checks correctly exposed OpenAPI generated drift、a type-only lint issue and Prisma void lock deserialization，all repaired before the final passing runs

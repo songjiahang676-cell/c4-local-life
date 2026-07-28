@@ -135,6 +135,19 @@ which is the only truthful baseline for pre-versioning drafts.
   rollback would sever old Listing validation provenance and therefore requires a backup,
   stopped writers, and a reviewed maintenance plan. See the migration-local `ROLLBACK.md`.
 
+## `20260728201500_media_upload_intents`
+
+Adds owner-scoped `media_assets` metadata for private quarantine upload intents. PostgreSQL enforces
+opaque `quarantine/<shard>/<uuid>/original` keys, lowercase SHA-256/request hashes, positive bounded
+size, owner foreign keys and unique `owner + idempotency_key`. The application holds an owner
+advisory transaction lock while evaluating exact retry and quotas.
+
+- Roll forward: deploy before enabling `POST /media/uploads`, provision the configured bucket with
+  public access blocked, and verify signed checksum/length/MIME headers plus concurrent quota tests.
+- Rollback: disable the route and let outstanding five-minute URLs expire while retaining metadata.
+  Physical removal requires stopped writers, object cleanup from a backed-up manifest, and the
+  migration-local `ROLLBACK.md`; corrective roll-forward is preferred.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed
