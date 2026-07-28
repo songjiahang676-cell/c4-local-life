@@ -55,8 +55,18 @@ Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有�
 `PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
 `REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
 只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
-`expiresAt`。Repository、权限投影和持久化事务仍由 `LIST-002/003` 接入，领域规则本身不直接操作
-Prisma，也不自行决定运营发布期限。
+`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；写事务仍由
+`LIST-003` 接入。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
+
+`LIST-002` 使用三套显式 Prisma `select` 和独立返回类型，而不是序列化完整 Listing。公开读取在 SQL
+条件中同时要求已发布、已批准、发布时间已到、尚未过期、未删除、有效地区/分类，以及可用 owner/
+organization；owner 读取把直接 owner 或当前 organization membership 与 actor 状态放进查询；
+moderator 读取只接受当前未撤销、未过期且 region/category scope 匹配的 `MODERATOR`/
+`SENIOR_MODERATOR`。不同权限层的动态 attributes 始终按 Listing 保存的精确
+`formSchemaVersion` 重新读取已发布定义并投影；定义缺失、损坏、字段重复或未知 attribute 时失败关闭，
+绝不返回原始 JSON。公开投影不含精确坐标、联系方式、审核状态和内部评分；owner 可读取自己的精确点和
+审核状态但不含审核员字段；moderator 可读取受控内部状态和三层动态字段，但仍不读取邮箱、手机号、
+组织 legal name 或精确坐标。
 
 ### Organization 聚合
 
@@ -104,7 +114,8 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影；LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+Listing 投影；READY asset 的显式所有权校验和绑定仍由 `LIST-004` 的表单/上传闭环完成，不能把未扫描
+对象直接公开。
 
 `MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
 元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和

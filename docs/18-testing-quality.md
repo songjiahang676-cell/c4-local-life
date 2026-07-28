@@ -36,6 +36,13 @@
 提前过期、归档、暂停、软删除、非法转换、旧版本、倒退时间和非法原因码。外部重建的聚合快照也必须
 经过同一 `assertListingInvariants`，避免 Repository 反序列化绕过规则。
 
+`LIST-002` 的真实 PostgreSQL 集成矩阵固定验证三种安全投影。公开层覆盖 draft、未审核、过期、停用
+taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization member、外部用户及暂停成员；审核层
+覆盖正确 scope、错误 scope、损坏 scope、撤销、到期、错误平台角色和普通用户。每层都序列化检查不含
+邮箱、legal name、精确坐标或不属于当前 visibility 的 attributes；精确历史 schema 缺失时三层都必须
+返回空 attributes，而不是原始 JSON。fixture 仅使用 `example.invalid` 与明确 synthetic 文本，并在
+事务回滚隔离中运行。
+
 ## 18.4 授权测试
 
 为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。

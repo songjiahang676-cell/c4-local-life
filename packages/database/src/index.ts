@@ -22,6 +22,21 @@ export {
   type NearbyPublishedListing,
 } from "./repositories/listing-geo.repository";
 export {
+  ListingRepository,
+  type ListingCategoryProjection,
+  type ListingLocationProjection,
+  type ListingOrganizationSummaryProjection,
+  type ListingOwnerSummaryProjection,
+  type ListingPriceProjection,
+  type ListingRegionProjection,
+  type ListingRepositoryOptions,
+  type ModeratorListingProjection,
+  type OwnerListingProjection,
+  type PublicListingProjection,
+  type PublicListingReadInput,
+  type ScopedListingReadInput,
+} from "./repositories/listing.repository";
+export {
   MediaAssetRepository,
   type CompleteMediaUploadInput,
   type CompleteMediaUploadResult,

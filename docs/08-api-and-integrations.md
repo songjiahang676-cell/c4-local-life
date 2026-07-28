@@ -156,6 +156,20 @@ provider 错误。
 
 不要直接序列化 Prisma 模型；这样可避免新增数据库字段意外泄漏。
 
+`LIST-002` 已在数据库包实现内部 `PublicListingProjection`、`OwnerListingProjection` 和
+`ModeratorListingProjection`，三者各有显式 Prisma `select`，不共享“读取整行再删除字段”的实现。
+公开读取只查询当前已批准、已发布、未过期、未删除且 taxonomy/发布主体可用的内容；owner 读取在同一
+查询中绑定直接 owner 或当前 organization member；moderator 读取先验证当前
+`MODERATOR|SENIOR_MODERATOR` grant 的撤销/到期状态，再按 region/category scope 匹配资源。缺失资源
+和越权读取均返回内部 `null`，由后续 HTTP use case 统一映射通用 404。
+
+动态 `attributes` 不是无条件 JSON：Repository 使用 Listing 固定的精确历史
+`formSchemaVersion` 读取已发布 schema，并按 `PUBLIC`、`OWNER_ONLY`、`MODERATOR_ONLY` 分层白名单
+投影。schema 缺失/损坏、重复字段和 schema 外属性都失败关闭为空对象。公开层没有精确坐标、
+`contactMode`、审核状态、owner/organization 内部关联或 `qualityScore`；owner 层没有审核员字段或内部
+评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。公共 OpenAPI 尚未
+变化；`LIST-003` 接线时才把这些内部安全投影映射到现有 HTTP 契约。
+
 ## 8.7 上传 API
 
 1. 客户端请求 upload intent，声明用途、mime、大小、hash。

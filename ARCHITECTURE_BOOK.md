@@ -701,8 +701,18 @@ Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有�
 `PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
 `REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
 只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
-`expiresAt`。Repository、权限投影和持久化事务仍由 `LIST-002/003` 接入，领域规则本身不直接操作
-Prisma，也不自行决定运营发布期限。
+`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；写事务仍由
+`LIST-003` 接入。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
+
+`LIST-002` 使用三套显式 Prisma `select` 和独立返回类型，而不是序列化完整 Listing。公开读取在 SQL
+条件中同时要求已发布、已批准、发布时间已到、尚未过期、未删除、有效地区/分类，以及可用 owner/
+organization；owner 读取把直接 owner 或当前 organization membership 与 actor 状态放进查询；
+moderator 读取只接受当前未撤销、未过期且 region/category scope 匹配的 `MODERATOR`/
+`SENIOR_MODERATOR`。不同权限层的动态 attributes 始终按 Listing 保存的精确
+`formSchemaVersion` 重新读取已发布定义并投影；定义缺失、损坏、字段重复或未知 attribute 时失败关闭，
+绝不返回原始 JSON。公开投影不含精确坐标、联系方式、审核状态和内部评分；owner 可读取自己的精确点和
+审核状态但不含审核员字段；moderator 可读取受控内部状态和三层动态字段，但仍不读取邮箱、手机号、
+组织 legal name 或精确坐标。
 
 ### Organization 聚合
 
@@ -750,7 +760,8 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影；LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+Listing 投影；READY asset 的显式所有权校验和绑定仍由 `LIST-004` 的表单/上传闭环完成，不能把未扫描
+对象直接公开。
 
 `MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
 元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和
@@ -1188,6 +1199,20 @@ provider 错误。
 - `ListingModerationView`：快照、规则命中、关联风险，仅审核员可见。
 
 不要直接序列化 Prisma 模型；这样可避免新增数据库字段意外泄漏。
+
+`LIST-002` 已在数据库包实现内部 `PublicListingProjection`、`OwnerListingProjection` 和
+`ModeratorListingProjection`，三者各有显式 Prisma `select`，不共享“读取整行再删除字段”的实现。
+公开读取只查询当前已批准、已发布、未过期、未删除且 taxonomy/发布主体可用的内容；owner 读取在同一
+查询中绑定直接 owner 或当前 organization member；moderator 读取先验证当前
+`MODERATOR|SENIOR_MODERATOR` grant 的撤销/到期状态，再按 region/category scope 匹配资源。缺失资源
+和越权读取均返回内部 `null`，由后续 HTTP use case 统一映射通用 404。
+
+动态 `attributes` 不是无条件 JSON：Repository 使用 Listing 固定的精确历史
+`formSchemaVersion` 读取已发布 schema，并按 `PUBLIC`、`OWNER_ONLY`、`MODERATOR_ONLY` 分层白名单
+投影。schema 缺失/损坏、重复字段和 schema 外属性都失败关闭为空对象。公开层没有精确坐标、
+`contactMode`、审核状态、owner/organization 内部关联或 `qualityScore`；owner 层没有审核员字段或内部
+评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。公共 OpenAPI 尚未
+变化；`LIST-003` 接线时才把这些内部安全投影映射到现有 HTTP 契约。
 
 ## 8.7 上传 API
 
@@ -1921,6 +1946,15 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 `POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
 403，避免已有写端点在框架接入后继续绕过服务端权限。
 
+`LIST-002` 把 Listing 对象授权下沉到 Repository 查询：公开查询强制当前发布/审核/过期/删除及
+taxonomy/主体状态，owner 查询绑定直接所有权或当前 organization membership，审核投影只允许 ACTIVE
+且具有当前 `MODERATOR|SENIOR_MODERATOR` grant 的 actor，并要求受控 region/category scope 匹配。
+撤销、到期、错误角色、越界、损坏 scope、受限/暂停 actor 与不存在资源都失败关闭。三种投影各用
+显式 `select`，不会先取完整 Prisma 模型；邮箱、手机号、组织 legal name、token/IP、公开精确坐标和
+不属于当前角色的动态字段从查询边界即被排除。动态 JSON 按 Listing 保存的精确已发布 schema version
+做字段 visibility 白名单，未知属性或 schema 缺失时返回空对象，避免历史配置漂移和 JSON 注入字段
+造成横向泄漏。后续 Controller 仍须通过 API-004 Policy；Repository 不是前端隐藏或单独的全部授权层。
+
 `ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
 `INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
@@ -2449,6 +2483,13 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 最小货币单位及 `FREE/NEGOTIABLE`、提交/升级/退回/重提、自动与人工审核边界、1–365 天发布期限、
 提前过期、归档、暂停、软删除、非法转换、旧版本、倒退时间和非法原因码。外部重建的聚合快照也必须
 经过同一 `assertListingInvariants`，避免 Repository 反序列化绕过规则。
+
+`LIST-002` 的真实 PostgreSQL 集成矩阵固定验证三种安全投影。公开层覆盖 draft、未审核、过期、停用
+taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization member、外部用户及暂停成员；审核层
+覆盖正确 scope、错误 scope、损坏 scope、撤销、到期、错误平台角色和普通用户。每层都序列化检查不含
+邮箱、legal name、精确坐标或不属于当前 visibility 的 attributes；精确历史 schema 缺失时三层都必须
+返回空 attributes，而不是原始 JSON。fixture 仅使用 `example.invalid` 与明确 synthetic 文本，并在
+事务回滚隔离中运行。
 
 ## 18.4 授权测试
 
@@ -3634,8 +3675,9 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - NestJS + Fastify 启动、Swagger、全局验证和 Problem Details 异常过滤器。
 - Health 模块。
 - Listing HTTP 示例仍只说明 Controller/DTO/Service 边界；`LIST-001` 已增加纯领域状态机，覆盖五类
-  type-detail、价格、审核/内容双状态、版本和过期不变式。真实 repository、安全投影和 use case 接线
-  由 `LIST-002/003` 替换现有内存 Service。
+  type-detail、价格、审核/内容双状态、版本和过期不变式。`LIST-002` 已增加 PostgreSQL Repository
+  及 public/owner/moderator 显式安全投影，包含对象范围、当前审核角色 scope 和精确历史动态字段
+  visibility 过滤；`LIST-003` 再用这些边界替换现有内存 Service 并接入 HTTP/并发写事务。
 
 ### `apps/worker`
 
@@ -3652,6 +3694,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - Prisma 7 配置和 client adapter。
 - 覆盖用户、组织、地区、分类、Listing、媒体、消息、商家/师傅、评价、审核、通知、订单、支付、积分、广告、Outbox 和审计的初始 Schema。
 - 安全的扩展引导迁移、需合并到首个建表迁移后的 PostGIS/trigram/约束 SQL，以及 fallback SQL。
+- Listing 的公开、owner 和 moderator 三类显式读取投影；对象授权条件及动态字段 visibility 在
+  Repository 边界失败关闭，不直接返回 Prisma 模型。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 
