@@ -737,7 +737,15 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影，MEDIA-002/LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+Listing 投影；LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+
+`MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
+元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和
+`media.upload.completed` Outbox；Worker 再重新读取原始对象、计算精确字节数/SHA-256、检查
+JPEG/PNG/WebP magic bytes、调用 ClamAV、使用 Sharp 解码与自动旋转，并生成不携带 EXIF/ICC 的
+THUMBNAIL/CARD/FULL WebP。`MediaVariant` 以 `(mediaAssetId, kind)` 唯一，key 固定为
+`processed/<两位分片>/<media UUID>/<kind>.webp`。READY/REJECTED 终态与对应 Outbox 事件在一个
+PostgreSQL 事务内提交；重复或过期 lifecycleVersion 只能返回 existing/stale，不能覆盖新状态。
 
 ### Conversation 聚合
 
@@ -950,6 +958,11 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 才向配置的 BullMQ 队列写入 versioned envelope；jobId 固定为 eventId。成功/重试/终态失败使用 attempt
 版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，
 队列 envelope 默认限制为 128 KiB。
+
+媒体处理同样留在模块化单体的 API/Worker 进程边界内。API 对 quarantine 对象执行服务端 HEAD 后原子写
+SCANNING + Outbox；Worker 消费 `media.upload.completed`，重新验证对象内容、经 ClamAV 和 Sharp
+生成三个确定性 WebP key，再原子写 READY + variants + Outbox。对象写可能先于数据库终态，因此 key
+必须确定且写入幂等；Worker/对账任务可安全重做，PostgreSQL 的 status + lifecycleVersion 始终是事实源。
 
 ## 7.5 读取流程
 
@@ -1182,9 +1195,18 @@ S3/MinIO PUT URL，并把 Content-Type、Content-Length、checksum、hash metada
 签名要求。bucket 与不含文件名的 `quarantine/` key 只由服务端配置/生成。`VERIFICATION` 在
 MEDIA-003 独立受限桶、KMS 与访问审批完成前返回 422；PDF 不会回退进入普通媒体隔离区。
 
-当前切片只签发并审计 intent。`POST /media/{mediaId}/complete`、对象 HEAD/magic-byte 复核、
-扫描/解码/转码、去 EXIF、变体和 READY/REJECTED 生命周期属于 MEDIA-002，不能把 intent 成功误认为
-对象已上传或可公开。
+`MEDIA-002` 已实现 `POST /media/{mediaId}/complete`。API 仅对当前 ACTIVE owner 的 UPLOADING
+asset 调用对象存储 HEAD，使用服务端返回的长度、MIME 和 checksum/受签 metadata 与 intent 对比；
+跨 owner/未知 ID 统一 404，过期或不一致对象进入 REJECTED 并返回 422，存储不可用返回不泄露 provider
+信息的 503。成功仅返回 `202 SCANNING`，重复请求按资源状态幂等返回 SCANNING/READY，绝不把上传完成
+误报为 READY。
+
+同事务 Outbox 驱动 Worker 重新读取有界原始字节并独立复算长度/SHA-256，验证 JPEG/PNG/WebP magic
+bytes，执行 ClamAV INSTREAM 和 Sharp 解码/像素上限/方向校正，再生成 THUMBNAIL、CARD、FULL 三个
+WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性安全 key、SSE 和 immutable cache metadata。
+永久内容错误进入 REJECTED，ClamAV/S3 等暂时故障抛回 BullMQ 重试；重复/乱序 event 由
+`lifecycleVersion` 关闭。只有数据库 READY 和完整三变体集可供后续 Listing 绑定，原始 quarantine
+对象及当前 processed bucket 都不直接匿名公开。
 
 ## 8.8 Stripe 集成
 
@@ -1243,7 +1265,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 44 个 path、88 个 schema、53 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 44 个 path、89 个 schema、53 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1954,8 +1976,14 @@ schema version 验证，不能信任前端表单隐藏或当前版本替代历�
 五分钟 PUT 签名绑定声明长度、白名单 MIME、SHA-256 checksum/metadata 和 SSE，响应及所有错误均
 `no-store`，HTTP 遥测不记录 body、签名 URL、hash、对象 key 或幂等键。私有 bucket 本地启动时显式
 设置 anonymous `none`；生产仍须以独立 S3 bucket policy、Block Public Access、最小任务角色和
-生命周期规则落实。此阶段不接受 SVG/HTML、视频或验证文件；文件内容真实性和恶意载荷仍必须由
-MEDIA-002 的 magic-byte/解码/杀毒/重编码完成，UPLOADING 不得用于公开页面。
+生命周期规则落实。此路径不接受 SVG/HTML、视频或验证文件；UPLOADING 不得用于公开页面。
+
+`MEDIA-002` 的完成端点不信任客户端“上传成功”声明，而以对象存储 HEAD 元数据做第一层闭合，并由
+Worker 对实际字节再次复算长度/SHA-256、检查 magic bytes 和执行真实 ClamAV INSTREAM。Sharp 在
+40MP 默认像素上限内解码、拒绝多页/损坏输入、按方向旋转并重编码为 WebP，不复制 EXIF/ICC。原始对象
+和派生桶均保持私有，key 只含 UUID/固定 variant；派生写入要求 SSE、不可变缓存 metadata 和安全
+`image/webp` 类型。永久拒绝仅保存有界错误码，不保存扫描响应或原始 provider 错误；暂时依赖故障重试。
+数据库 row lock + lifecycleVersion 阻止重复/乱序队列覆盖终态，只有 READY 才能被后续业务绑定。
 
 ## 14.8 PII 分类
 
@@ -2098,6 +2126,7 @@ reconciliation 仍属于 `EVT-002`。
 - OpenSearch 整体不可用与重建；
 - Redis 数据丢失、队列恢复、Outbox 重投；
 - S3 误删/版本恢复；
+- ClamAV 不可用/超时、重复媒体事件和对象在 HEAD 后被替换；暂时故障重试，内容 hash 不一致永久拒绝；
 - Stripe webhook 延迟/重复/乱序；
 - DNS/CDN/WAF 配置错误；
 - 错误迁移和应用回滚；
@@ -2150,10 +2179,11 @@ reconciliation 仍属于 `EVT-002`。
 
 Terraform 蓝图见 `infra/terraform/`。生产实施前需要成本、安全和网络评审。
 
-MEDIA-001 只接入 `private quarantine` 端口：API 任务角色仅需针对该 bucket 的受限
-`PutObject`/后续 `HeadObject` 权限，必须启用 Block Public Access、默认加密和短期未完成上传清理。
-public-derived 与 restricted-verification 不能通过同一前缀策略假装隔离；其 Terraform/IAM、KMS、
-访问审计和保留规则分别由 MEDIA-002/003 完成。本地 Compose 的一次性 `minio-init` 只建立私有开发桶。
+API 任务角色只需要 private quarantine 的受限 `PutObject`/`HeadObject`；Worker 才能读取 quarantine、
+连接 ClamAV 并写 processed-media bucket。两桶都必须启用 Block Public Access、默认加密和生命周期，
+不能用同一公开前缀假装隔离。`MEDIA-002` 的本地 Compose 会幂等建立两个 anonymous-none 桶并等待
+ClamAV healthy；生产 public-derived 的 Terraform/IAM、独立无 Cookie CDN 和删除/对账策略仍须在发布
+基础设施切片落实。restricted-verification 的独立 KMS、访问审计和短保留由 MEDIA-003 完成。
 
 ## 16.3 网络
 
@@ -2288,9 +2318,12 @@ Outbox dispatcher 额外暴露：
 - `socal_outbox_oldest_pending_age_seconds`：最老 PENDING 事件年龄；
 - `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
 - `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
+- `socal_media_processing_total{outcome}`：仅允许 ready/rejected/stale，区分终态和重复/乱序事件。
 
 事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
 有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
+媒体指标不使用 mediaId、对象 key、hash、MIME、ClamAV signature 或 rejection code 作为 label；
+Worker 的通用 job duration/failure 指标承担依赖超时/重试可见性。
 
 ## 17.4 告警
 
@@ -2811,6 +2844,13 @@ publisher/故障测试必须通过。
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
 决定 bucket/key；普通媒体路径拒绝 SVG/HTML 和验证文档；原始对象在 READY 前没有公共 URL。
+
+Gate 1 的 MEDIA-002 验收：完成端点只允许 ACTIVE owner，并用服务端 HEAD 元数据闭合 intent；
+成功只返回 SCANNING。Worker 必须对实际字节复算长度/hash、检查 magic bytes、真实接入 ClamAV、
+解码且限制像素，输出恰好 THUMBNAIL/CARD/FULL 三个无 EXIF/ICC 的 WebP；原始和派生对象保持私有。
+SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 lifecycleVersion 幂等；永久内容错误
+拒绝、暂时依赖错误重试、重复/乱序事件不得覆盖终态。CI 必须用真实 clamd 对 clean 与标准测试签名验证，
+不能只依赖 mock。
 
 ## 22.5 搜索验收
 
@@ -3576,7 +3616,9 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - 示例 search/media/notification job 类型。
 - `EVT-001` 已接 PostgreSQL Outbox dispatcher、SKIP LOCKED 租约领取、eventId jobId、发布重试和
   oldest-age/结果指标。
-- 仍需各领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
+- `MEDIA-002` 已接真实媒体消费者：有界 S3/MinIO 读取、内容 hash/magic-byte、ClamAV INSTREAM、
+  Sharp 解码/方向校正/去 metadata、三个确定性 WebP 变体和 lifecycleVersion 幂等终态。
+- 仍需其他领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
 
 ### `packages/database`
 

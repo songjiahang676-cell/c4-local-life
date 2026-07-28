@@ -42,9 +42,12 @@ Outbox dispatcher 额外暴露：
 - `socal_outbox_oldest_pending_age_seconds`：最老 PENDING 事件年龄；
 - `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
 - `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
+- `socal_media_processing_total{outcome}`：仅允许 ready/rejected/stale，区分终态和重复/乱序事件。
 
 事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
 有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
+媒体指标不使用 mediaId、对象 key、hash、MIME、ClamAV signature 或 rejection code 作为 label；
+Worker 的通用 job duration/failure 指标承担依赖超时/重试可见性。
 
 ## 17.4 告警
 

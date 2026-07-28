@@ -1,11 +1,17 @@
 import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  S3ServiceException,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import type {
   IssueQuarantineUploadInput,
   MediaObjectStorage,
+  QuarantineObjectMetadata,
   QuarantineUploadTarget,
 } from "./media-object-storage";
 
@@ -60,6 +66,33 @@ export class S3MediaObjectStorage implements MediaObjectStorage, OnModuleDestroy
       },
     );
     return { uploadUrl, headers };
+  }
+
+  async inspectQuarantineObject(input: {
+    bucket: string;
+    objectKey: string;
+  }): Promise<QuarantineObjectMetadata | null> {
+    try {
+      const object = await this.#client.send(
+        new HeadObjectCommand({
+          Bucket: input.bucket,
+          Key: input.objectKey,
+          ChecksumMode: "ENABLED",
+        }),
+      );
+      const checksum = object.ChecksumSHA256
+        ? Buffer.from(object.ChecksumSHA256, "base64").toString("hex")
+        : "";
+      return {
+        byteSize: object.ContentLength ?? -1,
+        mimeType: object.ContentType ?? "",
+        sha256Hex: checksum || object.Metadata?.["content-sha256"] || "",
+      };
+    } catch (error: unknown) {
+      if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404)
+        return null;
+      throw error;
+    }
   }
 
   onModuleDestroy(): void {

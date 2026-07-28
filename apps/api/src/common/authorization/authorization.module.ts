@@ -19,6 +19,10 @@ export function createPolicyService(): PolicyService {
     policies.register(action, requireActorPermissionPolicy);
   }
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
+  policies.register(
+    activeUserPolicyActions.mediaUploadComplete,
+    requireActiveActorPermissionPolicy,
+  );
   policies.register(activeUserPolicyActions.mediaUploadCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
   policies.register(adminPolicyActions.consoleAccess, requireActiveActorPermissionPolicy);

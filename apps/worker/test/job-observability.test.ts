@@ -59,7 +59,7 @@ describe("worker job observability", () => {
 
     await expect(
       runObservedJob(
-        { id: "job-2", name: "media.scan" },
+        { id: "job-2", name: "media.upload.completed" },
         () => Promise.reject(new Error("provider leaked private@example.com")),
         runtime,
       ),

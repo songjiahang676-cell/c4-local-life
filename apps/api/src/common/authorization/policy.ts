@@ -12,6 +12,7 @@ export const selfServicePolicyActions = {
 
 export const activeUserPolicyActions = {
   listingDraftCreate: "listing:draft:create",
+  mediaUploadComplete: "media:upload:complete",
   mediaUploadCreate: "media:upload:create",
   organizationCreate: "organization:create",
 } as const;
@@ -44,6 +45,7 @@ export const accountSelfServicePermissions = [
 export const activeUserPermissions = [
   ...accountSelfServicePermissions,
   activeUserPolicyActions.listingDraftCreate,
+  activeUserPolicyActions.mediaUploadComplete,
   activeUserPolicyActions.mediaUploadCreate,
   activeUserPolicyActions.organizationCreate,
 ] as const;

@@ -91,7 +91,15 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影，MEDIA-002/LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+Listing 投影；LIST-002 后续把 READY asset 通过显式所有权校验绑定，不能把未扫描对象直接公开。
+
+`MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
+元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和
+`media.upload.completed` Outbox；Worker 再重新读取原始对象、计算精确字节数/SHA-256、检查
+JPEG/PNG/WebP magic bytes、调用 ClamAV、使用 Sharp 解码与自动旋转，并生成不携带 EXIF/ICC 的
+THUMBNAIL/CARD/FULL WebP。`MediaVariant` 以 `(mediaAssetId, kind)` 唯一，key 固定为
+`processed/<两位分片>/<media UUID>/<kind>.webp`。READY/REJECTED 终态与对应 Outbox 事件在一个
+PostgreSQL 事务内提交；重复或过期 lifecycleVersion 只能返回 existing/stale，不能覆盖新状态。
 
 ### Conversation 聚合
 

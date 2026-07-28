@@ -83,6 +83,14 @@ services:
       NODE_ENV: production
       OTEL_SERVICE_NAME: socal-worker
       REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-west-2
+      S3_QUARANTINE_BUCKET: ${S3_QUARANTINE_BUCKET:-socal-media-quarantine-local}
+      S3_MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-socal-media-processed-local}
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_FORCE_PATH_STYLE: "true"
+      CLAMAV_HOST: clamav
       WORKER_HEALTH_PORT: 4001
     ports:
       - "4001:4001"
@@ -90,6 +98,10 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
         condition: service_healthy
     init: true
     security_opt:
@@ -171,12 +183,28 @@ services:
         condition: service_healthy
     environment:
       QUARANTINE_BUCKET: ${S3_QUARANTINE_BUCKET:-socal-media-quarantine-local}
+      MEDIA_BUCKET: ${S3_MEDIA_BUCKET:-socal-media-processed-local}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
         mc alias set local http://minio:9000 minioadmin minioadmin &&
-        mc mb --ignore-existing local/$$QUARANTINE_BUCKET &&
-        mc anonymous set none local/$$QUARANTINE_BUCKET
+          mc mb --ignore-existing local/$$QUARANTINE_BUCKET &&
+          mc anonymous set none local/$$QUARANTINE_BUCKET &&
+          mc mb --ignore-existing local/$$MEDIA_BUCKET &&
+          mc anonymous set none local/$$MEDIA_BUCKET
+
+  clamav:
+    image: clamav/clamav:1.4
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+    ports:
+      - "3310:3310"
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   mailpit:
     image: axllent/mailpit:latest

@@ -1,4 +1,6 @@
 import type {
+  CompleteMediaUploadInput,
+  CompleteMediaUploadResult,
   MediaStore,
   MediaUploadIntentRecord,
   ReserveMediaUploadIntentInput,
@@ -7,11 +9,13 @@ import type {
 import type {
   IssueQuarantineUploadInput,
   MediaObjectStorage,
+  QuarantineObjectMetadata,
   QuarantineUploadTarget,
 } from "../../src/modules/media/media-object-storage";
 
 export class MemoryMediaStore implements MediaStore {
   readonly inputs: ReserveMediaUploadIntentInput[] = [];
+  readonly completionInputs: CompleteMediaUploadInput[] = [];
   readonly intents = new Map<string, MediaUploadIntentRecord>();
   nextResult: ReserveMediaUploadIntentResult | null = null;
 
@@ -52,11 +56,45 @@ export class MemoryMediaStore implements MediaStore {
     this.intents.set(idempotencyIndex, intent);
     return Promise.resolve({ kind: "created", intent });
   }
+
+  findOwnedUploadIntent(id: string, ownerId: string): Promise<MediaUploadIntentRecord | null> {
+    const intent = [...this.intents.values()].find(
+      (candidate) => candidate.id === id && candidate.ownerId === ownerId,
+    );
+    return Promise.resolve(intent ?? null);
+  }
+
+  completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult> {
+    this.completionInputs.push(input);
+    const intent = [...this.intents.values()].find(
+      (candidate) => candidate.id === input.id && candidate.ownerId === input.ownerId,
+    );
+    if (!intent) return Promise.resolve({ kind: "not_found" });
+    if (intent.status === "SCANNING" || intent.status === "READY") {
+      return Promise.resolve({
+        kind: "existing",
+        status: intent.status,
+        updatedAt: input.now,
+      });
+    }
+    if (intent.status !== "UPLOADING") return Promise.resolve({ kind: "conflict" });
+    if (
+      intent.byteSize !== input.observed.byteSize ||
+      intent.mimeType !== input.observed.mimeType ||
+      intent.sha256 !== input.observed.sha256
+    ) {
+      intent.status = "REJECTED";
+      return Promise.resolve({ kind: "invalid", reason: "OBJECT_METADATA_MISMATCH" });
+    }
+    intent.status = "SCANNING";
+    return Promise.resolve({ kind: "accepted", status: "SCANNING", updatedAt: input.now });
+  }
 }
 
 export class CapturingMediaObjectStorage implements MediaObjectStorage {
   readonly inputs: IssueQuarantineUploadInput[] = [];
   failure: Error | null = null;
+  inspection: QuarantineObjectMetadata | null = null;
 
   issueQuarantineUpload(input: IssueQuarantineUploadInput): Promise<QuarantineUploadTarget> {
     this.inputs.push(input);
@@ -71,5 +109,10 @@ export class CapturingMediaObjectStorage implements MediaObjectStorage {
         "x-amz-server-side-encryption": "AES256",
       },
     });
+  }
+
+  inspectQuarantineObject(): Promise<QuarantineObjectMetadata | null> {
+    if (this.failure) return Promise.reject(this.failure);
+    return Promise.resolve(this.inspection);
   }
 }

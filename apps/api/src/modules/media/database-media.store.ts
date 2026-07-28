@@ -3,7 +3,10 @@ import type { ApiEnvironment } from "@socal/config";
 import { MediaAssetRepository } from "@socal/database/media";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import type {
+  CompleteMediaUploadInput,
+  CompleteMediaUploadResult,
   MediaStore,
+  MediaUploadIntentRecord,
   ReserveMediaUploadIntentInput,
   ReserveMediaUploadIntentResult,
 } from "./media.store";
@@ -23,6 +26,14 @@ export class DatabaseMediaStore implements MediaStore, OnModuleDestroy {
     input: ReserveMediaUploadIntentInput,
   ): Promise<ReserveMediaUploadIntentResult> {
     return this.#repository.reserveUploadIntent(input);
+  }
+
+  findOwnedUploadIntent(id: string, ownerId: string): Promise<MediaUploadIntentRecord | null> {
+    return this.#repository.findOwnedUploadIntent(id, ownerId);
+  }
+
+  completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult> {
+    return this.#repository.completeUpload(input);
   }
 
   onModuleDestroy(): Promise<void> {

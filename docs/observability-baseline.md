@@ -44,11 +44,14 @@ API 的 `GET /metrics` 与 Worker 健康端口的 `GET /metrics` 以 Prometheus 
 - `socal_outbox_dispatch_total`
 - `socal_outbox_poll_failures_total`
 - `socal_outbox_oldest_pending_age_seconds`
+- `socal_media_processing_total`
 
 HTTP label 只允许 method、路由模板、状态码分类；Worker label 只允许受限 job name 和 outcome。
 Outbox 结果只允许 published/retry/failed/stale，不使用 event type、eventId 或 aggregate 作为 label。禁止把用户
 ID、查询词、URL、资源 ID、邮箱、手机号、payload 或异常消息写入 label。`/metrics` 是运维端点，不属于
 公共 OpenAPI；部署时必须在负载均衡器/安全组层仅允许 Collector 或受控运维网络访问。
+媒体处理 outcome 只允许 ready/rejected/stale；对象 key、hash、MIME、扫描 signature 和 rejection code
+都不能成为 label。
 
 ## 配置
 

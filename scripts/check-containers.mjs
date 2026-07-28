@@ -54,6 +54,37 @@ for (const [serviceName, target] of Object.entries(applications)) {
   }
 }
 
+const worker = compose.services?.worker;
+const clamav = compose.services?.clamav;
+const minioInit = compose.services?.["minio-init"];
+if (!clamav || !String(clamav.image).startsWith("clamav/clamav:")) {
+  throw new Error("Compose must provide a versioned ClamAV service");
+}
+if (
+  worker?.depends_on?.clamav?.condition !== "service_healthy" ||
+  worker?.depends_on?.["minio-init"]?.condition !== "service_completed_successfully"
+) {
+  throw new Error("Worker must wait for healthy ClamAV and initialized private media buckets");
+}
+if (
+  !worker.environment?.S3_QUARANTINE_BUCKET ||
+  !worker.environment?.S3_MEDIA_BUCKET ||
+  !worker.environment?.CLAMAV_HOST
+) {
+  throw new Error("Worker media quarantine, derivative storage, and ClamAV settings are missing");
+}
+const minioInitialization = Array.isArray(minioInit?.command)
+  ? minioInit.command.join("\n")
+  : String(minioInit?.command ?? "");
+for (const bucket of ["QUARANTINE_BUCKET", "MEDIA_BUCKET"]) {
+  if (
+    !minioInitialization.includes(`mc mb --ignore-existing local/$$${bucket}`) ||
+    !minioInitialization.includes(`mc anonymous set none local/$$${bucket}`)
+  ) {
+    throw new Error(`MinIO initialization must create private ${bucket}`);
+  }
+}
+
 const apiTargetStart = dockerfileSource.indexOf(" AS api-runtime");
 const workerTargetStart = dockerfileSource.indexOf(" AS worker-runtime");
 const apiTargetSource = dockerfileSource.slice(apiTargetStart, workerTargetStart);

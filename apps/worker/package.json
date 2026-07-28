@@ -12,11 +12,13 @@
     "test": "vitest run --config ../../vitest.config.ts --project @socal/worker --reporter=default"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1096.0",
     "@socal/config": "workspace:*",
     "@socal/database": "workspace:*",
     "@socal/observability": "workspace:*",
     "bullmq": "5.80.9",
-    "ioredis": "5.11.1"
+    "ioredis": "5.11.1",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@types/node": "24.10.9",

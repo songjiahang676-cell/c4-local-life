@@ -46,6 +46,15 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
+      clamav:
+        image: clamav/clamav:1.4
+        ports:
+          - 3310:3310
+        options: >-
+          --health-cmd "clamdscan --ping 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
 
     env:
       NODE_ENV: test
@@ -54,6 +63,8 @@ jobs:
       DATABASE_INTEGRATION_URL: postgresql://socal:socal_test_password@localhost:5432/socal_test?schema=public
       REDIS_URL: redis://localhost:6379/0
       REDIS_INTEGRATION_URL: redis://localhost:6379/0
+      CLAMAV_INTEGRATION_HOST: 127.0.0.1
+      CLAMAV_INTEGRATION_PORT: "3310"
       SESSION_SECRET: ci-only-session-secret-at-least-32-bytes
       OTP_SECRET: ci-only-dedicated-otp-secret-at-least-32-bytes
       MFA_SECRET: ci-only-dedicated-mfa-secret-at-least-32-bytes

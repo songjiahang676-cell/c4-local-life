@@ -38,6 +38,7 @@
 | `S3_ENDPOINT`                                  | 否   | 否   | 本地 MinIO/兼容存储地址；AWS 留空使用默认端点 |
 | `S3_REGION`                                    | 否   | 否   | 对象存储区域，默认 `us-west-2`                |
 | `S3_QUARANTINE_BUCKET`                         | 否   | 否   | 私有原始上传 bucket                           |
+| `S3_MEDIA_BUCKET`                              | 否   | 否   | 私有安全派生媒体 bucket                       |
 | `S3_ACCESS_KEY`                                | 否   | 是   | 本地静态 access key；生产优先任务角色         |
 | `S3_SECRET_KEY`                                | 否   | 是   | 与 access key 成对提供                        |
 | `S3_FORCE_PATH_STYLE`                          | 否   | 否   | MinIO path-style 开关                         |
@@ -114,6 +115,18 @@ Admin 的同源 BFF 只代理代码内 allowlist 的认证、Admin Session 与 M
 | `OUTBOX_RETRY_MAX_SECONDS`  | 否   | 最大退避，默认 900 秒且不得小于基数                          |
 | `OUTBOX_MAX_PAYLOAD_BYTES`  | 否   | versioned queue envelope 上限，默认 128 KiB、最大 1 MiB      |
 | `OUTBOX_JOB_ATTEMPTS`       | 否   | BullMQ 消费失败重试次数，默认 8；消费者仍必须按 eventId 幂等 |
+| `S3_ENDPOINT`               | 否   | 本地 MinIO/兼容对象存储地址；AWS 留空                        |
+| `S3_REGION`                 | 否   | 对象存储区域，默认 `us-west-2`                               |
+| `S3_QUARANTINE_BUCKET`      | 否   | Worker 只读的私有原始对象 bucket                             |
+| `S3_MEDIA_BUCKET`           | 否   | Worker 写入安全 WebP 变体的私有 bucket                       |
+| `S3_ACCESS_KEY`             | 否   | 本地静态 access key；与 secret 成对，生产优先任务角色        |
+| `S3_SECRET_KEY`             | 否   | 本地静态 secret key；与 access key 成对                      |
+| `S3_FORCE_PATH_STYLE`       | 否   | MinIO path-style 开关                                        |
+| `CLAMAV_HOST`               | 否   | clamd 主机，Compose 默认 `clamav`                            |
+| `CLAMAV_PORT`               | 否   | clamd INSTREAM 端口，默认 3310                               |
+| `CLAMAV_TIMEOUT_MS`         | 否   | 单次扫描超时，默认 30000、最大 120000 ms                     |
+| `MEDIA_PROCESS_MAX_BYTES`   | 否   | Worker 原始读取硬上限，默认 20 MiB                           |
+| `MEDIA_IMAGE_MAX_PIXELS`    | 否   | 解码像素上限，默认 40MP                                      |
 
 ## 安全规则
 
@@ -123,4 +136,5 @@ Admin 的同源 BFF 只代理代码内 allowlist 的认证、Admin Session 与 M
 - 不记录完整连接串、请求头、作业载荷、OTP、会话或支付信息。
 - 生产秘密轮换必须支持新旧值短期并存、验证、切换和撤销，并在运行手册中留下审计记录。
 - `S3_ACCESS_KEY`/`S3_SECRET_KEY` 必须同时存在或同时省略；生产省略时由工作负载身份提供短期凭据。
-- quarantine bucket 禁止匿名访问和网站托管；签名 URL 不是日志字段，过期后须用新幂等键重新申请。
+- quarantine/processed bucket 禁止匿名访问和网站托管；签名 URL 不是日志字段，过期后须用新幂等键重新申请。
+- Worker 只记录有界媒体 outcome/error code，不记录对象字节、key/hash、扫描响应或恶意签名名称。

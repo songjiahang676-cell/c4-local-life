@@ -12,6 +12,7 @@ type WorkerObservation = {
 };
 
 type OutboxDispatchOutcome = "published" | "retry" | "failed" | "stale";
+type MediaProcessingOutcome = "ready" | "rejected" | "stale";
 
 type Histogram = {
   count: number;
@@ -79,6 +80,7 @@ export class MetricsRegistry {
   readonly #workerJobs = new Map<string, number>();
   readonly #workerDurations = new Map<string, Histogram>();
   readonly #outboxDispatches = new Map<OutboxDispatchOutcome, number>();
+  readonly #mediaProcessing = new Map<MediaProcessingOutcome, number>();
   #outboxOldestPendingAgeSeconds = 0;
   #outboxPollFailures = 0;
 
@@ -123,6 +125,10 @@ export class MetricsRegistry {
 
   setOutboxOldestPendingAgeSeconds(value: number): void {
     this.#outboxOldestPendingAgeSeconds = Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+
+  mediaProcessing(outcome: MediaProcessingOutcome): void {
+    this.#mediaProcessing.set(outcome, (this.#mediaProcessing.get(outcome) ?? 0) + 1);
   }
 
   renderPrometheus(): string {
@@ -174,7 +180,12 @@ export class MetricsRegistry {
       "# HELP socal_outbox_oldest_pending_age_seconds Age of the oldest pending outbox event.",
       "# TYPE socal_outbox_oldest_pending_age_seconds gauge",
       `socal_outbox_oldest_pending_age_seconds ${this.#outboxOldestPendingAgeSeconds}`,
+      "# HELP socal_media_processing_total Media processing terminal and stale outcomes.",
+      "# TYPE socal_media_processing_total counter",
     );
+    for (const [outcome, value] of [...this.#mediaProcessing].sort()) {
+      lines.push(`socal_media_processing_total${labels({ outcome })} ${value}`);
+    }
     return `${lines.join("\n")}\n`;
   }
 

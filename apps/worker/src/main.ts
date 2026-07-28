@@ -1,7 +1,8 @@
 import { createServer, type ServerResponse } from "node:http";
-import { Queue, Worker, type Job } from "bullmq";
+import { Queue, UnrecoverableError, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import { parseWorkerEnvironment, RuntimeConfigError, runtimeConfigSummary } from "@socal/config";
+import { MediaAssetRepository } from "@socal/database/media";
 import { OutboxEventRepository } from "@socal/database/outbox";
 import {
   createObservabilityRuntime,
@@ -10,6 +11,10 @@ import {
 } from "@socal/observability";
 import { workerLiveness, workerReadiness } from "./health-status";
 import { runObservedJob } from "./job-observability";
+import { ClamAvScanner } from "./media/clamav-scanner";
+import { MediaProcessingHandler, PermanentMediaProcessingError } from "./media/media-processing";
+import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
+import { SharpImageTransformer } from "./media/sharp-image-transformer";
 import { BullMqOutboxPublisher } from "./outbox/bullmq-outbox.publisher";
 import { OutboxDispatcher } from "./outbox/outbox-dispatcher";
 
@@ -51,6 +56,26 @@ const outboxRepository = new OutboxEventRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
+const mediaRepository = new MediaAssetRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
+const mediaStorage = new S3MediaProcessingStorage(environment);
+const mediaProcessing = new MediaProcessingHandler(
+  mediaRepository,
+  mediaStorage,
+  new ClamAvScanner({
+    host: environment.CLAMAV_HOST,
+    port: environment.CLAMAV_PORT,
+    timeoutMilliseconds: environment.CLAMAV_TIMEOUT_MS,
+  }),
+  new SharpImageTransformer(environment.MEDIA_IMAGE_MAX_PIXELS),
+  {
+    maximumBytes: environment.MEDIA_PROCESS_MAX_BYTES,
+    processedBucket: environment.S3_MEDIA_BUCKET,
+    onOutcome: (outcome) => runtimeState.observability?.metrics.mediaProcessing(outcome),
+  },
+);
 const outboxQueue = new Queue(environment.OUTBOX_QUEUE_NAME, { connection });
 const outboxDispatcher = new OutboxDispatcher({
   repository: outboxRepository,
@@ -75,7 +100,16 @@ function logEvent(event: string, fields: Record<string, unknown> = {}): void {
 
 const handlers: Record<string, (job: Job) => Promise<void>> = {
   "search.index": () => Promise.resolve(),
-  "media.scan": () => Promise.resolve(),
+  "media.upload.completed": async (job) => {
+    try {
+      await mediaProcessing.handle(job.data);
+    } catch (error: unknown) {
+      if (error instanceof PermanentMediaProcessingError) {
+        throw new UnrecoverableError(error.code);
+      }
+      throw error;
+    }
+  },
   "notification.dispatch": () => Promise.resolve(),
 };
 
@@ -150,6 +184,8 @@ async function shutdown(signal: string): Promise<void> {
   });
   await worker.close();
   await outboxQueue.close();
+  mediaStorage.close();
+  await mediaRepository.close();
   await outboxRepository.close();
   await connection.quit();
   await shutdownTracing();

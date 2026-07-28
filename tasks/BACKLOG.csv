@@ -32,7 +32,7 @@ TAX-001,G1,TAX,P0,地区/分类读取、种子与别名,DATA-003,中英名称、
 TAX-002,G1,TAX,P0,动态表单 schema 版本与发布,TAX-001,draft/preview/publish/rollback；旧草稿可验证,schemas/listing-form.schema.json;docs/23-content-taxonomy.md,done
 TAX-003,G3,TAX,P1,首页布局配置版本,TAX-002,schema 白名单、preview/publish/rollback、缓存失效,schemas/homepage-layout.schema.json;docs/26-homepage-component-map.md,todo
 MEDIA-001,G1,MEDIA,P0,上传 intent 与 quarantine,AUTH-001;DATA-001,短效 presign、配额、MIME/size/hash、私有原件,docs/08-api-and-integrations.md,done
-MEDIA-002,G1,MEDIA,P0,媒体扫描/重编码/变体生命周期,MEDIA-001;EVT-001,UPLOADING→SCANNING→READY/REJECTED；去 EXIF,docs/14-security-privacy-compliance.md,todo
+MEDIA-002,G1,MEDIA,P0,媒体扫描/重编码/变体生命周期,MEDIA-001;EVT-001,UPLOADING→SCANNING→READY/REJECTED；去 EXIF,docs/14-security-privacy-compliance.md,done
 MEDIA-003,G4,MEDIA,P0,受限验证文件存储,MEDIA-001;TRUST-001,独立桶/key/权限/保留；公开仅结论,docs/14-security-privacy-compliance.md,todo
 ADMIN-001,G1,ADMIN,P0,Admin shell、登录、RBAC 导航,AUTH-001;API-004,独立 app/domain；无权限路由/API 403；no-store,docs/28-admin-console.md,done
 LIST-001,G2,LIST,P0,Listing 领域状态机与不变式,DATA-001;TAX-002,非法转换/type-detail/价格/过期规则单测,docs/06-domain-and-data-model.md;docs/11-content-workflows-and-moderation.md,todo

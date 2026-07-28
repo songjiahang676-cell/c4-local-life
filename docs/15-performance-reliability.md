@@ -89,6 +89,7 @@ reconciliation 仍属于 `EVT-002`。
 - OpenSearch 整体不可用与重建；
 - Redis 数据丢失、队列恢复、Outbox 重投；
 - S3 误删/版本恢复；
+- ClamAV 不可用/超时、重复媒体事件和对象在 HEAD 后被替换；暂时故障重试，内容 hash 不一致永久拒绝；
 - Stripe webhook 延迟/重复/乱序；
 - DNS/CDN/WAF 配置错误；
 - 错误迁移和应用回滚；
