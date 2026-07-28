@@ -149,8 +149,8 @@ PostgreSQL 52 项、全仓 48 个文件共 179 项测试、8 个构建、运行�
 BullMQ `eventId` 幂等 job、版本化有界 envelope、终态失败、优雅停机和 oldest-pending-age 指标；
 第 13 个迁移、54 项真实 PostgreSQL 测试、全仓 51 个文件共 186 项测试、8 个构建、运行时可观测性、
 架构检查及 Chromium 桌面/移动 6/6 smoke 已在本机通过。本机没有运行中的 Redis，因此唯一真实
-BullMQ/Redis 集成测试明确跳过，并由受保护 GitHub CI 的 Redis service 强制执行。真实短信/邮件
-提供商适配器仍保留到 `NOTIF-001`。
+BullMQ/Redis 集成测试明确跳过；PR #15 / run `30404450730` 已使用托管 Redis service 强制执行并
+通过该测试、完整质量门禁和四应用非 root 镜像检查。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
 
 ## 七、规划容量与服务目标
 

@@ -7,13 +7,13 @@
 - Gate：G1 Identity / Taxonomy / Media
 - 目标：安全身份上下文、主数据、动态表单和隔离上传
 - 进度：11/13 个 G1 任务、29/101 个总任务完成
-- 风险：EVT-001 本地验收已通过，真实 Redis/BullMQ 投递留给受保护托管 CI 强制执行；真实短信/邮件提供商适配器仍由 NOTIF-001 提供
+- 风险：EVT-001 本地与受保护托管检查均已通过，PR #15 待合并；真实短信/邮件提供商适配器仍由 NOTIF-001 提供
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target            | Status                  | Notes                                                                  |
-| ------- | -------------------- | ---------- | ----------------- | ----------------------- | ---------------------------------------------------------------------- |
-| EVT-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | local validation passed | Outbox claim/retry/idempotent publish/oldest-age metrics；托管 CI 待跑 |
+| Task    | Owner                | Started    | Target            | Status         | Notes                                                                                       |
+| ------- | -------------------- | ---------- | ----------------- | -------------- | ------------------------------------------------------------------------------------------- |
+| EVT-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | ready-to-merge | Outbox claim/retry/idempotent publish/oldest-age metrics；PR #15 / run `30404450730` passed |
 
 ## Gate Evidence
 
@@ -69,6 +69,7 @@
 | EVT-001 local quality           | `pnpm ci:quality`                  | passed：51 files / 186 tests / 8 builds；1 Redis integration skipped | 2026-07-28 |
 | EVT-001 database lifecycle      | deploy + integration + baseline    | 13 migrations；54 DB tests；16 constraint negatives                  | 2026-07-28 |
 | EVT-001 browser/runtime         | Chromium desktop/mobile + runtime  | 6/6 E2E；API observability and architecture passed                   | 2026-07-28 |
+| EVT-001 protected checks        | PR #15 / run `30404450730`         | real Redis quality + non-root images passed；ready to merge          | 2026-07-28 |
 
 ## Decisions / Blocks
 
