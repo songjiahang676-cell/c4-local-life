@@ -1,4 +1,6 @@
 import type {
+  CompleteMediaUploadInput,
+  CompleteMediaUploadResult,
   MediaUploadIntentRecord,
   ReserveMediaUploadIntentInput,
   ReserveMediaUploadIntentResult,
@@ -10,9 +12,13 @@ export type MediaStore = {
   reserveUploadIntent(
     input: ReserveMediaUploadIntentInput,
   ): Promise<ReserveMediaUploadIntentResult>;
+  findOwnedUploadIntent(id: string, ownerId: string): Promise<MediaUploadIntentRecord | null>;
+  completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult>;
 };
 
 export type {
+  CompleteMediaUploadInput,
+  CompleteMediaUploadResult,
   MediaUploadIntentRecord,
   ReserveMediaUploadIntentInput,
   ReserveMediaUploadIntentResult,

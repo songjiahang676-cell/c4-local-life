@@ -51,6 +51,7 @@ try {
     "20260728221000_admin_mfa",
     "20260728223000_password_recovery",
     "20260728234500_outbox_dispatcher_constraints",
+    "20260729003000_media_processing_lifecycle",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -78,6 +79,7 @@ try {
             to_regclass('public.category_aliases') AS category_aliases,
             to_regclass('public.category_form_schema_versions') AS category_form_schema_versions,
             to_regclass('public.media_assets') AS media_assets,
+            to_regclass('public.media_variants') AS media_variants,
             to_regclass('public.platform_role_assignments') AS platform_role_assignments,
             to_regclass('public.mfa_credentials') AS mfa_credentials,
             to_regclass('public.mfa_recovery_codes') AS mfa_recovery_codes,
@@ -365,6 +367,39 @@ try {
     !outboxStorage.rows[0]?.pending_claim_index
   ) {
     throw new Error("Outbox state, attempt, or SKIP LOCKED claim controls are missing");
+  }
+
+  const mediaProcessingStorage = await client.query(
+    `SELECT
+       to_regclass('public.media_variants') AS variants,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_lifecycle_state_check'
+       ) AS lifecycle_state_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_variants'
+            AND constraint_name = 'media_variants_object_key_check'
+       ) AS variant_key_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_processing_status_updated_at_idx'
+       ) AS processing_index`,
+  );
+  if (
+    mediaProcessingStorage.rows[0]?.variants !== "media_variants" ||
+    !mediaProcessingStorage.rows[0]?.lifecycle_state_check ||
+    !mediaProcessingStorage.rows[0]?.variant_key_check ||
+    !mediaProcessingStorage.rows[0]?.processing_index
+  ) {
+    throw new Error("Media lifecycle, safe variant, or processing-index controls are missing");
   }
 
   await client.query("BEGIN");
@@ -704,6 +739,65 @@ try {
      )`,
     "23514",
   );
+  await client.query(
+    `INSERT INTO media_assets (
+       id, owner_id, purpose, kind, bucket, object_key, mime_type, byte_size,
+       sha256, idempotency_key, request_hash, upload_expires_at, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000023',
+       '00000000-0000-4000-8000-000000000001',
+       'LISTING_MEDIA',
+       'IMAGE',
+       'socal-test-quarantine',
+       'quarantine/00/00000000-0000-4000-8000-000000000023/original',
+       'image/jpeg',
+       100,
+       repeat('a', 64),
+       'baseline-media-processing',
+       repeat('b', 64),
+       now() + interval '5 minutes',
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "media READY lifecycle coherence",
+    `UPDATE media_assets
+        SET status = 'READY',
+            lifecycle_version = 1
+      WHERE id = '00000000-0000-4000-8000-000000000023'`,
+    "23514",
+  );
+  await expectSqlState(
+    "media rejection code bound",
+    `UPDATE media_assets
+        SET status = 'REJECTED',
+            uploaded_at = now(),
+            processed_at = now(),
+            rejection_code = 'raw provider detail'
+      WHERE id = '00000000-0000-4000-8000-000000000023'`,
+    "23514",
+  );
+  await expectSqlState(
+    "media variant safe key and MIME",
+    `INSERT INTO media_variants (
+       id, media_asset_id, kind, bucket, object_key, mime_type, byte_size,
+       sha256, width, height
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000024',
+       '00000000-0000-4000-8000-000000000023',
+       'FULL',
+       'socal-safe-media',
+       'public/original.svg',
+       'image/svg+xml',
+       100,
+       repeat('a', 64),
+       100,
+       100
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -750,7 +844,8 @@ try {
       mfaStorage: true,
       passwordStorage: true,
       outboxStorage: true,
-      negativeCases: 16,
+      mediaProcessingStorage: true,
+      negativeCases: 19,
     }),
   );
 } finally {

@@ -23,8 +23,15 @@ export {
 } from "./repositories/listing-geo.repository";
 export {
   MediaAssetRepository,
+  type CompleteMediaUploadInput,
+  type CompleteMediaUploadResult,
+  type FinalizeMediaProcessingInput,
   type MediaAssetRepositoryOptions,
+  type MediaProcessedVariantInput,
+  type MediaProcessingMutationResult,
+  type MediaProcessingRecord,
   type MediaUploadIntentRecord,
+  type RejectMediaProcessingInput,
   type ReserveMediaUploadIntentInput,
   type ReserveMediaUploadIntentResult,
 } from "./repositories/media-asset.repository";

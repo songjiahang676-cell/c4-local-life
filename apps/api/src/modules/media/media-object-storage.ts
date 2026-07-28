@@ -15,6 +15,16 @@ export type QuarantineUploadTarget = {
   headers: Readonly<Record<string, string>>;
 };
 
+export type QuarantineObjectMetadata = {
+  byteSize: number;
+  mimeType: string;
+  sha256Hex: string;
+};
+
 export type MediaObjectStorage = {
   issueQuarantineUpload(input: IssueQuarantineUploadInput): Promise<QuarantineUploadTarget>;
+  inspectQuarantineObject(input: {
+    bucket: string;
+    objectKey: string;
+  }): Promise<QuarantineObjectMetadata | null>;
 };

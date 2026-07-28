@@ -140,6 +140,12 @@ enum MediaStatus {
   DELETED
 }
 
+enum MediaVariantKind {
+  THUMBNAIL
+  CARD
+  FULL
+}
+
 enum MediaPurpose {
   LISTING_MEDIA
   AVATAR
@@ -780,27 +786,55 @@ model ListingMedia {
 }
 
 model MediaAsset {
-  id              String       @id @default(uuid()) @db.Uuid
-  ownerId         String       @map("owner_id") @db.Uuid
-  purpose         MediaPurpose
-  kind            MediaKind
-  status          MediaStatus  @default(UPLOADING)
-  bucket          String       @db.VarChar(63)
-  objectKey       String       @unique @map("object_key") @db.VarChar(512)
-  mimeType        String       @map("mime_type") @db.VarChar(120)
-  byteSize        Int          @map("byte_size")
-  sha256          String       @db.Char(64)
-  idempotencyKey  String       @map("idempotency_key") @db.VarChar(128)
-  requestHash     String       @map("request_hash") @db.Char(64)
-  uploadExpiresAt DateTime     @map("upload_expires_at") @db.Timestamptz(6)
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner           User         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  id               String         @id @default(uuid()) @db.Uuid
+  ownerId          String         @map("owner_id") @db.Uuid
+  purpose          MediaPurpose
+  kind             MediaKind
+  status           MediaStatus    @default(UPLOADING)
+  bucket           String         @db.VarChar(63)
+  objectKey        String         @unique @map("object_key") @db.VarChar(512)
+  mimeType         String         @map("mime_type") @db.VarChar(120)
+  detectedMimeType String?        @map("detected_mime_type") @db.VarChar(120)
+  byteSize         Int            @map("byte_size")
+  sha256           String         @db.Char(64)
+  width            Int?
+  height           Int?
+  idempotencyKey   String         @map("idempotency_key") @db.VarChar(128)
+  requestHash      String         @map("request_hash") @db.Char(64)
+  uploadExpiresAt  DateTime       @map("upload_expires_at") @db.Timestamptz(6)
+  uploadedAt       DateTime?      @map("uploaded_at") @db.Timestamptz(6)
+  scanStartedAt    DateTime?      @map("scan_started_at") @db.Timestamptz(6)
+  processedAt      DateTime?      @map("processed_at") @db.Timestamptz(6)
+  rejectionCode    String?        @map("rejection_code") @db.VarChar(64)
+  lifecycleVersion Int            @default(0) @map("lifecycle_version")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner            User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  variants         MediaVariant[]
 
   @@unique([ownerId, idempotencyKey])
   @@index([ownerId, status, uploadExpiresAt])
   @@index([ownerId, createdAt])
   @@map("media_assets")
+}
+
+model MediaVariant {
+  id           String           @id @default(uuid()) @db.Uuid
+  mediaAssetId String           @map("media_asset_id") @db.Uuid
+  kind         MediaVariantKind
+  bucket       String           @db.VarChar(63)
+  objectKey    String           @unique @map("object_key") @db.VarChar(512)
+  mimeType     String           @map("mime_type") @db.VarChar(120)
+  byteSize     Int              @map("byte_size")
+  sha256       String           @db.Char(64)
+  width        Int
+  height       Int
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  mediaAsset   MediaAsset       @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaAssetId, kind])
+  @@index([mediaAssetId])
+  @@map("media_variants")
 }
 
 model Favorite {

@@ -60,6 +60,9 @@ const workerEnvironment = parseWorkerEnvironment({
 assert.equal(workerEnvironment.WORKER_CONCURRENCY, 7);
 assert.equal(workerEnvironment.OUTBOX_BATCH_SIZE, 25);
 assert.equal(workerEnvironment.OUTBOX_MAX_ATTEMPTS, 10);
+assert.equal(workerEnvironment.S3_MEDIA_BUCKET, "socal-media-processed-local");
+assert.equal(workerEnvironment.CLAMAV_HOST, "clamav");
+assert.equal(workerEnvironment.MEDIA_PROCESS_MAX_BYTES, 20_971_520);
 
 let missingConfigurationError: RuntimeConfigError | undefined;
 try {

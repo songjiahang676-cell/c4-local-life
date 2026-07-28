@@ -477,7 +477,12 @@ export interface paths {
         };
         readonly get?: never;
         readonly put?: never;
-        /** Complete a media upload */
+        /**
+         * Complete a media upload
+         * @description Verifies the private quarantine object's declared length, content type and SHA-256 metadata,
+         *     then atomically moves the owner-scoped asset to SCANNING and writes the processing Outbox event.
+         *     Replays are resource-idempotent; READY is never inferred from this response.
+         */
         readonly post: operations["completeMediaUpload"];
         readonly delete?: never;
         readonly options?: never;
@@ -1411,6 +1416,16 @@ export interface components {
                 };
                 /** Format: date-time */
                 readonly expiresAt: string;
+            };
+        };
+        readonly MediaProcessingResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly mediaId: string;
+                /** @enum {string} */
+                readonly status: "SCANNING" | "READY";
+                /** Format: date-time */
+                readonly updatedAt: string;
             };
         };
         readonly WorkflowTransitionResponse: {
@@ -2611,12 +2626,20 @@ export interface operations {
             /** @description Scan and derivative generation queued */
             readonly 202: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["AcceptedResponse"];
+                    readonly "application/json": components["schemas"]["MediaProcessingResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
         };
     };
     readonly listFavorites: {

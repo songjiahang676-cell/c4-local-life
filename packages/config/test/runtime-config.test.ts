@@ -152,6 +152,12 @@ describe("runtime configuration", () => {
     expect(environment.OUTBOX_LEASE_SECONDS).toBe(60);
     expect(environment.OUTBOX_MAX_ATTEMPTS).toBe(10);
     expect(environment.OUTBOX_MAX_PAYLOAD_BYTES).toBe(131_072);
+    expect(environment.S3_QUARANTINE_BUCKET).toBe("socal-media-quarantine-local");
+    expect(environment.S3_MEDIA_BUCKET).toBe("socal-media-processed-local");
+    expect(environment.CLAMAV_HOST).toBe("clamav");
+    expect(environment.CLAMAV_PORT).toBe(3310);
+    expect(environment.MEDIA_PROCESS_MAX_BYTES).toBe(20_971_520);
+    expect(environment.MEDIA_IMAGE_MAX_PIXELS).toBe(40_000_000);
 
     expect(() =>
       parseWorkerEnvironment({
@@ -159,6 +165,13 @@ describe("runtime configuration", () => {
         REDIS_URL: "redis://localhost:6379/0",
         OUTBOX_RETRY_BASE_SECONDS: "60",
         OUTBOX_RETRY_MAX_SECONDS: "30",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseWorkerEnvironment({
+        DATABASE_URL: "postgresql://example.invalid/socal",
+        REDIS_URL: "redis://localhost:6379/0",
+        S3_ACCESS_KEY: "local-access-key",
       }),
     ).toThrow(RuntimeConfigError);
   });

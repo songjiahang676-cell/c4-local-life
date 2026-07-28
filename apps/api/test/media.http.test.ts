@@ -2,7 +2,7 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
 import type { CreateUploadResponse } from "@socal/contracts";
 import { createObservabilityRuntime } from "@socal/observability";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
@@ -28,6 +28,7 @@ const environment = parseApiEnvironment({
 
 const activeUserId = "10000000-0000-4000-8000-000000000051";
 const limitedUserId = "10000000-0000-4000-8000-000000000052";
+const secondaryUserId = "10000000-0000-4000-8000-000000000053";
 const validPayload = {
   filename: "客厅照片.webp",
   mimeType: "image/webp",
@@ -43,13 +44,20 @@ describe("media upload HTTP boundary", () => {
   let storage: CapturingMediaObjectStorage;
   let activeCookie: string;
   let limitedCookie: string;
+  let secondaryCookie: string;
 
   beforeAll(async () => {
     const authStore = new MemoryAuthSessionStore();
     authStore.registerSubject(buildActiveSubject({ id: activeUserId }));
     authStore.registerSubject(buildActiveSubject({ id: limitedUserId, status: "LIMITED" }));
+    authStore.registerSubject(buildActiveSubject({ id: secondaryUserId }));
     store = new MemoryMediaStore();
     storage = new CapturingMediaObjectStorage();
+    storage.inspection = {
+      byteSize: validPayload.byteSize,
+      mimeType: validPayload.mimeType,
+      sha256Hex: validPayload.sha256,
+    };
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore: authStore,
@@ -68,8 +76,10 @@ describe("media upload HTTP boundary", () => {
     const sessions = app.get(AuthSessionService);
     const active = await sessions.issueSession(activeUserId, {});
     const limited = await sessions.issueSession(limitedUserId, {});
+    const secondary = await sessions.issueSession(secondaryUserId, {});
     activeCookie = `${environment.SESSION_COOKIE_NAME}=${active.token}`;
     limitedCookie = `${environment.SESSION_COOKIE_NAME}=${limited.token}`;
+    secondaryCookie = `${environment.SESSION_COOKIE_NAME}=${secondary.token}`;
   });
 
   afterAll(async () => {
@@ -265,5 +275,105 @@ describe("media upload HTTP boundary", () => {
     expect(unavailable.statusCode).toBe(503);
     expect(unavailable.body).not.toContain("provider-secret-value");
     storage.failure = null;
+  });
+
+  it("owner-completes a verified object once and safely replays the SCANNING response", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/media/uploads",
+      headers: {
+        cookie: activeCookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "media-upload-complete-0001",
+      },
+      payload: validPayload,
+    });
+    const { data } = created.json<CreateUploadResponse>();
+    const complete = (): Promise<LightMyRequestResponse> =>
+      server.inject({
+        method: "POST",
+        url: `/v1/media/${data.mediaId}/complete`,
+        headers: {
+          cookie: activeCookie,
+          origin: environment.PUBLIC_WEB_URL,
+        },
+      });
+
+    const first = await complete();
+    const replay = await complete();
+
+    expect(first.statusCode).toBe(202);
+    expect(first.headers["cache-control"]).toBe("no-store");
+    expect(first.json()).toMatchObject({
+      data: { mediaId: data.mediaId, status: "SCANNING" },
+    });
+    expect(replay.statusCode).toBe(202);
+    expect(replay.json()).toMatchObject({
+      data: { mediaId: data.mediaId, status: "SCANNING" },
+    });
+    expect(store.completionInputs).toHaveLength(2);
+    expect(store.completionInputs[0]?.observed).toEqual({
+      byteSize: validPayload.byteSize,
+      mimeType: validPayload.mimeType,
+      sha256: validPayload.sha256,
+    });
+  });
+
+  it("hides cross-owner assets and rejects mismatched or unavailable objects without queueing", async () => {
+    const create = async (key: string): Promise<string> => {
+      const response = await server.inject({
+        method: "POST",
+        url: "/v1/media/uploads",
+        headers: {
+          cookie: activeCookie,
+          origin: environment.PUBLIC_WEB_URL,
+          "idempotency-key": key,
+        },
+        payload: validPayload,
+      });
+      return response.json<CreateUploadResponse>().data.mediaId;
+    };
+    const crossOwnerId = await create("media-upload-complete-0002");
+    const crossOwner = await server.inject({
+      method: "POST",
+      url: `/v1/media/${crossOwnerId}/complete`,
+      headers: {
+        cookie: secondaryCookie,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+
+    const mismatchId = await create("media-upload-complete-0003");
+    storage.inspection = { ...storage.inspection!, sha256Hex: "b".repeat(64) };
+    const mismatch = await server.inject({
+      method: "POST",
+      url: `/v1/media/${mismatchId}/complete`,
+      headers: {
+        cookie: activeCookie,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+
+    const unavailableId = await create("media-upload-complete-0004");
+    storage.inspection = {
+      byteSize: validPayload.byteSize,
+      mimeType: validPayload.mimeType,
+      sha256Hex: validPayload.sha256,
+    };
+    storage.failure = new Error("private-provider-detail");
+    const unavailable = await server.inject({
+      method: "POST",
+      url: `/v1/media/${unavailableId}/complete`,
+      headers: {
+        cookie: activeCookie,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    storage.failure = null;
+
+    expect(crossOwner.statusCode).toBe(404);
+    expect(mismatch.statusCode).toBe(422);
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.body).not.toContain("private-provider-detail");
   });
 });

@@ -149,8 +149,18 @@ PostgreSQL 52 项、全仓 48 个文件共 179 项测试、8 个构建、运行�
 BullMQ `eventId` 幂等 job、版本化有界 envelope、终态失败、优雅停机和 oldest-pending-age 指标；
 第 13 个迁移、54 项真实 PostgreSQL 测试、全仓 51 个文件共 186 项测试、8 个构建、运行时可观测性、
 架构检查及 Chromium 桌面/移动 6/6 smoke 已在本机通过。本机没有运行中的 Redis，因此唯一真实
-BullMQ/Redis 集成测试明确跳过；PR #15 / run `30404450730` 已使用托管 Redis service 强制执行并
-通过该测试、完整质量门禁和四应用非 root 镜像检查。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
+BullMQ/Redis 集成测试明确跳过；PR #15 / final run `30404864972` 已使用托管 Redis service 强制执行并
+通过该测试、完整质量门禁和四应用非 root 镜像检查，随后受保护合并为 `490efa4`。
+
+`MEDIA-002` 已实现 owner 范围 `POST /media/{mediaId}/complete`、S3/MinIO HEAD 闭合、原子
+SCANNING + Outbox，以及 Worker 的实际字节/hash/magic-byte 复核、ClamAV INSTREAM、Sharp
+方向校正/去 EXIF/ICC、THUMBNAIL/CARD/FULL 三个确定性 WebP 变体和 lifecycleVersion 幂等
+READY/REJECTED。第 14 个迁移已从全新空库部署，数据库 baseline 19 个负例、升级和 57 项真实
+PostgreSQL 测试通过；全仓 55 个文件/203 项测试通过，本机 Redis/ClamAV 两项集成因服务不存在明确
+跳过。PR #16 / run `30406971001` 已在真实 Redis/clamd 上通过 57 个文件/205 项测试，并通过完整
+Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非 root 镜像。Windows 中等完整性进程
+在 Admin standalone 最终复制阶段不能创建 symlink；本地编译、类型和静态页面生成已通过，该宿主限制
+没有在 Linux 托管构建复现。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
 
 ## 七、规划容量与服务目标
 

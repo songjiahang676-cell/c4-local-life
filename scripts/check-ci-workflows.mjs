@@ -24,6 +24,15 @@ if (!job.env?.DATABASE_INTEGRATION_URL) {
 if (!job.env?.REDIS_INTEGRATION_URL) {
   throw new Error("CI quality gate must run BullMQ integration tests against Redis");
 }
+if (!job.env?.CLAMAV_INTEGRATION_HOST || !job.env?.CLAMAV_INTEGRATION_PORT) {
+  throw new Error("CI quality gate must run media malware integration tests against clamd");
+}
+if (!job.services?.clamav || !String(job.services.clamav.image).startsWith("clamav/clamav:")) {
+  throw new Error("CI quality gate must provide a versioned ClamAV service");
+}
+if (!String(job.services.clamav.options).includes("clamdscan --ping 1")) {
+  throw new Error("CI ClamAV service must be health checked before integration tests");
+}
 
 if (workflow.permissions?.contents !== "read") {
   throw new Error("CI workflow must keep default contents permission read-only");

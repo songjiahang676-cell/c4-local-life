@@ -39,6 +39,7 @@
 - Added Admin TOTP enrollment, one-time recovery codes, replay-resistant verification, failure lockouts, short MFA sessions, recent-auth step-up policy, and an accessible bilingual MFA gate.
 - Added optional scrypt password authentication with dedicated peppering, generic anti-enumeration failures, persisted lockouts, cooldown recovery, one-time hashed proofs, all-session revocation, audit evidence, and notification ports.
 - Added a transactional PostgreSQL outbox dispatcher with atomic `SKIP LOCKED` claims, leases, bounded exponential retries, event-id BullMQ idempotency, terminal failure state, queue-envelope limits, graceful shutdown, oldest-age metrics, and real database/Redis integration coverage.
+- Added owner-verified media completion and a lifecycle-versioned processing Worker with bounded S3 reads, exact hash/magic-byte verification, real ClamAV streaming, Sharp decode/orientation/metadata stripping, three deterministic encrypted WebP variants, transactional READY/REJECTED Outbox events, and clean-signature hosted integration enforcement.
 
 ## 0.1.0 — Architecture handoff package
 

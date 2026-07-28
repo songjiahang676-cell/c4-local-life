@@ -232,6 +232,24 @@ const workerEnvironmentSchema = commonServerSchema
     OUTBOX_RETRY_MAX_SECONDS: positiveInteger(900, 86_400),
     OUTBOX_MAX_PAYLOAD_BYTES: positiveInteger(131_072, 1_048_576),
     OUTBOX_JOB_ATTEMPTS: positiveInteger(8, 100),
+    S3_ENDPOINT: z.string().url().optional().or(z.literal("")).default(""),
+    S3_REGION: z.string().min(1).max(64).default("us-west-2"),
+    S3_QUARANTINE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("socal-media-quarantine-local"),
+    S3_MEDIA_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default("socal-media-processed-local"),
+    S3_ACCESS_KEY: optionalStringSchema(),
+    S3_SECRET_KEY: optionalSecretSchema(),
+    S3_FORCE_PATH_STYLE: booleanValue(false),
+    CLAMAV_HOST: z.string().min(1).max(253).default("clamav"),
+    CLAMAV_PORT: positiveInteger(3310, 65_535),
+    CLAMAV_TIMEOUT_MS: positiveInteger(30_000, 120_000),
+    MEDIA_PROCESS_MAX_BYTES: positiveInteger(20_971_520, 25_165_824),
+    MEDIA_IMAGE_MAX_PIXELS: positiveInteger(40_000_000, 100_000_000),
   })
   .superRefine((value, context) => {
     if (value.OUTBOX_RETRY_BASE_SECONDS > value.OUTBOX_RETRY_MAX_SECONDS) {
@@ -239,6 +257,13 @@ const workerEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["OUTBOX_RETRY_BASE_SECONDS"],
         message: "Outbox retry base cannot exceed the maximum delay",
+      });
+    }
+    if (Boolean(value.S3_ACCESS_KEY) !== Boolean(value.S3_SECRET_KEY)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY"],
+        message: "S3 access key and secret key must be supplied together",
       });
     }
   });

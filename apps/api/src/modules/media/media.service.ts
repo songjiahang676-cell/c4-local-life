@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
-import type { CreateUploadRequest, CreateUploadResponse } from "@socal/contracts";
+import type {
+  CreateUploadRequest,
+  CreateUploadResponse,
+  MediaProcessingResponse,
+} from "@socal/contracts";
 import type { MediaKind, MediaPurpose } from "@socal/database/media";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import {
@@ -56,6 +60,27 @@ export class MediaStorageUnavailableError extends Error {
   constructor() {
     super("Private media storage is unavailable");
     this.name = "MediaStorageUnavailableError";
+  }
+}
+
+export class MediaUploadNotFoundError extends Error {
+  constructor() {
+    super("Media upload is unavailable");
+    this.name = "MediaUploadNotFoundError";
+  }
+}
+
+export class MediaUploadStateConflictError extends Error {
+  constructor() {
+    super("Media upload cannot be completed from its current state");
+    this.name = "MediaUploadStateConflictError";
+  }
+}
+
+export class MediaObjectInvalidError extends Error {
+  constructor() {
+    super("The quarantined object does not match the upload declaration");
+    this.name = "MediaObjectInvalidError";
   }
 }
 
@@ -179,5 +204,59 @@ export class MediaService {
     } catch {
       throw new MediaStorageUnavailableError();
     }
+  }
+
+  async completeUpload(
+    context: PolicyRequestContext,
+    mediaId: string,
+  ): Promise<MediaProcessingResponse> {
+    await this.policies.require({
+      action: activeUserPolicyActions.mediaUploadComplete,
+      context,
+    });
+    const ownerId = authenticatedUserId(context);
+    const intent = await this.store.findOwnedUploadIntent(mediaId, ownerId);
+    if (!intent) throw new MediaUploadNotFoundError();
+
+    let observed = {
+      byteSize: intent.byteSize,
+      mimeType: intent.mimeType,
+      sha256: intent.sha256,
+    };
+    if (intent.status === "UPLOADING") {
+      try {
+        const object = await this.storage.inspectQuarantineObject({
+          bucket: intent.bucket,
+          objectKey: intent.objectKey,
+        });
+        observed = object
+          ? {
+              byteSize: object.byteSize,
+              mimeType: object.mimeType,
+              sha256: object.sha256Hex,
+            }
+          : { byteSize: -1, mimeType: "", sha256: "" };
+      } catch {
+        throw new MediaStorageUnavailableError();
+      }
+    }
+
+    const result = await this.store.completeUpload({
+      id: mediaId,
+      ownerId,
+      eventId: randomUUID(),
+      now: new Date(),
+      observed,
+    });
+    if (result.kind === "not_found") throw new MediaUploadNotFoundError();
+    if (result.kind === "conflict") throw new MediaUploadStateConflictError();
+    if (result.kind === "invalid") throw new MediaObjectInvalidError();
+    return {
+      data: {
+        mediaId,
+        status: result.status,
+        updatedAt: result.updatedAt.toISOString(),
+      },
+    };
   }
 }

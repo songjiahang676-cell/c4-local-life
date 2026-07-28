@@ -69,6 +69,7 @@ export type GetCategoryFormSchemaQuery = NonNullable<
 >;
 export type CreateUploadRequest = components["schemas"]["CreateUploadRequest"];
 export type CreateUploadResponse = components["schemas"]["CreateUploadResponse"];
+export type MediaProcessingResponse = components["schemas"]["MediaProcessingResponse"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([

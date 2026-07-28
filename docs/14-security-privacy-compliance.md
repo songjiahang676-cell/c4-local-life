@@ -159,8 +159,14 @@ schema version 验证，不能信任前端表单隐藏或当前版本替代历�
 五分钟 PUT 签名绑定声明长度、白名单 MIME、SHA-256 checksum/metadata 和 SSE，响应及所有错误均
 `no-store`，HTTP 遥测不记录 body、签名 URL、hash、对象 key 或幂等键。私有 bucket 本地启动时显式
 设置 anonymous `none`；生产仍须以独立 S3 bucket policy、Block Public Access、最小任务角色和
-生命周期规则落实。此阶段不接受 SVG/HTML、视频或验证文件；文件内容真实性和恶意载荷仍必须由
-MEDIA-002 的 magic-byte/解码/杀毒/重编码完成，UPLOADING 不得用于公开页面。
+生命周期规则落实。此路径不接受 SVG/HTML、视频或验证文件；UPLOADING 不得用于公开页面。
+
+`MEDIA-002` 的完成端点不信任客户端“上传成功”声明，而以对象存储 HEAD 元数据做第一层闭合，并由
+Worker 对实际字节再次复算长度/SHA-256、检查 magic bytes 和执行真实 ClamAV INSTREAM。Sharp 在
+40MP 默认像素上限内解码、拒绝多页/损坏输入、按方向旋转并重编码为 WebP，不复制 EXIF/ICC。原始对象
+和派生桶均保持私有，key 只含 UUID/固定 variant；派生写入要求 SSE、不可变缓存 metadata 和安全
+`image/webp` 类型。永久拒绝仅保存有界错误码，不保存扫描响应或原始 provider 错误；暂时依赖故障重试。
+数据库 row lock + lifecycleVersion 阻止重复/乱序队列覆盖终态，只有 READY 才能被后续业务绑定。
 
 ## 14.8 PII 分类
 

@@ -23,10 +23,16 @@ listener on 4001, together with their local infrastructure dependencies. To star
 infrastructure dependencies, continue to use `pnpm infra:up`.
 
 The one-shot `minio-init` service waits for MinIO, creates
-`S3_QUARANTINE_BUCKET` (default `socal-media-quarantine-local`) idempotently and applies
-`anonymous none`. The API uses the internal `http://minio:9000` endpoint while the host keeps
+`S3_QUARANTINE_BUCKET` (default `socal-media-quarantine-local`) and `S3_MEDIA_BUCKET`
+(default `socal-media-processed-local`) idempotently, and applies `anonymous none` to both.
+The API/Worker use the internal `http://minio:9000` endpoint while the host keeps
 `http://localhost:9000`. Do not reuse this development bootstrap as production provisioning;
 production bucket policy, Block Public Access, encryption and lifecycle are Terraform-owned.
+
+The application profile also starts `clamav/clamav:1.4` and does not start the Worker until clamd
+is healthy. The Worker reads only quarantine objects, streams them to clamd, re-encodes accepted
+images, and writes deterministic encrypted WebP variants to the processed bucket. `pnpm infra:up`
+does not start ClamAV; use the application profile when exercising the complete media lifecycle.
 
 Health endpoints:
 

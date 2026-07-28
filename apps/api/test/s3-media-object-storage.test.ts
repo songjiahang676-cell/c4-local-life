@@ -1,5 +1,6 @@
+import { S3Client } from "@aws-sdk/client-s3";
 import { parseApiEnvironment } from "@socal/config";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { S3MediaObjectStorage } from "../src/modules/media/s3-media-object-storage";
 
 const environment = parseApiEnvironment({
@@ -30,6 +31,7 @@ describe("S3MediaObjectStorage", () => {
   afterEach(() => {
     storage?.onModuleDestroy();
     storage = undefined;
+    vi.restoreAllMocks();
   });
 
   it("binds content length, MIME, checksum, metadata and encryption into a short-lived PUT", async () => {
@@ -58,6 +60,27 @@ describe("S3MediaObjectStorage", () => {
       "content-type": "image/jpeg",
       "x-amz-meta-content-sha256": "a".repeat(64),
       "x-amz-server-side-encryption": "AES256",
+    });
+  });
+
+  it("reads server-trusted object length, MIME and checksum metadata before queueing", async () => {
+    vi.spyOn(S3Client.prototype, "send").mockResolvedValue({
+      ContentLength: 512,
+      ContentType: "image/jpeg",
+      ChecksumSHA256: Buffer.from("a".repeat(64), "hex").toString("base64"),
+      Metadata: { "content-sha256": "b".repeat(64) },
+    } as never);
+    storage = new S3MediaObjectStorage(environment);
+
+    await expect(
+      storage.inspectQuarantineObject({
+        bucket: environment.S3_QUARANTINE_BUCKET,
+        objectKey: "quarantine/70/70000000-0000-4000-8000-000000000001/original",
+      }),
+    ).resolves.toEqual({
+      byteSize: 512,
+      mimeType: "image/jpeg",
+      sha256Hex: "a".repeat(64),
     });
   });
 });

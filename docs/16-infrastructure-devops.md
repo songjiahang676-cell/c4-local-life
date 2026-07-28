@@ -30,10 +30,11 @@
 
 Terraform 蓝图见 `infra/terraform/`。生产实施前需要成本、安全和网络评审。
 
-MEDIA-001 只接入 `private quarantine` 端口：API 任务角色仅需针对该 bucket 的受限
-`PutObject`/后续 `HeadObject` 权限，必须启用 Block Public Access、默认加密和短期未完成上传清理。
-public-derived 与 restricted-verification 不能通过同一前缀策略假装隔离；其 Terraform/IAM、KMS、
-访问审计和保留规则分别由 MEDIA-002/003 完成。本地 Compose 的一次性 `minio-init` 只建立私有开发桶。
+API 任务角色只需要 private quarantine 的受限 `PutObject`/`HeadObject`；Worker 才能读取 quarantine、
+连接 ClamAV 并写 processed-media bucket。两桶都必须启用 Block Public Access、默认加密和生命周期，
+不能用同一公开前缀假装隔离。`MEDIA-002` 的本地 Compose 会幂等建立两个 anonymous-none 桶并等待
+ClamAV healthy；生产 public-derived 的 Terraform/IAM、独立无 Cookie CDN 和删除/对账策略仍须在发布
+基础设施切片落实。restricted-verification 的独立 KMS、访问审计和短保留由 MEDIA-003 完成。
 
 ## 16.3 网络
 

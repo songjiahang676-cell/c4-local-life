@@ -196,7 +196,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(44);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(88);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(89);
     expect(operationIds).toHaveLength(53);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -475,6 +475,18 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(201);
     expect(schema).toBeDefined();
     expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    const completion = contract.paths["/media/{mediaId}/complete"]?.post;
+    expect(completion?.responses["202"]?.content?.["application/json"]?.schema).toBeDefined();
+    expect(Object.keys(completion?.responses ?? {})).toEqual([
+      "202",
+      "400",
+      "401",
+      "403",
+      "404",
+      "409",
+      "422",
+      "503",
+    ]);
   });
 
   it("validates the operator-only Admin session projection against the contract", async () => {

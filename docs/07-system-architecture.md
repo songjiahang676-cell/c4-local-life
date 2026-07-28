@@ -102,6 +102,11 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，
 队列 envelope 默认限制为 128 KiB。
 
+媒体处理同样留在模块化单体的 API/Worker 进程边界内。API 对 quarantine 对象执行服务端 HEAD 后原子写
+SCANNING + Outbox；Worker 消费 `media.upload.completed`，重新验证对象内容、经 ClamAV 和 Sharp
+生成三个确定性 WebP key，再原子写 READY + variants + Outbox。对象写可能先于数据库终态，因此 key
+必须确定且写入幂等；Worker/对账任务可安全重做，PostgreSQL 的 status + lifecycleVersion 始终是事实源。
+
 ## 7.5 读取流程
 
 - 详情和强一致账户页面从 PostgreSQL 读取，可经过短缓存。

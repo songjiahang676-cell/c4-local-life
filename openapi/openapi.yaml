@@ -854,16 +854,37 @@ paths:
     post:
       tags: [Media]
       summary: Complete a media upload
+      description: |
+        Verifies the private quarantine object's declared length, content type and SHA-256 metadata,
+        then atomically moves the owner-scoped asset to SCANNING and writes the processing Outbox event.
+        Replays are resource-idempotent; READY is never inferred from this response.
       operationId: completeMediaUpload
       parameters:
         - $ref: "#/components/parameters/MediaId"
       responses:
         "202":
           description: Scan and derivative generation queued
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcceptedResponse"
+                $ref: "#/components/schemas/MediaProcessingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /favorites:
     get:
       tags: [Engagement]
@@ -2355,6 +2376,17 @@ components:
               type: object
               additionalProperties: { type: string }
             expiresAt: { type: string, format: date-time }
+    MediaProcessingResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [mediaId, status, updatedAt]
+          properties:
+            mediaId: { type: string, format: uuid }
+            status: { type: string, enum: [SCANNING, READY] }
+            updatedAt: { type: string, format: date-time }
     WorkflowTransitionResponse:
       type: object
       required: [data]

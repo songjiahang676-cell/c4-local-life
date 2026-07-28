@@ -175,9 +175,18 @@ S3/MinIO PUT URL，并把 Content-Type、Content-Length、checksum、hash metada
 签名要求。bucket 与不含文件名的 `quarantine/` key 只由服务端配置/生成。`VERIFICATION` 在
 MEDIA-003 独立受限桶、KMS 与访问审批完成前返回 422；PDF 不会回退进入普通媒体隔离区。
 
-当前切片只签发并审计 intent。`POST /media/{mediaId}/complete`、对象 HEAD/magic-byte 复核、
-扫描/解码/转码、去 EXIF、变体和 READY/REJECTED 生命周期属于 MEDIA-002，不能把 intent 成功误认为
-对象已上传或可公开。
+`MEDIA-002` 已实现 `POST /media/{mediaId}/complete`。API 仅对当前 ACTIVE owner 的 UPLOADING
+asset 调用对象存储 HEAD，使用服务端返回的长度、MIME 和 checksum/受签 metadata 与 intent 对比；
+跨 owner/未知 ID 统一 404，过期或不一致对象进入 REJECTED 并返回 422，存储不可用返回不泄露 provider
+信息的 503。成功仅返回 `202 SCANNING`，重复请求按资源状态幂等返回 SCANNING/READY，绝不把上传完成
+误报为 READY。
+
+同事务 Outbox 驱动 Worker 重新读取有界原始字节并独立复算长度/SHA-256，验证 JPEG/PNG/WebP magic
+bytes，执行 ClamAV INSTREAM 和 Sharp 解码/像素上限/方向校正，再生成 THUMBNAIL、CARD、FULL 三个
+WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性安全 key、SSE 和 immutable cache metadata。
+永久内容错误进入 REJECTED，ClamAV/S3 等暂时故障抛回 BullMQ 重试；重复/乱序 event 由
+`lifecycleVersion` 关闭。只有数据库 READY 和完整三变体集可供后续 Listing 绑定，原始 quarantine
+对象及当前 processed bucket 都不直接匿名公开。
 
 ## 8.8 Stripe 集成
 
@@ -236,7 +245,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 44 个 path、88 个 schema、53 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 44 个 path、89 个 schema、53 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 

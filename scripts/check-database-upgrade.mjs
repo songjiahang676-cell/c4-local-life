@@ -199,6 +199,23 @@ try {
             AND indexname = 'outbox_events_pending_available_id_idx'
        ) AS pending_claim_index`,
   );
+  const mediaProcessingStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.media_variants') AS variants,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_lifecycle_state_check'
+       ) AS lifecycle_state_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_processing_status_updated_at_idx'
+       ) AS processing_index`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -224,7 +241,10 @@ try {
     passwordStorage.rows[0].recoveries !== "password_recovery_requests" ||
     !passwordStorage.rows[0].password_state_check ||
     !outboxStorage.rows[0].state_check ||
-    !outboxStorage.rows[0].pending_claim_index
+    !outboxStorage.rows[0].pending_claim_index ||
+    mediaProcessingStorage.rows[0].variants !== "media_variants" ||
+    !mediaProcessingStorage.rows[0].lifecycle_state_check ||
+    !mediaProcessingStorage.rows[0].processing_index
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -247,6 +267,7 @@ try {
       mfaStorage: true,
       passwordStorage: true,
       outboxStorage: true,
+      mediaProcessingStorage: true,
     }),
   );
 } finally {
