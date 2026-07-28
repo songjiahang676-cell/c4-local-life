@@ -73,6 +73,12 @@ US
 
 城市别名（洛杉矶/LA、蒙市/MPK、尔湾/Irvine）存入 alias 表/搜索词典，不作为重复 Region。
 
+`TAX-001` 将此原则落为 `region_aliases` / `category_aliases`：原始别名保留 locale 与显示值，
+另存 NFKC、大小写和常见分隔符归一化键用于参数化查询。别名表通过 FK 依附稳定 taxonomy ID，
+删除父节点时级联清理；同一父节点、locale、归一化键唯一。公开 API 只返回 active 主数据、原始
+别名和中英名称，不返回内部归一化键，也不允许 `activeOnly=false` 绕过。无筛选时返回树；
+`parentCode` / `parentId` 返回直接子级，type/vertical 或 `q` 查询返回扁平匹配节点。
+
 ## 23.4 动态表单版本
 
 `schemas/listing-form.schema.json` 定义表单配置 envelope。每次发布 schema 形成不可变版本：

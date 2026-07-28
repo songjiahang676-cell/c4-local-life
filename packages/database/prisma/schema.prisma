@@ -384,6 +384,7 @@ model Region {
   sortOrder        Int               @default(0) @map("sort_order")
   parent           Region?           @relation("RegionTree", fields: [parentId], references: [id], onDelete: SetNull)
   children         Region[]          @relation("RegionTree")
+  aliases          RegionAlias[]
   userProfiles     UserProfile[]
   listings         Listing[]
   businessProfiles BusinessProfile[]
@@ -392,6 +393,19 @@ model Region {
   @@unique([parentId, slug])
   @@index([type, isActive, sortOrder])
   @@map("regions")
+}
+
+model RegionAlias {
+  id              String @id @default(uuid()) @db.Uuid
+  regionId        String @map("region_id") @db.Uuid
+  locale          String @db.VarChar(16)
+  value           String @db.VarChar(120)
+  normalizedValue String @map("normalized_value") @db.VarChar(120)
+  region          Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([regionId, locale, normalizedValue])
+  @@index([normalizedValue])
+  @@map("region_aliases")
 }
 
 model Category {
@@ -408,6 +422,7 @@ model Category {
   sortOrder         Int               @default(0) @map("sort_order")
   parent            Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
   children          Category[]        @relation("CategoryTree")
+  aliases           CategoryAlias[]
   fields            CategoryField[]
   listings          Listing[]
   businessProfiles  BusinessProfile[]
@@ -416,6 +431,19 @@ model Category {
   @@unique([parentId, slug])
   @@index([vertical, isActive, sortOrder])
   @@map("categories")
+}
+
+model CategoryAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  categoryId      String   @map("category_id") @db.Uuid
+  locale          String   @db.VarChar(16)
+  value           String   @db.VarChar(120)
+  normalizedValue String   @map("normalized_value") @db.VarChar(120)
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale, normalizedValue])
+  @@index([normalizedValue])
+  @@map("category_aliases")
 }
 
 model CategoryField {

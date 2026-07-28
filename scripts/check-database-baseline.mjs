@@ -44,6 +44,7 @@ try {
     "20260726041310_auth_session_lifecycle",
     "20260726044453_otp_challenges",
     "20260728090000_account_management",
+    "20260728184415_taxonomy_aliases",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -66,7 +67,9 @@ try {
     `SELECT to_regclass('public.users') AS users,
             to_regclass('public.listings') AS listings,
             to_regclass('public.reviews') AS reviews,
-            to_regclass('public.orders') AS orders`,
+            to_regclass('public.orders') AS orders,
+            to_regclass('public.region_aliases') AS region_aliases,
+            to_regclass('public.category_aliases') AS category_aliases`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -157,6 +160,24 @@ try {
     accountStateTrigger.rowCount !== 1
   ) {
     throw new Error("Account-management profile version or session-revocation trigger is missing");
+  }
+
+  const taxonomyAliasConstraints = await client.query(
+    `SELECT tc.table_name, rc.delete_rule
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.referential_constraints rc
+         ON rc.constraint_schema = tc.constraint_schema
+        AND rc.constraint_name = tc.constraint_name
+      WHERE tc.constraint_schema = 'public'
+        AND tc.constraint_type = 'FOREIGN KEY'
+        AND tc.table_name IN ('region_aliases', 'category_aliases')
+      ORDER BY tc.table_name`,
+  );
+  if (
+    taxonomyAliasConstraints.rowCount !== 2 ||
+    taxonomyAliasConstraints.rows.some((constraint) => constraint.delete_rule !== "CASCADE")
+  ) {
+    throw new Error("Taxonomy alias foreign keys are missing or do not cascade");
   }
 
   await client.query("BEGIN");
@@ -266,6 +287,28 @@ try {
      )`,
     "23503",
   );
+  await client.query(
+    `INSERT INTO region_aliases (id, region_id, locale, value, normalized_value)
+     VALUES (
+       '00000000-0000-4000-8000-000000000009',
+       '00000000-0000-4000-8000-000000000002',
+       'und',
+       'TST',
+       'tst'
+     )`,
+  );
+  await expectSqlState(
+    "region alias normalized uniqueness",
+    `INSERT INTO region_aliases (id, region_id, locale, value, normalized_value)
+     VALUES (
+       '00000000-0000-4000-8000-000000000010',
+       '00000000-0000-4000-8000-000000000002',
+       'und',
+       'T.S.T.',
+       'tst'
+     )`,
+    "23505",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -305,7 +348,8 @@ try {
       otpChallengeColumns: otpChallengeColumns.rows.map((column) => column.column_name),
       profileVersionColumn: true,
       accountStateTrigger: true,
-      negativeCases: 3,
+      taxonomyAliasTables: ["region_aliases", "category_aliases"],
+      negativeCases: 4,
     }),
   );
 } finally {

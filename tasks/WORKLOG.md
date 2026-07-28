@@ -373,3 +373,25 @@ Observability: Existing correlated bounded route/status telemetry covers organiz
 Docs: Updated product role implementation、domain model、API/integrations、security/privacy、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: ORG-002 owns invitation、accept/revoke、role mutation、at-least-one-Owner concurrency during member changes and step-up Owner transfer；public business/provider profiles remain TRUST-001；generic Idempotency-Key storage remains API-005，while organization creation uses exact slug/payload retry semantics
+
+## TAX-001 — 地区 / 分类读取、种子与别名
+
+Task: TAX-001 地区/分类读取、种子与别名
+
+Changed: Added `TaxonomyModule`、application store/service/controller and PostgreSQL `TaxonomyRepository`；public Region/Category endpoints return stable IDs/slugs、bilingual names、controlled original aliases and hierarchy trees，with parent/type/vertical/name/alias filters；versioned development seed now imports 17 regions/21 region aliases and 58 categories/15 category aliases with deterministic UUIDs
+
+Contracts: OpenAPI remains 37 paths/46 operations and grows from 65 to 66 schemas with `TaxonomyAlias`；`RegionType` now matches Prisma/seed by including `REGION_GROUP`；Region/Category projections are strict recursive trees with nullable parent/centroid、active flag and aliases；generated TypeScript and strict Zod query adapters reject unknown fields、ambiguous booleans、malformed parent IDs/codes、overlong/control/bidi text and public `activeOnly=false`
+
+Migrations: `20260728184415_taxonomy_aliases` additively creates `region_aliases` and `category_aliases` with lookup/uniqueness indexes and cascading canonical-parent FKs；roll forward deploys the migration before TAX-001 API/seed；application rollback redeploys the prior app while retaining harmless additive tables；migration-local `ROLLBACK.md` documents backed-up maintenance removal/rebuild if physical rollback is later required
+
+Security: Anonymous taxonomy is hard-coded active-only；inactive/preview nodes cannot be disclosed with query flags；queries are bounded and parameterized，NFKC/ASCII-case/common-separator alias normalization rejects controls and bidi；normalized keys never leave the Repository；only original controlled aliases、public names and non-address region centroids are returned；hostile SQL-shaped queries return no broad match；seed aliases are FK/unique constrained and cannot create duplicate Region/Category nodes
+
+Tests run: Contract targeted typecheck/lint and 2 taxonomy tests passed；API targeted typecheck/lint and 14 taxonomy/OpenAPI tests passed；real PostgreSQL taxonomy/seed targeted suite passed 2 files/4 tests；migration deploy applied all 7 migrations；baseline check verifies alias tables、cascade FKs and normalized uniqueness negative case；previous-release upgrade preserves its sentinel and both alias tables；actual seed ran twice with stable 17/21 Region rows/aliases、58/15 Category rows/aliases and 5 synthetic drafts；the first create-only migration attempt correctly failed because `.env` targeted an unavailable localhost:5432，then the explicit local integration URL generated and deployed it；the first recursive response contract test exposed Swagger full-dereference/Ajv recursion and was repaired to compile the canonical `$ref` document；security review removed anonymous inactive-data disclosure before final validation；final `pnpm ci:quality` passed 9 typechecks、9 lints、33/33 files、121/121 tests and 8 builds（82.22% statements、84.72% lines）；full architecture validation passed 101 tasks/39 models/37 paths/66 schemas/36 JSON；`pnpm.cmd observability:check` passed；`pnpm.cmd test:e2e:ci` passed Chromium desktop/mobile 4/4
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending
+
+Observability: Existing bounded route/status telemetry covers public taxonomy 200/400；no query text、alias value、normalized key or database error is added as a metric label or structured log field；responses use a five-minute public cache with stale-while-revalidate
+
+Docs: Updated taxonomy、domain/data、API/integrations、security/privacy、seed、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: TAX-002 owns immutable dynamic form schema draft/preview/publish/rollback；production GIS boundaries、approved launch cities/categories、SEO allowlists and licensed taxonomy import provenance still require owner/operations input；search synonym/analyzer lifecycle remains SEARCH-001/004 and inactive taxonomy administration remains ADMIN work

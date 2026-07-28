@@ -16,6 +16,7 @@ import {
   MemoryOtpChallengeStore,
 } from "./support/memory-otp-challenge.store";
 import { MemoryOrganizationStore } from "./support/memory-organization.store";
+import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -93,6 +94,40 @@ describe("canonical OpenAPI contract", () => {
         },
       ],
     );
+    const taxonomyStore = new MemoryTaxonomyStore(
+      [
+        {
+          id: "50000000-0000-4000-8000-000000000001",
+          parentId: null,
+          code: "US",
+          type: "COUNTRY",
+          slug: "us",
+          nameZhHans: "美国",
+          nameEn: "United States",
+          timezone: "America/Los_Angeles",
+          latitude: null,
+          longitude: null,
+          isActive: true,
+          sortOrder: 0,
+          aliases: [{ locale: "en-US", value: "USA" }],
+        },
+      ],
+      [
+        {
+          id: "60000000-0000-4000-8000-000000000001",
+          parentId: null,
+          vertical: "SERVICE",
+          slug: "services",
+          nameZhHans: "本地服务",
+          nameEn: "Local Services",
+          iconKey: "services",
+          formSchemaVersion: 1,
+          isActive: true,
+          sortOrder: 0,
+          aliases: [{ locale: "zh-Hans", value: "找师傅" }],
+        },
+      ],
+    );
     contract = (await SwaggerParser.validate(
       canonicalOpenApiPath(),
     )) as unknown as DereferencedOpenApi;
@@ -105,6 +140,7 @@ describe("canonical OpenAPI contract", () => {
       otpChallengeStore,
       otpDeliveryGateway: otpDelivery,
       organizationStore,
+      taxonomyStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -131,7 +167,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(37);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(65);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(66);
     expect(operationIds).toHaveLength(46);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -322,5 +358,34 @@ describe("canonical OpenAPI contract", () => {
     expect(ajv.validate(createSchema ?? false, created.json())).toBe(true);
     expect(ajv.validate(organizationSchema ?? false, organization.json())).toBe(true);
     expect(ajv.validate(membersSchema ?? false, members.json())).toBe(true);
+  });
+
+  it("validates implemented region and category trees against the contract", async () => {
+    const [regions, categories, rawContractResponse] = await Promise.all([
+      server.inject({ method: "GET", url: "/v1/regions?q=USA" }),
+      server.inject({ method: "GET", url: "/v1/categories?vertical=SERVICE" }),
+      server.inject({ method: "GET", url: "/docs/openapi.json" }),
+    ]);
+    const rawContract = rawContractResponse.json<DereferencedOpenApi>();
+    const regionsSchema =
+      rawContract.paths["/regions"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+    const categoriesSchema =
+      rawContract.paths["/categories"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(regions.statusCode).toBe(200);
+    expect(categories.statusCode).toBe(200);
+    const validateRegions = ajv.compile({
+      ...(regionsSchema ?? { not: {} }),
+      components: rawContract.components,
+    });
+    const validateCategories = ajv.compile({
+      ...(categoriesSchema ?? { not: {} }),
+      components: rawContract.components,
+    });
+    expect(validateRegions(regions.json()), ajv.errorsText(validateRegions.errors)).toBe(true);
+    expect(validateCategories(categories.json()), ajv.errorsText(validateCategories.errors)).toBe(
+      true,
+    );
   });
 });

@@ -381,7 +381,12 @@ paths:
             $ref: "#/components/schemas/RegionType"
         - name: activeOnly
           in: query
-          schema: { type: boolean, default: true }
+          description: Public taxonomy is active-only; false is rejected.
+          schema: { type: boolean, const: true, default: true }
+        - name: q
+          in: query
+          description: Bounded name, code, slug, or normalized alias query
+          schema: { type: string, minLength: 1, maxLength: 80 }
       responses:
         "200":
           description: Region tree or children
@@ -390,11 +395,14 @@ paths:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/Region"
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /categories:
     get:
       tags: [Taxonomy]
@@ -409,6 +417,14 @@ paths:
         - name: parentId
           in: query
           schema: { type: string, format: uuid }
+        - name: activeOnly
+          in: query
+          description: Public taxonomy is active-only; false is rejected.
+          schema: { type: boolean, const: true, default: true }
+        - name: q
+          in: query
+          description: Bounded bilingual name, slug, or normalized alias query
+          schema: { type: string, minLength: 1, maxLength: 80 }
       responses:
         "200":
           description: Category tree
@@ -417,11 +433,14 @@ paths:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data:
                     type: array
                     items:
                       $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /categories/{categoryId}/form-schema:
     get:
       tags: [Taxonomy]
@@ -1475,10 +1494,19 @@ components:
           $ref: "#/components/schemas/CursorPage"
     RegionType:
       type: string
-      enum: [COUNTRY, STATE, COUNTY, CITY, NEIGHBORHOOD, ZIP_CODE]
+      enum: [COUNTRY, STATE, COUNTY, CITY, NEIGHBORHOOD, ZIP_CODE, REGION_GROUP]
+    TaxonomyAlias:
+      type: object
+      required: [locale, value]
+      additionalProperties: false
+      properties:
+        locale: { type: string, enum: [zh-Hans, en-US, und] }
+        value: { type: string, minLength: 1, maxLength: 120 }
     Region:
       type: object
-      required: [id, code, type, name, timezone]
+      required:
+        [id, parentId, code, type, slug, name, timezone, centroid, active, aliases, children]
+      additionalProperties: false
       properties:
         id: { type: string, format: uuid }
         parentId: { type: [string, "null"], format: uuid }
@@ -1494,7 +1522,18 @@ components:
             en-US: { type: string }
         timezone: { type: string }
         centroid:
-          $ref: "#/components/schemas/GeoPoint"
+          oneOf:
+            - $ref: "#/components/schemas/GeoPoint"
+            - type: "null"
+        active: { type: boolean }
+        aliases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxonomyAlias"
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Region"
     ListingType:
       type: string
       enum: [JOB, RENTAL, TRANSFER, SECONDHAND, SERVICE]
@@ -1506,7 +1545,9 @@ components:
       enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED]
     Category:
       type: object
-      required: [id, slug, name, formSchemaVersion, active]
+      required:
+        [id, parentId, vertical, slug, name, iconKey, formSchemaVersion, active, aliases, children]
+      additionalProperties: false
       properties:
         id: { type: string, format: uuid }
         parentId: { type: [string, "null"], format: uuid }
@@ -1524,6 +1565,10 @@ components:
         iconKey: { type: [string, "null"] }
         formSchemaVersion: { type: integer, minimum: 1 }
         active: { type: boolean }
+        aliases:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxonomyAlias"
         children:
           type: array
           items:

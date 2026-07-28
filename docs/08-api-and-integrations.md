@@ -104,6 +104,12 @@ Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMI
 绑定的域分离 HMAC cursor，并排除联系方式、账号状态、验证材料和风险字段。当前切片不提供成员写接口；
 邀请、撤销和 Owner 转移保持在 ORG-002。
 
+`TAX-001` 实现公开 `GET /regions` 和 `GET /categories`。默认请求返回稳定 ID/slug、中英名称、
+原始受控别名与层级树；父级、type/vertical 与 `q` 提供直接子级或扁平匹配。`q` 最长 80 字符，
+拒绝控制/双向字符，Repository 使用参数化查询和受控 NFKC 别名键。公开接口的 `activeOnly` 只能
+为 true，响应使用五分钟 public cache 与 stale-while-revalidate；未启用 taxonomy 不通过匿名接口
+暴露。动态 form schema 的发布/回滚仍属于 TAX-002。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：

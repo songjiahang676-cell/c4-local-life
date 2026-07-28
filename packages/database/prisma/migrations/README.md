@@ -12,6 +12,8 @@
    indexes.
 6. `20260728090000_account_management` adds optimistic profile versions and enforces session
    revocation after user status/deletion changes.
+7. `20260728184415_taxonomy_aliases` adds FK-constrained, normalized lookup aliases for Regions and
+   Categories.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -102,6 +104,19 @@ transition; it never exposes or copies token/IP hashes.
 - Rollback: roll back the application while retaining the additive version column and trigger. The
   previous application ignores `version`, and conservative session revocation remains safe. Do not
   drop either during incident response.
+
+## `20260728184415_taxonomy_aliases`
+
+Adds `region_aliases` and `category_aliases` with canonical-parent foreign keys, cascade cleanup,
+per-parent/locale normalized uniqueness, and lookup indexes. Canonical names, IDs and slugs remain
+on Region/Category; normalized alias values are derived lookup state.
+
+- Roll forward: apply before the TAX-001 API or the versioned seed writes aliases; verify alias
+  uniqueness, parent FK behavior, bilingual queries and idempotent seed reconciliation.
+- Rollback: redeploy the previous application and retain the additive tables. If a later maintenance
+  window requires physical removal, stop alias writers, back up, drop category aliases before region
+  aliases, and rebuild them from the versioned source when rolling forward. See the migration-local
+  `ROLLBACK.md`.
 
 ## Roll-forward and recovery
 

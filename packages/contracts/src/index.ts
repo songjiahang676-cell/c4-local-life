@@ -33,6 +33,16 @@ export type CreateOrganizationRequest = components["schemas"]["CreateOrganizatio
 export type ListOrganizationMembersQuery = NonNullable<
   operations["listOrganizationMembers"]["parameters"]["query"]
 >;
+export type RegionType = components["schemas"]["RegionType"];
+export type TaxonomyAlias = components["schemas"]["TaxonomyAlias"];
+export type Region = components["schemas"]["Region"];
+export type Category = components["schemas"]["Category"];
+export type ListRegionsQuery = NonNullable<operations["listRegions"]["parameters"]["query"]>;
+export type ListCategoriesQuery = NonNullable<operations["listCategories"]["parameters"]["query"]>;
+export type RegionCollectionResponse =
+  operations["listRegions"]["responses"][200]["content"]["application/json"];
+export type CategoryCollectionResponse =
+  operations["listCategories"]["responses"][200]["content"]["application/json"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -274,5 +284,45 @@ export const listOrganizationMembersQuerySchema: z.ZodType<ListOrganizationMembe
   .object({
     cursor: z.string().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
+const taxonomyQueryTextSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .refine((value) => !hasUnsupportedDisplayNameCharacter(value), {
+    message: "Taxonomy query contains unsupported characters",
+  })
+  .transform((value) => value.normalize("NFKC"));
+
+const activeOnlyQuerySchema = z.preprocess((value) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}, z.literal(true));
+
+export const listRegionsQuerySchema: z.ZodType<ListRegionsQuery> = z
+  .object({
+    parentCode: z
+      .string()
+      .trim()
+      .regex(/^[A-Z0-9-]{2,80}$/)
+      .optional(),
+    type: z
+      .enum(["COUNTRY", "STATE", "COUNTY", "CITY", "NEIGHBORHOOD", "ZIP_CODE", "REGION_GROUP"])
+      .optional(),
+    activeOnly: activeOnlyQuerySchema.default(true),
+    q: taxonomyQueryTextSchema.optional(),
+  })
+  .strict();
+
+export const listCategoriesQuerySchema: z.ZodType<ListCategoriesQuery> = z
+  .object({
+    vertical: listingTypeSchema.optional(),
+    parentId: z.uuid().optional(),
+    activeOnly: activeOnlyQuerySchema.default(true),
+    q: taxonomyQueryTextSchema.optional(),
   })
   .strict();

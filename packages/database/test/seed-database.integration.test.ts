@@ -45,6 +45,36 @@ integration("idempotent database seed", () => {
     ];
   }
 
+  function regionAliasCount(): number {
+    return (
+      seed.regions.country.aliases.length +
+      seed.regions.state.aliases.length +
+      seed.regions.metros.reduce(
+        (total, metro) =>
+          total +
+          metro.aliases.length +
+          metro.children.reduce((childTotal, city) => childTotal + city.aliases.length, 0),
+        0,
+      )
+    );
+  }
+
+  function categoryAliasCount(): number {
+    return (
+      seed.categories.verticals.reduce(
+        (total, vertical) =>
+          total +
+          vertical.aliases.length +
+          vertical.children.reduce((childTotal, child) => childTotal + child.aliases.length, 0),
+        0,
+      ) +
+      seed.categories.communityCategories.reduce(
+        (total, category) => total + category.aliases.length,
+        0,
+      )
+    );
+  }
+
   beforeAll(async () => {
     seed = await loadSeedData();
     database = createIntegrationDatabase(databaseUrl);
@@ -62,7 +92,9 @@ integration("idempotent database seed", () => {
       expect(second).toEqual(first);
       expect(first).toMatchObject({
         regions: regionIds().length,
+        regionAliases: regionAliasCount(),
         categories: categoryIds().length,
+        categoryAliases: categoryAliasCount(),
         listings: listingIds().length,
         users: 1,
       });
@@ -72,6 +104,12 @@ integration("idempotent database seed", () => {
       await expect(
         transaction.category.count({ where: { id: { in: categoryIds() } } }),
       ).resolves.toBe(categoryIds().length);
+      await expect(
+        transaction.regionAlias.count({ where: { regionId: { in: regionIds() } } }),
+      ).resolves.toBe(regionAliasCount());
+      await expect(
+        transaction.categoryAlias.count({ where: { categoryId: { in: categoryIds() } } }),
+      ).resolves.toBe(categoryAliasCount());
       await expect(
         transaction.listing.count({ where: { id: { in: listingIds() } } }),
       ).resolves.toBe(listingIds().length);

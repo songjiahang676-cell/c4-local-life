@@ -33,6 +33,16 @@ export {
   type OrganizationProjection,
   type OrganizationRepositoryOptions,
 } from "./repositories/organization.repository";
+export {
+  normalizeTaxonomyAlias,
+  TaxonomyRepository,
+  type CategoryTaxonomyRecord,
+  type ListCategoryTaxonomyInput,
+  type ListRegionTaxonomyInput,
+  type RegionTaxonomyRecord,
+  type TaxonomyAliasProjection,
+  type TaxonomyRepositoryOptions,
+} from "./taxonomy";
 export { loadSeedData, parseSeedData, type SeedData } from "./seed/seed-data";
 export { seedDatabase, seedDatabaseInTransaction, type SeedSummary } from "./seed/seed-database";
 export { assertSyntheticSeedAllowed } from "./seed/seed-policy";
