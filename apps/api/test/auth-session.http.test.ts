@@ -84,7 +84,14 @@ describe("auth session HTTP boundary", () => {
         locale: "en-US",
         status: "ACTIVE",
       },
-      permissions: [],
+      permissions: [
+        "account:session:read",
+        "account:profile:read",
+        "account:profile:update",
+        "account:sessions:read",
+        "account:sessions:revoke",
+        "listing:draft:create",
+      ],
       organizations: [],
     });
     expect(JSON.stringify(payload)).not.toContain(issued.token);

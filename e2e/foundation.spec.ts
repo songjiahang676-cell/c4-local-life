@@ -29,9 +29,7 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
       headers: { "x-request-id": "playwright-foundation-smoke" },
     }),
     request.get("http://127.0.0.1:4100/docs/openapi.json"),
-    request.post(`${apiBaseUrl}/listings`, {
-      data: { type: "RENTAL", title: "short" },
-    }),
+    request.get(`${apiBaseUrl}/listings?unknown=not-allowed`),
   ]);
 
   expect(healthResponse.ok()).toBe(true);

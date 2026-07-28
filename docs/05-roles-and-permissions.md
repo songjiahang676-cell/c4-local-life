@@ -72,6 +72,16 @@
 - 后台高风险动作采用 step-up authentication 与可选双人审批。
 - 权限结果可短时缓存，但用户状态、组织角色和封禁变更必须主动失效。
 
+API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
+
+- `AuthContextGuard` 先解析 Cookie/Session，再为每个请求建立不可变 `RequestContext`。Actor 只包含 user/session ID、账户状态、验证徽章、显式全局权限和活动组织 membership，不携带显示名、联系方式、IP 或 token。
+- 控制器使用 `@RequirePolicy("<domain>:<resource>:<action>")` 声明动作；全局 `AuthorizationGuard` 在进入控制器前执行已注册规则。未声明动作的公共路由不被误拦截，但任何未注册动作、重复注册或规则异常都失败关闭。
+- `PolicyService` 返回内部 allow/deny 与稳定原因码；HTTP 边界只向未登录用户返回通用 401，向其他拒绝返回通用 403，不泄露资源、角色或组织是否存在。
+- 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
+- `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助和 `listing:draft:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿 POST 已由同名 Policy 动作强制执行。
+
 ## 5.6 权限测试最小矩阵
 
 每个资源至少测试：未登录、资源拥有者、同组织不同角色、无关普通用户、受限用户、正确后台角色、错误后台角色、跨组织 ID、已删除/下架状态、批量接口部分越权。默认拒绝，未知动作不得隐式放行。
+
+可复用测试 helper 位于 `apps/api/test/support/policy-matrix.ts`。新资源应以表驱动矩阵验证 allow/deny 和原因码，并至少包含跨组织、错误角色、受限账户、删除资源和缺失资源负例；HTTP 测试另外断言外部错误不会暴露内部 deny reason。

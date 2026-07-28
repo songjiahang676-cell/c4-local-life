@@ -77,6 +77,13 @@ trigger 立即设置全部未撤销会话的 `revoked_at`，避免后来 Admin/�
 - 后台角色与普通组织角色命名/权限分离。
 - 高风险后台动作需要 reason、工单和可选双人复核。
 
+`API-004` 将授权入口统一为 PII 最小化 Actor、不可变 RequestContext、显式动作注册和全局 Policy
+Guard。客户端提交的 permission、owner、organization 或 role 都不是授权事实；对象规则必须使用
+Repository scoped query 返回的最小上下文。未知动作、重复注册、规则异常、缺失/已删除资源均失败关闭，
+内部 deny reason 不进入通用 401/403。跨组织、错误角色、受限账户和缺失资源由可复用矩阵持续做负面测试。
+`POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
+403，避免已有写端点在框架接入后继续绕过服务端权限。
+
 ## 14.6 输入、输出和内容安全
 
 - API DTO 白名单、长度/嵌套/body 限制；未知字段按策略拒绝。

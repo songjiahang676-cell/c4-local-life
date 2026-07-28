@@ -142,14 +142,13 @@ describe("canonical OpenAPI contract", () => {
   it("validates implemented health and Problem Details responses against the contract", async () => {
     const healthResponse = await server.inject({ method: "GET", url: "/v1/health/live" });
     const invalidResponse = await server.inject({
-      method: "POST",
-      url: "/v1/listings",
-      payload: { type: "RENTAL", title: "x" },
+      method: "GET",
+      url: "/v1/listings?unknown=not-allowed",
     });
     const healthSchema =
       contract.paths["/health/live"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
     const problemSchema =
-      contract.paths["/listings"]?.post?.responses["400"]?.content?.["application/problem+json"]
+      contract.paths["/listings"]?.get?.responses["400"]?.content?.["application/problem+json"]
         ?.schema;
 
     expect(healthSchema).toBeDefined();
@@ -158,6 +157,13 @@ describe("canonical OpenAPI contract", () => {
     expect(invalidResponse.statusCode).toBe(400);
     expect(ajv.validate(healthSchema ?? false, healthResponse.json())).toBe(true);
     expect(ajv.validate(problemSchema ?? false, invalidResponse.json())).toBe(true);
+  });
+
+  it("declares authentication failures for protected listing creation", () => {
+    const operation = contract.paths["/listings"]?.post;
+
+    expect(operation?.responses["401"]).toBeDefined();
+    expect(operation?.responses["403"]).toBeDefined();
   });
 
   it("validates the implemented current-session projection against the contract", async () => {
