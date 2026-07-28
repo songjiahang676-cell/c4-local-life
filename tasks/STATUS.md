@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status         | Notes                                                                   |
-| -------- | -------------------- | ---------- | ----------------- | -------------- | ----------------------------------------------------------------------- |
-| LIST-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | local complete | 五类 type-detail、价格、审核/内容双状态、过期、版本和非法转换纯领域规则 |
+| Task     | Owner                | Started    | Target            | Status       | Notes                                                                   |
+| -------- | -------------------- | ---------- | ----------------- | ------------ | ----------------------------------------------------------------------- |
+| LIST-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | hosted green | 五类 type-detail、价格、审核/内容双状态、过期、版本和非法转换纯领域规则 |
 
 ## Gate Evidence
 
@@ -80,6 +80,7 @@
 | LIST-001 database integration   | 14 migrations / real PostgreSQL    | status current；17 files / 57 tests passed                                | 2026-07-28 |
 | LIST-001 local quality          | `pnpm ci:quality`                  | 56 files / 211 tests；9 typechecks/lints；8 builds passed                 | 2026-07-28 |
 | LIST-001 browser/runtime        | Chromium desktop/mobile            | standalone preparation and 6/6 E2E passed                                 | 2026-07-28 |
+| LIST-001 protected checks       | PR #17 / run `30408426707`         | real services、Linux build/E2E and four non-root images passed            | 2026-07-28 |
 
 ## Decisions / Blocks
 
