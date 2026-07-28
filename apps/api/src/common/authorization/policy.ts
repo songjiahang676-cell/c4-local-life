@@ -12,6 +12,18 @@ export const selfServicePolicyActions = {
 
 export const activeUserPolicyActions = {
   listingDraftCreate: "listing:draft:create",
+  organizationCreate: "organization:create",
+} as const;
+
+export const organizationPolicyActions = {
+  profileRead: "organization:profile:read",
+  profileEditContent: "organization:profile:edit",
+  profileManage: "organization:profile:manage",
+  listingsWrite: "organization:listings:write",
+  membersRead: "organization:members:read",
+  membersManage: "organization:members:manage",
+  billingManage: "organization:billing:manage",
+  analyticsRead: "organization:analytics:read",
 } as const;
 
 export const accountSelfServicePermissions = [
@@ -25,6 +37,7 @@ export const accountSelfServicePermissions = [
 export const activeUserPermissions = [
   ...accountSelfServicePermissions,
   activeUserPolicyActions.listingDraftCreate,
+  activeUserPolicyActions.organizationCreate,
 ] as const;
 
 export type PolicyAction = string;

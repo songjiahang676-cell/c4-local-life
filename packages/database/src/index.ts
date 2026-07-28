@@ -21,6 +21,18 @@ export {
   type ListingRadiusQuery,
   type NearbyPublishedListing,
 } from "./repositories/listing-geo.repository";
+export {
+  OrganizationRepository,
+  type CreateOwnedOrganizationInput,
+  type CreateOwnedOrganizationResult,
+  type ListOrganizationMembersInput,
+  type MemberOrganizationProjection,
+  type OrganizationMemberCursor,
+  type OrganizationMemberPage,
+  type OrganizationMemberProjection,
+  type OrganizationProjection,
+  type OrganizationRepositoryOptions,
+} from "./repositories/organization.repository";
 export { loadSeedData, parseSeedData, type SeedData } from "./seed/seed-data";
 export { seedDatabase, seedDatabaseInTransaction, type SeedSummary } from "./seed/seed-database";
 export { assertSyntheticSeedAllowed } from "./seed/seed-policy";

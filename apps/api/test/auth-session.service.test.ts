@@ -115,6 +115,7 @@ describe("AuthSessionService", () => {
 
     expect(issued.response.permissions).toContain("account:profile:read");
     expect(issued.response.permissions).not.toContain("listing:draft:create");
+    expect(issued.response.permissions).not.toContain("organization:create");
   });
 
   it("rejects duplicate cookies and clears with the same security attributes", () => {

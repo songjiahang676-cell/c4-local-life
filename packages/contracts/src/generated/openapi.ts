@@ -170,6 +170,66 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/organizations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Create an organization owned by the current user
+         * @description Atomically creates the organization and its initial OWNER membership. The requested slug is the stable retry handle; an exact owner retry returns the original resource.
+         */
+        readonly post: operations["createOrganization"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/organizations/{organizationId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get an organization visible to the current member
+         * @description Uses a membership-scoped repository query so unknown and cross-organization identifiers share one 404 response.
+         */
+        readonly get: operations["getMyOrganization"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/organizations/{organizationId}/members": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List organization members for OWNER or ADMIN
+         * @description Returns only display identity, role, and join time; contact identifiers and account risk fields are excluded.
+         */
+        readonly get: operations["listOrganizationMembers"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/regions": {
         readonly parameters: {
             readonly query?: never;
@@ -771,12 +831,55 @@ export interface components {
         readonly OrganizationSummary: {
             /** Format: uuid */
             readonly id: string;
-            /** @enum {string} */
-            readonly type: "MERCHANT" | "SERVICE_PROVIDER" | "SUPPLIER" | "MEDIA" | "INTERNAL";
+            readonly type: components["schemas"]["OrganizationType"];
             readonly displayName: string;
             readonly slug: string;
+            readonly role: components["schemas"]["MembershipRole"];
+        };
+        /** @enum {string} */
+        readonly OrganizationType: "MERCHANT" | "SERVICE_PROVIDER" | "SUPPLIER" | "MEDIA" | "INTERNAL";
+        /** @enum {string} */
+        readonly MembershipRole: "OWNER" | "ADMIN" | "EDITOR" | "BILLING" | "ANALYST";
+        readonly CreateOrganizationRequest: {
             /** @enum {string} */
-            readonly role: "OWNER" | "ADMIN" | "EDITOR" | "BILLING" | "ANALYST";
+            readonly type: "MERCHANT" | "SERVICE_PROVIDER" | "SUPPLIER" | "MEDIA";
+            readonly displayName: string;
+            readonly legalName?: string | null;
+            readonly slug: string;
+        };
+        readonly Organization: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["OrganizationType"];
+            readonly displayName: string;
+            readonly legalName: string | null;
+            readonly slug: string;
+            /** @enum {string} */
+            readonly status: "ACTIVE" | "LIMITED" | "SUSPENDED";
+            /** @enum {string} */
+            readonly verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
+            readonly role: components["schemas"]["MembershipRole"];
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly OrganizationResponse: {
+            readonly data: components["schemas"]["Organization"];
+        };
+        readonly OrganizationMember: {
+            /** Format: uuid */
+            readonly userId: string;
+            readonly displayName: string;
+            /** Format: uri */
+            readonly avatarUrl: string | null;
+            readonly role: components["schemas"]["MembershipRole"];
+            /** Format: date-time */
+            readonly joinedAt: string;
+        };
+        readonly OrganizationMemberCollection: {
+            readonly data: readonly components["schemas"]["OrganizationMember"][];
+            readonly pageInfo: components["schemas"]["CursorPage"];
         };
         /** @enum {string} */
         readonly RegionType: "COUNTRY" | "STATE" | "COUNTY" | "CITY" | "NEIGHBORHOOD" | "ZIP_CODE";
@@ -1348,6 +1451,7 @@ export interface components {
         readonly CategoryId: string;
         readonly ConversationId: string;
         readonly SessionId: string;
+        readonly OrganizationId: string;
         readonly Cursor: string;
         readonly Limit: number;
         readonly IdempotencyKey: string;
@@ -1636,6 +1740,93 @@ export interface operations {
             };
             readonly 400: components["responses"]["BadRequest"];
             readonly 401: components["responses"]["Unauthorized"];
+        };
+    };
+    readonly createOrganization: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateOrganizationRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Organization and initial OWNER membership created, or the exact owner retry returned */
+            readonly 201: {
+                headers: {
+                    readonly Location?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly getMyOrganization: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Member-safe organization projection */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly listOrganizationMembers: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: components["parameters"]["Limit"];
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Cursor-paginated member projection */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationMemberCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly listRegions: {

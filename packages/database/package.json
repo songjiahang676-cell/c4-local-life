@@ -11,6 +11,9 @@
       ],
       "otp-challenge": [
         "src/repositories/otp-challenge.repository.ts"
+      ],
+      "organization": [
+        "src/repositories/organization.repository.ts"
       ]
     }
   },
@@ -25,6 +28,11 @@
       "types": "./src/repositories/otp-challenge.repository.ts",
       "require": "./dist/src/repositories/otp-challenge.repository.js",
       "default": "./dist/src/repositories/otp-challenge.repository.js"
+    },
+    "./organization": {
+      "types": "./src/repositories/organization.repository.ts",
+      "require": "./dist/src/repositories/organization.repository.js",
+      "default": "./dist/src/repositories/organization.repository.js"
     }
   },
   "scripts": {

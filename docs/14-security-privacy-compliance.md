@@ -84,6 +84,12 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 `POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
 403，避免已有写端点在框架接入后继续绕过服务端权限。
 
+`ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
+`INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
+跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
+成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
+角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
+
 ## 14.6 输入、输出和内容安全
 
 - API DTO 白名单、长度/嵌套/body 限制；未知字段按策略拒绝。

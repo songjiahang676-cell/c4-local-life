@@ -23,6 +23,16 @@ export type UpdateMyProfileRequest = components["schemas"]["UpdateMyProfileReque
 export type SessionDevice = components["schemas"]["SessionDevice"];
 export type SessionDeviceCollection = components["schemas"]["SessionDeviceCollection"];
 export type ListMySessionsQuery = NonNullable<operations["listMySessions"]["parameters"]["query"]>;
+export type Organization = components["schemas"]["Organization"];
+export type OrganizationResponse = components["schemas"]["OrganizationResponse"];
+export type OrganizationType = components["schemas"]["OrganizationType"];
+export type MembershipRole = components["schemas"]["MembershipRole"];
+export type OrganizationMember = components["schemas"]["OrganizationMember"];
+export type OrganizationMemberCollection = components["schemas"]["OrganizationMemberCollection"];
+export type CreateOrganizationRequest = components["schemas"]["CreateOrganizationRequest"];
+export type ListOrganizationMembersQuery = NonNullable<
+  operations["listOrganizationMembers"]["parameters"]["query"]
+>;
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -225,6 +235,42 @@ export const updateMyProfileSchema: z.ZodType<UpdateMyProfileRequest> = z
   });
 
 export const listMySessionsQuerySchema: z.ZodType<ListMySessionsQuery> = z
+  .object({
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
+export const createOrganizationSchema: z.ZodType<CreateOrganizationRequest> = z
+  .object({
+    type: z.enum(["MERCHANT", "SERVICE_PROVIDER", "SUPPLIER", "MEDIA"]),
+    displayName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine((value) => !hasUnsupportedDisplayNameCharacter(value), {
+        message: "Display name contains unsupported characters",
+      }),
+    legalName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .refine((value) => !hasUnsupportedDisplayNameCharacter(value), {
+        message: "Legal name contains unsupported characters",
+      })
+      .nullable()
+      .optional(),
+    slug: z
+      .string()
+      .min(3)
+      .max(80)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  })
+  .strict();
+
+export const listOrganizationMembersQuerySchema: z.ZodType<ListOrganizationMembersQuery> = z
   .object({
     cursor: z.string().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),

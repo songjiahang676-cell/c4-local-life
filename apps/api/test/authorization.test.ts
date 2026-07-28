@@ -9,6 +9,7 @@ import {
   type PolicyActor,
   type PolicyRequestContext,
 } from "../src/common/authorization/policy";
+import { createPolicyService } from "../src/common/authorization/authorization.module";
 import { RequestContextAccessor } from "../src/common/authorization/request-context";
 import { expectPolicyMatrix } from "./support/policy-matrix";
 import type { Session } from "@socal/contracts";
@@ -185,6 +186,46 @@ describe("PolicyService", () => {
         context: requestContext(authenticatedActor({ permissions: ["account:profile:update"] })),
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("enforces the complete organization role/action matrix", async () => {
+    const policies = createPolicyService();
+    const resource = {
+      type: "organization",
+      id: organizationId,
+      organizationId,
+      state: "ACTIVE",
+      deleted: false,
+    };
+    const roles = ["OWNER", "ADMIN", "EDITOR", "BILLING", "ANALYST"] as const;
+    type OrganizationRole = (typeof roles)[number];
+    const matrix: Record<string, ReadonlySet<OrganizationRole>> = {
+      "organization:profile:read": new Set(roles),
+      "organization:profile:edit": new Set(["OWNER", "ADMIN", "EDITOR"]),
+      "organization:profile:manage": new Set(["OWNER", "ADMIN"]),
+      "organization:listings:write": new Set(["OWNER", "ADMIN", "EDITOR"]),
+      "organization:members:read": new Set(["OWNER", "ADMIN"]),
+      "organization:members:manage": new Set(["OWNER", "ADMIN"]),
+      "organization:billing:manage": new Set(["OWNER", "BILLING"]),
+      "organization:analytics:read": new Set(["OWNER", "ADMIN", "BILLING", "ANALYST"]),
+    };
+
+    for (const [action, allowedRoles] of Object.entries(matrix)) {
+      await expectPolicyMatrix(
+        policies,
+        action,
+        roles.map((role) => ({
+          name: `${action} ${role}`,
+          context: requestContext(
+            authenticatedActor({
+              organizations: [{ organizationId, role }],
+            }),
+          ),
+          resource,
+          expected: allowedRoles.has(role) ? allowPolicy() : denyPolicy("OBJECT_ACCESS_DENIED"),
+        })),
+      );
+    }
   });
 });
 

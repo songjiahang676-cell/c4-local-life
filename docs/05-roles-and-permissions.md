@@ -85,3 +85,21 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 每个资源至少测试：未登录、资源拥有者、同组织不同角色、无关普通用户、受限用户、正确后台角色、错误后台角色、跨组织 ID、已删除/下架状态、批量接口部分越权。默认拒绝，未知动作不得隐式放行。
 
 可复用测试 helper 位于 `apps/api/test/support/policy-matrix.ts`。新资源应以表驱动矩阵验证 allow/deny 和原因码，并至少包含跨组织、错误角色、受限账户、删除资源和缺失资源负例；HTTP 测试另外断言外部错误不会暴露内部 deny reason。
+
+`ORG-001` 把组织角色落为以下显式动作；未列出的组合默认拒绝：
+
+| 动作                          | OWNER | ADMIN | EDITOR | BILLING | ANALYST |
+| ----------------------------- | ----- | ----- | ------ | ------- | ------- |
+| `organization:profile:read`   | ✓     | ✓     | ✓      | ✓       | ✓       |
+| `organization:profile:edit`   | ✓     | ✓     | ✓      | —       | —       |
+| `organization:profile:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:listings:write` | ✓     | ✓     | ✓      | —       | —       |
+| `organization:members:read`   | ✓     | ✓     | —      | —       | —       |
+| `organization:members:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:billing:manage` | ✓     | —     | —      | ✓       | —       |
+| `organization:analytics:read` | ✓     | ✓     | —      | ✓       | ✓       |
+
+`profile:edit` 只代表公开档案内容，不能修改 legal identity、状态或验证结论；这些字段必须走
+`profile:manage` 或后续专用审核动作。当前 API 只开放创建、成员范围详情以及 OWNER/ADMIN 的成员只读列表，
+没有提前实现 ORG-002 的邀请、移除、角色变更或 Owner 转移。每次对象授权使用 Repository 返回的当前
+membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。

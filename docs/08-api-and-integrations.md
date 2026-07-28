@@ -97,6 +97,13 @@ Controller。`POST /listings` 的现有 Session 要求现在由 `listing:draft:c
 不替代每次请求的 Policy，也不接受客户端回传。对象级 action 必须在 Repository scoped query 后以最小
 resource context 评估，未知 action 或规则异常失败关闭。
 
+`ORG-001` 新增 `POST /organizations`、`GET /organizations/{organizationId}` 和
+`GET /organizations/{organizationId}/members`。创建仅允许 ACTIVE 用户和可创建的四类外部组织，
+服务端原子建立初始 OWNER；`INTERNAL`、状态、验证结论和角色不能由客户端 over-post。详情使用成员范围
+Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMIN 可读，采用 actor + organization
+绑定的域分离 HMAC cursor，并排除联系方式、账号状态、验证材料和风险字段。当前切片不提供成员写接口；
+邀请、撤销和 Owner 转移保持在 ORG-002。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：

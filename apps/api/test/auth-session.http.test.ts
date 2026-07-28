@@ -91,6 +91,7 @@ describe("auth session HTTP boundary", () => {
         "account:sessions:read",
         "account:sessions:revoke",
         "listing:draft:create",
+        "organization:create",
       ],
       organizations: [],
     });
