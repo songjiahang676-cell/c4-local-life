@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import type { ApiEnvironment } from "@socal/config";
 import type {
   AdminNavigationItem,
   AdminSessionResponse,
@@ -10,6 +11,8 @@ import {
   PolicyService,
   type PolicyRequestContext,
 } from "../../common/authorization/policy";
+import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { MFA_STORE, type MfaStore } from "./mfa.store";
 
 const roleOrder: readonly PlatformRole[] = [
   "SUPPORT",
@@ -57,7 +60,11 @@ function navigationForRoles(roles: readonly PlatformRole[]): AdminNavigationItem
 
 @Injectable()
 export class AdminSessionService {
-  constructor(private readonly policies: PolicyService) {}
+  constructor(
+    @Inject(API_ENVIRONMENT) private readonly environment: ApiEnvironment,
+    @Inject(MFA_STORE) private readonly mfa: MfaStore,
+    private readonly policies: PolicyService,
+  ) {}
 
   async getSession(
     context: PolicyRequestContext,
@@ -72,6 +79,14 @@ export class AdminSessionService {
     }
 
     const roles = orderedRoles(context.actor.platformRoles);
+    const now = new Date();
+    const mfaState = await this.mfa.findState(context.actor.userId, now);
+    const mfaVerifiedAt = context.actor.mfaVerifiedAt;
+    const stepUpExpiresAt = mfaVerifiedAt
+      ? new Date(
+          new Date(mfaVerifiedAt).getTime() + this.environment.ADMIN_STEP_UP_TTL_SECONDS * 1_000,
+        ).toISOString()
+      : null;
     return {
       data: {
         operator: session.user,
@@ -79,7 +94,12 @@ export class AdminSessionService {
         navigation: navigationForRoles(roles),
         security: {
           mfaRequired: true,
-          privilegedActionsAllowed: false,
+          mfaEnrolled: mfaState.status === "ACTIVE",
+          authenticationStrength: context.actor.authenticationStrength,
+          mfaVerifiedAt,
+          stepUpExpiresAt,
+          privilegedActionsAllowed: context.actor.authenticationStrength === "MFA",
+          sensitiveActionsAllowed: context.actor.recentMfa,
         },
       },
     };

@@ -1098,7 +1098,8 @@ paths:
       summary: Resolve the current operator console session
       description: |
         Returns only the current operator's active platform roles and server-computed workspace
-        navigation. This bootstrap endpoint does not grant privileged data access or satisfy MFA.
+        navigation plus MFA posture. Privileged workspaces require an MFA-bound session and
+        sensitive actions additionally require recent MFA.
       operationId: getAdminSession
       responses:
         "200":
@@ -1114,6 +1115,99 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /admin/mfa/enrollment:
+    post:
+      tags: [Admin]
+      summary: Begin TOTP enrollment for the current operator
+      description: |
+        Replaces only an unexpired or expired pending enrollment. Active and administratively
+        disabled credentials cannot be overwritten. The TOTP secret is returned exactly for this
+        enrollment response and is never logged.
+      operationId: beginAdminMfaEnrollment
+      responses:
+        "201":
+          description: Pending TOTP enrollment created
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaEnrollmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/mfa/enrollment/verify:
+    post:
+      tags: [Admin]
+      summary: Verify and activate a pending TOTP enrollment
+      description: |
+        Activates the credential only after a valid, unreplayed TOTP. Recovery codes are returned
+        once and only their domain-separated hashes are stored.
+      operationId: verifyAdminMfaEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMfaEnrollmentVerifyRequest"
+      responses:
+        "200":
+          description: MFA credential activated and the session elevated
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaActivationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /admin/mfa/verify:
+    post:
+      tags: [Admin]
+      summary: Verify TOTP or a one-time recovery code
+      description: |
+        Rotates the current primary or MFA session into a short-lived MFA-bound Admin session and
+        refreshes recent authentication. TOTP steps and recovery codes cannot be replayed.
+      operationId: verifyAdminMfa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMfaVerifyRequest"
+      responses:
+        "200":
+          description: MFA verified and recent-auth window established
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaVerificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /admin/moderation/cases:
     get:
       tags: [Admin]
@@ -1432,13 +1526,29 @@ components:
             ]
     AdminSecurityState:
       type: object
-      required: [mfaRequired, privilegedActionsAllowed]
+      required:
+        [
+          mfaRequired,
+          mfaEnrolled,
+          authenticationStrength,
+          mfaVerifiedAt,
+          stepUpExpiresAt,
+          privilegedActionsAllowed,
+          sensitiveActionsAllowed,
+        ]
       additionalProperties: false
       properties:
         mfaRequired: { type: boolean, const: true }
+        mfaEnrolled: { type: boolean }
+        authenticationStrength: { type: string, enum: [PRIMARY, MFA] }
+        mfaVerifiedAt: { type: [string, "null"], format: date-time }
+        stepUpExpiresAt: { type: [string, "null"], format: date-time }
         privilegedActionsAllowed:
           type: boolean
-          description: Remains false until AUTH-005 establishes and verifies an MFA-bound Admin session.
+          description: True only for an MFA-bound Admin session.
+        sensitiveActionsAllowed:
+          type: boolean
+          description: True only while the recent-MFA step-up window remains valid.
     AdminSession:
       type: object
       required: [operator, roles, navigation, security]
@@ -1466,6 +1576,72 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminSession"
+    AdminMfaEnrollment:
+      type: object
+      required: [credentialId, secret, otpauthUri, expiresAt]
+      additionalProperties: false
+      properties:
+        credentialId: { type: string, format: uuid }
+        secret: { type: string, pattern: "^[A-Z2-7]{32}$" }
+        otpauthUri: { type: string, pattern: "^otpauth://totp/" }
+        expiresAt: { type: string, format: date-time }
+    AdminMfaEnrollmentResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminMfaEnrollment"
+    AdminMfaEnrollmentVerifyRequest:
+      type: object
+      required: [credentialId, code]
+      additionalProperties: false
+      properties:
+        credentialId: { type: string, format: uuid }
+        code: { type: string, pattern: '^\d{6}$' }
+    AdminMfaVerifyRequest:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          pattern: '^(?:\d{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})$'
+    AdminMfaActivation:
+      type: object
+      required: [recoveryCodes, mfaVerifiedAt, stepUpExpiresAt]
+      additionalProperties: false
+      properties:
+        recoveryCodes:
+          type: array
+          minItems: 10
+          maxItems: 10
+          uniqueItems: true
+          items: { type: string, pattern: "^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$" }
+        mfaVerifiedAt: { type: string, format: date-time }
+        stepUpExpiresAt: { type: string, format: date-time }
+    AdminMfaActivationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminMfaActivation"
+    AdminMfaVerification:
+      type: object
+      required: [mfaVerifiedAt, stepUpExpiresAt, recoveryCodeUsed]
+      additionalProperties: false
+      properties:
+        mfaVerifiedAt: { type: string, format: date-time }
+        stepUpExpiresAt: { type: string, format: date-time }
+        recoveryCodeUsed: { type: boolean }
+    AdminMfaVerificationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminMfaVerification"
     MyProfileResponse:
       type: object
       required: [data]

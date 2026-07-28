@@ -55,6 +55,7 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       SESSION_SECRET: ci-only-session-secret-at-least-32-bytes
       OTP_SECRET: ci-only-dedicated-otp-secret-at-least-32-bytes
+      MFA_SECRET: ci-only-dedicated-mfa-secret-at-least-32-bytes
       CSRF_SECRET: ci-only-csrf-secret-at-least-32-bytes
       API_BASE_URL: http://localhost:4000/v1
       PUBLIC_WEB_URL: http://localhost:3000
@@ -232,6 +233,7 @@ jobs:
             --env OPENSEARCH_NODE=http://opensearch.invalid:9200 \
             --env SESSION_SECRET=ci-session-secret-container-smoke-0001 \
             --env OTP_SECRET=ci-dedicated-otp-secret-container-smoke-01 \
+            --env MFA_SECRET=ci-dedicated-mfa-secret-container-smoke-01 \
             --env CSRF_SECRET=ci-csrf-secret-container-smoke-000001 \
             socal-api-runtime:ci
           docker run --detach --name socal-worker --network "$network" \

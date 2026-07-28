@@ -27,6 +27,7 @@ const child = spawn(process.execPath, ["apps/api/dist/main.js"], {
     OPENSEARCH_NODE: process.env.OPENSEARCH_NODE ?? "http://localhost:9200",
     SESSION_SECRET: process.env.SESSION_SECRET ?? "runtime-check-session-secret-at-least-32-bytes",
     OTP_SECRET: process.env.OTP_SECRET ?? "runtime-check-otp-secret-at-least-32-bytes",
+    MFA_SECRET: process.env.MFA_SECRET ?? "runtime-check-mfa-secret-at-least-32-bytes",
     CSRF_SECRET: process.env.CSRF_SECRET ?? "runtime-check-csrf-secret-at-least-32-bytes",
     OTEL_SERVICE_NAME: "socal-api-runtime-check",
     OTEL_SERVICE_VERSION: "test",
@@ -75,8 +76,8 @@ try {
     !openApiJsonResponse.ok ||
     !openApiYamlResponse.ok ||
     !String(openApiJson.openapi).startsWith("3.1.") ||
-    Object.keys(openApiJson.paths ?? {}).length !== 38 ||
-    Object.keys(openApiJson.components?.schemas ?? {}).length !== 75 ||
+    Object.keys(openApiJson.paths ?? {}).length !== 41 ||
+    Object.keys(openApiJson.components?.schemas ?? {}).length !== 83 ||
     !openApiYaml.startsWith("openapi: 3.1.") ||
     !openApiYamlResponse.headers.get("content-type")?.includes("application/yaml")
   ) {

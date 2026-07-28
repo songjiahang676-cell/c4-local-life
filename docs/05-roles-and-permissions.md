@@ -84,8 +84,18 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
 未过期授权，不把客户端 claims 当作事实。`admin:console:access` 只授予 ACTIVE 且至少有一个有效平台
 角色的 Actor。`GET /admin/session` 再次执行服务端 Policy，并只返回安全用户投影、去重后的角色和服务端
-计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。当前
-`security.privilegedActionsAllowed=false`，在 `AUTH-005` 完成 MFA/step-up 前没有后台数据或写动作开放。
+计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。
+
+`AUTH-005` 在该 bootstrap 权限之外增加两层服务端动作：
+
+- `admin:console:privileged` 必须同时具备当前平台角色与 `MFA` 强度 Session；
+- `admin:sensitive:access` 还必须处在十分钟近期 MFA 窗口内。
+
+普通 EMAIL/SMS OTP 只能建立 `PRIMARY` Session。TOTP 或一次性恢复码验证会原子撤销旧 Session，
+换发默认绝对 8 小时、闲置 30 分钟的 MFA Session；`RequestContext` 携带服务端解析的认证强度与
+近期认证布尔值，客户端不能提交。新增后台工作区必须声明 `admin:console:privileged`，PII reveal、
+导出、封禁、角色/财务/配置等高风险动作必须声明 `admin:sensitive:access`，不能只读取
+`GET /admin/session` 的展示字段。
 
 ## 5.6 权限测试最小矩阵
 

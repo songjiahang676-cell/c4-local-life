@@ -165,6 +165,20 @@ role history is never copied into client-managed claims.
   additive enum/table. Do not drop grant history during incident response. See the migration-local
   `ROLLBACK.md` for the stopped-writer physical recovery sequence.
 
+## `20260728221000_admin_mfa`
+
+Adds explicit `PRIMARY` / `MFA` authentication strength to sessions, one encrypted TOTP credential
+per user, and one-time recovery-code hashes. Database checks keep pending/active/disabled timestamps
+coherent and bound failed attempts; repository transactions prevent replay of a TOTP time step or
+recovery code and append minimized audit events.
+
+- Roll forward: deploy before the Admin MFA routes, configure a dedicated `MFA_SECRET`, then verify
+  primary-to-MFA session rotation, old-token rejection, replay races, lockout, audit minimization,
+  and current platform-role enforcement.
+- Rollback: disable the MFA routes and privileged Admin workspaces, redeploy the prior application,
+  and retain additive credential/session metadata. Do not decrypt/export secrets or drop recovery
+  evidence during incident response. See the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

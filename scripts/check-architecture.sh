@@ -112,7 +112,16 @@ if len(re.findall(r'^  /', openapi_text, re.M)) < 20:
     raise SystemExit('OpenAPI path set looks incomplete')
 openapi = yaml_docs.get(openapi_path)
 openapi_path_count = len(re.findall(r'^  /', openapi_text, re.M))
-openapi_schema_count = len(re.findall(r'^    [A-Za-z][A-Za-z0-9]+:\s*$', openapi_text, re.M))
+openapi_schema_count = 0
+inside_schema_components = False
+for line in openapi_text.splitlines():
+    if line == '  schemas:':
+        inside_schema_components = True
+        continue
+    if inside_schema_components and line.startswith('  ') and not line.startswith('    '):
+        break
+    if inside_schema_components and re.fullmatch(r'    [A-Za-z][A-Za-z0-9]+:', line):
+        openapi_schema_count += 1
 if isinstance(openapi, dict):
     if openapi.get('openapi', '').split('.')[:2] != ['3', '1']:
         raise SystemExit('Parsed OpenAPI version must be 3.1.x')

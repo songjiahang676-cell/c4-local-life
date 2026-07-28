@@ -23,6 +23,7 @@ const environment = parseApiEnvironment({
   OPENSEARCH_NODE: "https://search.example.invalid",
   SESSION_SECRET: "otp-http-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "otp-http-dedicated-secret-with-more-than-32-bytes",
+  MFA_SECRET: "otp-http-mfa-secret-with-more-than-32-bytes",
   OTP_DESTINATION_LIMIT: "3",
   OTP_IP_LIMIT: "100",
   OTP_DEVICE_LIMIT: "100",

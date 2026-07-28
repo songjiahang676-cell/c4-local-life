@@ -20,6 +20,7 @@ const apiInput = {
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "session-secret-value-that-is-long-enough",
   OTP_SECRET: "otp-secret-value-that-is-long-enough",
+  MFA_SECRET: "mfa-secret-value-that-is-long-enough",
   CSRF_SECRET: "csrf-secret-value-that-is-long-enough",
 };
 
@@ -32,11 +33,19 @@ assert.equal(apiEnvironment.SESSION_IDLE_TTL_SECONDS, 604_800);
 assert.equal(apiEnvironment.SESSION_TOUCH_INTERVAL_SECONDS, 300);
 assert.equal(apiEnvironment.OTP_TTL_SECONDS, 600);
 assert.equal(apiEnvironment.OTP_MAX_ATTEMPTS, 5);
+assert.equal(apiEnvironment.MFA_ENROLLMENT_TTL_SECONDS, 600);
+assert.equal(apiEnvironment.MFA_MAX_ATTEMPTS, 5);
+assert.equal(apiEnvironment.MFA_LOCK_SECONDS, 300);
+assert.equal(apiEnvironment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS, 28_800);
+assert.equal(apiEnvironment.ADMIN_SESSION_IDLE_TTL_SECONDS, 1_800);
+assert.equal(apiEnvironment.ADMIN_STEP_UP_TTL_SECONDS, 600);
 assert.equal(apiEnvironment.FEATURE_PAYMENTS, false);
 assert.equal(apiEnvironment.SESSION_SECRET.reveal(), apiInput.SESSION_SECRET);
 assert.equal(apiEnvironment.OTP_SECRET.reveal(), apiInput.OTP_SECRET);
+assert.equal(apiEnvironment.MFA_SECRET.reveal(), apiInput.MFA_SECRET);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.SESSION_SECRET), false);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.OTP_SECRET), false);
+assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.MFA_SECRET), false);
 
 const workerEnvironment = parseWorkerEnvironment({
   NODE_ENV: "test",

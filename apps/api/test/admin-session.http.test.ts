@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
 import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
+import { MemoryMfaStore } from "./support/memory-mfa.store";
 
 const environment = parseApiEnvironment({
   NODE_ENV: "test",
@@ -18,6 +19,7 @@ const environment = parseApiEnvironment({
   OPENSEARCH_NODE: "https://search.example.invalid",
   SESSION_SECRET: "admin-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "admin-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "admin-mfa-secret-with-more-than-32-bytes",
   CSRF_SECRET: "admin-csrf-secret-with-more-than-32-bytes",
 });
 
@@ -51,6 +53,7 @@ describe("Admin session HTTP boundary", () => {
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore: store,
+      mfaStore: new MemoryMfaStore(),
     });
     await app.init();
     server = app.getHttpAdapter().getInstance();
@@ -98,7 +101,12 @@ describe("Admin session HTTP boundary", () => {
       ],
       security: {
         mfaRequired: true,
+        mfaEnrolled: false,
+        authenticationStrength: "PRIMARY",
+        mfaVerifiedAt: null,
+        stepUpExpiresAt: null,
         privilegedActionsAllowed: false,
+        sensitiveActionsAllowed: false,
       },
     });
     expect(JSON.stringify(payload)).not.toMatch(/email|phone|trustScore|token|scope/i);

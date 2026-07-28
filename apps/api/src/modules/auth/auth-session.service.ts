@@ -36,6 +36,12 @@ export type IssuedSession = {
   response: Session;
 };
 
+export type SessionAuthentication = {
+  strength: "PRIMARY" | "MFA";
+  mfaVerifiedAt: string | null;
+  recentMfa: boolean;
+};
+
 function addSeconds(value: Date, seconds: number): Date {
   return new Date(value.getTime() + seconds * millisecondsPerSecond);
 }
@@ -93,6 +99,9 @@ function toSessionResponse(principal: AuthSessionPrincipal): Session {
         ? [
             ...activeUserPermissions,
             ...(platformRoles.length > 0 ? [adminPolicyActions.consoleAccess] : []),
+            ...(platformRoles.length > 0 && principal.session.authenticationStrength === "MFA"
+              ? [adminPolicyActions.privilegedAccess]
+              : []),
           ]
         : [...accountSelfServicePermissions],
     platformRoles,
@@ -136,6 +145,8 @@ export class AuthSessionService {
       ipHash: hashIpAddress(metadata.ipAddress, this.#secret),
       expiresAt,
       idleExpiresAt,
+      authenticationStrength: "PRIMARY",
+      mfaVerifiedAt: null,
       now,
     });
     if (!principal) throw new SessionSubjectUnavailableError();
@@ -152,11 +163,15 @@ export class AuthSessionService {
 
     const token = randomBytes(32).toString("base64url");
     const tokenHash = hashSessionToken(token, this.#secret);
-    const expiresAt = addSeconds(now, this.environment.SESSION_ABSOLUTE_TTL_SECONDS);
-    const idleExpiresAt = earlierDate(
-      expiresAt,
-      addSeconds(now, this.environment.SESSION_IDLE_TTL_SECONDS),
-    );
+    const isMfa = current.authentication.strength === "MFA";
+    const absoluteTtl = isMfa
+      ? this.environment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS
+      : this.environment.SESSION_ABSOLUTE_TTL_SECONDS;
+    const idleTtl = isMfa
+      ? this.environment.ADMIN_SESSION_IDLE_TTL_SECONDS
+      : this.environment.SESSION_IDLE_TTL_SECONDS;
+    const expiresAt = addSeconds(now, absoluteTtl);
+    const idleExpiresAt = earlierDate(expiresAt, addSeconds(now, idleTtl));
     const principal = await this.store.rotate({
       userId: current.response.user.id,
       currentTokenHash: hashSessionToken(currentToken, this.#secret),
@@ -165,6 +180,10 @@ export class AuthSessionService {
       ipHash: hashIpAddress(metadata.ipAddress, this.#secret),
       expiresAt,
       idleExpiresAt,
+      authenticationStrength: current.authentication.strength,
+      mfaVerifiedAt: current.authentication.mfaVerifiedAt
+        ? new Date(current.authentication.mfaVerifiedAt)
+        : null,
       now,
     });
     return principal ? this.#issued(token, principal, now) : null;
@@ -173,7 +192,11 @@ export class AuthSessionService {
   async resolveToken(
     token: string,
     now = new Date(),
-  ): Promise<{ sessionId: string; response: Session } | null> {
+  ): Promise<{
+    sessionId: string;
+    response: Session;
+    authentication: SessionAuthentication;
+  } | null> {
     if (!isSessionToken(token)) return null;
     const tokenHash = hashSessionToken(token, this.#secret);
     const principal = await this.store.findActiveByTokenHash(tokenHash, now);
@@ -181,10 +204,11 @@ export class AuthSessionService {
 
     const touchInterval = this.environment.SESSION_TOUCH_INTERVAL_SECONDS * millisecondsPerSecond;
     if (now.getTime() - principal.session.lastSeenAt.getTime() >= touchInterval) {
-      const idleExpiresAt = earlierDate(
-        principal.session.expiresAt,
-        addSeconds(now, this.environment.SESSION_IDLE_TTL_SECONDS),
-      );
+      const idleTtl =
+        principal.session.authenticationStrength === "MFA"
+          ? this.environment.ADMIN_SESSION_IDLE_TTL_SECONDS
+          : this.environment.SESSION_IDLE_TTL_SECONDS;
+      const idleExpiresAt = earlierDate(principal.session.expiresAt, addSeconds(now, idleTtl));
       const touchBefore = new Date(now.getTime() - touchInterval);
       if (!(await this.store.touch(tokenHash, now, touchBefore, idleExpiresAt))) return null;
       principal.session.lastSeenAt = now;
@@ -194,7 +218,38 @@ export class AuthSessionService {
     return {
       sessionId: principal.session.id,
       response: toSessionResponse(principal),
+      authentication: this.#authentication(principal, now),
     };
+  }
+
+  async elevateWithMfa(
+    currentToken: string,
+    metadata: SessionClientMetadata,
+    now = new Date(),
+  ): Promise<IssuedSession | null> {
+    const current = await this.resolveToken(currentToken, now);
+    if (!current) return null;
+
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = hashSessionToken(token, this.#secret);
+    const expiresAt = addSeconds(now, this.environment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS);
+    const idleExpiresAt = earlierDate(
+      expiresAt,
+      addSeconds(now, this.environment.ADMIN_SESSION_IDLE_TTL_SECONDS),
+    );
+    const principal = await this.store.rotate({
+      userId: current.response.user.id,
+      currentTokenHash: hashSessionToken(currentToken, this.#secret),
+      tokenHash,
+      userAgent: cleanUserAgent(metadata.userAgent),
+      ipHash: hashIpAddress(metadata.ipAddress, this.#secret),
+      expiresAt,
+      idleExpiresAt,
+      authenticationStrength: "MFA",
+      mfaVerifiedAt: now,
+      now,
+    });
+    return principal ? this.#issued(token, principal, now) : null;
   }
 
   logout(token: string, now = new Date()): Promise<boolean> {
@@ -215,6 +270,19 @@ export class AuthSessionService {
       ),
       sessionId: principal.session.id,
       response: toSessionResponse(principal),
+    };
+  }
+
+  #authentication(principal: AuthSessionPrincipal, now: Date): SessionAuthentication {
+    const mfaVerifiedAt = principal.session.mfaVerifiedAt;
+    return {
+      strength: principal.session.authenticationStrength,
+      mfaVerifiedAt: mfaVerifiedAt?.toISOString() ?? null,
+      recentMfa:
+        principal.session.authenticationStrength === "MFA" &&
+        mfaVerifiedAt !== null &&
+        now.getTime() - mfaVerifiedAt.getTime() <=
+          this.environment.ADMIN_STEP_UP_TTL_SECONDS * millisecondsPerSecond,
     };
   }
 }

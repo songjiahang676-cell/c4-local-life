@@ -86,3 +86,18 @@
 - 本切片的登录表单复用 EMAIL OTP，但 OTP 不是 Admin MFA。API 明确返回
   `mfaRequired=true`、`privilegedActionsAllowed=false`，因此工作区仅显示安全占位/空态。AUTH-005
   完成 MFA、step-up 与近期认证前，禁止接入任何特权数据、写动作、PII reveal 或导出。
+
+## 28.9 AUTH-005 MFA / step-up 实施基线
+
+- Admin BFF allowlist 增加三个固定 MFA 路径，但仍不允许任意 `/admin/*` 代理。所有写请求受
+  Cookie、same-origin、严格 DTO、no-store 和通用 Problem Details 保护。
+- 未设置账号显示双语 TOTP 设置页；pending 设置十分钟有效且重试稳定返回同一 secret。验证成功后
+  恢复码显示一次，用户明确确认保存后才进入工作区。已设置账号必须先完成 TOTP/恢复码验证，前端在
+  `PRIMARY` 状态完全不渲染角色导航。
+- TOTP secret 使用 AES-256-GCM 加密；恢复码只存域分离哈希；TOTP 时间步与恢复码均一次消费。
+  五次失败锁定五分钟，不能通过重启进程绕过。
+- MFA 验证原子轮换 Session；旧 token 失效。MFA Admin Session 默认绝对 8 小时、闲置 30 分钟，
+  敏感动作的近期认证窗口为 10 分钟。后台页可重新 step-up，但领域 controller 仍必须声明
+  `admin:console:privileged` 或 `admin:sensitive:access`。
+- enrollment、TOTP 验证和恢复码消费写最小审计事件。审计与 HTTP 日志不得包含 secret、明文
+  recovery code、token、联系方式或 IP 原文。当前不提供自助禁用/重置以避免降级绕过。

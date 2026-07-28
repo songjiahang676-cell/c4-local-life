@@ -89,6 +89,13 @@ const apiEnvironmentSchema = commonServerSchema
     OTP_IP_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
     OTP_DEVICE_LIMIT: positiveInteger(10, 500),
     OTP_DEVICE_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    MFA_SECRET: secretSchema(32),
+    MFA_ENROLLMENT_TTL_SECONDS: positiveInteger(600, 1_800),
+    MFA_MAX_ATTEMPTS: positiveInteger(5, 20),
+    MFA_LOCK_SECONDS: positiveInteger(300, 3_600),
+    ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: positiveInteger(28_800, 86_400),
+    ADMIN_SESSION_IDLE_TTL_SECONDS: positiveInteger(1_800, 14_400),
+    ADMIN_STEP_UP_TTL_SECONDS: positiveInteger(600, 3_600),
     FEATURE_PAYMENTS: booleanValue(false),
     FEATURE_MESSAGING: booleanValue(true),
     FEATURE_COMMUNITY: booleanValue(false),
@@ -120,6 +127,37 @@ const apiEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["OTP_SECRET"],
         message: "OTP secret must be distinct from session and CSRF secrets",
+      });
+    }
+    if (
+      value.MFA_SECRET instanceof SecretValue &&
+      value.SESSION_SECRET instanceof SecretValue &&
+      value.CSRF_SECRET instanceof SecretValue &&
+      value.OTP_SECRET instanceof SecretValue &&
+      [
+        value.SESSION_SECRET.reveal(),
+        value.CSRF_SECRET.reveal(),
+        value.OTP_SECRET.reveal(),
+      ].includes(value.MFA_SECRET.reveal())
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["MFA_SECRET"],
+        message: "MFA secret must be distinct from session, CSRF, and OTP secrets",
+      });
+    }
+    if (value.ADMIN_SESSION_IDLE_TTL_SECONDS > value.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["ADMIN_SESSION_IDLE_TTL_SECONDS"],
+        message: "Admin idle session lifetime cannot exceed the absolute lifetime",
+      });
+    }
+    if (value.ADMIN_STEP_UP_TTL_SECONDS > value.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["ADMIN_STEP_UP_TTL_SECONDS"],
+        message: "Admin step-up lifetime cannot exceed the absolute session lifetime",
       });
     }
     if (Boolean(value.S3_ACCESS_KEY) !== Boolean(value.S3_SECRET_KEY)) {

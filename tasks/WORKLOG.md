@@ -461,3 +461,25 @@ Observability: Existing correlated bounded route/status telemetry covers Admin 2
 Docs: Updated roles/permissions、domain/data、API/integrations、security/privacy、acceptance、Admin architecture、runtime configuration、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: AUTH-005 must add real Admin MFA/step-up/recent-auth and only then allow privileged reads/writes；role grant/revoke UI/API、scope enforcement per resource、immutable `AuditLog` writes、SSO、two-person approvals and real workspaces remain their planned tasks；bootstrap grants require a reviewed maintenance procedure；local Docker smoke and hosted protected checks remain
+
+## AUTH-005 — 后台 MFA / step-up
+
+Task: AUTH-005 后台 MFA/step-up
+
+Changed: Added encrypted TOTP enrollment/activation/verification、one-time recovery codes、proof replay protection、failure lockouts、short MFA-elevated Admin sessions and recent-auth step-up；the Admin shell now presents bilingual accessible setup、recovery-code acknowledgement、verification and reauthentication states，while role navigation remains absent until MFA；added a Prisma-backed MFA Repository and a strict application store boundary
+
+Contracts: OpenAPI grows from 38 to 41 paths、47 to 50 operations and 75 to 83 schemas with no-store enrollment/activation/verification resources；Admin session now exposes only bounded MFA state、authentication strength and server-computed privileged/sensitive flags；generated TypeScript and strict Zod validators updated；Prisma grows from 42 to 44 models with `MfaCredential`、`MfaRecoveryCode`、`AuthenticationStrength` and `MfaCredentialStatus`
+
+Migrations: 有，`20260728221000_admin_mfa` additively creates credential/recovery storage and adds session authentication-strength/recent-MFA fields；all 11 migrations replayed on a newly created empty database，baseline checks passed 11 negative constraints and previous-release upgrade preserved its sentinel；application rollback disables MFA routes/Admin privileged actions and requires reauthentication while retaining additive evidence，and migration-local `ROLLBACK.md` documents exceptional stopped-writer physical rollback
+
+Security: TOTP secrets use AES-256-GCM with a dedicated `MFA_SECRET`-derived key and version；recovery codes have 80 bits of entropy and only domain-separated HMAC hashes are stored；RFC 6238 verification allows one adjacent time step and atomically rejects replay；recovery codes are consumed once；five failures create a durable timed lock with generic errors and `Retry-After`；enrollment is actor/role-bound and idempotently returns only the same live pending secret；activation and every successful proof rotate/revoke the prior session；Admin absolute/idle/recent-auth windows default to 8h/30m/10m；same-origin CSRF、platform-role checks、no-store responses and minimized audit metadata apply throughout；secrets/codes are excluded from audit/logs
+
+Tests run: RFC HOTP/TOTP vectors、encryption tamper and recovery-code tests passed；API abuse coverage proves enrollment retry stability、activation、session rotation、TOTP replay rejection、one-time recovery consumption、foreign-origin denial and lockout；real PostgreSQL passed 15 files/49 tests including role binding、atomic activation/proof/recovery and audit history；all 11 migrations deployed and status/baseline/upgrade/safety passed；the first production E2E start exposed the new Repository missing from the database runtime TypeScript include and was fixed before rerun；final `pnpm ci:quality` passed 9 typechecks、9 lints、44/44 test files、165/165 tests and 8 builds（77.69% statements、80.04% lines）；forced clean local builds passed；`pnpm observability:check` passed；`pnpm test:e2e:ci` passed Chromium desktop/mobile 6/6
+
+Not run: Local Docker/Compose image smoke，because this host has no Docker CLI；no production staff identity/authenticator was enrolled；protected hosted Linux quality and four-image runtime jobs remain pending
+
+Observability: Existing bounded route/status telemetry covers Admin MFA 200/201/400/401/403/409/429 without user、role、secret、code、session or provider values as labels；structured audit records contain action、actor、credential and non-sensitive method/step metadata only；no secret、recovery code、cookie or raw PII is logged
+
+Docs: Updated roles/permissions、domain/data、API/integrations、security/privacy、acceptance、Admin architecture、runtime configuration、implementation sequence、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: Self-service MFA disable/reset and lost-device recovery are intentionally absent until an audited identity-recovery workflow can revoke all sessions；platform-role grant/revoke UI/API、resource scope enforcement、two-person approval、SSO and real privileged workspaces remain later tasks；`MFA_SECRET` rotation requires a dual-key operational migration before changing key version；local Docker smoke and protected hosted checks remain

@@ -17,6 +17,8 @@ export type AuthSessionCreateInput = {
   ipHash: string | null;
   expiresAt: Date;
   idleExpiresAt: Date;
+  authenticationStrength: "PRIMARY" | "MFA";
+  mfaVerifiedAt: Date | null;
   now: Date;
 };
 
@@ -32,6 +34,8 @@ export type AuthSessionPrincipal = {
     idleExpiresAt: Date;
     lastSeenAt: Date;
     createdAt: Date;
+    authenticationStrength: "PRIMARY" | "MFA";
+    mfaVerifiedAt: Date | null;
   };
   user: {
     id: string;
@@ -149,6 +153,8 @@ function mapPrincipal(row: SessionWithPrincipal, now: Date): AuthSessionPrincipa
       idleExpiresAt: row.idleExpiresAt,
       lastSeenAt: row.lastSeenAt,
       createdAt: row.createdAt,
+      authenticationStrength: row.authenticationStrength,
+      mfaVerifiedAt: row.mfaVerifiedAt,
     },
     user: {
       id: row.user.id,
@@ -277,6 +283,8 @@ export class AuthSessionRepository {
           ipHash: input.ipHash,
           expiresAt: input.expiresAt,
           idleExpiresAt: input.idleExpiresAt,
+          authenticationStrength: input.authenticationStrength,
+          mfaVerifiedAt: input.mfaVerifiedAt,
           lastSeenAt: input.now,
           createdAt: input.now,
         },
@@ -309,6 +317,8 @@ export class AuthSessionRepository {
           ipHash: input.ipHash,
           expiresAt: input.expiresAt,
           idleExpiresAt: input.idleExpiresAt,
+          authenticationStrength: input.authenticationStrength,
+          mfaVerifiedAt: input.mfaVerifiedAt,
           lastSeenAt: input.now,
           createdAt: input.now,
         },

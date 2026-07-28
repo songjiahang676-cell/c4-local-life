@@ -9,6 +9,7 @@ const validApiEnvironment = {
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "test-mfa-secret-with-more-than-32-bytes",
   CSRF_SECRET: "test-csrf-secret-with-more-than-32-bytes",
 };
 
@@ -24,14 +25,22 @@ describe("runtime configuration", () => {
     expect(environment.SESSION_TOUCH_INTERVAL_SECONDS).toBe(300);
     expect(environment.SESSION_SECRET).toBeInstanceOf(SecretValue);
     expect(environment.OTP_SECRET).toBeInstanceOf(SecretValue);
+    expect(environment.MFA_SECRET).toBeInstanceOf(SecretValue);
     expect(environment.OTP_TTL_SECONDS).toBe(600);
     expect(environment.OTP_MAX_ATTEMPTS).toBe(5);
+    expect(environment.MFA_ENROLLMENT_TTL_SECONDS).toBe(600);
+    expect(environment.MFA_MAX_ATTEMPTS).toBe(5);
+    expect(environment.MFA_LOCK_SECONDS).toBe(300);
+    expect(environment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS).toBe(28_800);
+    expect(environment.ADMIN_SESSION_IDLE_TTL_SECONDS).toBe(1_800);
+    expect(environment.ADMIN_STEP_UP_TTL_SECONDS).toBe(600);
     expect(environment.S3_QUARANTINE_BUCKET).toBe("socal-media-quarantine-local");
     expect(environment.MEDIA_UPLOAD_URL_TTL_SECONDS).toBe(300);
     expect(environment.MEDIA_UPLOAD_MAX_ACTIVE).toBe(20);
     expect(environment.MEDIA_UPLOAD_DAILY_BYTES).toBe(209_715_200);
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
+    expect(JSON.stringify(environment.MFA_SECRET)).toBe('"[REDACTED]"');
   });
 
   it("fails fast without exposing a supplied value", () => {
@@ -72,6 +81,29 @@ describe("runtime configuration", () => {
       parseApiEnvironment({
         ...validApiEnvironment,
         OTP_SECRET: validApiEnvironment.SESSION_SECRET,
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("requires a domain-separated MFA secret and safe Admin lifetimes", () => {
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        MFA_SECRET: validApiEnvironment.SESSION_SECRET,
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: "1800",
+        ADMIN_SESSION_IDLE_TTL_SECONDS: "1801",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: "600",
+        ADMIN_STEP_UP_TTL_SECONDS: "601",
       }),
     ).toThrow(RuntimeConfigError);
   });

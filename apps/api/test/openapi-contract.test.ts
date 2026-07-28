@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { canonicalOpenApiPath } from "../src/common/openapi-document";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
+import { decodeBase32, totpCode } from "../src/modules/admin/mfa-crypto";
 import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
 import {
   CapturingOtpDeliveryGateway,
@@ -18,6 +19,7 @@ import {
 import { MemoryOrganizationStore } from "./support/memory-organization.store";
 import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-media.store";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
+import { MemoryMfaStore } from "./support/memory-mfa.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -46,6 +48,7 @@ const environment = parseApiEnvironment({
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "contract-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "contract-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "contract-mfa-secret-with-more-than-32-bytes",
   CSRF_SECRET: "contract-csrf-secret-with-more-than-32-bytes",
 });
 const contractUserId = "20000000-0000-4000-8000-000000000001";
@@ -145,6 +148,7 @@ describe("canonical OpenAPI contract", () => {
       mediaStore: new MemoryMediaStore(),
       mediaObjectStorage: new CapturingMediaObjectStorage(),
       taxonomyStore,
+      mfaStore: new MemoryMfaStore(),
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -170,9 +174,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(38);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(75);
-    expect(operationIds).toHaveLength(47);
+    expect(Object.keys(contract.paths)).toHaveLength(41);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(83);
+    expect(operationIds).toHaveLength(50);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -209,8 +213,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(38);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(38);
+    expect(Object.keys(servedJson.paths)).toHaveLength(41);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(41);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -405,6 +409,71 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+  });
+
+  it("validates Admin MFA enrollment, activation, and recovery verification against the contract", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    let cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const started = await server.inject({
+      method: "POST",
+      url: "/v1/admin/mfa/enrollment",
+      headers: { cookie, origin: environment.PUBLIC_ADMIN_URL },
+    });
+    const enrollmentSchema =
+      contract.paths["/admin/mfa/enrollment"]?.post?.responses["201"]?.content?.["application/json"]
+        ?.schema;
+    expect(started.statusCode).toBe(201);
+    expect(
+      ajv.validate(enrollmentSchema ?? false, started.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
+
+    const enrollment = started.json<{ data: { credentialId: string; secret: string } }>().data;
+    const activated = await server.inject({
+      method: "POST",
+      url: "/v1/admin/mfa/enrollment/verify",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+      },
+      payload: {
+        credentialId: enrollment.credentialId,
+        code: totpCode(decodeBase32(enrollment.secret), new Date()),
+      },
+    });
+    const activationSchema =
+      contract.paths["/admin/mfa/enrollment/verify"]?.post?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+    expect(activated.statusCode).toBe(200);
+    expect(
+      ajv.validate(activationSchema ?? false, activated.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
+    const setCookie = activated.headers["set-cookie"];
+    cookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)?.split(";", 1)[0] ?? "";
+
+    const recoveryCode = activated.json<{ data: { recoveryCodes: string[] } }>().data
+      .recoveryCodes[0];
+    const verified = await server.inject({
+      method: "POST",
+      url: "/v1/admin/mfa/verify",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+      },
+      payload: { code: recoveryCode },
+    });
+    const verificationSchema =
+      contract.paths["/admin/mfa/verify"]?.post?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    expect(verified.statusCode).toBe(200);
+    expect(
+      ajv.validate(verificationSchema ?? false, verified.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
   });
 
   it("validates implemented region and category trees against the contract", async () => {

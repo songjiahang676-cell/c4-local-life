@@ -18,6 +18,8 @@ export const activeUserPolicyActions = {
 
 export const adminPolicyActions = {
   consoleAccess: "admin:console:access",
+  privilegedAccess: "admin:console:privileged",
+  sensitiveAccess: "admin:sensitive:access",
 } as const;
 
 export const organizationPolicyActions = {
@@ -74,6 +76,9 @@ export type AuthenticatedActor = {
     | "PLATFORM_ADMIN"
     | "READ_ONLY_AUDITOR"
   )[];
+  authenticationStrength: "PRIMARY" | "MFA";
+  mfaVerifiedAt: string | null;
+  recentMfa: boolean;
   organizations: readonly OrganizationActorMembership[];
 };
 
@@ -150,6 +155,33 @@ export function requireActiveActorPermissionPolicy(input: PolicyEvaluationInput)
   return actor.permissions.includes(input.action)
     ? allowPolicy()
     : denyPolicy("INSUFFICIENT_PERMISSION");
+}
+
+export function requireMfaActorPermissionPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const { actor } = input.context;
+  if (actor.kind === "guest") return denyPolicy("AUTHENTICATION_REQUIRED");
+  if (actor.accountStatus !== "ACTIVE") return denyPolicy("ACCOUNT_RESTRICTED");
+  if (actor.authenticationStrength !== "MFA") {
+    return denyPolicy("INSUFFICIENT_PERMISSION");
+  }
+  return actor.permissions.includes(adminPolicyActions.privilegedAccess)
+    ? allowPolicy()
+    : denyPolicy("INSUFFICIENT_PERMISSION");
+}
+
+export function requireRecentMfaActorPermissionPolicy(
+  input: PolicyEvaluationInput,
+): PolicyDecision {
+  const mfa = requireMfaActorPermissionPolicy({
+    ...input,
+    action: adminPolicyActions.privilegedAccess,
+  });
+  if (!mfa.allowed) return mfa;
+  const { actor } = input.context;
+  if (actor.kind === "guest" || !actor.recentMfa) {
+    return denyPolicy("INSUFFICIENT_PERMISSION");
+  }
+  return allowPolicy();
 }
 
 export function ownerOrOrganizationPolicy(options: ObjectAccessPolicyOptions): PolicyRule {

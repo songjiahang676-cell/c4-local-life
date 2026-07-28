@@ -1,4 +1,4 @@
-import { type DynamicModule, Module, type Provider } from "@nestjs/common";
+import { type DynamicModule, Global, Module, type Provider } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import type { ApiEnvironment } from "@socal/config";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
@@ -21,6 +21,7 @@ import {
 import { OtpController } from "./otp.controller";
 import { OtpService } from "./otp.service";
 
+@Global()
 @Module({})
 export class AuthModule {
   static register(

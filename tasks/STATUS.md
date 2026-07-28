@@ -6,14 +6,14 @@
 
 - Gate：G1 Identity / Taxonomy / Media
 - 目标：安全身份上下文、主数据、动态表单和隔离上传
-- 进度：9/13 个 G1 任务、26/101 个总任务完成
-- 风险：ADMIN-001 本地验收已通过，仍需受保护 PR 的托管质量/容器检查；AUTH-005 前特权动作保持关闭
+- 进度：10/13 个 G1 任务、27/101 个总任务完成
+- 风险：AUTH-005 本地验收已通过，仍需受保护 PR 的托管质量/容器检查；未完成 MFA 的 Admin 会话继续无法访问特权动作
 
 ## 正在进行
 
-| Task      | Owner                | Started    | Target            | Status     | Notes                                                             |
-| --------- | -------------------- | ---------- | ----------------- | ---------- | ----------------------------------------------------------------- |
-| ADMIN-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | validating | 独立 Admin/RBAC/no-store/CSP/41 files/152 tests 通过；等待托管 CI |
+| Task     | Owner                | Started    | Target            | Status     | Notes                                                              |
+| -------- | -------------------- | ---------- | ----------------- | ---------- | ------------------------------------------------------------------ |
+| AUTH-005 | @songjiahang676-cell | 2026-07-28 | protected task PR | validating | TOTP/恢复码/step-up/近期认证；44 files/165 tests 通过；等待托管 CI |
 
 ## Gate Evidence
 
@@ -56,12 +56,16 @@
 | ADMIN-001 local quality         | `pnpm ci:quality` + Admin tests    | passed：41 files / 152 tests / 8 builds                 | 2026-07-28 |
 | ADMIN-001 database lifecycle    | deploy + integration + baseline    | 10 migrations；47 DB tests；9 constraint negatives      | 2026-07-28 |
 | ADMIN-001 browser/CSP           | Chromium desktop/mobile + in-app   | 6/6 E2E；nonce hydration、双语、noindex/no-store passed | 2026-07-28 |
+| ADMIN-001 protected merge       | PR #11 / run `30396556334`         | merged `8058597`；quality + non-root images passed      | 2026-07-28 |
+| AUTH-005 local quality          | `pnpm ci:quality` + MFA tests      | passed：44 files / 165 tests / 8 builds                 | 2026-07-28 |
+| AUTH-005 database lifecycle     | deploy + integration + baseline    | 11 migrations；49 DB tests；11 constraint negatives     | 2026-07-28 |
+| AUTH-005 browser/runtime        | Chromium desktop/mobile + runtime  | 6/6 E2E；API observability check passed                 | 2026-07-28 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001 已由受保护 PR #3–#10 合并；ADMIN-001 本地验收完成。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001 已由受保护 PR #3–#11 合并；AUTH-005 本地验收完成。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。
