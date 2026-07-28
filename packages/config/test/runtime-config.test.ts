@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseApiEnvironment, redactSensitiveValue, RuntimeConfigError, SecretValue } from "../src";
+import {
+  parseApiEnvironment,
+  parseWorkerEnvironment,
+  redactSensitiveValue,
+  RuntimeConfigError,
+  SecretValue,
+} from "../src";
 
 const validApiEnvironment = {
   PUBLIC_WEB_URL: "http://localhost:3000",
@@ -132,6 +138,27 @@ describe("runtime configuration", () => {
       parseApiEnvironment({
         ...validApiEnvironment,
         S3_ACCESS_KEY: "local-access-key",
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("validates bounded outbox worker controls and retry ordering", () => {
+    const environment = parseWorkerEnvironment({
+      DATABASE_URL: "postgresql://example.invalid/socal",
+      REDIS_URL: "redis://localhost:6379/0",
+    });
+    expect(environment.OUTBOX_QUEUE_NAME).toBe("platform-events");
+    expect(environment.OUTBOX_BATCH_SIZE).toBe(25);
+    expect(environment.OUTBOX_LEASE_SECONDS).toBe(60);
+    expect(environment.OUTBOX_MAX_ATTEMPTS).toBe(10);
+    expect(environment.OUTBOX_MAX_PAYLOAD_BYTES).toBe(131_072);
+
+    expect(() =>
+      parseWorkerEnvironment({
+        DATABASE_URL: "postgresql://example.invalid/socal",
+        REDIS_URL: "redis://localhost:6379/0",
+        OUTBOX_RETRY_BASE_SECONDS: "60",
+        OUTBOX_RETRY_MAX_SECONDS: "30",
       }),
     ).toThrow(RuntimeConfigError);
   });

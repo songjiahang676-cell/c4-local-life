@@ -1,7 +1,8 @@
 import { createServer, type ServerResponse } from "node:http";
-import { Worker, type Job } from "bullmq";
+import { Queue, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import { parseWorkerEnvironment, RuntimeConfigError, runtimeConfigSummary } from "@socal/config";
+import { OutboxEventRepository } from "@socal/database/outbox";
 import {
   createObservabilityRuntime,
   shutdownTracing,
@@ -9,6 +10,8 @@ import {
 } from "@socal/observability";
 import { workerLiveness, workerReadiness } from "./health-status";
 import { runObservedJob } from "./job-observability";
+import { BullMqOutboxPublisher } from "./outbox/bullmq-outbox.publisher";
+import { OutboxDispatcher } from "./outbox/outbox-dispatcher";
 
 const runtimeState: { observability?: ObservabilityRuntime } = {};
 process.on("uncaughtException", (error: Error) => {
@@ -44,6 +47,27 @@ runtimeState.observability = createObservabilityRuntime({
   otlpEndpoint: environment.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
 });
 const connection = new IORedis(environment.REDIS_URL, { maxRetriesPerRequest: null });
+const outboxRepository = new OutboxEventRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
+const outboxQueue = new Queue(environment.OUTBOX_QUEUE_NAME, { connection });
+const outboxDispatcher = new OutboxDispatcher({
+  repository: outboxRepository,
+  publisher: new BullMqOutboxPublisher(outboxQueue, {
+    maximumPayloadBytes: environment.OUTBOX_MAX_PAYLOAD_BYTES,
+    jobAttempts: environment.OUTBOX_JOB_ATTEMPTS,
+  }),
+  observability: runtimeState.observability,
+  configuration: {
+    batchSize: environment.OUTBOX_BATCH_SIZE,
+    leaseSeconds: environment.OUTBOX_LEASE_SECONDS,
+    maximumAttempts: environment.OUTBOX_MAX_ATTEMPTS,
+    pollIntervalMilliseconds: environment.OUTBOX_POLL_INTERVAL_MS,
+    retryBaseSeconds: environment.OUTBOX_RETRY_BASE_SECONDS,
+    retryMaximumSeconds: environment.OUTBOX_RETRY_MAX_SECONDS,
+  },
+});
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   runtimeState.observability?.logger.info(event, fields);
@@ -56,7 +80,7 @@ const handlers: Record<string, (job: Job) => Promise<void>> = {
 };
 
 const worker = new Worker(
-  "platform-events",
+  environment.OUTBOX_QUEUE_NAME,
   async (job) => {
     const handler = handlers[job.name];
     if (!handler) throw new Error(`No handler registered for job ${job.name}`);
@@ -120,10 +144,13 @@ healthServer.listen(environment.WORKER_HEALTH_PORT, "0.0.0.0");
 
 async function shutdown(signal: string): Promise<void> {
   logEvent("worker.shutdown.started", { signal });
+  await outboxDispatcher.stop();
   await new Promise<void>((resolve, reject) => {
     healthServer.close((error) => (error ? reject(error) : resolve()));
   });
   await worker.close();
+  await outboxQueue.close();
+  await outboxRepository.close();
   await connection.quit();
   await shutdownTracing();
   process.exit(0);
@@ -132,9 +159,11 @@ async function shutdown(signal: string): Promise<void> {
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
+outboxDispatcher.start();
 logEvent("worker.started", {
   concurrency: environment.WORKER_CONCURRENCY,
   healthPort: environment.WORKER_HEALTH_PORT,
-  queue: "platform-events",
+  outboxBatchSize: environment.OUTBOX_BATCH_SIZE,
+  queue: environment.OUTBOX_QUEUE_NAME,
   ...runtimeConfigSummary(environment),
 });

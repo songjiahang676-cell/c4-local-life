@@ -66,6 +66,16 @@ for (const workspacePackage of ["config", "contracts", "database", "observabilit
     throw new Error(`API runtime image must include workspace package ${workspacePackage}`);
   }
 }
+const workerTargetSource = dockerfileSource.slice(workerTargetStart);
+for (const workspacePackage of ["config", "database", "observability"]) {
+  if (
+    !workerTargetSource.includes(
+      `/workspace/packages/${workspacePackage} ./packages/${workspacePackage}`,
+    )
+  ) {
+    throw new Error(`Worker runtime image must include workspace package ${workspacePackage}`);
+  }
+}
 
 if (!/^\.env$/m.test(dockerignoreSource) || !/^node_modules$/m.test(dockerignoreSource)) {
   throw new Error(".dockerignore must exclude local secrets and dependencies");

@@ -53,10 +53,13 @@ assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.PASSWORD_PEPPER), 
 const workerEnvironment = parseWorkerEnvironment({
   NODE_ENV: "test",
   APP_ENV: "test",
+  DATABASE_URL: "postgresql://user:password@localhost:5432/socal_test",
   REDIS_URL: "redis://localhost:6379/0",
   WORKER_CONCURRENCY: "7",
 });
 assert.equal(workerEnvironment.WORKER_CONCURRENCY, 7);
+assert.equal(workerEnvironment.OUTBOX_BATCH_SIZE, 25);
+assert.equal(workerEnvironment.OUTBOX_MAX_ATTEMPTS, 10);
 
 let missingConfigurationError: RuntimeConfigError | undefined;
 try {

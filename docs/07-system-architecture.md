@@ -97,6 +97,11 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 
 所有消费者以 `eventId` 或业务幂等键去重。
 
+`EVT-001` 的 dispatcher 运行在现有 Worker 进程，不新增服务边界。它短事务领取有界批次，事务提交后
+才向配置的 BullMQ 队列写入 versioned envelope；jobId 固定为 eventId。成功/重试/终态失败使用 attempt
+版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，
+队列 envelope 默认限制为 128 KiB。
+
 ## 7.5 读取流程
 
 - 详情和强一致账户页面从 PostgreSQL 读取，可经过短缓存。

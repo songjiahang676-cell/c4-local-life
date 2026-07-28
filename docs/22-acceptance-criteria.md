@@ -51,6 +51,13 @@ hash；冷却前、过期、错误、已消费、已取代和重放证明均失�
 Session、写最小审计、发送变更通知且不自动登录。空库 12 个 migration、上一发布基线升级、数据库
 约束负例、真实 Repository 事务、HTTP 契约与 abuse 测试必须通过。
 
+`EVT-001` 可靠事件验收：两个 dispatcher 并发领取同一批 PENDING 事件不得重复 claim；领取事务不得
+跨越 Redis 调用；租约过期可安全重领，旧 attempt 的确认必须失败。BullMQ jobId 固定为 eventId，
+入队后确认前崩溃允许安全重复；失败使用指数退避+jitter，达到上限或永久无效 envelope 进入 FAILED。
+数据库约束保护状态/attempt/eventType，日志与指标不含 payload/PII；oldest pending age 和有界结果指标
+可抓取。空库 13 个 migration、上一发布基线升级、约束负例、真实 PostgreSQL 并发 Repository 和 Worker
+publisher/故障测试必须通过。
+
 ## 22.4 Listing 验收
 
 对五种类型逐项：

@@ -38,7 +38,9 @@ Health endpoints:
 | Worker  | `/health/live`    | `/health/ready`    |
 
 Liveness only reports that the event loop can answer. Worker readiness additionally requires its
-Redis connection. API readiness currently represents the HTTP process; database, Redis, and search
+Redis connection. The Worker also receives PostgreSQL configuration and polls the canonical Outbox;
+database polling failures are exposed through bounded logs and Outbox metrics while queued consumers
+remain available. API readiness currently represents the HTTP process; database, Redis, and search
 probes must be added when those adapters are wired, so it does not issue speculative dependency
 traffic before the owning tasks.
 
@@ -53,5 +55,6 @@ docker compose down
 The static contract check is useful when Docker is unavailable. It does not replace an actual image
 build; CI builds all four targets, asserts their configured user is `node`, starts the four runtime
 images on loopback-only ports, and waits for each readiness endpoint. The Worker smoke includes an
-isolated Redis container so its readiness is dependency-aware. Local completion evidence must state
-whether Docker ran.
+isolated Redis container and a syntactically valid database contract; hosted quality separately
+replays all migrations and PostgreSQL integration tests. Local completion evidence must state whether
+Docker ran.

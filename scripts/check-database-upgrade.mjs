@@ -183,6 +183,22 @@ try {
             AND constraint_name = 'users_password_state_check'
        ) AS password_state_check`,
   );
+  const outboxStorage = await upgrade.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'outbox_events'
+            AND constraint_name = 'outbox_events_state_check'
+       ) AS state_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'outbox_events_pending_available_id_idx'
+       ) AS pending_claim_index`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -206,7 +222,9 @@ try {
     !mfaStorage.rows[0].session_strength_check ||
     passwordStorage.rows[0].attempts !== "password_auth_attempts" ||
     passwordStorage.rows[0].recoveries !== "password_recovery_requests" ||
-    !passwordStorage.rows[0].password_state_check
+    !passwordStorage.rows[0].password_state_check ||
+    !outboxStorage.rows[0].state_check ||
+    !outboxStorage.rows[0].pending_claim_index
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -228,6 +246,7 @@ try {
       platformRoleStorage: true,
       mfaStorage: true,
       passwordStorage: true,
+      outboxStorage: true,
     }),
   );
 } finally {

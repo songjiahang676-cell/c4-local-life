@@ -504,4 +504,26 @@ Observability: Existing correlated bounded route/status telemetry covers passwor
 
 Docs: Updated domain/data、API/integrations、security/privacy、acceptance、runtime configuration、implementation sequence、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
 
-Known gaps: NOTIF-001/EVT-001 must replace the unavailable notification gateway with durable email/SMS dispatch before enabling recovery in production；the small built-in common-password denylist should be expanded to a reviewed compromised-password feed/service without leaking candidate passwords；self-service password enrollment/change UI and audited support recovery remain later slices；local Docker smoke remains unavailable，while PR #14 / run `30402574230` passed hosted Linux quality and four-application non-root runtime checks
+Known gaps: NOTIF-001 must replace the unavailable notification gateway with durable email/SMS dispatch before enabling recovery in production；the small built-in common-password denylist should be expanded to a reviewed compromised-password feed/service without leaking candidate passwords；self-service password enrollment/change UI and audited support recovery remain later slices；local Docker smoke remains unavailable，while PR #14 / final run `30402997906` passed hosted Linux quality and four-application non-root runtime checks and merged as `b4d9474`
+
+## EVT-001 — Transactional Outbox dispatcher
+
+Task: EVT-001 Transactional Outbox dispatcher
+
+Changed: Added a PostgreSQL Outbox Repository with atomic `UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED)` claims、attempt-versioned leases and stale-writer protection；added a Worker dispatcher、versioned BullMQ envelope、event-id job idempotency、bounded sequential batches、exponential retry with deterministic jitter、terminal failure handling、poll scheduling and graceful shutdown；wired the Worker to the database/config/observability packages and updated container/runtime contracts
+
+Contracts: OpenAPI、generated HTTP contracts and Prisma models are unchanged；the database storage contract gains additive Outbox state constraints and a partial pending `(available_at,id)` claim index；the Worker runtime contract now requires `DATABASE_URL` and bounded Outbox/queue settings；the internal queue envelope is explicitly versioned and size-limited
+
+Migrations: 有，`20260728234500_outbox_dispatcher_constraints` additively adds attempts/event-type/state-coherence checks and the partial pending-claim index；all 13 migrations replayed on the disposable `socal_evt001_empty` database，migration status、baseline and previous-release upgrade passed；migration-local `ROLLBACK.md` documents safe index/constraint removal while retaining Outbox rows
+
+Security: Business state and events remain in one PostgreSQL transaction boundary；claim/publish/fail writes are conditioned on `id + attempts` to prevent an expired worker overwriting a newer lease；BullMQ uses `eventId` as the idempotency key and consumers remain responsible for durable event-id/version deduplication under at-least-once delivery；payloads are capped at 128 KiB by default and never emitted to logs/metrics，while stored errors are reduced to bounded codes；runtime secrets and raw provider errors remain excluded
+
+Tests run: Repository integration covers concurrent disjoint claims、lease expiry/reclaim、stale completion rejection、retry scheduling、terminal failure and oldest pending age；Worker unit coverage verifies duplicate-safe publish、envelope bounds、retry/terminal classification、stale claims、poll failures and non-overlapping scheduling；database project passed 17 files/54 tests；all 13 migrations deployed，baseline passed 16 negative cases and previous-release upgrade preserved its sentinel；`pnpm ci:quality` passed 9 typechecks、9 lints、51 passed + 1 skipped test files、186 passed + 1 skipped tests and 8 builds（78.41% statements、80.8% lines）；clean Database/Worker builds、CI/container/runtime contracts、`pnpm observability:check`、architecture validation and Chromium desktop/mobile E2E 6/6 passed
+
+Not run: The real BullMQ/Redis integration test was attempted locally and correctly failed with `ECONNREFUSED 127.0.0.1:6379` because this host has no running Redis，so the final local suite explicitly skipped only that test；local Docker/Compose image smoke was not run because this host has no Docker CLI；the protected hosted CI Redis service and four-image runtime checks are pending
+
+Observability: Added bounded `socal_outbox_dispatch_total{outcome=published|retry|failed|stale}`、`socal_outbox_poll_failures_total` and `socal_outbox_oldest_pending_age_seconds` metrics；structured Worker events contain only event/aggregate identifiers、event type、attempt/outcome/duration and bounded error codes，never payload or raw provider details
+
+Docs: Updated domain/data、system architecture、reliability、observability、acceptance criteria、reference implementation、runtime configuration、local containers、migration rollback、implementation sequence、README、SECURITY、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: EVT-002 must add DLQ inspection、controlled replay and canonical-data reconciliation；each future consumer must durably deduplicate `eventId` and reject stale aggregate versions；domain-specific producers/consumers and real notification/search/media jobs remain their planned slices；local Redis/Docker evidence remains unavailable while protected hosted checks are pending

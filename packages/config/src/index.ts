@@ -213,11 +213,35 @@ const apiEnvironmentSchema = commonServerSchema
     }
   });
 
-const workerEnvironmentSchema = commonServerSchema.extend({
-  REDIS_URL: z.string().url(),
-  WORKER_CONCURRENCY: positiveInteger(5, 100),
-  WORKER_HEALTH_PORT: positiveInteger(4001, 65_535),
-});
+const workerEnvironmentSchema = commonServerSchema
+  .extend({
+    DATABASE_URL: z.string().url(),
+    DATABASE_POOL_MAX: positiveInteger(10, 100),
+    REDIS_URL: z.string().url(),
+    WORKER_CONCURRENCY: positiveInteger(5, 100),
+    WORKER_HEALTH_PORT: positiveInteger(4001, 65_535),
+    OUTBOX_QUEUE_NAME: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]{0,62}$/)
+      .default("platform-events"),
+    OUTBOX_BATCH_SIZE: positiveInteger(25, 500),
+    OUTBOX_LEASE_SECONDS: positiveInteger(60, 900),
+    OUTBOX_MAX_ATTEMPTS: positiveInteger(10, 100),
+    OUTBOX_POLL_INTERVAL_MS: positiveInteger(1_000, 60_000),
+    OUTBOX_RETRY_BASE_SECONDS: positiveInteger(5, 3_600),
+    OUTBOX_RETRY_MAX_SECONDS: positiveInteger(900, 86_400),
+    OUTBOX_MAX_PAYLOAD_BYTES: positiveInteger(131_072, 1_048_576),
+    OUTBOX_JOB_ATTEMPTS: positiveInteger(8, 100),
+  })
+  .superRefine((value, context) => {
+    if (value.OUTBOX_RETRY_BASE_SECONDS > value.OUTBOX_RETRY_MAX_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["OUTBOX_RETRY_BASE_SECONDS"],
+        message: "Outbox retry base cannot exceed the maximum delay",
+      });
+    }
+  });
 
 export class RuntimeConfigError extends Error {
   readonly code = "INVALID_RUNTIME_CONFIGURATION";

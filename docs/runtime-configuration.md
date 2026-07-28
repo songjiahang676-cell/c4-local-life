@@ -98,11 +98,22 @@ Admin 的同源 BFF 只代理代码内 allowlist 的认证、Admin Session 与 M
 
 ## Worker 配置
 
-| 变量                 | 必需 | 用途                              |
-| -------------------- | ---- | --------------------------------- |
-| `REDIS_URL`          | 是   | 队列连接                          |
-| `WORKER_CONCURRENCY` | 否   | Worker 并发数，范围 1–100，默认 5 |
-| `WORKER_HEALTH_PORT` | 否   | Worker 健康检查端口，默认 4001    |
+| 变量                        | 必需 | 用途                                                         |
+| --------------------------- | ---- | ------------------------------------------------------------ |
+| `DATABASE_URL`              | 是   | PostgreSQL/Outbox 连接串                                     |
+| `DATABASE_POOL_MAX`         | 否   | Worker 数据库连接池上限，默认 10                             |
+| `REDIS_URL`                 | 是   | BullMQ 队列连接                                              |
+| `WORKER_CONCURRENCY`        | 否   | Worker 消费并发数，范围 1–100，默认 5                        |
+| `WORKER_HEALTH_PORT`        | 否   | Worker 健康检查端口，默认 4001                               |
+| `OUTBOX_QUEUE_NAME`         | 否   | 目标队列，默认 `platform-events`                             |
+| `OUTBOX_BATCH_SIZE`         | 否   | 单次领取上限，默认 25、最大 500                              |
+| `OUTBOX_LEASE_SECONDS`      | 否   | claim 租约，默认 60 秒                                       |
+| `OUTBOX_MAX_ATTEMPTS`       | 否   | 发布最大领取次数，默认 10                                    |
+| `OUTBOX_POLL_INTERVAL_MS`   | 否   | 空闲/轮询间隔，默认 1000ms                                   |
+| `OUTBOX_RETRY_BASE_SECONDS` | 否   | 指数退避基数，默认 5 秒                                      |
+| `OUTBOX_RETRY_MAX_SECONDS`  | 否   | 最大退避，默认 900 秒且不得小于基数                          |
+| `OUTBOX_MAX_PAYLOAD_BYTES`  | 否   | versioned queue envelope 上限，默认 128 KiB、最大 1 MiB      |
+| `OUTBOX_JOB_ATTEMPTS`       | 否   | BullMQ 消费失败重试次数，默认 8；消费者仍必须按 eventId 幂等 |
 
 ## 安全规则
 
