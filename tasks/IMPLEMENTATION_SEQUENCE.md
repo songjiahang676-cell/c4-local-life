@@ -29,6 +29,7 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 8. `MEDIA-002` scan/transform/READY lifecycle。
 9. `ADMIN-001` admin auth/RBAC shell 与 fail-closed MFA gate。
 10. `AUTH-005` TOTP MFA、恢复码、step-up 与近期认证。
+11. `AUTH-004` 可选密码登录、恢复冷却、通知与会话全撤销。
 
 先完成权限负面测试，再进入 Listing。
 

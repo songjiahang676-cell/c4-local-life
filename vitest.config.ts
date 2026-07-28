@@ -37,6 +37,12 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/password-credential": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/password-credential.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/otp-challenge": fileURLToPath(
         new URL(
           "./packages/database/src/repositories/otp-challenge.repository.ts",

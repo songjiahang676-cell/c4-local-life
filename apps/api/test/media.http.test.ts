@@ -21,6 +21,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "media-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "media-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "media-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "media-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "media-csrf-secret-with-more-than-32-bytes",
   S3_QUARANTINE_BUCKET: "socal-test-quarantine",
 });

@@ -65,6 +65,12 @@ enum MfaCredentialStatus {
   DISABLED
 }
 
+enum PasswordAuthAttemptOutcome {
+  PENDING
+  SUCCESS
+  FAILURE
+}
+
 enum RegionType {
   COUNTRY
   STATE
@@ -264,6 +270,9 @@ model User {
   email                   String?                   @unique @db.VarChar(320)
   phoneE164               String?                   @unique @map("phone_e164") @db.VarChar(32)
   passwordHash            String?                   @map("password_hash") @db.VarChar(255)
+  passwordChangedAt       DateTime?                 @map("password_changed_at") @db.Timestamptz(6)
+  passwordFailedAttempts  Int                       @default(0) @map("password_failed_attempts")
+  passwordLockedUntil     DateTime?                 @map("password_locked_until") @db.Timestamptz(6)
   status                  UserStatus                @default(ACTIVE)
   trustScore              Int                       @default(0) @map("trust_score")
   lastLoginAt             DateTime?                 @map("last_login_at") @db.Timestamptz(6)
@@ -292,6 +301,8 @@ model User {
   platformRoleGrants      PlatformRoleAssignment[]  @relation("PlatformRoleGranter")
   platformRoleRevocations PlatformRoleAssignment[]  @relation("PlatformRoleRevoker")
   mfaCredential           MfaCredential?
+  passwordAuthAttempts    PasswordAuthAttempt[]
+  passwordRecoveries      PasswordRecoveryRequest[]
 
   @@index([status, createdAt])
   @@map("users")
@@ -379,6 +390,47 @@ model MfaRecoveryCode {
   @@unique([credentialId, codeHash])
   @@index([credentialId, consumedAt])
   @@map("mfa_recovery_codes")
+}
+
+model PasswordAuthAttempt {
+  id             String                     @id @default(uuid()) @db.Uuid
+  userId         String?                    @map("user_id") @db.Uuid
+  identifierHash String                     @map("identifier_hash") @db.VarChar(128)
+  ipHash         String                     @map("ip_hash") @db.VarChar(128)
+  deviceHash     String                     @map("device_hash") @db.VarChar(128)
+  outcome        PasswordAuthAttemptOutcome @default(PENDING)
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt    DateTime?                  @map("completed_at") @db.Timestamptz(6)
+  user           User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([identifierHash, createdAt(sort: Desc)])
+  @@index([ipHash, createdAt(sort: Desc)])
+  @@index([deviceHash, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("password_auth_attempts")
+}
+
+model PasswordRecoveryRequest {
+  id              String     @id @default(uuid()) @db.Uuid
+  userId          String?    @map("user_id") @db.Uuid
+  channel         OtpChannel
+  destinationHash String     @map("destination_hash") @db.VarChar(128)
+  tokenHash       String     @unique @map("token_hash") @db.VarChar(128)
+  ipHash          String     @map("ip_hash") @db.VarChar(128)
+  deviceHash      String     @map("device_hash") @db.VarChar(128)
+  availableAt     DateTime   @map("available_at") @db.Timestamptz(6)
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(6)
+  failedAttempts  Int        @default(0) @map("failed_attempts")
+  consumedAt      DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  supersededAt    DateTime?  @map("superseded_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([destinationHash, createdAt(sort: Desc)])
+  @@index([ipHash, createdAt(sort: Desc)])
+  @@index([deviceHash, createdAt(sort: Desc)])
+  @@index([userId, expiresAt])
+  @@map("password_recovery_requests")
 }
 
 model OtpChallenge {

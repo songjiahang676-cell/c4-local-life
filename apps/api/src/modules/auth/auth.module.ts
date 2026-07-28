@@ -20,6 +20,15 @@ import {
 } from "./otp-delivery.gateway";
 import { OtpController } from "./otp.controller";
 import { OtpService } from "./otp.service";
+import { DatabasePasswordStore } from "./database-password.store";
+import {
+  UnavailablePasswordNotificationGateway,
+  PASSWORD_NOTIFICATION_GATEWAY,
+  type PasswordNotificationGateway,
+} from "./password-notification.gateway";
+import { PasswordController } from "./password.controller";
+import { PasswordService } from "./password.service";
+import { PASSWORD_STORE, type PasswordStore } from "./password.store";
 
 @Global()
 @Module({})
@@ -29,6 +38,8 @@ export class AuthModule {
     sessionStore?: AuthSessionStore,
     challengeStore?: OtpChallengeStore,
     deliveryGateway?: OtpDeliveryGateway,
+    passwordStore?: PasswordStore,
+    passwordNotificationGateway?: PasswordNotificationGateway,
   ): DynamicModule {
     const storeProviders: Provider[] = sessionStore
       ? [{ provide: AUTH_SESSION_STORE, useValue: sessionStore }]
@@ -42,28 +53,43 @@ export class AuthModule {
           DatabaseOtpChallengeStore,
           { provide: OTP_CHALLENGE_STORE, useExisting: DatabaseOtpChallengeStore },
         ];
+    const passwordProviders: Provider[] = passwordStore
+      ? [{ provide: PASSWORD_STORE, useValue: passwordStore }]
+      : [DatabasePasswordStore, { provide: PASSWORD_STORE, useExisting: DatabasePasswordStore }];
 
     return {
       module: AuthModule,
-      controllers: [AuthController, OtpController, AccountController],
+      controllers: [AuthController, OtpController, PasswordController, AccountController],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...storeProviders,
         ...challengeProviders,
+        ...passwordProviders,
         {
           provide: OTP_DELIVERY_GATEWAY,
           useValue: deliveryGateway ?? new FailClosedOtpDeliveryGateway(),
+        },
+        {
+          provide: PASSWORD_NOTIFICATION_GATEWAY,
+          useValue: passwordNotificationGateway ?? new UnavailablePasswordNotificationGateway(),
         },
         AuthContextAccessor,
         AuthSessionService,
         AccountService,
         OtpService,
+        PasswordService,
         AuthContextGuard,
         { provide: APP_GUARD, useExisting: AuthContextGuard },
         AuthorizationGuard,
         { provide: APP_GUARD, useExisting: AuthorizationGuard },
       ],
-      exports: [AuthContextAccessor, AuthSessionService, AccountService, OtpService],
+      exports: [
+        AuthContextAccessor,
+        AuthSessionService,
+        AccountService,
+        OtpService,
+        PasswordService,
+      ],
     };
   }
 }

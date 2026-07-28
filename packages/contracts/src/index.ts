@@ -27,6 +27,13 @@ export type AdminMfaVerificationResponse = components["schemas"]["AdminMfaVerifi
 export type OtpRequest = components["schemas"]["OtpRequest"];
 export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
 export type OtpAcceptedResponse = components["schemas"]["OtpAcceptedResponse"];
+export type PasswordLoginRequest = components["schemas"]["PasswordLoginRequest"];
+export type PasswordRecoveryRequest = components["schemas"]["PasswordRecoveryRequest"];
+export type PasswordRecoveryConfirmRequest =
+  components["schemas"]["PasswordRecoveryConfirmRequest"];
+export type PasswordRecoveryAcceptedResponse =
+  components["schemas"]["PasswordRecoveryAcceptedResponse"];
+export type PasswordRecoveryResponse = components["schemas"]["PasswordRecoveryResponse"];
 export type MyProfile = components["schemas"]["MyProfile"];
 export type MyProfileResponse = components["schemas"]["MyProfileResponse"];
 export type UpdateMyProfileRequest = components["schemas"]["UpdateMyProfileRequest"];
@@ -243,6 +250,55 @@ export const otpVerifyRequestSchema: z.ZodType<OtpVerifyRequest> = z
   .object({
     challengeId: z.uuid(),
     code: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+
+export const passwordLoginRequestSchema: z.ZodType<PasswordLoginRequest> = z
+  .object({
+    identifier: z.string().trim().min(1).max(320),
+    password: z.string().min(1).max(512),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const validEmail = z.email().max(320).safeParse(value.identifier).success;
+    const validPhone = /^\+[1-9]\d{7,14}$/.test(value.identifier);
+    if (!validEmail && !validPhone) {
+      context.addIssue({
+        code: "custom",
+        path: ["identifier"],
+        message: "Invalid account identifier",
+      });
+    }
+  });
+
+export const passwordRecoveryRequestSchema: z.ZodType<PasswordRecoveryRequest> = z
+  .object({
+    channel: z.enum(["EMAIL", "SMS"]),
+    destination: z.string().trim().min(1).max(320),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.channel === "EMAIL" && !z.email().max(320).safeParse(value.destination).success) {
+      context.addIssue({
+        code: "custom",
+        path: ["destination"],
+        message: "Invalid email address",
+      });
+    }
+    if (value.channel === "SMS" && !/^\+[1-9]\d{7,14}$/.test(value.destination)) {
+      context.addIssue({
+        code: "custom",
+        path: ["destination"],
+        message: "Invalid E.164 phone number",
+      });
+    }
+  });
+
+export const passwordRecoveryConfirmRequestSchema: z.ZodType<PasswordRecoveryConfirmRequest> = z
+  .object({
+    recoveryRequestId: z.uuid(),
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    newPassword: z.string().min(15).max(128),
   })
   .strict();
 

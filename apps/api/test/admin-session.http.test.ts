@@ -20,6 +20,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "admin-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "admin-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "admin-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "admin-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "admin-csrf-secret-with-more-than-32-bytes",
 });
 

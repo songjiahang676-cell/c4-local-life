@@ -77,6 +77,13 @@ reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 
 `MfaRecoveryCode` 只保存域分离 hash 与消费时间，`credential + hash` 唯一。激活、时间步消费和恢复码
 消费均在事务内追加最小化 `AuditLog`，并用条件更新使并发重放最多一个成功。
 
+`AUTH-004` 在 User 上增加可空版本化 `password_hash`、`password_changed_at`、有界失败计数与锁定时间。
+`PasswordAuthAttempt` 只保存 identifier/IP/device 的域分离 hash、可空 user 关联和
+PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存凭据或 PII 原文。
+`PasswordRecoveryRequest` 保存可空 user、channel、destination/token/IP/device hash、冷却/到期、
+失败次数、消费/取代时间；窗口、终态与失败次数由数据库 check 约束。成功恢复在同一事务更新 User、
+撤销全部 `AuthSession`、消费请求并追加 `auth.password.recovered` 审计，保证重放和部分提交失败关闭。
+
 ### Media 聚合
 
 `MediaAsset` 在任何业务资源绑定前记录上传所有权、用途、类型、声明字节数、SHA-256、私有 bucket/key、

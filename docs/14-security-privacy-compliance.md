@@ -110,6 +110,20 @@ MFA 成功会轮换 bearer Session，旧 token 立即失效；MFA Session 默认
 secret、code、token、IP 原文或 PII。当前不提供低保证的 MFA 关闭/重置；恢复需要后续受审计身份核验
 流程并撤销全部 Session。
 
+`AUTH-004` 把密码认证保持为可选能力：密码先做 NFC 规范化和 15–128 Unicode code point 长度检查，
+拒绝控制字符与内置常见/泄漏密码 blocklist，再使用独立 `PASSWORD_PEPPER` 域分离 HMAC 和
+scrypt `N=2^17,r=8,p=1`、32-byte 随机 salt、64-byte verifier。数据库只保存版本化 verifier，不保存
+密码、pepper 或恢复 token。登录对未知账号、未设置密码、错误密码和状态不可用账号使用同一 401，并对
+identifier、IP、device 三个维度串行限流；连续失败达到阈值后持久锁定，锁定期间仍执行 dummy KDF，
+降低账号枚举和时序差异。
+
+密码设置/恢复使用 256-bit 单次随机 token，只保存域分离 hash；请求对存在/不存在账号返回相同 202
+投影，并受 destination、IP、device 限流。证明必须等待默认五分钟安全冷却且在默认三十分钟内消费，
+错误证明最多五次，新请求会使旧请求失效。成功后在同一 PostgreSQL 事务内更换 verifier、清除失败状态、
+消费恢复记录、撤销该用户全部 Session 并追加不含 token/PII 的 `AuditLog`，然后发送密码变更通知；
+绝不自动登录。通知端口在未配置真实 provider 时 fail-closed，真实邮件/SMS durable adapter 仍由
+`NOTIF-001`/`EVT-001` 接入。
+
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
 控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID

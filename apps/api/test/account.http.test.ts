@@ -21,6 +21,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "account-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "account-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "account-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "account-password-pepper-with-more-than-32-bytes",
   SESSION_ABSOLUTE_TTL_SECONDS: "1200",
   SESSION_IDLE_TTL_SECONDS: "600",
   SESSION_TOUCH_INTERVAL_SECONDS: "60",

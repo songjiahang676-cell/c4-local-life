@@ -171,6 +171,18 @@ try {
             AND constraint_name = 'auth_sessions_mfa_strength_check'
        ) AS session_strength_check`,
   );
+  const passwordStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.password_auth_attempts') AS attempts,
+       to_regclass('public.password_recovery_requests') AS recoveries,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'users'
+            AND constraint_name = 'users_password_state_check'
+       ) AS password_state_check`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -191,7 +203,10 @@ try {
     platformRoleStorage.rows[0].enum_value_count !== 8 ||
     mfaStorage.rows[0].credentials !== "mfa_credentials" ||
     mfaStorage.rows[0].recovery_codes !== "mfa_recovery_codes" ||
-    !mfaStorage.rows[0].session_strength_check
+    !mfaStorage.rows[0].session_strength_check ||
+    passwordStorage.rows[0].attempts !== "password_auth_attempts" ||
+    passwordStorage.rows[0].recoveries !== "password_recovery_requests" ||
+    !passwordStorage.rows[0].password_state_check
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -212,6 +227,7 @@ try {
       mediaUploadStorage: true,
       platformRoleStorage: true,
       mfaStorage: true,
+      passwordStorage: true,
     }),
   );
 } finally {

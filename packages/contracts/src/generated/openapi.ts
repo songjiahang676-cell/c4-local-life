@@ -78,6 +78,66 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/auth/password/login": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Sign in with an opt-in password
+         * @description Uses one generic unauthorized response for unknown accounts, disabled password credentials, and incorrect passwords.
+         */
+        readonly post: operations["loginWithPassword"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/auth/password/recovery": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Request password setup or recovery
+         * @description Returns the same accepted projection for existing and unknown destinations. The side-channel token is single-use and subject to a security cooldown.
+         */
+        readonly post: operations["requestPasswordRecovery"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/auth/password/recovery/confirm": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Complete password setup or recovery
+         * @description Consumes the side-channel token once, replaces the password hash, revokes every session, and never signs the user in automatically.
+         */
+        readonly post: operations["confirmPasswordRecovery"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/auth/session": {
         readonly parameters: {
             readonly query?: never;
@@ -854,6 +914,42 @@ export interface components {
             readonly challengeId: string;
             /** Format: date-time */
             readonly expiresAt: string;
+        };
+        readonly PasswordLoginRequest: {
+            /** @description Normalized email address or E.164 phone number. */
+            readonly identifier: string;
+            readonly password: string;
+        };
+        readonly PasswordRecoveryRequest: {
+            /** @enum {string} */
+            readonly channel: "EMAIL" | "SMS";
+            readonly destination: string;
+        };
+        readonly PasswordRecoveryConfirmRequest: {
+            /** Format: uuid */
+            readonly recoveryRequestId: string;
+            readonly token: string;
+            /** @description Unicode NFC password checked against the configured compromised/common-password blocklist. */
+            readonly newPassword: string;
+        };
+        readonly PasswordRecoveryAcceptedResponse: {
+            /** @constant */
+            readonly accepted: true;
+            readonly requestId: string;
+            /** Format: uuid */
+            readonly recoveryRequestId: string;
+            /** Format: date-time */
+            readonly availableAt: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
+        };
+        readonly PasswordRecoveryResponse: {
+            readonly data: {
+                /** @constant */
+                readonly passwordChanged: true;
+                /** @constant */
+                readonly sessionsRevoked: true;
+            };
         };
         readonly SessionResponse: {
             readonly data: components["schemas"]["Session"];
@@ -1759,6 +1855,99 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly loginWithPassword: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+                readonly "X-Device-Id": components["parameters"]["DeviceId"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PasswordLoginRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Authenticated session established */
+            readonly 200: {
+                headers: {
+                    /** @description Secure, HttpOnly, SameSite=Lax host-only session cookie scoped to /v1. */
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly requestPasswordRecovery: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+                readonly "X-Device-Id": components["parameters"]["DeviceId"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PasswordRecoveryRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Recovery request accepted without disclosing account existence */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["PasswordRecoveryAcceptedResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly confirmPasswordRecovery: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
+                readonly "X-Device-Id": components["parameters"]["DeviceId"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PasswordRecoveryConfirmRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Password changed and existing sessions revoked */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["PasswordRecoveryResponse"];
                 };
             };
             readonly 400: components["responses"]["BadRequest"];

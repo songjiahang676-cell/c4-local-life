@@ -87,6 +87,7 @@ export default defineConfig({
         SESSION_SECRET: "e2e-session-secret-with-at-least-32-bytes",
         OTP_SECRET: "e2e-otp-secret-with-at-least-32-bytes",
         MFA_SECRET: "e2e-mfa-secret-with-at-least-32-bytes",
+        PASSWORD_PEPPER: "e2e-password-pepper-with-at-least-32-bytes",
         CSRF_SECRET: "e2e-csrf-secret-with-at-least-32-bytes",
         OTEL_SERVICE_NAME: "socal-api-e2e",
         OTEL_SERVICE_VERSION: "test",

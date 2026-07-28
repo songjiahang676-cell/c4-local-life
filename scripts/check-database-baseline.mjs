@@ -49,6 +49,7 @@ try {
     "20260728201500_media_upload_intents",
     "20260728203000_admin_platform_roles",
     "20260728221000_admin_mfa",
+    "20260728223000_password_recovery",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -78,7 +79,9 @@ try {
             to_regclass('public.media_assets') AS media_assets,
             to_regclass('public.platform_role_assignments') AS platform_role_assignments,
             to_regclass('public.mfa_credentials') AS mfa_credentials,
-            to_regclass('public.mfa_recovery_codes') AS mfa_recovery_codes`,
+            to_regclass('public.mfa_recovery_codes') AS mfa_recovery_codes,
+            to_regclass('public.password_auth_attempts') AS password_auth_attempts,
+            to_regclass('public.password_recovery_requests') AS password_recovery_requests`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -298,6 +301,38 @@ try {
     !mfaStorage.rows[0]?.recovery_code_unique
   ) {
     throw new Error("MFA session, credential, or recovery-code controls are missing");
+  }
+
+  const passwordStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'users'
+            AND constraint_name = 'users_password_state_check'
+       ) AS password_state_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'password_auth_attempts'
+            AND constraint_name = 'password_auth_attempts_state_check'
+       ) AS attempt_state_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'password_recovery_requests'
+            AND constraint_name = 'password_recovery_requests_window_check'
+       ) AS recovery_window_check`,
+  );
+  if (
+    !passwordStorage.rows[0]?.password_state_check ||
+    !passwordStorage.rows[0]?.attempt_state_check ||
+    !passwordStorage.rows[0]?.recovery_window_check
+  ) {
+    throw new Error("Password credential, attempt, or recovery controls are missing");
   }
 
   await client.query("BEGIN");
@@ -565,6 +600,34 @@ try {
      )`,
     "23514",
   );
+  await expectSqlState(
+    "password state coherence",
+    `UPDATE users
+        SET password_hash = '$scrypt$ln=17,r=8,p=1$${"a".repeat(43)}$${"b".repeat(86)}',
+            password_changed_at = NULL
+      WHERE id = '00000000-0000-4000-8000-000000000001'`,
+    "23514",
+  );
+  await expectSqlState(
+    "password recovery window coherence",
+    `INSERT INTO password_recovery_requests (
+       id, user_id, channel, destination_hash, token_hash, ip_hash, device_hash,
+       available_at, expires_at, created_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000019',
+       '00000000-0000-4000-8000-000000000001',
+       'EMAIL',
+       repeat('c', 64),
+       repeat('d', 64),
+       repeat('e', 64),
+       repeat('f', 64),
+       now() - interval '1 minute',
+       now() + interval '10 minutes',
+       now()
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -609,7 +672,8 @@ try {
       mediaUploadStorage: true,
       platformRoleStorage: true,
       mfaStorage: true,
-      negativeCases: 11,
+      passwordStorage: true,
+      negativeCases: 13,
     }),
   );
 } finally {
