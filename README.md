@@ -117,7 +117,7 @@ pnpm test:e2e
 
 原始架构包静态验证详情见 [`VALIDATION_REPORT.md`](./VALIDATION_REPORT.md)；该报告保留交付时点，不代表当前动态工程状态。
 
-截至 2026-07-25，本机已经真实完成依赖锁定、Prisma 生成/校验、格式、TypeScript、ESLint、
+截至 2026-07-28，本机已经真实完成依赖锁定、Prisma 生成/校验、格式、TypeScript、ESLint、
 OpenAPI lint/生成漂移检查、单元/契约/真实 PostgreSQL 集成测试、数据库基线/升级验证、全部应用构建，
 以及 Chromium 桌面/移动端首页与 API smoke。逐项命令、失败修复和未运行项见
 [`tasks/WORKLOG.md`](./tasks/WORKLOG.md)。
@@ -130,10 +130,11 @@ run 及其修复证据。项目负责人于 2026-07-25 明确授权公开仓库�
 随后已关闭/删除。绿色 PR #1 的两项 required checks 均通过。
 
 Gate 0 最终 head run `30187153269` 通过后，PR #1 已按保护规则合并到 `main`（merge commit
-`8590060`）。Gate 1 的 `AUTH-001` 随后通过 PR #3 / run `30187968381` 的完整质量与非 root 容器检查，
-按保护规则合并为 `89c7f8b`。当前 `AUTH-002` 已在本地实现邮件/手机 OTP、一次消费、账号/IP/设备
-限频、设备绑定、反枚举响应和安全会话签发，并通过从零回放 5 个 migration、31 项真实 PostgreSQL
-测试、全仓 24 个测试文件共 80 项测试及全部构建；受保护托管检查通过前不进入 `AUTH-003`。
+`8590060`）。Gate 1 的 `AUTH-001` 随后通过 PR #3 / run `30187968381` 合并为 `89c7f8b`；
+`AUTH-002` 通过 PR #4 / run `30188776254` 的完整质量、E2E 和四应用非 root 容器检查合并为
+`22d9120`。当前 `AUTH-003` 已在本地实现并发安全的个人资料、签名 cursor 会话设备列表、单设备/全部
+注销及账户状态变化自动撤销会话，并通过从零回放 6 个 migration、33 项真实 PostgreSQL 测试、全仓
+26 个测试文件共 92 项测试和 8 个构建；受保护托管检查通过前不进入下一 Gate 1 任务。
 
 ## 七、规划容量与服务目标
 

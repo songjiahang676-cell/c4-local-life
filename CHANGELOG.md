@@ -29,6 +29,7 @@
 - Published the repository with explicit owner authorization, enforced protected-branch checks for administrators, and proved the policy using a closed failing negative-control PR.
 - Added database-backed opaque sessions with domain-separated HMAC storage, atomic rotation/revocation, absolute and idle expiry, request auth context, hardened host-only cookies, and current-session contract coverage.
 - Added PostgreSQL-backed email/SMS OTP challenges with one-time consumption, account/IP/device rate limits, device binding, generic anti-enumeration errors, provider isolation, and secure session establishment.
+- Added concurrency-safe self-profile management, signed cursor session-device listing, user-scoped single/all-session revocation, and database-enforced revocation after account state changes.
 
 ## 0.1.0 — Architecture handoff package
 

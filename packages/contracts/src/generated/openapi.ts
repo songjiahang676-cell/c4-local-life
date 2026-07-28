@@ -102,6 +102,74 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/me": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get the current user's profile
+         * @description Returns only the authenticated user's profile projection; contact identifiers and internal trust fields are excluded.
+         */
+        readonly get: operations["getMyProfile"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Update the current user's profile
+         * @description Updates a whitelisted profile projection using optimistic concurrency; contact and account-status fields cannot be changed here.
+         */
+        readonly patch: operations["updateMyProfile"];
+        readonly trace?: never;
+    };
+    readonly "/me/sessions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List the current user's active session devices
+         * @description Returns bounded session metadata without bearer tokens, token hashes, IP hashes, or contact identifiers.
+         */
+        readonly get: operations["listMySessions"];
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Revoke all of the current user's sessions
+         * @description Atomically revokes every active session for the authenticated user and expires the presented cookie.
+         */
+        readonly delete: operations["logoutAllSessions"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/me/sessions/{sessionId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Revoke one of the current user's session devices
+         * @description Idempotently revokes only a session owned by the authenticated user; foreign and unknown identifiers share the same response.
+         */
+        readonly delete: operations["revokeMySession"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/regions": {
         readonly parameters: {
             readonly query?: never;
@@ -645,6 +713,48 @@ export interface components {
             readonly expiresAt: string;
             readonly permissions: readonly string[];
             readonly organizations?: readonly components["schemas"]["OrganizationSummary"][];
+        };
+        readonly MyProfileResponse: {
+            readonly data: components["schemas"]["MyProfile"];
+        };
+        readonly MyProfile: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly displayName: string;
+            /** Format: uri */
+            readonly avatarUrl: string | null;
+            readonly bio: string | null;
+            /** @enum {string} */
+            readonly preferredLocale: "zh-Hans" | "en-US";
+            /** Format: uuid */
+            readonly homeRegionId: string | null;
+            readonly version: number;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly UpdateMyProfileRequest: {
+            readonly displayName?: string;
+            readonly bio?: string | null;
+            /** @enum {string} */
+            readonly preferredLocale?: "zh-Hans" | "en-US";
+            /** Format: uuid */
+            readonly homeRegionId?: string | null;
+        };
+        readonly SessionDeviceCollection: {
+            readonly data: readonly components["schemas"]["SessionDevice"][];
+            readonly pageInfo: components["schemas"]["CursorPage"];
+        };
+        readonly SessionDevice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly current: boolean;
+            readonly userAgent: string | null;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly lastSeenAt: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
         };
         readonly UserSummary: {
             /** Format: uuid */
@@ -1237,11 +1347,14 @@ export interface components {
         readonly MediaId: string;
         readonly CategoryId: string;
         readonly ConversationId: string;
+        readonly SessionId: string;
         readonly Cursor: string;
         readonly Limit: number;
         readonly IdempotencyKey: string;
         /** @description Opaque client-generated installation identifier used only through a keyed hash for abuse controls. */
         readonly DeviceId: string;
+        /** @description Strong ETag returned with the current resource version. */
+        readonly IfMatch: string;
     };
     requestBodies: never;
     headers: never;
@@ -1393,6 +1506,136 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    readonly getMyProfile: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Current profile */
+            readonly 200: {
+                headers: {
+                    /** @description Strong profile version tag required by profile updates. */
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MyProfileResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+        };
+    };
+    readonly updateMyProfile: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/merge-patch+json": components["schemas"]["UpdateMyProfileRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Updated profile */
+            readonly 200: {
+                headers: {
+                    /** @description New strong profile version tag. */
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MyProfileResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly listMySessions: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: components["parameters"]["Limit"];
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Cursor-paginated active sessions */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SessionDeviceCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+        };
+    };
+    readonly logoutAllSessions: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description All sessions revoked */
+            readonly 204: {
+                headers: {
+                    /** @description Clears the Secure, HttpOnly, SameSite=Lax cookie scoped to /v1. */
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+        };
+    };
+    readonly revokeMySession: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly sessionId: components["parameters"]["SessionId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Session no longer active */
+            readonly 204: {
+                headers: {
+                    /** @description Present only when the revoked session is the current session. */
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
         };
     };
     readonly listRegions: {
