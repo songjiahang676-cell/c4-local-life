@@ -41,6 +41,15 @@ export {
   type OrganizationRepositoryOptions,
 } from "./repositories/organization.repository";
 export {
+  OutboxEventRepository,
+  type AppendOutboxEventInput,
+  type ClaimedOutboxEvent,
+  type ClaimOutboxEventsInput,
+  type CompleteOutboxEventInput,
+  type FailOutboxEventInput,
+  type OutboxEventRepositoryOptions,
+} from "./repositories/outbox-event.repository";
+export {
   CategoryFormSchemaRepository,
   normalizeTaxonomyAlias,
   TaxonomyRepository,

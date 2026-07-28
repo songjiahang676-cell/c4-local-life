@@ -21,6 +21,9 @@ if (!containerJob) {
 if (!job.env?.DATABASE_INTEGRATION_URL) {
   throw new Error("CI quality gate must run repository integration tests against PostgreSQL");
 }
+if (!job.env?.REDIS_INTEGRATION_URL) {
+  throw new Error("CI quality gate must run BullMQ integration tests against Redis");
+}
 
 if (workflow.permissions?.contents !== "read") {
   throw new Error("CI workflow must keep default contents permission read-only");
@@ -87,6 +90,9 @@ for (const healthPath of [
   if (!containerRunScripts.includes(healthPath)) {
     throw new Error(`CI container runtime smoke is missing ${healthPath}`);
   }
+}
+if (!containerRunScripts.includes("--env DATABASE_URL=")) {
+  throw new Error("CI Worker container smoke must provide the required database contract");
 }
 
 console.log(

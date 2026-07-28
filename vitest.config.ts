@@ -52,6 +52,9 @@ export default defineConfig({
       "@socal/database/organization": fileURLToPath(
         new URL("./packages/database/src/repositories/organization.repository.ts", import.meta.url),
       ),
+      "@socal/database/outbox": fileURLToPath(
+        new URL("./packages/database/src/repositories/outbox-event.repository.ts", import.meta.url),
+      ),
       "@socal/database/media": fileURLToPath(
         new URL("./packages/database/src/repositories/media-asset.repository.ts", import.meta.url),
       ),

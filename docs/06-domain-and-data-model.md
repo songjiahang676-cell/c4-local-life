@@ -135,6 +135,12 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 不要为猜测中的查询建立大量索引。每个新索引应有目标查询、Explain 证据、写入成本和删除条件。
 
+`EVT-001` 将该索引合同实现为部分 claim 索引和原子 CTE：单条
+`UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED)` 按 `availableAt,id` 领取事件、增加 attempt 并把
+`availableAt` 推进到租约到期时间。Dispatcher 不持有数据库事务调用 Redis；发布确认和失败记录必须同时
+匹配 `id + attempt`，因此过期 dispatcher 不能覆盖后续领取结果。PENDING、PUBLISHED、FAILED 的
+`publishedAt/lastError` 组合和 attempts 上限由数据库 check 约束。
+
 ## 6.5 一致性边界
 
 同一数据库事务内完成：
@@ -146,6 +152,11 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 - Message 写入 + Conversation lastMessageAt + 通知事件。
 
 不得把 OpenSearch、邮件、短信、S3 派生处理或第三方 API 放入数据库事务。事务提交后由 Outbox/Worker 完成。
+
+Outbox 进入 BullMQ 后即标记 PUBLISHED，而不是等待消费者完成。`eventId` 同时作为 BullMQ `jobId` 和
+消费者幂等键；Redis 或进程故障窗口允许重复投递，消费者必须用 eventId/业务版本做条件更新，不能假设
+exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED，
+受控重放和 reconciliation 由 `EVT-002` 提供。
 
 ## 6.6 版本与历史
 

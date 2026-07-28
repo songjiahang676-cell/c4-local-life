@@ -50,6 +50,7 @@ try {
     "20260728203000_admin_platform_roles",
     "20260728221000_admin_mfa",
     "20260728223000_password_recovery",
+    "20260728234500_outbox_dispatcher_constraints",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -333,6 +334,37 @@ try {
     !passwordStorage.rows[0]?.recovery_window_check
   ) {
     throw new Error("Password credential, attempt, or recovery controls are missing");
+  }
+
+  const outboxStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'outbox_events'
+            AND constraint_name = 'outbox_events_state_check'
+       ) AS state_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'outbox_events'
+            AND constraint_name = 'outbox_events_attempts_check'
+       ) AS attempts_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'outbox_events_pending_available_id_idx'
+       ) AS pending_claim_index`,
+  );
+  if (
+    !outboxStorage.rows[0]?.state_check ||
+    !outboxStorage.rows[0]?.attempts_check ||
+    !outboxStorage.rows[0]?.pending_claim_index
+  ) {
+    throw new Error("Outbox state, attempt, or SKIP LOCKED claim controls are missing");
   }
 
   await client.query("BEGIN");
@@ -628,6 +660,50 @@ try {
      )`,
     "23514",
   );
+  await expectSqlState(
+    "outbox attempt bound",
+    `INSERT INTO outbox_events (
+       id, aggregate_type, aggregate_id, event_type, payload, attempts
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000020',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'listing.submitted',
+       '{}'::jsonb,
+       101
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "outbox event type bound",
+    `INSERT INTO outbox_events (
+       id, aggregate_type, aggregate_id, event_type, payload
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000021',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'Invalid Event',
+       '{}'::jsonb
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "outbox published state coherence",
+    `INSERT INTO outbox_events (
+       id, aggregate_type, aggregate_id, event_type, payload, status
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000022',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'listing.submitted',
+       '{}'::jsonb,
+       'PUBLISHED'
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -673,7 +749,8 @@ try {
       platformRoleStorage: true,
       mfaStorage: true,
       passwordStorage: true,
-      negativeCases: 13,
+      outboxStorage: true,
+      negativeCases: 16,
     }),
   );
 } finally {

@@ -229,6 +229,9 @@ importers:
       "@socal/config":
         specifier: workspace:*
         version: link:../../packages/config
+      "@socal/database":
+        specifier: workspace:*
+        version: link:../../packages/database
       "@socal/observability":
         specifier: workspace:*
         version: link:../../packages/observability

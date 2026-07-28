@@ -19,6 +19,8 @@
 - 全部资源执行后端对象级授权；前端显示控制不是授权。
 - 上传采用认证/幂等/配额、短效校验和长度绑定的私有 quarantine 预签名；公开前必须完成 magic-byte、
   恶意文件扫描、图像解码重编码/去 EXIF，并通过独立无 Cookie 域名分发。
+- 异步事件采用数据库同事务 Outbox 和至少一次投递；`eventId` 是消费者幂等键，队列 envelope 有大小
+  上限和版本。日志/指标不记录事件 payload、原始提供商错误或 PII，失败只保留有界错误码。
 - 支付数据由支付服务商托管；平台不保存完整卡号和 CVC。
 - 密钥存入云 Secret Manager/KMS，禁止写入镜像、日志或仓库。
 - 依赖、容器、IaC、SAST、secret scanning 和 DAST 纳入 CI/CD。

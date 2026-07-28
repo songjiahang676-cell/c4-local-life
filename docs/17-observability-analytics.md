@@ -37,6 +37,15 @@
 
 每队列 waiting、active、delayed、failed、oldest age、duration、attempts、DLQ 和吞吐。
 
+Outbox dispatcher 额外暴露：
+
+- `socal_outbox_oldest_pending_age_seconds`：最老 PENDING 事件年龄；
+- `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
+- `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
+
+事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
+有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
+
 ## 17.4 告警
 
 告警必须可操作，绑定 Runbook 和 owner。建议：

@@ -60,6 +60,11 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 - backpressure：暂停低优先任务、限制生产速率、水平扩 Worker。
 - 定期 reconciliation 修复“数据库成功但副作用缺失”。
 
+`EVT-001` 已实现有界 batch、短租约、`SKIP LOCKED` 多实例并发领取、指数退避 + eventId 确定性 jitter、
+最大 attempts 和 BullMQ eventId jobId。每次确认都匹配 claim attempt，避免旧 worker 覆盖新租约；
+PENDING 事件年龄和 publish/retry/failed/stale 结果直接进入低基数指标。DLQ 管理、人工重放和跨系统
+reconciliation 仍属于 `EVT-002`。
+
 ## 15.6 数据库可靠性
 
 - Multi-AZ、PITR、自动备份、存储自动扩展阈值。

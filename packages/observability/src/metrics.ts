@@ -11,6 +11,8 @@ type WorkerObservation = {
   durationSeconds: number;
 };
 
+type OutboxDispatchOutcome = "published" | "retry" | "failed" | "stale";
+
 type Histogram = {
   count: number;
   sum: number;
@@ -76,6 +78,9 @@ export class MetricsRegistry {
   readonly #httpDurations = new Map<string, Histogram>();
   readonly #workerJobs = new Map<string, number>();
   readonly #workerDurations = new Map<string, Histogram>();
+  readonly #outboxDispatches = new Map<OutboxDispatchOutcome, number>();
+  #outboxOldestPendingAgeSeconds = 0;
+  #outboxPollFailures = 0;
 
   httpRequestStarted(): void {
     this.#httpInFlight += 1;
@@ -106,6 +111,18 @@ export class MetricsRegistry {
     const key = labelKey(dimensions);
     increment(this.#workerJobs, key);
     observe(this.#workerDurations, key, Math.max(0, observation.durationSeconds));
+  }
+
+  outboxDispatch(outcome: OutboxDispatchOutcome): void {
+    this.#outboxDispatches.set(outcome, (this.#outboxDispatches.get(outcome) ?? 0) + 1);
+  }
+
+  outboxPollFailed(): void {
+    this.#outboxPollFailures += 1;
+  }
+
+  setOutboxOldestPendingAgeSeconds(value: number): void {
+    this.#outboxOldestPendingAgeSeconds = Number.isFinite(value) ? Math.max(0, value) : 0;
   }
 
   renderPrometheus(): string {
@@ -143,6 +160,21 @@ export class MetricsRegistry {
       "# TYPE socal_worker_job_duration_seconds histogram",
     );
     this.#renderHistograms(lines, "socal_worker_job_duration_seconds", this.#workerDurations);
+    lines.push(
+      "# HELP socal_outbox_dispatch_total Outbox publish results by bounded outcome.",
+      "# TYPE socal_outbox_dispatch_total counter",
+    );
+    for (const [outcome, value] of [...this.#outboxDispatches].sort()) {
+      lines.push(`socal_outbox_dispatch_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_outbox_poll_failures_total Outbox polling failures.",
+      "# TYPE socal_outbox_poll_failures_total counter",
+      `socal_outbox_poll_failures_total ${this.#outboxPollFailures}`,
+      "# HELP socal_outbox_oldest_pending_age_seconds Age of the oldest pending outbox event.",
+      "# TYPE socal_outbox_oldest_pending_age_seconds gauge",
+      `socal_outbox_oldest_pending_age_seconds ${this.#outboxOldestPendingAgeSeconds}`,
+    );
     return `${lines.join("\n")}\n`;
   }
 

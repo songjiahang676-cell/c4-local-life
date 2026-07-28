@@ -24,9 +24,11 @@
 
 ### `apps/worker`
 
-- BullMQ/Redis 队列与 Worker 启动骨架。
+- BullMQ/Redis 队列与 Worker 进程。
 - 示例 search/media/notification job 类型。
-- 需要接 Outbox dispatcher、真实 adapter、幂等存储、metrics 和 DLQ 工具。
+- `EVT-001` 已接 PostgreSQL Outbox dispatcher、SKIP LOCKED 租约领取、eventId jobId、发布重试和
+  oldest-age/结果指标。
+- 仍需各领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
 
 ### `packages/database`
 

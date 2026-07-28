@@ -781,6 +781,12 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 不要为猜测中的查询建立大量索引。每个新索引应有目标查询、Explain 证据、写入成本和删除条件。
 
+`EVT-001` 将该索引合同实现为部分 claim 索引和原子 CTE：单条
+`UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED)` 按 `availableAt,id` 领取事件、增加 attempt 并把
+`availableAt` 推进到租约到期时间。Dispatcher 不持有数据库事务调用 Redis；发布确认和失败记录必须同时
+匹配 `id + attempt`，因此过期 dispatcher 不能覆盖后续领取结果。PENDING、PUBLISHED、FAILED 的
+`publishedAt/lastError` 组合和 attempts 上限由数据库 check 约束。
+
 ## 6.5 一致性边界
 
 同一数据库事务内完成：
@@ -792,6 +798,11 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 - Message 写入 + Conversation lastMessageAt + 通知事件。
 
 不得把 OpenSearch、邮件、短信、S3 派生处理或第三方 API 放入数据库事务。事务提交后由 Outbox/Worker 完成。
+
+Outbox 进入 BullMQ 后即标记 PUBLISHED，而不是等待消费者完成。`eventId` 同时作为 BullMQ `jobId` 和
+消费者幂等键；Redis 或进程故障窗口允许重复投递，消费者必须用 eventId/业务版本做条件更新，不能假设
+exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED，
+受控重放和 reconciliation 由 `EVT-002` 提供。
 
 ## 6.6 版本与历史
 
@@ -934,6 +945,11 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 7. Worker 更新索引、发送通知；失败重试，超过阈值进入 DLQ。
 
 所有消费者以 `eventId` 或业务幂等键去重。
+
+`EVT-001` 的 dispatcher 运行在现有 Worker 进程，不新增服务边界。它短事务领取有界批次，事务提交后
+才向配置的 BullMQ 队列写入 versioned envelope；jobId 固定为 eventId。成功/重试/终态失败使用 attempt
+版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，
+队列 envelope 默认限制为 128 KiB。
 
 ## 7.5 读取流程
 
@@ -2053,6 +2069,11 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 - backpressure：暂停低优先任务、限制生产速率、水平扩 Worker。
 - 定期 reconciliation 修复“数据库成功但副作用缺失”。
 
+`EVT-001` 已实现有界 batch、短租约、`SKIP LOCKED` 多实例并发领取、指数退避 + eventId 确定性 jitter、
+最大 attempts 和 BullMQ eventId jobId。每次确认都匹配 claim attempt，避免旧 worker 覆盖新租约；
+PENDING 事件年龄和 publish/retry/failed/stale 结果直接进入低基数指标。DLQ 管理、人工重放和跨系统
+reconciliation 仍属于 `EVT-002`。
+
 ## 15.6 数据库可靠性
 
 - Multi-AZ、PITR、自动备份、存储自动扩展阈值。
@@ -2261,6 +2282,15 @@ Terraform 是云资源事实源；禁止长期手工改生产。紧急控制台�
 ### Worker
 
 每队列 waiting、active、delayed、failed、oldest age、duration、attempts、DLQ 和吞吐。
+
+Outbox dispatcher 额外暴露：
+
+- `socal_outbox_oldest_pending_age_seconds`：最老 PENDING 事件年龄；
+- `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
+- `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
+
+事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
+有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
 
 ## 17.4 告警
 
@@ -2756,6 +2786,13 @@ TOTP 算法必须通过 RFC 向量、真实 PostgreSQL 事务/约束和中文/�
 hash；冷却前、过期、错误、已消费、已取代和重放证明均失败。成功恢复必须原子替换密码、撤销全部
 Session、写最小审计、发送变更通知且不自动登录。空库 12 个 migration、上一发布基线升级、数据库
 约束负例、真实 Repository 事务、HTTP 契约与 abuse 测试必须通过。
+
+`EVT-001` 可靠事件验收：两个 dispatcher 并发领取同一批 PENDING 事件不得重复 claim；领取事务不得
+跨越 Redis 调用；租约过期可安全重领，旧 attempt 的确认必须失败。BullMQ jobId 固定为 eventId，
+入队后确认前崩溃允许安全重复；失败使用指数退避+jitter，达到上限或永久无效 envelope 进入 FAILED。
+数据库约束保护状态/attempt/eventType，日志与指标不含 payload/PII；oldest pending age 和有界结果指标
+可抓取。空库 13 个 migration、上一发布基线升级、约束负例、真实 PostgreSQL 并发 Repository 和 Worker
+publisher/故障测试必须通过。
 
 ## 22.4 Listing 验收
 
@@ -3535,9 +3572,11 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 
 ### `apps/worker`
 
-- BullMQ/Redis 队列与 Worker 启动骨架。
+- BullMQ/Redis 队列与 Worker 进程。
 - 示例 search/media/notification job 类型。
-- 需要接 Outbox dispatcher、真实 adapter、幂等存储、metrics 和 DLQ 工具。
+- `EVT-001` 已接 PostgreSQL Outbox dispatcher、SKIP LOCKED 租约领取、eventId jobId、发布重试和
+  oldest-age/结果指标。
+- 仍需各领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
 
 ### `packages/database`
 

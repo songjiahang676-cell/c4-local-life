@@ -53,6 +53,7 @@ jobs:
       DATABASE_URL: postgresql://socal:socal_test_password@localhost:5432/socal_test?schema=public
       DATABASE_INTEGRATION_URL: postgresql://socal:socal_test_password@localhost:5432/socal_test?schema=public
       REDIS_URL: redis://localhost:6379/0
+      REDIS_INTEGRATION_URL: redis://localhost:6379/0
       SESSION_SECRET: ci-only-session-secret-at-least-32-bytes
       OTP_SECRET: ci-only-dedicated-otp-secret-at-least-32-bytes
       MFA_SECRET: ci-only-dedicated-mfa-secret-at-least-32-bytes
@@ -243,6 +244,7 @@ jobs:
             --env APP_ENV=test \
             --env APP_NAME=socal-worker-container-smoke \
             --env LOG_LEVEL=info \
+            --env DATABASE_URL=postgresql://socal:socal@database.invalid:5432/socal?schema=public \
             --env REDIS_URL=redis://socal-redis:6379/0 \
             socal-worker-runtime:ci
 
