@@ -16,7 +16,7 @@ DATA-006,G0,DATA,P1,Repository 集成测试框架,DATA-001;FND-006,真实 Postgr
 API-001,G0,API,P0,HTTP 基础中间件与 Problem Details,FND-002,requestId、validation、错误 envelope、body limit、CORS/CSRF 策略,docs/08-api-and-integrations.md,done
 API-002,G0,API,P0,OpenAPI serving/lint/schema test,API-001;FND-003,契约可解析；示例和实现 smoke 验证,openapi/openapi.yaml;docs/08-api-and-integrations.md,done
 API-003,G0,API,P1,契约生成方向与共享类型,API-002,选定 OpenAPI↔Zod/DTO 单向生成；无手工三份漂移,docs/08-api-and-integrations.md,done
-API-004,G1,API,P1,Policy/Actor/RequestContext 框架,AUTH-001,默认拒绝；对象级授权测试 helper 可复用,docs/05-roles-and-permissions.md,todo
+API-004,G1,API,P1,Policy/Actor/RequestContext 框架,AUTH-001,默认拒绝；对象级授权测试 helper 可复用,docs/05-roles-and-permissions.md,done
 API-005,G5,API,P0,通用幂等键存储与拦截器,DATA-001;API-001,相同 key 重放一致；payload 冲突 409；TTL/审计,docs/08-api-and-integrations.md,todo
 OBS-001,G0,OBS,P0,结构日志、基础指标和 OTel trace,FND-004;API-001,跨 HTTP/job 带 request/trace id；PII redaction 测试,docs/17-observability-analytics.md,done
 OBS-002,G6,OBS,P0,SLO Dashboard 与告警,OBS-001;REL-001,服务/依赖/队列/业务 dashboard；告警绑定 runbook,docs/17-observability-analytics.md,todo

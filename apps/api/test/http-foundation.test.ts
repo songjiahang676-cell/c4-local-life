@@ -5,6 +5,8 @@ import { createObservabilityRuntime, type ObservabilityRuntime } from "@socal/ob
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
+import { AuthSessionService } from "../src/modules/auth/auth-session.service";
+import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
 
 const environment = parseApiEnvironment({
   NODE_ENV: "test",
@@ -33,19 +35,40 @@ describe("HTTP foundation", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
   let observability: ObservabilityRuntime;
+  let mutationHeaders: { cookie: string; origin: string };
+  let limitedMutationHeaders: { cookie: string; origin: string };
   const logRecords: string[] = [];
 
   beforeAll(async () => {
+    const userId = "10000000-0000-4000-8000-000000000001";
+    const limitedUserId = "10000000-0000-4000-8000-000000000002";
+    const authSessionStore = new MemoryAuthSessionStore();
+    authSessionStore.registerSubject(buildActiveSubject({ id: userId }));
+    authSessionStore.registerSubject(buildActiveSubject({ id: limitedUserId, status: "LIMITED" }));
     observability = createObservabilityRuntime({
       serviceName: "socal-api-test",
       serviceVersion: "0.1.0",
       environment: "test",
       logSink: (record) => logRecords.push(record),
     });
-    app = await createApiApplication(environment, { logger: false, observability });
+    app = await createApiApplication(environment, {
+      logger: false,
+      observability,
+      authSessionStore,
+    });
     await app.init();
     server = app.getHttpAdapter().getInstance();
     await server.ready();
+    const issued = await app.get(AuthSessionService).issueSession(userId, {});
+    mutationHeaders = {
+      cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}`,
+      origin: environment.PUBLIC_WEB_URL,
+    };
+    const limited = await app.get(AuthSessionService).issueSession(limitedUserId, {});
+    limitedMutationHeaders = {
+      cookie: `${environment.SESSION_COOKIE_NAME}=${limited.token}`,
+      origin: environment.PUBLIC_WEB_URL,
+    };
   });
 
   afterAll(async () => {
@@ -92,6 +115,7 @@ describe("HTTP foundation", () => {
     const response = await server.inject({
       method: "POST",
       url: "/v1/listings",
+      headers: mutationHeaders,
       payload: {
         ...validListing,
         title: "no",
@@ -134,7 +158,7 @@ describe("HTTP foundation", () => {
     const response = await server.inject({
       method: "POST",
       url: "/v1/listings",
-      headers: { "content-type": "application/json" },
+      headers: { ...mutationHeaders, "content-type": "application/json" },
       payload: JSON.stringify({ ...validListing, body: "x".repeat(2_000) }),
     });
 
@@ -169,7 +193,7 @@ describe("HTTP foundation", () => {
       method: "POST",
       url: "/v1/listings",
       headers: {
-        cookie: `${environment.SESSION_COOKIE_NAME}=opaque-test-session`,
+        cookie: mutationHeaders.cookie,
         origin: "https://foreign.example.invalid",
       },
       payload: validListing,
@@ -177,10 +201,7 @@ describe("HTTP foundation", () => {
     const allowed = await server.inject({
       method: "POST",
       url: "/v1/listings",
-      headers: {
-        cookie: `${environment.SESSION_COOKIE_NAME}=opaque-test-session`,
-        origin: environment.PUBLIC_WEB_URL,
-      },
+      headers: mutationHeaders,
       payload: validListing,
     });
 
@@ -191,6 +212,32 @@ describe("HTTP foundation", () => {
       detail: "Cross-site request rejected",
     });
     expect(allowed.statusCode).toBe(201);
+  });
+
+  it("fails closed for unauthenticated and limited listing mutations", async () => {
+    const unauthenticated = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      payload: validListing,
+    });
+    const limited = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: limitedMutationHeaders,
+      payload: validListing,
+    });
+
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(unauthenticated.json<ProblemDetails>()).toMatchObject({
+      title: "Unauthorized",
+      detail: "Authentication required",
+    });
+    expect(limited.statusCode).toBe(403);
+    expect(limited.json<ProblemDetails>()).toMatchObject({
+      title: "Forbidden",
+      detail: "Access denied",
+    });
+    expect(limited.body).not.toContain("ACCOUNT_RESTRICTED");
   });
 
   it("uses Problem Details for routing errors without query reflection", async () => {

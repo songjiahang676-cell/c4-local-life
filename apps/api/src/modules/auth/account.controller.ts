@@ -28,6 +28,8 @@ import {
 } from "@socal/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { selfServicePolicyActions } from "../../common/authorization/policy";
+import { RequirePolicy } from "../../common/authorization/require-policy.decorator";
 import { SchemaValidationPipe } from "../../common/schema-validation.pipe";
 import {
   AccountProfileConflictError,
@@ -56,6 +58,7 @@ export class AccountController {
   ) {}
 
   @Get()
+  @RequirePolicy(selfServicePolicyActions.profileRead)
   @Header("Cache-Control", "no-store")
   @Header("Pragma", "no-cache")
   async getProfile(
@@ -73,6 +76,7 @@ export class AccountController {
   }
 
   @Patch()
+  @RequirePolicy(selfServicePolicyActions.profileUpdate)
   @Header("Cache-Control", "no-store")
   @Header("Pragma", "no-cache")
   async updateProfile(
@@ -94,6 +98,7 @@ export class AccountController {
   }
 
   @Get("sessions")
+  @RequirePolicy(selfServicePolicyActions.sessionsRead)
   @Header("Cache-Control", "no-store")
   @Header("Pragma", "no-cache")
   async listSessions(
@@ -109,6 +114,7 @@ export class AccountController {
   }
 
   @Delete("sessions")
+  @RequirePolicy(selfServicePolicyActions.sessionsRevoke)
   @HttpCode(204)
   @Header("Cache-Control", "no-store")
   async logoutAll(
@@ -124,6 +130,7 @@ export class AccountController {
   }
 
   @Delete("sessions/:sessionId")
+  @RequirePolicy(selfServicePolicyActions.sessionsRevoke)
   @HttpCode(204)
   @Header("Cache-Control", "no-store")
   async revokeSession(

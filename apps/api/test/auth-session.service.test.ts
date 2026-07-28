@@ -105,6 +105,18 @@ describe("AuthSessionService", () => {
     );
   });
 
+  it("does not advertise content-mutation capabilities to a limited account", async () => {
+    const store = new MemoryAuthSessionStore();
+    const subject = buildActiveSubject({ status: "LIMITED" });
+    store.registerSubject(subject);
+    const service = new AuthSessionService(environment, store);
+
+    const issued = await service.issueSession(subject.id, {});
+
+    expect(issued.response.permissions).toContain("account:profile:read");
+    expect(issued.response.permissions).not.toContain("listing:draft:create");
+  });
+
   it("rejects duplicate cookies and clears with the same security attributes", () => {
     const token = "a".repeat(43);
     expect(readSessionCookie(`socal_session=${token}`, "socal_session")).toBe(token);

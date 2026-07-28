@@ -329,3 +329,25 @@ Observability: Existing bounded route/status RED metrics cover profile/session 2
 Docs: Updated user journey、domain model、API/security/retention、migration operations、README、changelog、status、architecture book and this worklog
 
 Known gaps: Avatar mutation waits for the Gate 1 quarantined media capability；session metadata physical purge remains PRIV-001；account deletion orchestration and Admin status UI remain their planned tasks；hosted PR must prove clean Linux and non-root images
+
+## API-004 — Policy / Actor / RequestContext 框架
+
+Task: API-004 Policy/Actor/RequestContext 框架
+
+Changed: Added global `AuthorizationModule`、PII-minimized immutable per-request Actor/RequestContext、explicit action registry、fail-closed `PolicyService`、declarative `@RequirePolicy`/global Guard、owner-or-organization resource rule and reusable table-driven policy matrix helper；existing session/profile/device controllers declare self-service actions，Listing draft creation now requires `listing:draft:create`，and Session returns status-aware capability hints
+
+Contracts: OpenAPI remains 34 paths/58 schemas and adds the missing 401 response for protected `POST /listings`；generated TypeScript was refreshed；Prisma remains 37 models；the existing free-form `Session.permissions` field contains five account self-service actions plus `listing:draft:create` only for ACTIVE users；LIMITED users do not receive the content-mutation capability；no client-supplied permission/owner/org field is trusted
+
+Migrations: 无
+
+Security: Unknown actions、duplicate registration、evaluator exceptions、suspended/deleted actors、missing/deleted resources、wrong roles and cross-organization IDs fail closed；RequestContext excludes display names、contacts、IP and tokens；HTTP maps only authentication-required to generic 401 and all other denial reasons to generic 403；Repository scoped queries remain mandatory before object-policy evaluation
+
+Tests run: API targeted typecheck/lint and final 8 files/46 tests passed；reusable matrix covers guest、owner、organization Editor、Billing、cross-org、unrelated、limited、deleted and missing-resource cases；first full run correctly failed because optional `verificationBadges` was iterated without a fallback and was repaired；after protecting Listing create，old unauthenticated POST contract/E2E checks correctly changed from expected 400 to actual 401 and were moved to a public invalid-query 400 while dedicated write tests assert 401/403；contract test asserts Listing create declares both 401/403；`DATABASE_INTEGRATION_URL` forced 10 files/33 PostgreSQL tests；final `pnpm ci:quality` passed 9 typechecks、9 lints、27/27 files、99/99 tests and 8 builds；`scripts/check-architecture.sh` passed 101 tasks/37 models/34 paths/58 schemas；`pnpm observability:check` passed；final `pnpm test:e2e:ci` passed desktop/mobile 4/4
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending
+
+Observability: Existing correlated route/status logs cover generic 401/403 without Actor、resource context or internal deny reason；stable internal reason codes are bounded but not emitted as high-cardinality labels
+
+Docs: Updated roles/permissions、API/integrations、security/privacy、README、changelog、architecture book、status and this worklog
+
+Known gaps: Organization action/role matrix is intentionally next in ORG-001；platform/admin roles、step-up and two-person approval remain ADMIN-001/AUTH-005；authorization decision caching is intentionally absent until invalidation workflows exist

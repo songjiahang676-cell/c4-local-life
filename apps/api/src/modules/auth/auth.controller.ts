@@ -13,6 +13,8 @@ import type { ApiEnvironment } from "@socal/config";
 import type { SessionResponse } from "@socal/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { selfServicePolicyActions } from "../../common/authorization/policy";
+import { RequirePolicy } from "../../common/authorization/require-policy.decorator";
 import { AuthContextAccessor } from "./auth-context";
 import { AuthSessionService } from "./auth-session.service";
 import { readSessionCookie, serializeClearedSessionCookie } from "./session-cookie";
@@ -26,6 +28,7 @@ export class AuthController {
   ) {}
 
   @Get()
+  @RequirePolicy(selfServicePolicyActions.currentSessionRead)
   @Header("Cache-Control", "no-store")
   @Header("Pragma", "no-cache")
   getSession(@Req() request: FastifyRequest): SessionResponse {

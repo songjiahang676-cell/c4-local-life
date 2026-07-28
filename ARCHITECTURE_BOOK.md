@@ -502,6 +502,17 @@
 6. 搜索索引、缓存、对象存储和分析标识通过异步任务清理。
 7. 生成删除完成审计，不保留不必要的原始身份材料。
 
+## 4.8 管理个人资料与登录设备
+
+1. 已登录用户读取自己的安全资料投影；响应不包含邮箱、手机号、trust score、token/IP hash。
+2. 用户修改显示名、简介、语言或首选地区时提交服务器返回的强 ETag；过期版本返回冲突而不静默覆盖。
+3. 首选地区必须是仍启用的 taxonomy region；头像只能由后续安全媒体流程设置，不能保存任意外部 URL。
+4. 用户查看仍有效的登录会话，看到创建/最近活动/到期时间和经过清理的 User-Agent，并明确标识当前会话。
+5. 会话列表使用用户绑定、HMAC 签名的 cursor；客户端不能篡改游标或用一个账号的 cursor 查询另一个账号。
+6. 用户可幂等撤销自己的任一会话，未知或他人 session ID 返回相同结果；撤销当前会话时同时清除 Cookie。
+7. “注销全部”原子撤销该用户所有会话并清除当前 Cookie。
+8. 用户状态或软删除标记变化时，数据库不变量立即撤销全部未撤销会话；后续请求继续执行状态 fail-closed。
+
 ---
 
 <!-- source: docs\05-roles-and-permissions.md -->
@@ -580,9 +591,19 @@
 - 后台高风险动作采用 step-up authentication 与可选双人审批。
 - 权限结果可短时缓存，但用户状态、组织角色和封禁变更必须主动失效。
 
+API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
+
+- `AuthContextGuard` 先解析 Cookie/Session，再为每个请求建立不可变 `RequestContext`。Actor 只包含 user/session ID、账户状态、验证徽章、显式全局权限和活动组织 membership，不携带显示名、联系方式、IP 或 token。
+- 控制器使用 `@RequirePolicy("<domain>:<resource>:<action>")` 声明动作；全局 `AuthorizationGuard` 在进入控制器前执行已注册规则。未声明动作的公共路由不被误拦截，但任何未注册动作、重复注册或规则异常都失败关闭。
+- `PolicyService` 返回内部 allow/deny 与稳定原因码；HTTP 边界只向未登录用户返回通用 401，向其他拒绝返回通用 403，不泄露资源、角色或组织是否存在。
+- 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
+- `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助和 `listing:draft:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿 POST 已由同名 Policy 动作强制执行。
+
 ## 5.6 权限测试最小矩阵
 
 每个资源至少测试：未登录、资源拥有者、同组织不同角色、无关普通用户、受限用户、正确后台角色、错误后台角色、跨组织 ID、已删除/下架状态、批量接口部分越权。默认拒绝，未知动作不得隐式放行。
+
+可复用测试 helper 位于 `apps/api/test/support/policy-matrix.ts`。新资源应以表驱动矩阵验证 allow/deny 和原因码，并至少包含跨组织、错误角色、受限账户、删除资源和缺失资源负例；HTTP 测试另外断言外部错误不会暴露内部 deny reason。
 
 ---
 
@@ -640,6 +661,13 @@
 Organization 是可多人管理的商业主体。商家、师傅团队和供应商共享成员模型，但对应 profile/verification 能力不同。
 
 不变式：至少一名 Owner；slug 唯一；被暂停组织不能创建新公开内容；删除组织前必须处理信息、订单和 Owner 关系。
+
+### Identity 聚合
+
+`User`、`UserProfile` 与 `AuthSession` 构成认证后的账户管理边界。资料通过递增 `version` 做乐观并发，
+避免多端编辑静默覆盖；联系方式和内部信任状态不属于自助资料 DTO。会话只保存 bearer token 的域分离
+HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
+用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
 
 ### Conversation 聚合
 
@@ -967,6 +995,20 @@ OpenAPI 已定义核心端点，实施时保持下列模块：
 AUTH-001 的会话服务签发同一安全 Cookie。两个端点要求不含 PII 的 `X-Device-Id`，服务端只保存其
 HMAC，用于设备绑定和限频。请求认证 Guard 只附加经过有效期、用户状态和软删除检查的上下文；业务对象
 授权继续由 `API-004` 的默认拒绝 Policy 完成。
+
+`AUTH-003` 实现 `GET/PATCH /me`、`GET/DELETE /me/sessions` 与
+`DELETE /me/sessions/{sessionId}`。资料响应只包含显示名、简介、locale、首选地区、受控头像引用、
+版本和更新时间；邮箱、手机号及内部信任字段不进入 DTO。资料更新只接受
+`application/merge-patch+json` 白名单字段，要求强 `If-Match` ETag，并以 profile version 原子检测
+并发冲突。会话列表按最近活动时间稳定排序，cursor 用 `SESSION_SECRET` 域分离 HMAC 签名并绑定用户；
+投影不含 bearer token、token/IP hash。单会话撤销查询始终绑定 actor user ID，未知/他人 ID 与已撤销
+ID 共用幂等 204；注销全部撤销全部会话并清除当前 Cookie。
+
+`API-004` 统一把 Session 投影为最小 Actor/RequestContext，并由显式注册的 Policy 动作控制已保护
+Controller。`POST /listings` 的现有 Session 要求现在由 `listing:draft:create` 强制执行；OpenAPI
+明确声明未登录 401 和无权限/受限账户 403。`Session.permissions` 是服务端生成的 UI capability hint，
+不替代每次请求的 Policy，也不接受客户端回传。对象级 action 必须在 Repository scoped query 后以最小
+resource context 评估，未知 action 或规则异常失败关闭。
 
 ## 8.6 响应投影
 
@@ -1661,6 +1703,13 @@ transaction lock 串行化三个限频键，避免并发绕过；新的同账号
 `SUSPENDED`、`DELETED`、已软删或缺少完整 profile 的用户 fail closed，响应投影不包含邮箱、手机号、
 token hash 或 IP hash。首次部署闲置期限字段时现有会话统一失效并要求重新认证。
 
+`AUTH-003` 增加用户自助资料和设备会话边界。资料修改要求强 ETag/version，拒绝未知字段、控制字符、
+双向文本控制符、任意头像 URL 和停用地区；返回投影不包含联系方式或内部风险字段。活跃会话列表使用
+用户绑定的签名 cursor，只返回 session UUID、清理后的 User-Agent 与生命周期时间，不返回 token、
+token/IP hash。撤销 session 的数据库条件同时包含 `userId + sessionId`，避免 IDOR；未知、外部和已撤销
+ID 均幂等 204。当前会话/注销全部同步返回过期 Cookie。`users.status` 或 `deleted_at` 变化由数据库
+trigger 立即设置全部未撤销会话的 `revoked_at`，避免后来 Admin/删除工作流绕过身份层不变量。
+
 ## 14.5 授权
 
 - 默认拒绝；后端 policy 基于 actor/action/resource/context。
@@ -1668,6 +1717,13 @@ token hash 或 IP hash。首次部署闲置期限字段时现有会话统一失�
 - 组织边界在 repository query 中体现。
 - 后台角色与普通组织角色命名/权限分离。
 - 高风险后台动作需要 reason、工单和可选双人复核。
+
+`API-004` 将授权入口统一为 PII 最小化 Actor、不可变 RequestContext、显式动作注册和全局 Policy
+Guard。客户端提交的 permission、owner、organization 或 role 都不是授权事实；对象规则必须使用
+Repository scoped query 返回的最小上下文。未知动作、重复注册、规则异常、缺失/已删除资源均失败关闭，
+内部 deny reason 不进入通用 401/403。跨组织、错误角色、受限账户和缺失资源由可复用矩阵持续做负面测试。
+`POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
+403，避免已有写端点在框架接入后继续绕过服务端权限。
 
 ## 14.6 输入、输出和内容安全
 
@@ -2671,6 +2727,10 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 `AUTH-002` 的 `otp_challenges` 在读取时强制 10 分钟失效，数据库只保留验证码、账号查找、IP 和设备标识的
 域分离 HMAC；投递/建档所需联系方式仍按 Confidential PII 管理。24 小时物理删除/聚合由 `PRIV-001`
 维护任务执行并监控，不能把在线过期误当作已经完成保留清理。
+
+`AUTH-003` 的设备管理投影只读取活跃 session UUID、清理后的 User-Agent、创建/最近活动/有效期；
+不返回 token、token hash 或 IP hash。撤销和到期后的 metadata 仍按上表 30 天上限清理，不能因为用户
+界面不再显示就无限保留。用户状态或软删除变化会即时标记全部会话已撤销，物理删除仍由保留任务完成。
 
 ## 24.3 账户删除编排
 

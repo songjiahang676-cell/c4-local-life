@@ -91,6 +91,12 @@ HMAC，用于设备绑定和限频。请求认证 Guard 只附加经过有效期
 投影不含 bearer token、token/IP hash。单会话撤销查询始终绑定 actor user ID，未知/他人 ID 与已撤销
 ID 共用幂等 204；注销全部撤销全部会话并清除当前 Cookie。
 
+`API-004` 统一把 Session 投影为最小 Actor/RequestContext，并由显式注册的 Policy 动作控制已保护
+Controller。`POST /listings` 的现有 Session 要求现在由 `listing:draft:create` 强制执行；OpenAPI
+明确声明未登录 401 和无权限/受限账户 403。`Session.permissions` 是服务端生成的 UI capability hint，
+不替代每次请求的 Policy，也不接受客户端回传。对象级 action 必须在 Repository scoped query 后以最小
+resource context 评估，未知 action 或规则异常失败关闭。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：

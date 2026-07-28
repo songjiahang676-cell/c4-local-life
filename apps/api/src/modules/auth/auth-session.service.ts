@@ -4,6 +4,10 @@ import type { ApiEnvironment } from "@socal/config";
 import type { Session } from "@socal/contracts";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import {
+  accountSelfServicePermissions,
+  activeUserPermissions,
+} from "../../common/authorization/policy";
+import {
   AUTH_SESSION_STORE,
   type AuthSessionPrincipal,
   type AuthSessionStore,
@@ -81,7 +85,10 @@ function toSessionResponse(principal: AuthSessionPrincipal): Session {
       verificationBadges: [],
     },
     expiresAt: effectiveExpiry.toISOString(),
-    permissions: [],
+    permissions:
+      principal.user.status === "ACTIVE"
+        ? [...activeUserPermissions]
+        : [...accountSelfServicePermissions],
     organizations: principal.organizations.map((organization) => ({
       id: organization.id,
       type: organization.type,

@@ -5,6 +5,8 @@ import {
   type CreateListingInput,
   type ListListingsQuery,
 } from "@socal/contracts";
+import { activeUserPolicyActions } from "../../common/authorization/policy";
+import { RequirePolicy } from "../../common/authorization/require-policy.decorator";
 import { SchemaValidationPipe } from "../../common/schema-validation.pipe";
 import { ListingsService, type ListingSummary } from "./listings.service";
 
@@ -22,6 +24,7 @@ export class ListingsController {
   }
 
   @Post()
+  @RequirePolicy(activeUserPolicyActions.listingDraftCreate)
   create(@Body(new SchemaValidationPipe(createListingSchema)) input: CreateListingInput): {
     data: ListingSummary;
   } {
