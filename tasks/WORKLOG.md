@@ -549,3 +549,25 @@ Observability: Added bounded `socal_media_processing_total{outcome=ready|rejecte
 Docs: Updated media data model、system/event flow、API/integrations、security/privacy、reliability、infrastructure、observability、acceptance、reference implementation、runtime configuration、local containers、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: Listing media binding/READY authorization belongs to LIST-002/004；quarantine/derivative deletion、lifecycle reconciliation and production no-cookie CDN/Terraform IAM remain release/infrastructure work；restricted verification documents remain MEDIA-003；only JPEG/PNG/WebP are enabled；animated/multi-page content is intentionally rejected；local dependency services and Windows symlink privilege remain unavailable，while PR #16 / run `30406971001` passed the equivalent protected Redis/ClamAV、Linux build/E2E and four-image checks
+
+## LIST-001 — Listing 领域状态机与不变式
+
+Task: LIST-001 Listing 领域状态机与不变式
+
+Changed: Added a pure TypeScript Listing aggregate and transition boundary independent of NestJS and Prisma；five discriminated detail variants enforce exact `type` matching and bounded type-specific values；integer-minor-unit USD price rules distinguish fixed units from `FREE/NEGOTIABLE`；separate content/moderation states cover submit、auto/moderator approval、escalation、rejection、suspension、expiry、archive and one-time soft deletion；every mutation requires expected version、monotonic UTC time、actor and stable reason code and returns immutable before/after evidence
+
+Contracts: Public OpenAPI、generated HTTP contracts、JSON Schemas、Prisma Schema and database storage are unchanged；the new boundary is an internal application-domain contract for LIST-002/003
+
+Migrations: 无；all existing 14 migrations remain current and replay behavior is unchanged，so no rollback/roll-forward database action is required；code rollback removes the isolated domain module and its tests before later consumers depend on it
+
+Security: Invalid reconstructed snapshots fail closed；type/detail mismatch、invalid money、unreviewed publication、early expiry、stale version、time regression、unsafe reason code and illegal state transitions are rejected with stable non-sensitive codes；the domain does not authorize actors or expose PII and later use cases must combine it with Policy/Repository transaction checks；no raw detail or price is logged
+
+Tests run: API targeted typecheck、lint and 19 files/97 tests passed，including 8 new Listing test groups；`scripts/check-architecture.sh` passed 101 tasks/47 models/44 paths/89 schemas；observability runtime、format、Prisma validate、9 workspace typechecks、9 lints and the initial 44 files/171 tests passed；migration status confirmed all 14 migrations current and dedicated PostgreSQL integration passed 17 files/57 tests；final `pnpm ci:quality` passed workflow/governance/config/container/seed/migration/OpenAPI checks、Prisma generate、9 typechecks、9 lints、56 files/211 tests and 8 production builds with 78.55% statements/81.10% lines；standalone preparation and Chromium desktop/mobile E2E passed 6/6
+
+Not run: Real Redis and ClamAV integrations were explicitly skipped because those local services are unavailable and LIST-001 does not consume either；local Docker image smoke was not run because the host has no Docker CLI；protected Linux PR checks and four-image runtime smoke remain required before merge
+
+Observability: No new runtime metric or log was added for this pure domain slice；each successful transition returns bounded actor/reason/status/version evidence for the later audited application/Outbox transaction，while rejected operations expose only stable error codes
+
+Docs: Updated domain/data、moderation workflow、testing matrix、reference implementation、Gate checklist/status、Backlog、README、changelog、architecture book and this worklog；documented that G1/P1 ORG-002 waits for explicit G2 NOTIF-001 and G4 MEDIA-003 owns restricted verification files
+
+Known gaps: LIST-002 must map Prisma records into this aggregate and implement owner/public/moderator safe projections；LIST-003 must run transitions with row/version predicates and atomically persist audit/Outbox evidence；dynamic form exact-version validation、media READY binding、authorization and RFC 9457 HTTP mapping remain later slices；publication lifetime and reason-code catalogs require operations/legal policy rather than being hard-coded here；protected hosted PR evidence is pending

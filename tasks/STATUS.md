@@ -4,16 +4,16 @@
 
 ## 当前 Gate
 
-- Gate：G1 Identity / Taxonomy / Media
-- 目标：安全身份上下文、主数据、动态表单和隔离上传
-- 进度：12/13 个 G1 任务、30/101 个总任务完成
-- 风险：MEDIA-002 本机没有 Docker/clamd/Redis，等价的真实 ClamAV/Redis、完整 Linux 构建/E2E 和四镜像已由 PR #16 / run `30406971001` 通过；Windows 中等完整性进程不能创建 Next standalone symlink；真实短信/邮件提供商适配器仍由 NOTIF-001 提供
+- Gate：G2 Listings / Moderation
+- 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
+- 进度：2/16 个 G2 任务、31/101 个总任务完成
+- 风险：`ORG-002` 是 G1/P1 但显式依赖 G2 `NOTIF-001`，按依赖顺序延后；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产发布期限、审核策略和原因码仍需运营/法律确认，当前领域只接受调用方提供的 1–365 天显式策略值
 
 ## 正在进行
 
-| Task      | Owner                | Started    | Target            | Status         | Notes                                                                                            |
-| --------- | -------------------- | ---------- | ----------------- | -------------- | ------------------------------------------------------------------------------------------------ |
-| MEDIA-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | ready-to-merge | HEAD closure、ClamAV/Sharp、3 WebP variants、lifecycleVersion；PR #16 / run `30406971001` passed |
+| Task     | Owner                | Started    | Target            | Status         | Notes                                                                   |
+| -------- | -------------------- | ---------- | ----------------- | -------------- | ----------------------------------------------------------------------- |
+| LIST-001 | @songjiahang676-cell | 2026-07-28 | protected task PR | local complete | 五类 type-detail、价格、审核/内容双状态、过期、版本和非法转换纯领域规则 |
 
 ## Gate Evidence
 
@@ -74,12 +74,19 @@
 | MEDIA-002 local database        | fresh 14-migration empty database  | baseline 19 negatives；upgrade preserved sentinel；57 tests passed        | 2026-07-28 |
 | MEDIA-002 local quality         | `pnpm ci:quality`                  | 55 files / 203 tests passed；Redis/ClamAV skipped；Admin standalone EPERM | 2026-07-28 |
 | MEDIA-002 protected checks      | PR #16 / run `30406971001`         | 57 files / 205 tests with real Redis/ClamAV；build/E2E/4 images passed    | 2026-07-28 |
+| MEDIA-002 final checks          | PR #16 / run `30407394217`         | final head quality + four non-root images passed                          | 2026-07-28 |
+| MEDIA-002 protected merge       | PR #16 / merge `d4abece`           | protected merge completed                                                 | 2026-07-28 |
+| LIST-001 API domain tests       | API typecheck/lint/test            | 19 files / 97 tests passed；8 Listing state-machine groups                | 2026-07-28 |
+| LIST-001 database integration   | 14 migrations / real PostgreSQL    | status current；17 files / 57 tests passed                                | 2026-07-28 |
+| LIST-001 local quality          | `pnpm ci:quality`                  | 56 files / 211 tests；9 typechecks/lints；8 builds passed                 | 2026-07-28 |
+| LIST-001 browser/runtime        | Chromium desktop/mobile            | standalone preparation and 6/6 E2E passed                                 | 2026-07-28 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成。
+- `ORG-002` 保留原 G1/P1 标签，但它显式依赖 `NOTIF-001`；`MEDIA-003` 属于 G4 受限验证文件。两者不提前实现，也不阻塞按 `IMPLEMENTATION_SEQUENCE.md` 进入 LIST-001。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。

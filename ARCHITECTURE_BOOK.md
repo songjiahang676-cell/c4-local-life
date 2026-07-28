@@ -691,6 +691,19 @@ membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 
 6. 每次更新递增 `version`，并用乐观并发控制。
 7. 重大字段变化产生新的审核快照，而不是覆盖审核证据。
 
+`LIST-001` 将这些规则实现为不依赖 Nest/Prisma 的纯领域边界
+`apps/api/src/modules/listings/listing-domain.ts`。五类 detail 使用 `kind` 判别联合并在运行时再次校验
+必须与 Listing `type` 一致；金额只接受 `bigint` 最小货币单位和 `USD`，`FREE/NEGOTIABLE`
+必须没有金额，其余价格必须为正数且不超过数据库精度。Job 薪资上下限、Rental 房间/押金、
+Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有有界规则。
+
+内容状态和审核状态保持正交但受组合矩阵约束：草稿只能 `NOT_REVIEWED|REJECTED`，提交态只能
+`PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
+`REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
+只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
+`expiresAt`。Repository、权限投影和持久化事务仍由 `LIST-002/003` 接入，领域规则本身不直接操作
+Prisma，也不自行决定运营发布期限。
+
 ### Organization 聚合
 
 Organization 是可多人管理的商业主体。商家、师傅团队和供应商共享成员模型，但对应 profile/verification 能力不同。
@@ -1520,6 +1533,13 @@ PUBLISHED
 ```
 
 `ContentStatus` 表达用户可见生命周期，`ModerationStatus` 表达审核决策；两者不可混为一个字段。状态变更只通过明确 use case，记录 actor、原因、版本和审计。
+
+`LIST-001` 的可执行状态机覆盖 `SUBMIT`、自动/人工批准、升级、退回草稿、暂停、到期、owner
+归档和软删除。自动批准只接受尚未升级的 `PENDING_REVIEW`；升级后的提交只能由 moderator 批准或
+退回。发布会同时写入 UTC `publishedAt` 和基于显式 1–365 天策略计算的 `expiresAt`，到期前调用
+`EXPIRE` 必须失败。删除以 `DELETED + deletedAt` 表达且不可重复执行；过期、归档和暂停保留原发布
+证据。每次转换先验证重建快照的不变式和 `expectedVersion`，再返回包含 actor、原因码、前后双状态
+与前后版本的事件；持久化和 Outbox 原子提交由后续 Listing application/repository 切片完成。
 
 ## 11.2 风险分层
 
@@ -2424,6 +2444,11 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 - 钱包条目不可变，余额与条目对账。
 - 广告库存无超卖，暂停立即传播。
 - 删除请求覆盖搜索、缓存和媒体清理任务。
+
+`LIST-001` 的纯领域测试固定覆盖五类 type-detail 正例与错配、Job 薪资范围、Service 半径、
+最小货币单位及 `FREE/NEGOTIABLE`、提交/升级/退回/重提、自动与人工审核边界、1–365 天发布期限、
+提前过期、归档、暂停、软删除、非法转换、旧版本、倒退时间和非法原因码。外部重建的聚合快照也必须
+经过同一 `assertListingInvariants`，避免 Repository 反序列化绕过规则。
 
 ## 18.4 授权测试
 
@@ -3608,7 +3633,9 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 
 - NestJS + Fastify 启动、Swagger、全局验证和 Problem Details 异常过滤器。
 - Health 模块。
-- Listing 示例模块，当前主要用于说明 Controller/DTO/Service 边界；需要替换为真实 repository、policy 和状态机。
+- Listing HTTP 示例仍只说明 Controller/DTO/Service 边界；`LIST-001` 已增加纯领域状态机，覆盖五类
+  type-detail、价格、审核/内容双状态、版本和过期不变式。真实 repository、安全投影和 use case 接线
+  由 `LIST-002/003` 替换现有内存 Service。
 
 ### `apps/worker`
 
