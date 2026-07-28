@@ -1,10 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import type { Session } from "@socal/contracts";
 import type { FastifyRequest } from "fastify";
+import type { SessionAuthentication } from "./auth-session.service";
 
 export type AuthContext = {
   sessionId: string;
   response: Session;
+  authentication: SessionAuthentication;
 };
 
 @Injectable()

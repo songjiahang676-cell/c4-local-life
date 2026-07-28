@@ -27,7 +27,8 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 6. `TAX-002` schema version/publish/rollback。
 7. `MEDIA-001` upload intent/quarantine。
 8. `MEDIA-002` scan/transform/READY lifecycle。
-9. `ADMIN-001` admin auth/MFA/RBAC shell。
+9. `ADMIN-001` admin auth/RBAC shell 与 fail-closed MFA gate。
+10. `AUTH-005` TOTP MFA、恢复码、step-up 与近期认证。
 
 先完成权限负面测试，再进入 Listing。
 

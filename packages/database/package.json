@@ -9,6 +9,9 @@
       "auth-session": [
         "src/repositories/auth-session.repository.ts"
       ],
+      "mfa-credential": [
+        "src/repositories/mfa-credential.repository.ts"
+      ],
       "otp-challenge": [
         "src/repositories/otp-challenge.repository.ts"
       ],
@@ -29,6 +32,11 @@
       "types": "./src/repositories/auth-session.repository.ts",
       "require": "./dist/src/repositories/auth-session.repository.js",
       "default": "./dist/src/repositories/auth-session.repository.js"
+    },
+    "./mfa-credential": {
+      "types": "./src/repositories/mfa-credential.repository.ts",
+      "require": "./dist/src/repositories/mfa-credential.repository.js",
+      "default": "./dist/src/repositories/mfa-credential.repository.js"
     },
     "./otp-challenge": {
       "types": "./src/repositories/otp-challenge.repository.ts",

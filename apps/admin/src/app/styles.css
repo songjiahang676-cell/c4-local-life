@@ -89,19 +89,24 @@ button:disabled {
   border-top: 5px solid #b94a48;
 }
 
-.signInCard form {
+.signInCard form,
+.mfaCard form {
   display: grid;
   gap: 16px;
   margin-top: 24px;
 }
 
-.signInCard label {
+.signInCard label,
+.mfaCard label,
+.stepUpForm label {
   display: grid;
   gap: 7px;
   font-weight: 650;
 }
 
 .signInCard input,
+.mfaCard input,
+.stepUpForm input,
 .languageControl select {
   border: 1px solid #b8c5d6;
   border-radius: 9px;
@@ -112,6 +117,61 @@ button:disabled {
 
 .signInCard small {
   color: #617087;
+}
+
+.mfaCard {
+  width: min(100%, 560px);
+}
+
+.mfaCard .secondaryButton {
+  margin-top: 14px;
+  background: transparent;
+  color: #324761;
+  border: 1px solid #cbd5e2;
+}
+
+.setupKey {
+  display: grid;
+  gap: 8px;
+  border-radius: 10px;
+  background: #eef4fb;
+  padding: 14px;
+}
+
+.setupKey > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.setupKey code {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+
+.setupKey button {
+  justify-self: start;
+}
+
+.recoveryCodes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 22px 0;
+}
+
+.recoveryCodes li {
+  border: 1px solid #cbd8e8;
+  border-radius: 8px;
+  background: #f7f9fc;
+  padding: 9px 10px;
+  text-align: center;
+}
+
+.recoveryCodes code {
+  letter-spacing: 0.06em;
 }
 
 .brandMark {
@@ -241,6 +301,22 @@ button:disabled {
   line-height: 1.5;
 }
 
+.stepUpForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.stepUpForm label {
+  min-width: min(100%, 280px);
+}
+
+.stepUpForm input {
+  width: 100%;
+}
+
 .adminGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(250px, 0.6fr);
@@ -318,6 +394,10 @@ button:disabled {
   }
 
   .adminGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .recoveryCodes {
     grid-template-columns: 1fr;
   }
 }

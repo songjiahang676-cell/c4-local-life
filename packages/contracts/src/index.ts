@@ -18,6 +18,12 @@ export type PlatformRole = components["schemas"]["PlatformRole"];
 export type AdminNavigationItem = components["schemas"]["AdminNavigationItem"];
 export type AdminSession = components["schemas"]["AdminSession"];
 export type AdminSessionResponse = components["schemas"]["AdminSessionResponse"];
+export type AdminMfaEnrollmentResponse = components["schemas"]["AdminMfaEnrollmentResponse"];
+export type AdminMfaEnrollmentVerifyRequest =
+  components["schemas"]["AdminMfaEnrollmentVerifyRequest"];
+export type AdminMfaVerifyRequest = components["schemas"]["AdminMfaVerifyRequest"];
+export type AdminMfaActivationResponse = components["schemas"]["AdminMfaActivationResponse"];
+export type AdminMfaVerificationResponse = components["schemas"]["AdminMfaVerificationResponse"];
 export type OtpRequest = components["schemas"]["OtpRequest"];
 export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
 export type OtpAcceptedResponse = components["schemas"]["OtpAcceptedResponse"];
@@ -237,6 +243,23 @@ export const otpVerifyRequestSchema: z.ZodType<OtpVerifyRequest> = z
   .object({
     challengeId: z.uuid(),
     code: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+
+export const adminMfaEnrollmentVerifyRequestSchema: z.ZodType<AdminMfaEnrollmentVerifyRequest> = z
+  .object({
+    credentialId: z.uuid(),
+    code: z.string().regex(/^\d{6}$/),
+  })
+  .strict();
+
+export const adminMfaVerifyRequestSchema: z.ZodType<AdminMfaVerifyRequest> = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .transform((value) => value.toUpperCase())
+      .pipe(z.string().regex(/^(?:\d{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})$/)),
   })
   .strict();
 

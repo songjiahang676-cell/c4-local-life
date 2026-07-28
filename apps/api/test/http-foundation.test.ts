@@ -19,6 +19,7 @@ const environment = parseApiEnvironment({
   OPENSEARCH_NODE: "http://localhost:9200",
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "test-mfa-secret-with-more-than-32-bytes",
   CSRF_SECRET: "test-csrf-secret-with-more-than-32-bytes",
   API_BODY_LIMIT_BYTES: "1024",
 });

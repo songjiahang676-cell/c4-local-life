@@ -8,6 +8,8 @@ import {
   PolicyService,
   requireActiveActorPermissionPolicy,
   requireActorPermissionPolicy,
+  requireMfaActorPermissionPolicy,
+  requireRecentMfaActorPermissionPolicy,
 } from "./policy";
 import { RequestContextAccessor } from "./request-context";
 
@@ -20,6 +22,8 @@ export function createPolicyService(): PolicyService {
   policies.register(activeUserPolicyActions.mediaUploadCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
   policies.register(adminPolicyActions.consoleAccess, requireActiveActorPermissionPolicy);
+  policies.register(adminPolicyActions.privilegedAccess, requireMfaActorPermissionPolicy);
+  policies.register(adminPolicyActions.sensitiveAccess, requireRecentMfaActorPermissionPolicy);
   policies.register(
     organizationPolicyActions.profileRead,
     ownerOrOrganizationPolicy({

@@ -138,10 +138,11 @@ PR #7 / run `30388093140` 的完整质量和四应用非 root 镜像检查合并
 PR #8 / run `30389838047` 合并为 `d622f74`；`TAX-002` 通过 PR #9 / run `30391936500` 合并为
 `59218aa`，合并后 main run `30392308720` 亦通过。`MEDIA-001` 通过 PR #10 / run
 `30393901014` 合并为 `aadddcf`；main run `30394324273` 的完整质量和四应用非 root 容器检查亦通过。
-当前 `ADMIN-001` 已实现独立 Admin app、同源 allowlist BFF、可到期/撤销且保留 provenance 的平台
-角色、服务端 RBAC 导航、通用 401/403、no-store/noindex 与 nonce CSP。MFA/step-up 未完成前 API
-明确关闭特权动作，不提供真实后台数据或写入口。本地真实 PostgreSQL 47 项、全仓 41 个文件共 152 项
-测试、8 个构建和 Chromium 桌面/移动 6/6 smoke 已通过；受保护托管检查通过前不进入 AUTH-005。
+`ADMIN-001` 通过 PR #11 / run `30396556334` 合并为 `8058597`。当前 `AUTH-005` 已实现加密保存的
+TOTP、只返回一次且只存哈希的恢复码、重放防护、失败锁定、短时 Admin MFA 会话和 recent-auth
+step-up。未完成 MFA 的平台角色会话不会获得特权权限，近期认证过期后不能执行敏感动作。本地真实
+PostgreSQL 49 项、全仓 44 个文件共 165 项测试、8 个构建、运行时可观测性检查和 Chromium
+桌面/移动 6/6 smoke 已通过；受保护托管检查仍待 AUTH-005 PR 验证。
 
 ## 七、规划容量与服务目标
 

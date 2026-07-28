@@ -10,6 +10,7 @@
   },
   "include": [
     "src/repositories/auth-session.repository.ts",
+    "src/repositories/mfa-credential.repository.ts",
     "src/repositories/otp-challenge.repository.ts",
     "src/repositories/organization.repository.ts",
     "src/repositories/media-asset.repository.ts",

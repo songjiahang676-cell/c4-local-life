@@ -659,11 +659,76 @@ export interface paths {
         /**
          * Resolve the current operator console session
          * @description Returns only the current operator's active platform roles and server-computed workspace
-         *     navigation. This bootstrap endpoint does not grant privileged data access or satisfy MFA.
+         *     navigation plus MFA posture. Privileged workspaces require an MFA-bound session and
+         *     sensitive actions additionally require recent MFA.
          */
         readonly get: operations["getAdminSession"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/mfa/enrollment": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Begin TOTP enrollment for the current operator
+         * @description Replaces only an unexpired or expired pending enrollment. Active and administratively
+         *     disabled credentials cannot be overwritten. The TOTP secret is returned exactly for this
+         *     enrollment response and is never logged.
+         */
+        readonly post: operations["beginAdminMfaEnrollment"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/mfa/enrollment/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Verify and activate a pending TOTP enrollment
+         * @description Activates the credential only after a valid, unreplayed TOTP. Recovery codes are returned
+         *     once and only their domain-separated hashes are stored.
+         */
+        readonly post: operations["verifyAdminMfaEnrollment"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/mfa/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Verify TOTP or a one-time recovery code
+         * @description Rotates the current primary or MFA session into a short-lived MFA-bound Admin session and
+         *     refreshes recent authentication. TOTP steps and recovery codes cannot be replayed.
+         */
+        readonly post: operations["verifyAdminMfa"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -812,8 +877,17 @@ export interface components {
         readonly AdminSecurityState: {
             /** @constant */
             readonly mfaRequired: true;
-            /** @description Remains false until AUTH-005 establishes and verifies an MFA-bound Admin session. */
+            readonly mfaEnrolled: boolean;
+            /** @enum {string} */
+            readonly authenticationStrength: "PRIMARY" | "MFA";
+            /** Format: date-time */
+            readonly mfaVerifiedAt: string | null;
+            /** Format: date-time */
+            readonly stepUpExpiresAt: string | null;
+            /** @description True only for an MFA-bound Admin session. */
             readonly privilegedActionsAllowed: boolean;
+            /** @description True only while the recent-MFA step-up window remains valid. */
+            readonly sensitiveActionsAllowed: boolean;
         };
         readonly AdminSession: {
             readonly operator: components["schemas"]["UserSummary"];
@@ -823,6 +897,45 @@ export interface components {
         };
         readonly AdminSessionResponse: {
             readonly data: components["schemas"]["AdminSession"];
+        };
+        readonly AdminMfaEnrollment: {
+            /** Format: uuid */
+            readonly credentialId: string;
+            readonly secret: string;
+            readonly otpauthUri: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
+        };
+        readonly AdminMfaEnrollmentResponse: {
+            readonly data: components["schemas"]["AdminMfaEnrollment"];
+        };
+        readonly AdminMfaEnrollmentVerifyRequest: {
+            /** Format: uuid */
+            readonly credentialId: string;
+            readonly code: string;
+        };
+        readonly AdminMfaVerifyRequest: {
+            readonly code: string;
+        };
+        readonly AdminMfaActivation: {
+            readonly recoveryCodes: readonly string[];
+            /** Format: date-time */
+            readonly mfaVerifiedAt: string;
+            /** Format: date-time */
+            readonly stepUpExpiresAt: string;
+        };
+        readonly AdminMfaActivationResponse: {
+            readonly data: components["schemas"]["AdminMfaActivation"];
+        };
+        readonly AdminMfaVerification: {
+            /** Format: date-time */
+            readonly mfaVerifiedAt: string;
+            /** Format: date-time */
+            readonly stepUpExpiresAt: string;
+            readonly recoveryCodeUsed: boolean;
+        };
+        readonly AdminMfaVerificationResponse: {
+            readonly data: components["schemas"]["AdminMfaVerification"];
         };
         readonly MyProfileResponse: {
             readonly data: components["schemas"]["MyProfile"];
@@ -2744,6 +2857,90 @@ export interface operations {
             };
             readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly beginAdminMfaEnrollment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Pending TOTP enrollment created */
+            readonly 201: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaEnrollmentResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly verifyAdminMfaEnrollment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AdminMfaEnrollmentVerifyRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description MFA credential activated and the session elevated */
+            readonly 200: {
+                headers: {
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaActivationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly verifyAdminMfa: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AdminMfaVerifyRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description MFA verified and recent-auth window established */
+            readonly 200: {
+                headers: {
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaVerificationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 429: components["responses"]["TooManyRequests"];
         };
     };
     readonly listModerationCases: {

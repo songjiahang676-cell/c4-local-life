@@ -95,8 +95,20 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 ACTIVE 或 LIMITED 员工账号返回同样不泄露内部角色的 403；所有结果包括错误都 no-store。Admin app
 只使用同源 allowlist BFF，设置 nonce-based script CSP、frame denial、no-referrer、noindex 和
 Permissions-Policy，并且从服务端返回的导航渲染入口。OTP 只能建立普通 Session；在 `AUTH-005`
-完成 MFA/step-up 前，服务端明确返回 `privilegedActionsAllowed=false`，本切片不开放任何后台数据、
-导出或写动作，不能把 UI 隐藏当作授权。
+之前服务端明确返回 `privilegedActionsAllowed=false`，不把 UI 隐藏当作授权。
+
+`AUTH-005` 使用 RFC 4226/6238 的 6 位、30 秒 TOTP（允许前后各一个时间步），通过 Node 内置
+HMAC-SHA1 计算并用公开标准向量测试。TOTP secret 由 CSPRNG 产生，以从独立 `MFA_SECRET` 域分离
+派生的 AES-256-GCM key 加密保存；恢复码具有 80 bit 随机性，仅保存域分离 HMAC-SHA256，明文只在
+激活成功时返回一次。数据库原子记录最后消费的时间步和恢复码，拒绝并发/重复使用；连续五次失败锁定
+五分钟，响应使用通用 400/429，不泄露 credential 状态。pending 设置十分钟到期，重试返回相同设置而
+不是静默替换。
+
+MFA 成功会轮换 bearer Session，旧 token 立即失效；MFA Session 默认绝对 8 小时、闲置 30 分钟，
+十分钟后普通后台权限仍可存在但敏感动作必须重新 step-up。平台角色仍在每次请求从 PostgreSQL 读取，
+角色撤销不会等待 MFA Session 到期。设置、TOTP 验证和恢复码消费都写最小化 `AuditLog`，不记录
+secret、code、token、IP 原文或 PII。当前不提供低保证的 MFA 关闭/重置；恢复需要后续受审计身份核验
+流程并撤销全部 Session。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi

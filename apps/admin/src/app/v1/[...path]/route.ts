@@ -36,6 +36,9 @@ const allowedApiPaths = new Set([
   "auth/otp/request",
   "auth/otp/verify",
   "admin/session",
+  "admin/mfa/enrollment",
+  "admin/mfa/enrollment/verify",
+  "admin/mfa/verify",
 ]);
 
 function isAllowedPath(path: string): boolean {

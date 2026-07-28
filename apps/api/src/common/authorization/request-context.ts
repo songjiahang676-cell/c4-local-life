@@ -1,11 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import type { Session } from "@socal/contracts";
 import type { FastifyRequest } from "fastify";
+import type { SessionAuthentication } from "../../modules/auth/auth-session.service";
 import type { AuthenticatedActor, PolicyActor, PolicyRequestContext } from "./policy";
 
 export type SessionIdentityContext = {
   sessionId: string;
   response: Session;
+  authentication: SessionAuthentication;
 };
 
 function actorFromSession(identity: SessionIdentityContext | null): PolicyActor {
@@ -26,6 +28,9 @@ function actorFromSession(identity: SessionIdentityContext | null): PolicyActor 
         }),
       ),
     ),
+    authenticationStrength: identity.authentication.strength,
+    mfaVerifiedAt: identity.authentication.mfaVerifiedAt,
+    recentMfa: identity.authentication.recentMfa,
   };
   return Object.freeze(actor);
 }

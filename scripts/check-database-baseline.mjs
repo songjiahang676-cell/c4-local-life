@@ -48,6 +48,7 @@ try {
     "20260728190935_category_form_schema_versions",
     "20260728201500_media_upload_intents",
     "20260728203000_admin_platform_roles",
+    "20260728221000_admin_mfa",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -75,7 +76,9 @@ try {
             to_regclass('public.category_aliases') AS category_aliases,
             to_regclass('public.category_form_schema_versions') AS category_form_schema_versions,
             to_regclass('public.media_assets') AS media_assets,
-            to_regclass('public.platform_role_assignments') AS platform_role_assignments`,
+            to_regclass('public.platform_role_assignments') AS platform_role_assignments,
+            to_regclass('public.mfa_credentials') AS mfa_credentials,
+            to_regclass('public.mfa_recovery_codes') AS mfa_recovery_codes`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -262,6 +265,39 @@ try {
     platformRoleStorage.rows[0]?.enum_value_count !== 8
   ) {
     throw new Error("Platform role uniqueness, provenance, or enum controls are missing");
+  }
+
+  const mfaStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'auth_sessions'
+            AND constraint_name = 'auth_sessions_mfa_strength_check'
+            AND constraint_type = 'CHECK'
+       ) AS session_strength_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'mfa_credentials'
+            AND constraint_name = 'mfa_credentials_state_check'
+            AND constraint_type = 'CHECK'
+       ) AS credential_state_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'mfa_recovery_codes_credential_id_code_hash_key'
+       ) AS recovery_code_unique`,
+  );
+  if (
+    !mfaStorage.rows[0]?.session_strength_check ||
+    !mfaStorage.rows[0]?.credential_state_check ||
+    !mfaStorage.rows[0]?.recovery_code_unique
+  ) {
+    throw new Error("MFA session, credential, or recovery-code controls are missing");
   }
 
   await client.query("BEGIN");
@@ -494,6 +530,41 @@ try {
      )`,
     "23514",
   );
+  await expectSqlState(
+    "MFA session strength coherence",
+    `INSERT INTO auth_sessions (
+       id, user_id, token_hash, authentication_strength,
+       expires_at, idle_expires_at, last_seen_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000017',
+       '00000000-0000-4000-8000-000000000001',
+       repeat('b', 64),
+       'MFA',
+       now() + interval '1 hour',
+       now() + interval '30 minutes',
+       now()
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "MFA credential state coherence",
+    `INSERT INTO mfa_credentials (
+       id, user_id, status, encrypted_secret, key_version,
+       enrollment_expires_at, created_at, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000018',
+       '00000000-0000-4000-8000-000000000001',
+       'ACTIVE',
+       'v1.synthetic',
+       1,
+       now() + interval '10 minutes',
+       now(),
+       now()
+     )`,
+    "23514",
+  );
 
   await client.query(
     `INSERT INTO auth_sessions (
@@ -537,7 +608,8 @@ try {
       categoryFormSchemaStorage: true,
       mediaUploadStorage: true,
       platformRoleStorage: true,
-      negativeCases: 9,
+      mfaStorage: true,
+      negativeCases: 11,
     }),
   );
 } finally {

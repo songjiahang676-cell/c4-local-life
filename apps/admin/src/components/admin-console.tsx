@@ -1,6 +1,10 @@
 "use client";
 
-import type { AdminSessionResponse } from "@socal/contracts";
+import type {
+  AdminMfaActivationResponse,
+  AdminMfaEnrollmentResponse,
+  AdminSessionResponse,
+} from "@socal/contracts";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
@@ -16,6 +20,8 @@ type OtpChallenge = {
   challengeId: string;
   expiresAt: string;
 };
+
+type MfaEnrollment = AdminMfaEnrollmentResponse["data"];
 
 export const knownAdminPaths = new Set([
   "/admin/moderation/listings",
@@ -46,8 +52,29 @@ const copy = {
     serviceErrorBody: "无法验证权限。请稍后重试，或联系值班人员。",
     retry: "重试",
     signOut: "退出",
-    securityTitle: "MFA 安全门尚未完成",
-    securityBody: "AUTH-005 完成前，当前界面只显示角色与导航骨架，不开放任何特权数据或写操作。",
+    mfaEnrollTitle: "设置后台双重验证",
+    mfaEnrollIntro: "后台访问必须使用身份验证器。密钥和恢复码只会在设置过程中显示。",
+    beginEnrollment: "开始设置",
+    setupKey: "身份验证器设置密钥",
+    setupInstructions: "在身份验证器中添加此密钥，然后输入当前六位动态验证码。",
+    copyKey: "复制密钥",
+    keyCopied: "已复制",
+    mfaCode: "身份验证器验证码",
+    activateMfa: "启用双重验证",
+    mfaVerifyTitle: "完成后台双重验证",
+    mfaVerifyIntro: "输入身份验证器的六位动态验证码，或使用一枚未使用的恢复码。",
+    recoveryOrCode: "动态验证码或恢复码",
+    verifyMfa: "验证并进入后台",
+    mfaError: "验证失败或已过期，请检查后重试。",
+    mfaLocked: "尝试次数过多，请稍后重试。",
+    recoveryTitle: "立即保存恢复码",
+    recoveryIntro: "每枚恢复码只能使用一次。请存入受保护的密码管理器；离开此页后不会再次显示。",
+    recoverySaved: "我已安全保存",
+    securityTitle: "双重验证已启用",
+    securityBody: "当前后台会话已通过 MFA。敏感操作仍要求近期验证。",
+    stepUpExpired: "近期验证已过期；执行敏感操作前请再次验证。",
+    stepUpValid: "近期验证有效，可执行当前角色允许的敏感操作。",
+    verifyAgain: "再次验证",
     overview: "访问概览",
     overviewBody: "以下工作区由服务端根据当前有效平台角色计算。未授权入口不会显示。",
     empty: "当前角色没有可见工作区。",
@@ -84,9 +111,33 @@ const copy = {
     serviceErrorBody: "Access could not be verified. Retry later or contact the operator on call.",
     retry: "Retry",
     signOut: "Sign out",
-    securityTitle: "MFA security gate is pending",
+    mfaEnrollTitle: "Set up Admin two-factor authentication",
+    mfaEnrollIntro:
+      "Admin access requires an authenticator app. The setup secret and recovery codes are shown only during enrollment.",
+    beginEnrollment: "Begin setup",
+    setupKey: "Authenticator setup key",
+    setupInstructions:
+      "Add this key to your authenticator app, then enter its current six-digit code.",
+    copyKey: "Copy key",
+    keyCopied: "Copied",
+    mfaCode: "Authenticator code",
+    activateMfa: "Enable two-factor authentication",
+    mfaVerifyTitle: "Complete Admin two-factor authentication",
+    mfaVerifyIntro: "Enter the current six-digit authenticator code or one unused recovery code.",
+    recoveryOrCode: "Authenticator or recovery code",
+    verifyMfa: "Verify and enter Admin",
+    mfaError: "Verification failed or expired. Check the code and try again.",
+    mfaLocked: "Too many attempts. Try again later.",
+    recoveryTitle: "Save your recovery codes now",
+    recoveryIntro:
+      "Each recovery code works once. Store them in a protected password manager; they are not shown again.",
+    recoverySaved: "I saved them securely",
+    securityTitle: "Two-factor authentication enabled",
     securityBody:
-      "Until AUTH-005 ships, this shell exposes only role and navigation metadata—no privileged data or writes.",
+      "This Admin session is MFA-bound. Sensitive actions still require recent verification.",
+    stepUpExpired: "Recent verification expired. Verify again before a sensitive action.",
+    stepUpValid: "Recent verification is valid for sensitive actions allowed by your role.",
+    verifyAgain: "Verify again",
     overview: "Access overview",
     overviewBody:
       "The API computes these workspaces from current platform roles. Unauthorized entries are omitted.",
@@ -133,6 +184,11 @@ export function AdminConsole({ activePath }: { activePath: string }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
+  const [mfaEnrollment, setMfaEnrollment] = useState<MfaEnrollment | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState<"invalid" | "locked" | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<readonly string[] | null>(null);
+  const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const deviceId = useRef<string | null>(null);
   const text = copy[locale];
@@ -232,6 +288,92 @@ export function AdminConsole({ activePath }: { activePath: string }) {
       headers: { origin: window.location.origin },
     }).catch(() => undefined);
     setState({ kind: "signed-out" });
+  }
+
+  async function beginMfaEnrollment(): Promise<void> {
+    setSubmitting(true);
+    setMfaError(null);
+    try {
+      const response = await fetch("/v1/admin/mfa/enrollment", {
+        method: "POST",
+        credentials: "include",
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) {
+        setMfaError(response.status === 429 ? "locked" : "invalid");
+        return;
+      }
+      setMfaEnrollment(((await response.json()) as AdminMfaEnrollmentResponse).data);
+      setMfaCode("");
+    } catch {
+      setMfaError("invalid");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function activateMfa(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!mfaEnrollment) return;
+    setSubmitting(true);
+    setMfaError(null);
+    try {
+      const response = await fetch("/v1/admin/mfa/enrollment/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          credentialId: mfaEnrollment.credentialId,
+          code: mfaCode,
+        }),
+      });
+      if (!response.ok) {
+        setMfaError(response.status === 429 ? "locked" : "invalid");
+        return;
+      }
+      const activation = ((await response.json()) as AdminMfaActivationResponse).data;
+      setRecoveryCodes(activation.recoveryCodes);
+      setMfaEnrollment(null);
+      setMfaCode("");
+    } catch {
+      setMfaError("invalid");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function verifyMfa(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setSubmitting(true);
+    setMfaError(null);
+    try {
+      const response = await fetch("/v1/admin/mfa/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ code: mfaCode.trim().toUpperCase() }),
+      });
+      if (!response.ok) {
+        setMfaError(response.status === 429 ? "locked" : "invalid");
+        return;
+      }
+      setMfaCode("");
+      await refresh();
+    } catch {
+      setMfaError("invalid");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function copyMfaKey(): Promise<void> {
+    if (!mfaEnrollment) return;
+    try {
+      await navigator.clipboard.writeText(mfaEnrollment.secret);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
   }
 
   const languageControl = (
@@ -341,6 +483,125 @@ export function AdminConsole({ activePath }: { activePath: string }) {
   }
 
   const session = state.session;
+  const mfaErrorMessage =
+    mfaError === "locked" ? text.mfaLocked : mfaError === "invalid" ? text.mfaError : null;
+
+  if (recoveryCodes) {
+    return (
+      <main className="statePage">
+        {languageControl}
+        <section className="stateCard mfaCard" aria-labelledby="recovery-title">
+          <p className="eyebrow">{text.admin}</p>
+          <h1 id="recovery-title">{text.recoveryTitle}</h1>
+          <p>{text.recoveryIntro}</p>
+          <ul className="recoveryCodes" aria-label={text.recoveryTitle}>
+            {recoveryCodes.map((recoveryCode) => (
+              <li key={recoveryCode}>
+                <code>{recoveryCode}</code>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              setRecoveryCodes(null);
+              void refresh();
+            }}
+          >
+            {text.recoverySaved}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session.security.mfaEnrolled) {
+    return (
+      <main className="statePage">
+        {languageControl}
+        <section className="stateCard mfaCard" aria-labelledby="mfa-enroll-title">
+          <p className="eyebrow">{text.admin}</p>
+          <h1 id="mfa-enroll-title">{text.mfaEnrollTitle}</h1>
+          <p>{text.mfaEnrollIntro}</p>
+          {!mfaEnrollment ? (
+            <button type="button" disabled={submitting} onClick={() => void beginMfaEnrollment()}>
+              {text.beginEnrollment}
+            </button>
+          ) : (
+            <>
+              <p>{text.setupInstructions}</p>
+              <div className="setupKey">
+                <span>{text.setupKey}</span>
+                <code>{mfaEnrollment.secret}</code>
+                <button type="button" onClick={() => void copyMfaKey()}>
+                  {copied ? text.keyCopied : text.copyKey}
+                </button>
+              </div>
+              <form onSubmit={(event) => void activateMfa(event)}>
+                <label>
+                  <span>{text.mfaCode}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    required
+                    value={mfaCode}
+                    onChange={(event) => setMfaCode(event.target.value)}
+                  />
+                </label>
+                <button type="submit" disabled={submitting}>
+                  {text.activateMfa}
+                </button>
+              </form>
+            </>
+          )}
+          {mfaErrorMessage ? <p role="alert">{mfaErrorMessage}</p> : null}
+          <button className="secondaryButton" type="button" onClick={() => void signOut()}>
+            {text.signOut}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  if (session.security.authenticationStrength !== "MFA") {
+    return (
+      <main className="statePage">
+        {languageControl}
+        <section className="stateCard mfaCard" aria-labelledby="mfa-verify-title">
+          <p className="eyebrow">{text.admin}</p>
+          <h1 id="mfa-verify-title">{text.mfaVerifyTitle}</h1>
+          <p>{text.mfaVerifyIntro}</p>
+          <form onSubmit={(event) => void verifyMfa(event)}>
+            <label>
+              <span>{text.recoveryOrCode}</span>
+              <input
+                type="text"
+                autoComplete="one-time-code"
+                pattern="(?:[0-9]{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})"
+                minLength={6}
+                maxLength={19}
+                required
+                value={mfaCode}
+                onChange={(event) => setMfaCode(event.target.value.toUpperCase())}
+              />
+            </label>
+            <button type="submit" disabled={submitting}>
+              {text.verifyMfa}
+            </button>
+          </form>
+          {mfaErrorMessage ? <p role="alert">{mfaErrorMessage}</p> : null}
+          <button className="secondaryButton" type="button" onClick={() => void signOut()}>
+            {text.signOut}
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   const activeNavigation = session.navigation.find((item) => item.href === activePath);
   return (
     <div className="adminShell">
@@ -386,6 +647,28 @@ export function AdminConsole({ activePath }: { activePath: string }) {
         <section className="securityNotice" aria-labelledby="security-title">
           <strong id="security-title">{text.securityTitle}</strong>
           <p>{text.securityBody}</p>
+          <p>{session.security.sensitiveActionsAllowed ? text.stepUpValid : text.stepUpExpired}</p>
+          {!session.security.sensitiveActionsAllowed ? (
+            <form className="stepUpForm" onSubmit={(event) => void verifyMfa(event)}>
+              <label>
+                <span>{text.recoveryOrCode}</span>
+                <input
+                  type="text"
+                  autoComplete="one-time-code"
+                  pattern="(?:[0-9]{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})"
+                  minLength={6}
+                  maxLength={19}
+                  required
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value.toUpperCase())}
+                />
+              </label>
+              <button type="submit" disabled={submitting}>
+                {text.verifyAgain}
+              </button>
+              {mfaErrorMessage ? <span role="alert">{mfaErrorMessage}</span> : null}
+            </form>
+          ) : null}
         </section>
         <div className="adminGrid">
           <section className="panel">

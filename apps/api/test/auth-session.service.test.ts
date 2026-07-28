@@ -19,6 +19,7 @@ const environment = parseApiEnvironment({
   OPENSEARCH_NODE: "https://search.example.invalid",
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "test-mfa-secret-with-more-than-32-bytes",
   SESSION_ABSOLUTE_TTL_SECONDS: "1200",
   SESSION_IDLE_TTL_SECONDS: "600",
   SESSION_TOUCH_INTERVAL_SECONDS: "60",
@@ -77,6 +78,36 @@ describe("AuthSessionService", () => {
     expect(
       await service.resolveToken(rotated?.token ?? "", new Date("2026-07-25T12:01:01.000Z")),
     ).toMatchObject({ response: { user: { id: subject.id } } });
+  });
+
+  it("elevates into a short MFA-bound session and expires recent-auth independently", async () => {
+    const { service, store, subject } = createService();
+    store.registerPlatformRole(subject.id, "SUPPORT");
+    const issued = await service.issueSession(subject.id, {}, new Date("2026-07-25T12:00:00.000Z"));
+    const elevated = await service.elevateWithMfa(
+      issued.token,
+      {},
+      new Date("2026-07-25T12:01:00.000Z"),
+    );
+
+    expect(elevated?.response.permissions).toContain("admin:console:privileged");
+    expect(
+      await service.resolveToken(elevated?.token ?? "", new Date("2026-07-25T12:01:01.000Z")),
+    ).toMatchObject({
+      authentication: {
+        strength: "MFA",
+        mfaVerifiedAt: "2026-07-25T12:01:00.000Z",
+        recentMfa: true,
+      },
+    });
+    expect(
+      await service.resolveToken(elevated?.token ?? "", new Date("2026-07-25T12:12:00.000Z")),
+    ).toMatchObject({
+      authentication: { strength: "MFA", recentMfa: false },
+    });
+    expect(
+      await service.resolveToken(issued.token, new Date("2026-07-25T12:01:01.000Z")),
+    ).toBeNull();
   });
 
   it("enforces idle expiry, bounds refresh by absolute expiry, and rejects malformed tokens early", async () => {

@@ -31,6 +31,12 @@ export default defineConfig({
       "@socal/database/auth-session": fileURLToPath(
         new URL("./packages/database/src/repositories/auth-session.repository.ts", import.meta.url),
       ),
+      "@socal/database/mfa-credential": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/mfa-credential.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/otp-challenge": fileURLToPath(
         new URL(
           "./packages/database/src/repositories/otp-challenge.repository.ts",

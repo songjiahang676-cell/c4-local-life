@@ -96,6 +96,8 @@ export class MemoryAuthSessionStore implements AuthSessionStore {
         userId: input.userId,
         expiresAt: input.expiresAt,
         idleExpiresAt: input.idleExpiresAt,
+        authenticationStrength: input.authenticationStrength,
+        mfaVerifiedAt: input.mfaVerifiedAt,
         lastSeenAt: input.now,
         createdAt: input.now,
       },

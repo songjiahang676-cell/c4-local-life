@@ -71,6 +71,12 @@ reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 
 后续受控授权工作流显式撤销后再授予。认证 Repository 每次解析 Session 时按当前时间过滤过期/撤销行，
 所以降权不依赖客户端 token 刷新；`ADMIN-001` 不提供角色写 API，bootstrap 只能走受审计维护流程。
 
+`AUTH-005` 为 `AuthSession` 增加 `PRIMARY|MFA` 强度与 `mfa_verified_at`，MFA 换发时在同一事务撤销
+旧 Session。每个 User 最多一个 `MfaCredential`；pending/active/disabled 时间状态由数据库 check
+约束，TOTP secret 只保存 AES-256-GCM 密文、key version、最后消费时间步和失败锁定元数据。
+`MfaRecoveryCode` 只保存域分离 hash 与消费时间，`credential + hash` 唯一。激活、时间步消费和恢复码
+消费均在事务内追加最小化 `AuditLog`，并用条件更新使并发重放最多一个成功。
+
 ### Media 聚合
 
 `MediaAsset` 在任何业务资源绑定前记录上传所有权、用途、类型、声明字节数、SHA-256、私有 bucket/key、

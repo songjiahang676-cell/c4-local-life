@@ -159,6 +159,18 @@ try {
           WHERE type.typname = 'PlatformRole'
        ) AS enum_value_count`,
   );
+  const mfaStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.mfa_credentials') AS credentials,
+       to_regclass('public.mfa_recovery_codes') AS recovery_codes,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'auth_sessions'
+            AND constraint_name = 'auth_sessions_mfa_strength_check'
+       ) AS session_strength_check`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -176,7 +188,10 @@ try {
     !mediaUploadStorage.rows[0].owner_idempotency ||
     platformRoleStorage.rows[0].assignments !== "platform_role_assignments" ||
     !platformRoleStorage.rows[0].one_active_role ||
-    platformRoleStorage.rows[0].enum_value_count !== 8
+    platformRoleStorage.rows[0].enum_value_count !== 8 ||
+    mfaStorage.rows[0].credentials !== "mfa_credentials" ||
+    mfaStorage.rows[0].recovery_codes !== "mfa_recovery_codes" ||
+    !mfaStorage.rows[0].session_strength_check
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -196,6 +211,7 @@ try {
       categoryFormSchemaStorage: true,
       mediaUploadStorage: true,
       platformRoleStorage: true,
+      mfaStorage: true,
     }),
   );
 } finally {

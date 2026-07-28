@@ -122,8 +122,17 @@ taxonomy 写端点；后续管理切片必须复用这些能力并增加 MFA/ste
 未登录返回通用 401，普通/受限用户返回不泄露角色状态的通用 403。成功响应只含安全用户投影、角色、
 导航与安全门状态，所有 `/v1/admin/*` 成功或错误响应统一 `Cache-Control: no-store`。独立 Admin
 Next.js app 通过同源 `/v1` BFF 仅代理认证与 Admin session allowlist，过滤 hop-by-hop headers，不把
-内部 API 地址或任意代理能力暴露给浏览器。当前 `privilegedActionsAllowed=false`；真实后台数据/写动作
-等待 `AUTH-005` MFA/step-up 和对应领域任务。
+内部 API 地址或任意代理能力暴露给浏览器。
+
+`AUTH-005` 新增三个 no-store、Cookie + same-origin 保护的端点：
+
+- `POST /admin/mfa/enrollment` 幂等返回当前短效 pending TOTP 设置；
+- `POST /admin/mfa/enrollment/verify` 激活 TOTP、一次性返回十枚恢复码并轮换 Session；
+- `POST /admin/mfa/verify` 使用未重放的 TOTP 时间步或未消费恢复码建立/刷新 MFA 与近期认证。
+
+`GET /admin/session.security` 返回是否已设置 MFA、`PRIMARY|MFA` 认证强度、验证/step-up 到期时间以及
+普通特权与敏感动作两个服务端状态。它仍不是业务授权凭证；真实后台 controller 必须声明对应 Policy。
+OpenAPI 不提供禁用/重置接口，防止自助降级；人工恢复流程必须由后续审计、身份核验和会话全撤销切片实现。
 
 ## 8.6 响应投影
 
@@ -216,7 +225,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 38 个 path、75 个 schema、47 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 41 个 path、83 个 schema、50 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 

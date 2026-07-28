@@ -36,6 +36,8 @@ function createInput(userId: string, tokenHash: string, now: Date): AuthSessionC
     ipHash: "f".repeat(64),
     expiresAt: new Date(now.getTime() + 60 * 60 * 1_000),
     idleExpiresAt: new Date(now.getTime() + 30 * 60 * 1_000),
+    authenticationStrength: "PRIMARY",
+    mfaVerifiedAt: null,
     now,
   };
 }
@@ -157,6 +159,8 @@ integration("AuthSessionRepository with PostgreSQL", () => {
 
       const rotated = await repository.rotate({
         ...createInput(userId, newHash, new Date("2026-07-25T12:05:00.000Z")),
+        authenticationStrength: "MFA",
+        mfaVerifiedAt: new Date("2026-07-25T12:05:00.000Z"),
         currentTokenHash: oldHash,
       });
       const replay = await repository.rotate({
@@ -168,6 +172,8 @@ integration("AuthSessionRepository with PostgreSQL", () => {
       });
 
       expect(rotated?.session.userId).toBe(userId);
+      expect(rotated?.session.authenticationStrength).toBe("MFA");
+      expect(rotated?.session.mfaVerifiedAt?.toISOString()).toBe("2026-07-25T12:05:00.000Z");
       expect(old.revokedAt?.toISOString()).toBe("2026-07-25T12:05:00.000Z");
       expect(replay).toBeNull();
       expect(await transaction.authSession.count({ where: { userId } })).toBe(2);

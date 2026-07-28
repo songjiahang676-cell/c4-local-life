@@ -54,6 +54,17 @@ enum PlatformRole {
   READ_ONLY_AUDITOR
 }
 
+enum AuthenticationStrength {
+  PRIMARY
+  MFA
+}
+
+enum MfaCredentialStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+}
+
 enum RegionType {
   COUNTRY
   STATE
@@ -280,6 +291,7 @@ model User {
   platformRoles           PlatformRoleAssignment[]  @relation("PlatformRoleSubject")
   platformRoleGrants      PlatformRoleAssignment[]  @relation("PlatformRoleGranter")
   platformRoleRevocations PlatformRoleAssignment[]  @relation("PlatformRoleRevoker")
+  mfaCredential           MfaCredential?
 
   @@index([status, createdAt])
   @@map("users")
@@ -316,21 +328,57 @@ model Identity {
 }
 
 model AuthSession {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  tokenHash     String    @unique @map("token_hash") @db.VarChar(128)
-  userAgent     String?   @map("user_agent") @db.VarChar(512)
-  ipHash        String?   @map("ip_hash") @db.VarChar(128)
-  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
-  idleExpiresAt DateTime  @default(now()) @map("idle_expires_at") @db.Timestamptz(6)
-  lastSeenAt    DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
-  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String                 @id @default(uuid()) @db.Uuid
+  userId                 String                 @map("user_id") @db.Uuid
+  tokenHash              String                 @unique @map("token_hash") @db.VarChar(128)
+  userAgent              String?                @map("user_agent") @db.VarChar(512)
+  ipHash                 String?                @map("ip_hash") @db.VarChar(128)
+  authenticationStrength AuthenticationStrength @default(PRIMARY) @map("authentication_strength")
+  mfaVerifiedAt          DateTime?              @map("mfa_verified_at") @db.Timestamptz(6)
+  expiresAt              DateTime               @map("expires_at") @db.Timestamptz(6)
+  idleExpiresAt          DateTime               @default(now()) @map("idle_expires_at") @db.Timestamptz(6)
+  lastSeenAt             DateTime               @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt              DateTime?              @map("revoked_at") @db.Timestamptz(6)
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([userId, idleExpiresAt])
   @@map("auth_sessions")
+}
+
+model MfaCredential {
+  id                  String              @id @default(uuid()) @db.Uuid
+  userId              String              @unique @map("user_id") @db.Uuid
+  status              MfaCredentialStatus @default(PENDING)
+  encryptedSecret     String              @map("encrypted_secret") @db.VarChar(512)
+  keyVersion          Int                 @default(1) @map("key_version")
+  enrollmentExpiresAt DateTime            @map("enrollment_expires_at") @db.Timestamptz(6)
+  activatedAt         DateTime?           @map("activated_at") @db.Timestamptz(6)
+  disabledAt          DateTime?           @map("disabled_at") @db.Timestamptz(6)
+  lastUsedStep        BigInt?             @map("last_used_step")
+  failedAttempts      Int                 @default(0) @map("failed_attempts")
+  lockedUntil         DateTime?           @map("locked_until") @db.Timestamptz(6)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryCodes       MfaRecoveryCode[]
+
+  @@index([status, enrollmentExpiresAt])
+  @@map("mfa_credentials")
+}
+
+model MfaRecoveryCode {
+  id           String        @id @default(uuid()) @db.Uuid
+  credentialId String        @map("credential_id") @db.Uuid
+  codeHash     String        @map("code_hash") @db.VarChar(128)
+  consumedAt   DateTime?     @map("consumed_at") @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  credential   MfaCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@unique([credentialId, codeHash])
+  @@index([credentialId, consumedAt])
+  @@map("mfa_recovery_codes")
 }
 
 model OtpChallenge {

@@ -603,8 +603,18 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
 未过期授权，不把客户端 claims 当作事实。`admin:console:access` 只授予 ACTIVE 且至少有一个有效平台
 角色的 Actor。`GET /admin/session` 再次执行服务端 Policy，并只返回安全用户投影、去重后的角色和服务端
-计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。当前
-`security.privilegedActionsAllowed=false`，在 `AUTH-005` 完成 MFA/step-up 前没有后台数据或写动作开放。
+计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。
+
+`AUTH-005` 在该 bootstrap 权限之外增加两层服务端动作：
+
+- `admin:console:privileged` 必须同时具备当前平台角色与 `MFA` 强度 Session；
+- `admin:sensitive:access` 还必须处在十分钟近期 MFA 窗口内。
+
+普通 EMAIL/SMS OTP 只能建立 `PRIMARY` Session。TOTP 或一次性恢复码验证会原子撤销旧 Session，
+换发默认绝对 8 小时、闲置 30 分钟的 MFA Session；`RequestContext` 携带服务端解析的认证强度与
+近期认证布尔值，客户端不能提交。新增后台工作区必须声明 `admin:console:privileged`，PII reveal、
+导出、封禁、角色/财务/配置等高风险动作必须声明 `admin:sensitive:access`，不能只读取
+`GET /admin/session` 的展示字段。
 
 ## 5.6 权限测试最小矩阵
 
@@ -706,6 +716,12 @@ reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 
 撤销时间/操作者同时存在，并禁止同一用户/角色出现两个未撤销 grant。过期授权仍保留为审计历史，并须由
 后续受控授权工作流显式撤销后再授予。认证 Repository 每次解析 Session 时按当前时间过滤过期/撤销行，
 所以降权不依赖客户端 token 刷新；`ADMIN-001` 不提供角色写 API，bootstrap 只能走受审计维护流程。
+
+`AUTH-005` 为 `AuthSession` 增加 `PRIMARY|MFA` 强度与 `mfa_verified_at`，MFA 换发时在同一事务撤销
+旧 Session。每个 User 最多一个 `MfaCredential`；pending/active/disabled 时间状态由数据库 check
+约束，TOTP secret 只保存 AES-256-GCM 密文、key version、最后消费时间步和失败锁定元数据。
+`MfaRecoveryCode` 只保存域分离 hash 与消费时间，`credential + hash` 唯一。激活、时间步消费和恢复码
+消费均在事务内追加最小化 `AuditLog`，并用条件更新使并发重放最多一个成功。
 
 ### Media 聚合
 
@@ -1090,8 +1106,17 @@ taxonomy 写端点；后续管理切片必须复用这些能力并增加 MFA/ste
 未登录返回通用 401，普通/受限用户返回不泄露角色状态的通用 403。成功响应只含安全用户投影、角色、
 导航与安全门状态，所有 `/v1/admin/*` 成功或错误响应统一 `Cache-Control: no-store`。独立 Admin
 Next.js app 通过同源 `/v1` BFF 仅代理认证与 Admin session allowlist，过滤 hop-by-hop headers，不把
-内部 API 地址或任意代理能力暴露给浏览器。当前 `privilegedActionsAllowed=false`；真实后台数据/写动作
-等待 `AUTH-005` MFA/step-up 和对应领域任务。
+内部 API 地址或任意代理能力暴露给浏览器。
+
+`AUTH-005` 新增三个 no-store、Cookie + same-origin 保护的端点：
+
+- `POST /admin/mfa/enrollment` 幂等返回当前短效 pending TOTP 设置；
+- `POST /admin/mfa/enrollment/verify` 激活 TOTP、一次性返回十枚恢复码并轮换 Session；
+- `POST /admin/mfa/verify` 使用未重放的 TOTP 时间步或未消费恢复码建立/刷新 MFA 与近期认证。
+
+`GET /admin/session.security` 返回是否已设置 MFA、`PRIMARY|MFA` 认证强度、验证/step-up 到期时间以及
+普通特权与敏感动作两个服务端状态。它仍不是业务授权凭证；真实后台 controller 必须声明对应 Policy。
+OpenAPI 不提供禁用/重置接口，防止自助降级；人工恢复流程必须由后续审计、身份核验和会话全撤销切片实现。
 
 ## 8.6 响应投影
 
@@ -1184,7 +1209,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 38 个 path、75 个 schema、47 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 41 个 path、83 个 schema、50 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1831,8 +1856,20 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 ACTIVE 或 LIMITED 员工账号返回同样不泄露内部角色的 403；所有结果包括错误都 no-store。Admin app
 只使用同源 allowlist BFF，设置 nonce-based script CSP、frame denial、no-referrer、noindex 和
 Permissions-Policy，并且从服务端返回的导航渲染入口。OTP 只能建立普通 Session；在 `AUTH-005`
-完成 MFA/step-up 前，服务端明确返回 `privilegedActionsAllowed=false`，本切片不开放任何后台数据、
-导出或写动作，不能把 UI 隐藏当作授权。
+之前服务端明确返回 `privilegedActionsAllowed=false`，不把 UI 隐藏当作授权。
+
+`AUTH-005` 使用 RFC 4226/6238 的 6 位、30 秒 TOTP（允许前后各一个时间步），通过 Node 内置
+HMAC-SHA1 计算并用公开标准向量测试。TOTP secret 由 CSPRNG 产生，以从独立 `MFA_SECRET` 域分离
+派生的 AES-256-GCM key 加密保存；恢复码具有 80 bit 随机性，仅保存域分离 HMAC-SHA256，明文只在
+激活成功时返回一次。数据库原子记录最后消费的时间步和恢复码，拒绝并发/重复使用；连续五次失败锁定
+五分钟，响应使用通用 400/429，不泄露 credential 状态。pending 设置十分钟到期，重试返回相同设置而
+不是静默替换。
+
+MFA 成功会轮换 bearer Session，旧 token 立即失效；MFA Session 默认绝对 8 小时、闲置 30 分钟，
+十分钟后普通后台权限仍可存在但敏感动作必须重新 step-up。平台角色仍在每次请求从 PostgreSQL 读取，
+角色撤销不会等待 MFA Session 到期。设置、TOTP 验证和恢复码消费都写最小化 `AuditLog`，不记录
+secret、code、token、IP 原文或 PII。当前不提供低保证的 MFA 关闭/重置；恢复需要后续受审计身份核验
+流程并撤销全部 Session。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
@@ -2674,6 +2711,13 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 `privilegedActionsAllowed=false`，直到 `AUTH-005` 真实完成 MFA/step-up；因此本切片不能被当作上面
 “后台强制 MFA”最终验收已经完成。
 
+`AUTH-005` 最终验收：有效平台角色只能先进入 MFA setup/verify 边界；未设置账号必须用 TOTP 激活，
+恢复码只显示一次且服务端仅存哈希。普通 OTP Session 不得通过 `admin:console:privileged`；成功 MFA
+必须轮换 Cookie/数据库 Session，旧 token、同一 TOTP 时间步和已用恢复码均失败。连续失败触发带
+`Retry-After` 的锁定，跨站 Cookie 写被拒绝。MFA Session 使用更短绝对/闲置期限；近期认证窗口过期后
+`admin:sensitive:access` 失败，重新验证后恢复。所有 MFA 结果 no-store、写审计且不含 secret/code。
+TOTP 算法必须通过 RFC 向量、真实 PostgreSQL 事务/约束和中文/英文移动/键盘界面测试。
+
 ## 22.4 Listing 验收
 
 对五种类型逐项：
@@ -3311,6 +3355,21 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 - 本切片的登录表单复用 EMAIL OTP，但 OTP 不是 Admin MFA。API 明确返回
   `mfaRequired=true`、`privilegedActionsAllowed=false`，因此工作区仅显示安全占位/空态。AUTH-005
   完成 MFA、step-up 与近期认证前，禁止接入任何特权数据、写动作、PII reveal 或导出。
+
+## 28.9 AUTH-005 MFA / step-up 实施基线
+
+- Admin BFF allowlist 增加三个固定 MFA 路径，但仍不允许任意 `/admin/*` 代理。所有写请求受
+  Cookie、same-origin、严格 DTO、no-store 和通用 Problem Details 保护。
+- 未设置账号显示双语 TOTP 设置页；pending 设置十分钟有效且重试稳定返回同一 secret。验证成功后
+  恢复码显示一次，用户明确确认保存后才进入工作区。已设置账号必须先完成 TOTP/恢复码验证，前端在
+  `PRIMARY` 状态完全不渲染角色导航。
+- TOTP secret 使用 AES-256-GCM 加密；恢复码只存域分离哈希；TOTP 时间步与恢复码均一次消费。
+  五次失败锁定五分钟，不能通过重启进程绕过。
+- MFA 验证原子轮换 Session；旧 token 失效。MFA Admin Session 默认绝对 8 小时、闲置 30 分钟，
+  敏感动作的近期认证窗口为 10 分钟。后台页可重新 step-up，但领域 controller 仍必须声明
+  `admin:console:privileged` 或 `admin:sensitive:access`。
+- enrollment、TOTP 验证和恢复码消费写最小审计事件。审计与 HTTP 日志不得包含 secret、明文
+  recovery code、token、联系方式或 IP 原文。当前不提供自助禁用/重置以避免降级绕过。
 
 ---
 

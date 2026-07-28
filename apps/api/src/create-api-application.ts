@@ -20,6 +20,7 @@ import { AppModule } from "./app.module";
 import { loadCanonicalOpenApiDocument } from "./common/openapi-document";
 import { ProblemDetailsFilter } from "./common/problem-details.filter";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
+import type { MfaStore } from "./modules/admin/mfa.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
 import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
@@ -53,6 +54,7 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   taxonomyStore?: TaxonomyStore;
   mediaStore?: MediaStore;
   mediaObjectStorage?: MediaObjectStorage;
+  mfaStore?: MfaStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -127,6 +129,7 @@ export async function createApiApplication(
       options.taxonomyStore,
       options.mediaStore,
       options.mediaObjectStorage,
+      options.mfaStore,
     ),
     adapter,
     {

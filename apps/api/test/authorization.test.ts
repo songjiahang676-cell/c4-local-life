@@ -30,6 +30,9 @@ function authenticatedActor(overrides: Partial<AuthenticatedActor> = {}): Authen
     verificationBadges: [],
     permissions: [],
     platformRoles: [],
+    authenticationStrength: "PRIMARY",
+    mfaVerifiedAt: null,
+    recentMfa: false,
     organizations: [],
     ...overrides,
   };
@@ -228,6 +231,68 @@ describe("PolicyService", () => {
       );
     }
   });
+
+  it("requires MFA for Admin workspaces and recent MFA for sensitive actions", async () => {
+    const policies = createPolicyService();
+    await expectPolicyMatrix(policies, "admin:console:privileged", [
+      {
+        name: "guest",
+        context: requestContext({ kind: "guest" }),
+        expected: denyPolicy("AUTHENTICATION_REQUIRED"),
+      },
+      {
+        name: "primary staff session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["SUPPORT"],
+          }),
+        ),
+        expected: denyPolicy("INSUFFICIENT_PERMISSION"),
+      },
+      {
+        name: "MFA staff session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["SUPPORT"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T20:00:00.000Z",
+            recentMfa: true,
+          }),
+        ),
+        expected: allowPolicy(),
+      },
+    ]);
+    await expectPolicyMatrix(policies, "admin:sensitive:access", [
+      {
+        name: "expired recent authentication",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["PLATFORM_ADMIN"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T18:00:00.000Z",
+            recentMfa: false,
+          }),
+        ),
+        expected: denyPolicy("INSUFFICIENT_PERMISSION"),
+      },
+      {
+        name: "recent MFA authentication",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["PLATFORM_ADMIN"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T20:00:00.000Z",
+            recentMfa: true,
+          }),
+        ),
+        expected: allowPolicy(),
+      },
+    ]);
+  });
 });
 
 describe("RequestContextAccessor", () => {
@@ -273,6 +338,11 @@ describe("RequestContextAccessor", () => {
     contexts.initialize(request, {
       sessionId: "30000000-0000-4000-8000-000000000001",
       response: session,
+      authentication: {
+        strength: "MFA",
+        mfaVerifiedAt: "2026-07-28T23:55:00.000Z",
+        recentMfa: true,
+      },
     });
     const actor = contexts.require(request).actor;
 
@@ -284,6 +354,9 @@ describe("RequestContextAccessor", () => {
       verificationBadges: [],
       permissions: ["account:profile:read"],
       platformRoles: ["SUPPORT"],
+      authenticationStrength: "MFA",
+      mfaVerifiedAt: "2026-07-28T23:55:00.000Z",
+      recentMfa: true,
       organizations: [{ organizationId, role: "OWNER" }],
     });
     expect(JSON.stringify(actor)).not.toContain("Must not enter actor");
