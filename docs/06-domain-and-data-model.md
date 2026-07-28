@@ -87,6 +87,11 @@ HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_a
 
 当前 `ListingGeoRepository` 是地理读取的唯一基础封装：它查询由公开模糊经纬度生成的 `geography(Point, 4326)`，使用 `ST_DWithin`（米）筛选、`ST_Distance`（英里）返回距离，并限制最大 250 英里/100 条。Repository 不返回经纬度或私有地址，且对状态、审核、过期、删除、地区与分类有效性做防御性过滤。调用方不得绕过该边界直接拼接地理 SQL。
 
+`TAX-001` 的 `TaxonomyRepository` 是 Region/Category 公共读取边界。主表保留稳定 ID、父级、
+slug 和中英名称；`region_aliases` / `category_aliases` 保存可重建查询词，不复制主节点。
+Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树并仅公开原始别名、公开区域
+中心点和 active 状态。匿名 API 固定 active-only；未启用节点留给后续受权后台预览。
+
 ## 6.4 索引策略
 
 基础索引在 Prisma Schema 与 `packages/database/prisma/sql/post_schema_constraints.sql` 中给出。扩展迁移只安装 `pg_trgm`/`postgis`；后置 SQL 必须合并到首个建表迁移之后，再根据查询计划验证：

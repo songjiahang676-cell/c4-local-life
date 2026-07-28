@@ -76,7 +76,7 @@ try {
     !openApiYamlResponse.ok ||
     !String(openApiJson.openapi).startsWith("3.1.") ||
     Object.keys(openApiJson.paths ?? {}).length !== 37 ||
-    Object.keys(openApiJson.components?.schemas ?? {}).length !== 65 ||
+    Object.keys(openApiJson.components?.schemas ?? {}).length !== 66 ||
     !openApiYaml.startsWith("openapi: 3.1.") ||
     !openApiYamlResponse.headers.get("content-type")?.includes("application/yaml")
   ) {

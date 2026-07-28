@@ -716,6 +716,11 @@ HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_a
 
 当前 `ListingGeoRepository` 是地理读取的唯一基础封装：它查询由公开模糊经纬度生成的 `geography(Point, 4326)`，使用 `ST_DWithin`（米）筛选、`ST_Distance`（英里）返回距离，并限制最大 250 英里/100 条。Repository 不返回经纬度或私有地址，且对状态、审核、过期、删除、地区与分类有效性做防御性过滤。调用方不得绕过该边界直接拼接地理 SQL。
 
+`TAX-001` 的 `TaxonomyRepository` 是 Region/Category 公共读取边界。主表保留稳定 ID、父级、
+slug 和中英名称；`region_aliases` / `category_aliases` 保存可重建查询词，不复制主节点。
+Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树并仅公开原始别名、公开区域
+中心点和 active 状态。匿名 API 固定 active-only；未启用节点留给后续受权后台预览。
+
 ## 6.4 索引策略
 
 基础索引在 Prisma Schema 与 `packages/database/prisma/sql/post_schema_constraints.sql` 中给出。扩展迁移只安装 `pg_trgm`/`postgis`；后置 SQL 必须合并到首个建表迁移之后，再根据查询计划验证：
@@ -1041,6 +1046,12 @@ resource context 评估，未知 action 或规则异常失败关闭。
 Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMIN 可读，采用 actor + organization
 绑定的域分离 HMAC cursor，并排除联系方式、账号状态、验证材料和风险字段。当前切片不提供成员写接口；
 邀请、撤销和 Owner 转移保持在 ORG-002。
+
+`TAX-001` 实现公开 `GET /regions` 和 `GET /categories`。默认请求返回稳定 ID/slug、中英名称、
+原始受控别名与层级树；父级、type/vertical 与 `q` 提供直接子级或扁平匹配。`q` 最长 80 字符，
+拒绝控制/双向字符，Repository 使用参数化查询和受控 NFKC 别名键。公开接口的 `activeOnly` 只能
+为 true，响应使用五分钟 public cache 与 stale-while-revalidate；未启用 taxonomy 不通过匿名接口
+暴露。动态 form schema 的发布/回滚仍属于 TAX-002。
 
 ## 8.6 响应投影
 
@@ -1762,6 +1773,11 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
 成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
 角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
+
+`TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
+`activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
+控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID
+协调并受唯一/FK 约束，不接收用户生成文本，也不把非权威 seed 中心点描述成精确地址。
 
 ## 14.6 输入、输出和内容安全
 
@@ -2703,6 +2719,12 @@ US
 ```
 
 城市别名（洛杉矶/LA、蒙市/MPK、尔湾/Irvine）存入 alias 表/搜索词典，不作为重复 Region。
+
+`TAX-001` 将此原则落为 `region_aliases` / `category_aliases`：原始别名保留 locale 与显示值，
+另存 NFKC、大小写和常见分隔符归一化键用于参数化查询。别名表通过 FK 依附稳定 taxonomy ID，
+删除父节点时级联清理；同一父节点、locale、归一化键唯一。公开 API 只返回 active 主数据、原始
+别名和中英名称，不返回内部归一化键，也不允许 `activeOnly=false` 绕过。无筛选时返回树；
+`parentCode` / `parentId` 返回直接子级，type/vertical 或 `q` 查询返回扁平匹配节点。
 
 ## 23.4 动态表单版本
 

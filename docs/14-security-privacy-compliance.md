@@ -90,6 +90,11 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
 角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
 
+`TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
+`activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
+控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID
+协调并受唯一/FK 约束，不接收用户生成文本，也不把非权威 seed 中心点描述成精确地址。
+
 ## 14.6 输入、输出和内容安全
 
 - API DTO 白名单、长度/嵌套/body 限制；未知字段按策略拒绝。

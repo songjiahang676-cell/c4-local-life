@@ -9,7 +9,13 @@ describe("seed data and test factories", () => {
     const seed = await loadSeedData();
 
     expect(seed.regions.metros[0]?.children.length).toBeGreaterThan(10);
+    expect(
+      seed.regions.metros[0]?.children.find((region) => region.code === "US-CA-LA")?.aliases,
+    ).toEqual(expect.arrayContaining([{ locale: "und", value: "LA" }]));
     expect(seed.categories.verticals).toHaveLength(5);
+    expect(
+      seed.categories.verticals.find((category) => category.type === "SERVICE")?.aliases,
+    ).toEqual(expect.arrayContaining([{ locale: "zh-Hans", value: "找师傅" }]));
     expect(seed.listings.listings).toHaveLength(5);
     expect(() =>
       parseSeedData({
@@ -17,6 +23,21 @@ describe("seed data and test factories", () => {
         listings: { ...seed.listings, disclaimer: "Looks like production data." },
       }),
     ).toThrow();
+    expect(() =>
+      parseSeedData({
+        ...seed,
+        regions: {
+          ...seed.regions,
+          country: {
+            ...seed.regions.country,
+            aliases: [
+              { locale: "en-US", value: "U.S.A." },
+              { locale: "en-US", value: "USA" },
+            ],
+          },
+        },
+      }),
+    ).toThrow("Alias must be safe and unique");
   });
 
   it("derives stable RFC-compatible UUIDs without collisions for distinct keys", () => {

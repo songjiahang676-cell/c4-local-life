@@ -6,7 +6,11 @@
     "name": {
       "zh-Hans": "美国",
       "en-US": "United States"
-    }
+    },
+    "aliases": [
+      { "locale": "en-US", "value": "USA" },
+      { "locale": "zh-Hans", "value": "美國" }
+    ]
   },
   "state": {
     "code": "US-CA",
@@ -14,6 +18,11 @@
       "zh-Hans": "加利福尼亚州",
       "en-US": "California"
     },
+    "aliases": [
+      { "locale": "und", "value": "CA" },
+      { "locale": "zh-Hans", "value": "加州" },
+      { "locale": "zh-Hans", "value": "加利福尼亞州" }
+    ],
     "timezone": "America/Los_Angeles"
   },
   "metros": [
@@ -24,6 +33,10 @@
         "zh-Hans": "南加州",
         "en-US": "Southern California"
       },
+      "aliases": [
+        { "locale": "en-US", "value": "SoCal" },
+        { "locale": "zh-Hans", "value": "南加" }
+      ],
       "children": [
         {
           "code": "US-CA-LA",
@@ -32,6 +45,12 @@
             "zh-Hans": "洛杉矶",
             "en-US": "Los Angeles"
           },
+          "aliases": [
+            { "locale": "und", "value": "LA" },
+            { "locale": "en-US", "value": "L.A." },
+            { "locale": "zh-Hans", "value": "洛城" },
+            { "locale": "zh-Hans", "value": "洛杉磯" }
+          ],
           "centroid": {
             "latitude": 34.0522,
             "longitude": -118.2437
@@ -45,6 +64,10 @@
             "zh-Hans": "尔湾",
             "en-US": "Irvine"
           },
+          "aliases": [
+            { "locale": "zh-Hans", "value": "爾灣" },
+            { "locale": "zh-Hans", "value": "尔湾市" }
+          ],
           "centroid": {
             "latitude": 33.6846,
             "longitude": -117.8265
@@ -58,6 +81,11 @@
             "zh-Hans": "圣盖博谷",
             "en-US": "San Gabriel Valley"
           },
+          "aliases": [
+            { "locale": "und", "value": "SGV" },
+            { "locale": "zh-Hans", "value": "圣谷" },
+            { "locale": "zh-Hans", "value": "聖蓋博谷" }
+          ],
           "centroid": {
             "latitude": 34.0953,
             "longitude": -118.127
@@ -71,6 +99,11 @@
             "zh-Hans": "蒙特利公园",
             "en-US": "Monterey Park"
           },
+          "aliases": [
+            { "locale": "und", "value": "MPK" },
+            { "locale": "zh-Hans", "value": "蒙市" },
+            { "locale": "zh-Hans", "value": "蒙特利公園" }
+          ],
           "centroid": {
             "latitude": 34.0625,
             "longitude": -118.1228
@@ -84,6 +117,10 @@
             "zh-Hans": "阿凯迪亚",
             "en-US": "Arcadia"
           },
+          "aliases": [
+            { "locale": "zh-Hans", "value": "亞凱迪亞" },
+            { "locale": "zh-Hans", "value": "亚凯迪亚" }
+          ],
           "centroid": {
             "latitude": 34.1397,
             "longitude": -118.0353

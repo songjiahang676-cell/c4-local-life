@@ -9,10 +9,13 @@ import {
 } from "../../generated/prisma/client";
 import type { SeedData } from "./seed-data";
 import { stableSeedUuid } from "./stable-id";
+import { normalizeTaxonomyAlias } from "../taxonomy/alias-normalization";
 
 export type SeedSummary = {
   regions: number;
+  regionAliases: number;
   categories: number;
+  categoryAliases: number;
   listings: number;
   users: number;
   sourceVersion: number;
@@ -31,6 +34,45 @@ export async function seedDatabaseInTransaction(
   seed: SeedData,
 ): Promise<SeedSummary> {
   const regionIds = new Map<string, string>();
+  let regionAliasCount = 0;
+  let categoryAliasCount = 0;
+
+  const syncRegionAliases = async (
+    regionId: string,
+    regionCode: string,
+    aliases: SeedData["regions"]["country"]["aliases"],
+  ): Promise<void> => {
+    const aliasIds: string[] = [];
+    for (const alias of aliases) {
+      const normalizedValue = normalizeTaxonomyAlias(alias.value);
+      const id = stableSeedUuid(`region-alias:${regionCode}:${alias.locale}:${normalizedValue}`);
+      aliasIds.push(id);
+      await transaction.regionAlias.upsert({
+        where: { id },
+        create: {
+          id,
+          regionId,
+          locale: alias.locale,
+          value: alias.value,
+          normalizedValue,
+        },
+        update: {
+          regionId,
+          locale: alias.locale,
+          value: alias.value,
+          normalizedValue,
+        },
+      });
+    }
+    await transaction.regionAlias.deleteMany({
+      where: {
+        regionId,
+        ...(aliasIds.length > 0 ? { id: { notIn: aliasIds } } : {}),
+      },
+    });
+    regionAliasCount += aliasIds.length;
+  };
+
   const upsertRegion = async (input: {
     code: string;
     type: RegionType;
@@ -40,6 +82,7 @@ export async function seedDatabaseInTransaction(
     timezone?: string;
     latitude?: number;
     longitude?: number;
+    aliases: SeedData["regions"]["country"]["aliases"];
   }): Promise<void> => {
     const id = stableSeedUuid(`region:${input.code}`);
     const parentId = input.parentCode ? regionIds.get(input.parentCode) : undefined;
@@ -63,6 +106,7 @@ export async function seedDatabaseInTransaction(
       update: values,
     });
     regionIds.set(input.code, region.id);
+    await syncRegionAliases(region.id, input.code, input.aliases);
   };
 
   await upsertRegion({
@@ -70,6 +114,7 @@ export async function seedDatabaseInTransaction(
     type: RegionType.COUNTRY,
     nameZhHans: seed.regions.country.name["zh-Hans"],
     nameEn: seed.regions.country.name["en-US"],
+    aliases: seed.regions.country.aliases,
   });
   await upsertRegion({
     code: seed.regions.state.code,
@@ -78,6 +123,7 @@ export async function seedDatabaseInTransaction(
     nameZhHans: seed.regions.state.name["zh-Hans"],
     nameEn: seed.regions.state.name["en-US"],
     timezone: seed.regions.state.timezone,
+    aliases: seed.regions.state.aliases,
   });
   for (const metro of seed.regions.metros) {
     await upsertRegion({
@@ -87,6 +133,7 @@ export async function seedDatabaseInTransaction(
       nameZhHans: metro.name["zh-Hans"],
       nameEn: metro.name["en-US"],
       timezone: metro.timezone,
+      aliases: metro.aliases,
     });
     for (const city of metro.children) {
       await upsertRegion({
@@ -98,11 +145,48 @@ export async function seedDatabaseInTransaction(
         timezone: city.timezone,
         latitude: city.centroid?.latitude,
         longitude: city.centroid?.longitude,
+        aliases: city.aliases,
       });
     }
   }
 
   const categoryIds = new Map<string, string>();
+  const syncCategoryAliases = async (
+    categoryId: string,
+    categoryKey: string,
+    aliases: SeedData["categories"]["verticals"][number]["aliases"],
+  ): Promise<void> => {
+    const aliasIds: string[] = [];
+    for (const alias of aliases) {
+      const normalizedValue = normalizeTaxonomyAlias(alias.value);
+      const id = stableSeedUuid(`category-alias:${categoryKey}:${alias.locale}:${normalizedValue}`);
+      aliasIds.push(id);
+      await transaction.categoryAlias.upsert({
+        where: { id },
+        create: {
+          id,
+          categoryId,
+          locale: alias.locale,
+          value: alias.value,
+          normalizedValue,
+        },
+        update: {
+          categoryId,
+          locale: alias.locale,
+          value: alias.value,
+          normalizedValue,
+        },
+      });
+    }
+    await transaction.categoryAlias.deleteMany({
+      where: {
+        categoryId,
+        ...(aliasIds.length > 0 ? { id: { notIn: aliasIds } } : {}),
+      },
+    });
+    categoryAliasCount += aliasIds.length;
+  };
+
   for (const vertical of seed.categories.verticals) {
     const verticalType = ListingType[vertical.type];
     const rootId = stableSeedUuid(`category:${vertical.type}:${vertical.slug}`);
@@ -125,6 +209,7 @@ export async function seedDatabaseInTransaction(
       },
     });
     categoryIds.set(`${vertical.type}:${vertical.slug}`, rootId);
+    await syncCategoryAliases(rootId, `${vertical.type}:${vertical.slug}`, vertical.aliases);
 
     for (const child of vertical.children) {
       const id = stableSeedUuid(`category:${vertical.type}:${vertical.slug}:${child.slug}`);
@@ -149,6 +234,11 @@ export async function seedDatabaseInTransaction(
         },
       });
       categoryIds.set(`${vertical.type}:${child.slug}`, id);
+      await syncCategoryAliases(
+        id,
+        `${vertical.type}:${vertical.slug}:${child.slug}`,
+        child.aliases,
+      );
     }
   }
   for (const category of seed.categories.communityCategories) {
@@ -170,6 +260,7 @@ export async function seedDatabaseInTransaction(
       },
     });
     categoryIds.set(`COMMUNITY:${category.slug}`, id);
+    await syncCategoryAliases(id, `COMMUNITY:${category.slug}`, category.aliases);
   }
 
   const seedOwnerId = stableSeedUuid("user:synthetic-seed-owner");
@@ -235,7 +326,9 @@ export async function seedDatabaseInTransaction(
 
   return {
     regions: regionIds.size,
+    regionAliases: regionAliasCount,
     categories: categoryIds.size,
+    categoryAliases: categoryAliasCount,
     listings: seed.listings.listings.length,
     users: 1,
     sourceVersion: seed.regions.version,

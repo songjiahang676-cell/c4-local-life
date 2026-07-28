@@ -8,6 +8,11 @@
         "zh-Hans": "招聘招工",
         "en-US": "Jobs"
       },
+      "aliases": [
+        { "locale": "zh-Hans", "value": "找工作" },
+        { "locale": "zh-Hans", "value": "招工" },
+        { "locale": "en-US", "value": "Employment" }
+      ],
       "lifetimeDays": 30,
       "manualReview": "risk_based",
       "children": [
@@ -97,6 +102,11 @@
         "zh-Hans": "房屋租售",
         "en-US": "Housing"
       },
+      "aliases": [
+        { "locale": "zh-Hans", "value": "租房" },
+        { "locale": "zh-Hans", "value": "房屋出租" },
+        { "locale": "en-US", "value": "Rentals" }
+      ],
       "lifetimeDays": 30,
       "manualReview": "risk_based",
       "children": [
@@ -165,6 +175,11 @@
         "zh-Hans": "生意/店铺转让",
         "en-US": "Business Transfers"
       },
+      "aliases": [
+        { "locale": "zh-Hans", "value": "店铺转让" },
+        { "locale": "zh-Hans", "value": "生意转让" },
+        { "locale": "en-US", "value": "Businesses for Sale" }
+      ],
       "lifetimeDays": 45,
       "manualReview": "always",
       "children": [
@@ -233,6 +248,11 @@
         "zh-Hans": "二手物品",
         "en-US": "Marketplace"
       },
+      "aliases": [
+        { "locale": "zh-Hans", "value": "二手市场" },
+        { "locale": "zh-Hans", "value": "闲置" },
+        { "locale": "en-US", "value": "Used Goods" }
+      ],
       "lifetimeDays": 45,
       "manualReview": "risk_based",
       "children": [
@@ -301,6 +321,11 @@
         "zh-Hans": "本地服务/找师傅",
         "en-US": "Local Services"
       },
+      "aliases": [
+        { "locale": "zh-Hans", "value": "找师傅" },
+        { "locale": "zh-Hans", "value": "生活服务" },
+        { "locale": "en-US", "value": "Services" }
+      ],
       "lifetimeDays": 90,
       "manualReview": "risk_based",
       "children": [

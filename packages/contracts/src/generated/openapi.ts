@@ -882,21 +882,29 @@ export interface components {
             readonly pageInfo: components["schemas"]["CursorPage"];
         };
         /** @enum {string} */
-        readonly RegionType: "COUNTRY" | "STATE" | "COUNTY" | "CITY" | "NEIGHBORHOOD" | "ZIP_CODE";
+        readonly RegionType: "COUNTRY" | "STATE" | "COUNTY" | "CITY" | "NEIGHBORHOOD" | "ZIP_CODE" | "REGION_GROUP";
+        readonly TaxonomyAlias: {
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US" | "und";
+            readonly value: string;
+        };
         readonly Region: {
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
-            readonly parentId?: string | null;
+            readonly parentId: string | null;
             readonly code: string;
             readonly type: components["schemas"]["RegionType"];
-            readonly slug?: string;
+            readonly slug: string;
             readonly name: {
                 readonly "zh-Hans": string;
                 readonly "en-US": string;
             };
             readonly timezone: string;
-            readonly centroid?: components["schemas"]["GeoPoint"];
+            readonly centroid: components["schemas"]["GeoPoint"] | null;
+            readonly active: boolean;
+            readonly aliases: readonly components["schemas"]["TaxonomyAlias"][];
+            readonly children: readonly components["schemas"]["Region"][];
         };
         /** @enum {string} */
         readonly ListingType: "JOB" | "RENTAL" | "TRANSFER" | "SECONDHAND" | "SERVICE";
@@ -908,17 +916,18 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
-            readonly parentId?: string | null;
-            readonly vertical?: components["schemas"]["ListingType"] | null;
+            readonly parentId: string | null;
+            readonly vertical: components["schemas"]["ListingType"] | null;
             readonly slug: string;
             readonly name: {
                 readonly "zh-Hans": string;
                 readonly "en-US": string;
             };
-            readonly iconKey?: string | null;
+            readonly iconKey: string | null;
             readonly formSchemaVersion: number;
             readonly active: boolean;
-            readonly children?: readonly components["schemas"]["Category"][];
+            readonly aliases: readonly components["schemas"]["TaxonomyAlias"][];
+            readonly children: readonly components["schemas"]["Category"][];
         };
         readonly CategoryFormSchema: {
             /** Format: uuid */
@@ -1834,7 +1843,10 @@ export interface operations {
             readonly query?: {
                 readonly parentCode?: string;
                 readonly type?: components["schemas"]["RegionType"];
-                readonly activeOnly?: boolean;
+                /** @description Public taxonomy is active-only; false is rejected. */
+                readonly activeOnly?: true;
+                /** @description Bounded name, code, slug, or normalized alias query */
+                readonly q?: string;
             };
             readonly header?: never;
             readonly path?: never;
@@ -1853,6 +1865,7 @@ export interface operations {
                     };
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
         };
     };
     readonly listCategories: {
@@ -1860,6 +1873,10 @@ export interface operations {
             readonly query?: {
                 readonly vertical?: components["schemas"]["ListingType"];
                 readonly parentId?: string;
+                /** @description Public taxonomy is active-only; false is rejected. */
+                readonly activeOnly?: true;
+                /** @description Bounded bilingual name, slug, or normalized alias query */
+                readonly q?: string;
             };
             readonly header?: never;
             readonly path?: never;
@@ -1878,6 +1895,7 @@ export interface operations {
                     };
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
         };
     };
     readonly getCategoryFormSchema: {

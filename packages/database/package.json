@@ -14,6 +14,9 @@
       ],
       "organization": [
         "src/repositories/organization.repository.ts"
+      ],
+      "taxonomy": [
+        "src/taxonomy.ts"
       ]
     }
   },
@@ -33,6 +36,11 @@
       "types": "./src/repositories/organization.repository.ts",
       "require": "./dist/src/repositories/organization.repository.js",
       "default": "./dist/src/repositories/organization.repository.js"
+    },
+    "./taxonomy": {
+      "types": "./src/taxonomy.ts",
+      "require": "./dist/src/taxonomy.js",
+      "default": "./dist/src/taxonomy.js"
     }
   },
   "scripts": {

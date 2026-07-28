@@ -12,6 +12,8 @@ import { HealthModule } from "./modules/health/health.module";
 import { ListingsModule } from "./modules/listings/listings.module";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
+import { TaxonomyModule } from "./modules/taxonomy/taxonomy.module";
 
 @Module({})
 export class AppModule {
@@ -21,6 +23,7 @@ export class AppModule {
     otpChallengeStore?: OtpChallengeStore,
     otpDeliveryGateway?: OtpDeliveryGateway,
     organizationStore?: OrganizationStore,
+    taxonomyStore?: TaxonomyStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -30,6 +33,7 @@ export class AppModule {
         HealthModule,
         ListingsModule,
         OrganizationsModule.register(environment, organizationStore),
+        TaxonomyModule.register(environment, taxonomyStore),
       ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },

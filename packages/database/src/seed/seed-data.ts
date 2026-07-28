@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { normalizeTaxonomyAlias } from "../taxonomy/alias-normalization";
 
 const localizedNameSchema = z
   .object({
@@ -16,11 +17,39 @@ const centroidSchema = z
   })
   .strict();
 
+const taxonomyAliasesSchema = z
+  .array(
+    z
+      .object({
+        locale: z.enum(["zh-Hans", "en-US", "und"]),
+        value: z.string().trim().min(1).max(120),
+      })
+      .strict(),
+  )
+  .max(20)
+  .default([])
+  .superRefine((aliases, context) => {
+    const seen = new Set<string>();
+    for (const [index, alias] of aliases.entries()) {
+      const normalized = normalizeTaxonomyAlias(alias.value);
+      const key = `${alias.locale}\0${normalized}`;
+      if (!normalized || seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "value"],
+          message: "Alias must be safe and unique after normalization within its locale",
+        });
+      }
+      seen.add(key);
+    }
+  });
+
 const regionNodeSchema = z
   .object({
     code: z.string().regex(/^[A-Z0-9-]{2,80}$/),
     type: z.enum(["REGION_GROUP", "CITY"]),
     name: localizedNameSchema,
+    aliases: taxonomyAliasesSchema,
     centroid: centroidSchema.optional(),
     timezone: z.string().min(1).max(64).default("America/Los_Angeles"),
   })
@@ -30,11 +59,18 @@ const regionsSchema = z
   .object({
     version: z.literal(1),
     note: z.string().min(1),
-    country: z.object({ code: z.literal("US"), name: localizedNameSchema }).strict(),
+    country: z
+      .object({
+        code: z.literal("US"),
+        name: localizedNameSchema,
+        aliases: taxonomyAliasesSchema,
+      })
+      .strict(),
     state: z
       .object({
         code: z.literal("US-CA"),
         name: localizedNameSchema,
+        aliases: taxonomyAliasesSchema,
         timezone: z.literal("America/Los_Angeles"),
       })
       .strict(),
@@ -51,6 +87,7 @@ const categoryNodeSchema = z
   .object({
     slug: z.string().regex(/^[a-z0-9-]{1,120}$/),
     name: localizedNameSchema,
+    aliases: taxonomyAliasesSchema,
   })
   .strict();
 

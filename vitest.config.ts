@@ -40,6 +40,9 @@ export default defineConfig({
       "@socal/database/organization": fileURLToPath(
         new URL("./packages/database/src/repositories/organization.repository.ts", import.meta.url),
       ),
+      "@socal/database/taxonomy": fileURLToPath(
+        new URL("./packages/database/src/taxonomy.ts", import.meta.url),
+      ),
       "@socal/observability": fileURLToPath(
         new URL("./packages/observability/src/index.ts", import.meta.url),
       ),

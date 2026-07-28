@@ -113,6 +113,10 @@ try {
       WHERE tgname = 'users_revoke_sessions_after_state_change'
         AND NOT tgisinternal`,
   );
+  const taxonomyAliasTables = await upgrade.query(
+    `SELECT to_regclass('public.region_aliases') AS region_aliases,
+            to_regclass('public.category_aliases') AS category_aliases`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -120,7 +124,9 @@ try {
     otpChallengeTable.rows[0].table_name !== "otp_challenges" ||
     profileVersionColumn.rowCount !== 1 ||
     profileVersionColumn.rows[0].is_nullable !== "NO" ||
-    accountStateTrigger.rowCount !== 1
+    accountStateTrigger.rowCount !== 1 ||
+    taxonomyAliasTables.rows[0].region_aliases !== "region_aliases" ||
+    taxonomyAliasTables.rows[0].category_aliases !== "category_aliases"
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -136,6 +142,7 @@ try {
       otpChallengeTable: otpChallengeTable.rows[0].table_name,
       profileVersionColumn: true,
       accountStateTrigger: true,
+      taxonomyAliasTables: ["region_aliases", "category_aliases"],
     }),
   );
 } finally {

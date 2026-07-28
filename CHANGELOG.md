@@ -32,6 +32,7 @@
 - Added concurrency-safe self-profile management, signed cursor session-device listing, user-scoped single/all-session revocation, and database-enforced revocation after account state changes.
 - Added a fail-closed Actor/RequestContext/Policy framework with declarative controller actions, PII-minimized request actors, resource owner/organization rules, and reusable authorization matrix tests.
 - Added atomic organization-plus-OWNER creation, membership-scoped organization reads, signed OWNER/ADMIN member pagination, and a fail-closed five-role action matrix.
+- Added bilingual Region/Category trees, FK-constrained normalized aliases, active-only public taxonomy filters, and idempotent alias seed/migration coverage.
 
 ## 0.1.0 — Architecture handoff package
 
