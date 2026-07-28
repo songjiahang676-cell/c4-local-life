@@ -10,6 +10,7 @@ const validApiEnvironment = {
   SESSION_SECRET: "test-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "test-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "test-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "test-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "test-csrf-secret-with-more-than-32-bytes",
 };
 
@@ -26,6 +27,7 @@ describe("runtime configuration", () => {
     expect(environment.SESSION_SECRET).toBeInstanceOf(SecretValue);
     expect(environment.OTP_SECRET).toBeInstanceOf(SecretValue);
     expect(environment.MFA_SECRET).toBeInstanceOf(SecretValue);
+    expect(environment.PASSWORD_PEPPER).toBeInstanceOf(SecretValue);
     expect(environment.OTP_TTL_SECONDS).toBe(600);
     expect(environment.OTP_MAX_ATTEMPTS).toBe(5);
     expect(environment.MFA_ENROLLMENT_TTL_SECONDS).toBe(600);
@@ -41,6 +43,7 @@ describe("runtime configuration", () => {
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.MFA_SECRET)).toBe('"[REDACTED]"');
+    expect(JSON.stringify(environment.PASSWORD_PEPPER)).toBe('"[REDACTED]"');
   });
 
   it("fails fast without exposing a supplied value", () => {
@@ -104,6 +107,22 @@ describe("runtime configuration", () => {
         ...validApiEnvironment,
         ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: "600",
         ADMIN_STEP_UP_TTL_SECONDS: "601",
+      }),
+    ).toThrow(RuntimeConfigError);
+  });
+
+  it("requires a domain-separated password pepper and a bounded recovery cooldown", () => {
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        PASSWORD_PEPPER: validApiEnvironment.MFA_SECRET,
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        PASSWORD_RECOVERY_TTL_SECONDS: "300",
+        PASSWORD_RECOVERY_COOLDOWN_SECONDS: "300",
       }),
     ).toThrow(RuntimeConfigError);
   });

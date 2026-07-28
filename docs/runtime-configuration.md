@@ -23,49 +23,67 @@
 
 ## API 配置
 
-| 变量                                 | 必需 | 敏感 | 用途                                          |
-| ------------------------------------ | ---- | ---- | --------------------------------------------- |
-| `PORT`                               | 否   | 否   | API 监听端口，默认 4000                       |
-| `API_BODY_LIMIT_BYTES`               | 否   | 否   | 通用 JSON body 上限，默认 1 MiB               |
-| `PUBLIC_WEB_URL`                     | 是   | 否   | Web CORS 来源                                 |
-| `PUBLIC_ADMIN_URL`                   | 是   | 否   | Admin CORS 来源                               |
-| `DATABASE_URL`                       | 是   | 是   | PostgreSQL 连接串                             |
-| `DATABASE_POOL_MAX`                  | 否   | 否   | 数据库连接池上限                              |
-| `REDIS_URL`                          | 是   | 可能 | Redis/BullMQ 连接串                           |
-| `OPENSEARCH_NODE`                    | 是   | 否   | OpenSearch 地址                               |
-| `OPENSEARCH_USERNAME`                | 否   | 是   | OpenSearch 用户名                             |
-| `OPENSEARCH_PASSWORD`                | 否   | 是   | OpenSearch 密码                               |
-| `S3_ENDPOINT`                        | 否   | 否   | 本地 MinIO/兼容存储地址；AWS 留空使用默认端点 |
-| `S3_REGION`                          | 否   | 否   | 对象存储区域，默认 `us-west-2`                |
-| `S3_QUARANTINE_BUCKET`               | 否   | 否   | 私有原始上传 bucket                           |
-| `S3_ACCESS_KEY`                      | 否   | 是   | 本地静态 access key；生产优先任务角色         |
-| `S3_SECRET_KEY`                      | 否   | 是   | 与 access key 成对提供                        |
-| `S3_FORCE_PATH_STYLE`                | 否   | 否   | MinIO path-style 开关                         |
-| `MEDIA_UPLOAD_URL_TTL_SECONDS`       | 否   | 否   | PUT URL 有效期，默认 300、最长 900 秒         |
-| `MEDIA_UPLOAD_MAX_ACTIVE`            | 否   | 否   | 每用户未过期 intent 上限，默认 20             |
-| `MEDIA_UPLOAD_DAILY_BYTES`           | 否   | 否   | 每用户滚动 24 小时声明字节配额，默认 200 MiB  |
-| `SESSION_SECRET`                     | 是   | 是   | 会话 token HMAC 秘密，至少 32 字节            |
-| `SESSION_COOKIE_NAME`                | 否   | 否   | 会话 Cookie 名称                              |
-| `SESSION_ABSOLUTE_TTL_SECONDS`       | 否   | 否   | 会话绝对期限，默认 30 天、最长 365 天         |
-| `SESSION_IDLE_TTL_SECONDS`           | 否   | 否   | 会话闲置期限，默认 7 天且不得超过绝对期限     |
-| `SESSION_TOUCH_INTERVAL_SECONDS`     | 否   | 否   | 刷新闲置期限的最小间隔，默认 5 分钟           |
-| `CSRF_SECRET`                        | 是   | 是   | CSRF 防护秘密，至少 32 字节                   |
-| `OTP_SECRET`                         | 是   | 是   | OTP、账号/IP/设备 HMAC 秘密，至少 32 字节     |
-| `OTP_TTL_SECONDS`                    | 否   | 否   | OTP 有效期，默认 10 分钟、最长 30 分钟        |
-| `OTP_MAX_ATTEMPTS`                   | 否   | 否   | 单个 challenge 最大失败次数，默认 5           |
-| `OTP_DESTINATION_LIMIT`              | 否   | 否   | 同账号窗口请求上限，默认 3                    |
-| `OTP_DESTINATION_WINDOW_SECONDS`     | 否   | 否   | 同账号限频窗口，默认 15 分钟                  |
-| `OTP_IP_LIMIT`                       | 否   | 否   | 同 IP 窗口请求上限，默认 20                   |
-| `OTP_IP_WINDOW_SECONDS`              | 否   | 否   | 同 IP 限频窗口，默认 1 小时                   |
-| `OTP_DEVICE_LIMIT`                   | 否   | 否   | 同设备窗口请求上限，默认 10                   |
-| `OTP_DEVICE_WINDOW_SECONDS`          | 否   | 否   | 同设备限频窗口，默认 1 小时                   |
-| `MFA_SECRET`                         | 是   | 是   | TOTP 加密/恢复码 HMAC 主秘密，至少 32 字节    |
-| `MFA_ENROLLMENT_TTL_SECONDS`         | 否   | 否   | 待激活 TOTP 设置有效期，默认 10 分钟          |
-| `MFA_MAX_ATTEMPTS`                   | 否   | 否   | MFA 连续失败锁定阈值，默认 5                  |
-| `MFA_LOCK_SECONDS`                   | 否   | 否   | MFA 失败锁定期，默认 5 分钟                   |
-| `ADMIN_SESSION_ABSOLUTE_TTL_SECONDS` | 否   | 否   | MFA 后台会话绝对期限，默认 8 小时             |
-| `ADMIN_SESSION_IDLE_TTL_SECONDS`     | 否   | 否   | MFA 后台会话闲置期限，默认 30 分钟            |
-| `ADMIN_STEP_UP_TTL_SECONDS`          | 否   | 否   | 敏感动作近期认证窗口，默认 10 分钟            |
+| 变量                                           | 必需 | 敏感 | 用途                                          |
+| ---------------------------------------------- | ---- | ---- | --------------------------------------------- |
+| `PORT`                                         | 否   | 否   | API 监听端口，默认 4000                       |
+| `API_BODY_LIMIT_BYTES`                         | 否   | 否   | 通用 JSON body 上限，默认 1 MiB               |
+| `PUBLIC_WEB_URL`                               | 是   | 否   | Web CORS 来源                                 |
+| `PUBLIC_ADMIN_URL`                             | 是   | 否   | Admin CORS 来源                               |
+| `DATABASE_URL`                                 | 是   | 是   | PostgreSQL 连接串                             |
+| `DATABASE_POOL_MAX`                            | 否   | 否   | 数据库连接池上限                              |
+| `REDIS_URL`                                    | 是   | 可能 | Redis/BullMQ 连接串                           |
+| `OPENSEARCH_NODE`                              | 是   | 否   | OpenSearch 地址                               |
+| `OPENSEARCH_USERNAME`                          | 否   | 是   | OpenSearch 用户名                             |
+| `OPENSEARCH_PASSWORD`                          | 否   | 是   | OpenSearch 密码                               |
+| `S3_ENDPOINT`                                  | 否   | 否   | 本地 MinIO/兼容存储地址；AWS 留空使用默认端点 |
+| `S3_REGION`                                    | 否   | 否   | 对象存储区域，默认 `us-west-2`                |
+| `S3_QUARANTINE_BUCKET`                         | 否   | 否   | 私有原始上传 bucket                           |
+| `S3_ACCESS_KEY`                                | 否   | 是   | 本地静态 access key；生产优先任务角色         |
+| `S3_SECRET_KEY`                                | 否   | 是   | 与 access key 成对提供                        |
+| `S3_FORCE_PATH_STYLE`                          | 否   | 否   | MinIO path-style 开关                         |
+| `MEDIA_UPLOAD_URL_TTL_SECONDS`                 | 否   | 否   | PUT URL 有效期，默认 300、最长 900 秒         |
+| `MEDIA_UPLOAD_MAX_ACTIVE`                      | 否   | 否   | 每用户未过期 intent 上限，默认 20             |
+| `MEDIA_UPLOAD_DAILY_BYTES`                     | 否   | 否   | 每用户滚动 24 小时声明字节配额，默认 200 MiB  |
+| `SESSION_SECRET`                               | 是   | 是   | 会话 token HMAC 秘密，至少 32 字节            |
+| `SESSION_COOKIE_NAME`                          | 否   | 否   | 会话 Cookie 名称                              |
+| `SESSION_ABSOLUTE_TTL_SECONDS`                 | 否   | 否   | 会话绝对期限，默认 30 天、最长 365 天         |
+| `SESSION_IDLE_TTL_SECONDS`                     | 否   | 否   | 会话闲置期限，默认 7 天且不得超过绝对期限     |
+| `SESSION_TOUCH_INTERVAL_SECONDS`               | 否   | 否   | 刷新闲置期限的最小间隔，默认 5 分钟           |
+| `CSRF_SECRET`                                  | 是   | 是   | CSRF 防护秘密，至少 32 字节                   |
+| `OTP_SECRET`                                   | 是   | 是   | OTP、账号/IP/设备 HMAC 秘密，至少 32 字节     |
+| `OTP_TTL_SECONDS`                              | 否   | 否   | OTP 有效期，默认 10 分钟、最长 30 分钟        |
+| `OTP_MAX_ATTEMPTS`                             | 否   | 否   | 单个 challenge 最大失败次数，默认 5           |
+| `OTP_DESTINATION_LIMIT`                        | 否   | 否   | 同账号窗口请求上限，默认 3                    |
+| `OTP_DESTINATION_WINDOW_SECONDS`               | 否   | 否   | 同账号限频窗口，默认 15 分钟                  |
+| `OTP_IP_LIMIT`                                 | 否   | 否   | 同 IP 窗口请求上限，默认 20                   |
+| `OTP_IP_WINDOW_SECONDS`                        | 否   | 否   | 同 IP 限频窗口，默认 1 小时                   |
+| `OTP_DEVICE_LIMIT`                             | 否   | 否   | 同设备窗口请求上限，默认 10                   |
+| `OTP_DEVICE_WINDOW_SECONDS`                    | 否   | 否   | 同设备限频窗口，默认 1 小时                   |
+| `MFA_SECRET`                                   | 是   | 是   | TOTP 加密/恢复码 HMAC 主秘密，至少 32 字节    |
+| `MFA_ENROLLMENT_TTL_SECONDS`                   | 否   | 否   | 待激活 TOTP 设置有效期，默认 10 分钟          |
+| `MFA_MAX_ATTEMPTS`                             | 否   | 否   | MFA 连续失败锁定阈值，默认 5                  |
+| `MFA_LOCK_SECONDS`                             | 否   | 否   | MFA 失败锁定期，默认 5 分钟                   |
+| `ADMIN_SESSION_ABSOLUTE_TTL_SECONDS`           | 否   | 否   | MFA 后台会话绝对期限，默认 8 小时             |
+| `ADMIN_SESSION_IDLE_TTL_SECONDS`               | 否   | 否   | MFA 后台会话闲置期限，默认 30 分钟            |
+| `ADMIN_STEP_UP_TTL_SECONDS`                    | 否   | 否   | 敏感动作近期认证窗口，默认 10 分钟            |
+| `PASSWORD_PEPPER`                              | 是   | 是   | 密码预哈希、限流键与恢复 token 的独立主秘密   |
+| `PASSWORD_LOGIN_MAX_FAILURES`                  | 否   | 否   | 密码连续失败锁定阈值，默认 5                  |
+| `PASSWORD_LOGIN_LOCK_SECONDS`                  | 否   | 否   | 密码失败锁定期，默认 5 分钟                   |
+| `PASSWORD_LOGIN_IDENTIFIER_LIMIT`              | 否   | 否   | 同账号登录窗口上限，默认 10                   |
+| `PASSWORD_LOGIN_IDENTIFIER_WINDOW_SECONDS`     | 否   | 否   | 同账号登录窗口，默认 15 分钟                  |
+| `PASSWORD_LOGIN_IP_LIMIT`                      | 否   | 否   | 同 IP 登录窗口上限，默认 50                   |
+| `PASSWORD_LOGIN_IP_WINDOW_SECONDS`             | 否   | 否   | 同 IP 登录窗口，默认 1 小时                   |
+| `PASSWORD_LOGIN_DEVICE_LIMIT`                  | 否   | 否   | 同设备登录窗口上限，默认 30                   |
+| `PASSWORD_LOGIN_DEVICE_WINDOW_SECONDS`         | 否   | 否   | 同设备登录窗口，默认 1 小时                   |
+| `PASSWORD_RECOVERY_TTL_SECONDS`                | 否   | 否   | 恢复证明寿命，默认 30 分钟                    |
+| `PASSWORD_RECOVERY_COOLDOWN_SECONDS`           | 否   | 否   | 恢复证明安全冷却，默认 5 分钟且短于寿命       |
+| `PASSWORD_RECOVERY_MAX_ATTEMPTS`               | 否   | 否   | 单个恢复证明最大失败次数，默认 5              |
+| `PASSWORD_RECOVERY_DESTINATION_LIMIT`          | 否   | 否   | 同目的地恢复窗口上限，默认 3                  |
+| `PASSWORD_RECOVERY_DESTINATION_WINDOW_SECONDS` | 否   | 否   | 同目的地恢复窗口，默认 1 小时                 |
+| `PASSWORD_RECOVERY_IP_LIMIT`                   | 否   | 否   | 同 IP 恢复窗口上限，默认 20                   |
+| `PASSWORD_RECOVERY_IP_WINDOW_SECONDS`          | 否   | 否   | 同 IP 恢复窗口，默认 1 小时                   |
+| `PASSWORD_RECOVERY_DEVICE_LIMIT`               | 否   | 否   | 同设备恢复窗口上限，默认 10                   |
+| `PASSWORD_RECOVERY_DEVICE_WINDOW_SECONDS`      | 否   | 否   | 同设备恢复窗口，默认 1 小时                   |
 
 功能开关 `FEATURE_PAYMENTS`、`FEATURE_MESSAGING`、`FEATURE_COMMUNITY`、`FEATURE_CROSS_BORDER` 只接受 `true` 或 `false`。
 

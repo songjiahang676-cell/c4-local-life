@@ -133,6 +133,98 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /auth/password/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Sign in with an opt-in password
+      description: Uses one generic unauthorized response for unknown accounts, disabled password credentials, and incorrect passwords.
+      operationId: loginWithPassword
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordLoginRequest"
+      responses:
+        "200":
+          description: Authenticated session established
+          headers:
+            Set-Cookie:
+              description: Secure, HttpOnly, SameSite=Lax host-only session cookie scoped to /v1.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/password/recovery:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Request password setup or recovery
+      description: Returns the same accepted projection for existing and unknown destinations. The side-channel token is single-use and subject to a security cooldown.
+      operationId: requestPasswordRecovery
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordRecoveryRequest"
+      responses:
+        "202":
+          description: Recovery request accepted without disclosing account existence
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordRecoveryAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/password/recovery/confirm:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Complete password setup or recovery
+      description: Consumes the side-channel token once, replaces the password hash, revokes every session, and never signs the user in automatically.
+      operationId: confirmPasswordRecovery
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordRecoveryConfirmRequest"
+      responses:
+        "200":
+          description: Password changed and existing sessions revoked
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordRecoveryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/session:
     get:
       tags: [Auth]
@@ -1464,6 +1556,62 @@ components:
         requestId: { type: string }
         challengeId: { type: string, format: uuid }
         expiresAt: { type: string, format: date-time }
+    PasswordLoginRequest:
+      type: object
+      required: [identifier, password]
+      additionalProperties: false
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 320
+          description: Normalized email address or E.164 phone number.
+        password: { type: string, minLength: 1, maxLength: 512, writeOnly: true }
+    PasswordRecoveryRequest:
+      type: object
+      required: [channel, destination]
+      additionalProperties: false
+      properties:
+        channel: { type: string, enum: [EMAIL, SMS] }
+        destination: { type: string, minLength: 1, maxLength: 320 }
+    PasswordRecoveryConfirmRequest:
+      type: object
+      required: [recoveryRequestId, token, newPassword]
+      additionalProperties: false
+      properties:
+        recoveryRequestId: { type: string, format: uuid }
+        token:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{43}$"
+          writeOnly: true
+        newPassword:
+          type: string
+          minLength: 15
+          maxLength: 128
+          writeOnly: true
+          description: Unicode NFC password checked against the configured compromised/common-password blocklist.
+    PasswordRecoveryAcceptedResponse:
+      type: object
+      required: [accepted, requestId, recoveryRequestId, availableAt, expiresAt]
+      additionalProperties: false
+      properties:
+        accepted: { type: boolean, const: true }
+        requestId: { type: string }
+        recoveryRequestId: { type: string, format: uuid }
+        availableAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    PasswordRecoveryResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [passwordChanged, sessionsRevoked]
+          additionalProperties: false
+          properties:
+            passwordChanged: { type: boolean, const: true }
+            sessionsRevoked: { type: boolean, const: true }
     SessionResponse:
       type: object
       required: [data]

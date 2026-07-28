@@ -483,3 +483,25 @@ Observability: Existing bounded route/status telemetry covers Admin MFA 200/201/
 Docs: Updated roles/permissions、domain/data、API/integrations、security/privacy、acceptance、Admin architecture、runtime configuration、implementation sequence、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: Self-service MFA disable/reset and lost-device recovery are intentionally absent until an audited identity-recovery workflow can revoke all sessions；platform-role grant/revoke UI/API、resource scope enforcement、two-person approval、SSO and real privileged workspaces remain later tasks；`MFA_SECRET` rotation requires a dual-key operational migration before changing key version；local Docker smoke and protected hosted checks remain
+
+## AUTH-004 — 密码与账户恢复（可选）
+
+Task: AUTH-004 密码与账户恢复（可选）
+
+Changed: Added optional password login and recovery through Controller → application service → store/repository boundaries；introduced NFC-normalized password policy、versioned scrypt verifier with dedicated pepper prehash、dummy verification for unknown/unusable accounts、identifier/IP/device throttles、persistent lockout、cooldown recovery、one-time proof consumption、all-session revocation and notification gateway ports；no controller imports or calls Prisma directly
+
+Contracts: OpenAPI grows from 41 to 44 paths、50 to 53 operations and 83 to 88 schemas with strict no-store password login/recovery/recovery-confirm resources and required `X-Device-Id`；generated TypeScript and strict Zod contracts updated；Prisma grows from 44 to 46 models with password lifecycle fields on `User`、`PasswordAuthAttempt`、`PasswordRecoveryRequest` and `PasswordAuthAttemptOutcome`
+
+Migrations: 有，`20260728223000_password_recovery` additively creates password attempt/recovery evidence and nullable password lifecycle fields；all 12 migrations replayed on a newly created empty database，baseline passed 13 negative constraints and previous-release upgrade preserved its sentinel；application rollback disables password routes and retains evidence，while migration-local `ROLLBACK.md` documents exceptional stopped-writer export/drop steps
+
+Security: Passwords are NFC-normalized、15–128 Unicode code points、bounded to 512 UTF-8 bytes and screened against a built-in common-password denylist；a domain-separated HMAC-SHA256 pepper prehash feeds scrypt `N=2^17,r=8,p=1` with random salt；unknown/unusable accounts perform dummy KDF work and share generic 401 responses；login attempts are bound to identifier/IP/device with durable bounded lockout；recovery uses 256-bit random proofs stored only as hashes、cooldown/TTL/max-attempt/supersession controls and atomic one-time consumption；success changes the verifier、revokes every session、writes minimized audit evidence、sends a notification and never auto-signs in；tokens、passwords、pepper、full identifiers and raw provider errors are excluded from responses/logs
+
+Tests run: Password crypto vectors/policy/tamper and contract tests passed；HTTP abuse coverage proves generic unknown/disabled/bad-password failures、device header enforcement、three-dimensional rate limiting、lockout、cooldown、unknown-account parity、one-time recovery、attempt exhaustion、supersession、session revocation and provider-unavailable behavior；real PostgreSQL passed 16 files/52 tests including serialized attempts、exact completion、hash-only recovery and atomic password/session/audit mutation；all 12 migrations deployed and status/baseline/upgrade/safety passed；final `pnpm ci:quality` passed 9 typechecks、9 lints、48/48 test files、179/179 tests and 8 builds（78.6% statements、80.96% lines）；forced clean local build passed；`pnpm observability:check` passed；`pnpm test:e2e:ci` passed Chromium desktop/mobile 6/6
+
+Not run: Local Docker/Compose image smoke，because this host has no Docker CLI；no real email/SMS recovery message was sent because NOTIF-001/EVT-001 and production provider accounts are not implemented
+
+Observability: Existing correlated bounded route/status telemetry covers password login/recovery 200/400/401/409/429 without identifier、IP、device、token、hash、pepper or provider values as metric labels；durable attempts and audit metadata use bounded outcome/action values；public recovery responses stay uniform when the notification provider is unavailable
+
+Docs: Updated domain/data、API/integrations、security/privacy、acceptance、runtime configuration、implementation sequence、migration operations/rollback、OpenAPI/generated contracts、README、SECURITY、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: NOTIF-001/EVT-001 must replace the unavailable notification gateway with durable email/SMS dispatch before enabling recovery in production；the small built-in common-password denylist should be expanded to a reviewed compromised-password feed/service without leaking candidate passwords；self-service password enrollment/change UI and audited support recovery remain later slices；local Docker smoke remains unavailable，while PR #14 / run `30402574230` passed hosted Linux quality and four-application non-root runtime checks

@@ -37,6 +37,7 @@
 - Added owner-scoped, idempotent media upload intents with serialized count/byte quotas, checksum-bound five-minute S3/MinIO PUTs, opaque private quarantine keys, and verification-document fail-closed handling.
 - Added an independent no-store Admin shell, same-origin allowlist BFF, auditable expiring platform-role grants, server-computed RBAC navigation, generic 401/403 boundaries, and a fail-closed MFA gate that exposes no privileged data or writes.
 - Added Admin TOTP enrollment, one-time recovery codes, replay-resistant verification, failure lockouts, short MFA sessions, recent-auth step-up policy, and an accessible bilingual MFA gate.
+- Added optional scrypt password authentication with dedicated peppering, generic anti-enumeration failures, persisted lockouts, cooldown recovery, one-time hashed proofs, all-session revocation, audit evidence, and notification ports.
 
 ## 0.1.0 — Architecture handoff package
 

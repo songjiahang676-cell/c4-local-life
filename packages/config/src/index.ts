@@ -96,6 +96,24 @@ const apiEnvironmentSchema = commonServerSchema
     ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: positiveInteger(28_800, 86_400),
     ADMIN_SESSION_IDLE_TTL_SECONDS: positiveInteger(1_800, 14_400),
     ADMIN_STEP_UP_TTL_SECONDS: positiveInteger(600, 3_600),
+    PASSWORD_PEPPER: secretSchema(32),
+    PASSWORD_LOGIN_MAX_FAILURES: positiveInteger(5, 20),
+    PASSWORD_LOGIN_LOCK_SECONDS: positiveInteger(300, 3_600),
+    PASSWORD_LOGIN_IDENTIFIER_LIMIT: positiveInteger(10, 100),
+    PASSWORD_LOGIN_IDENTIFIER_WINDOW_SECONDS: positiveInteger(900, 86_400),
+    PASSWORD_LOGIN_IP_LIMIT: positiveInteger(50, 1_000),
+    PASSWORD_LOGIN_IP_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    PASSWORD_LOGIN_DEVICE_LIMIT: positiveInteger(30, 500),
+    PASSWORD_LOGIN_DEVICE_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    PASSWORD_RECOVERY_TTL_SECONDS: positiveInteger(1_800, 86_400),
+    PASSWORD_RECOVERY_COOLDOWN_SECONDS: positiveInteger(300, 3_600),
+    PASSWORD_RECOVERY_MAX_ATTEMPTS: positiveInteger(5, 20),
+    PASSWORD_RECOVERY_DESTINATION_LIMIT: positiveInteger(3, 100),
+    PASSWORD_RECOVERY_DESTINATION_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    PASSWORD_RECOVERY_IP_LIMIT: positiveInteger(20, 1_000),
+    PASSWORD_RECOVERY_IP_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
+    PASSWORD_RECOVERY_DEVICE_LIMIT: positiveInteger(10, 500),
+    PASSWORD_RECOVERY_DEVICE_WINDOW_SECONDS: positiveInteger(3_600, 86_400),
     FEATURE_PAYMENTS: booleanValue(false),
     FEATURE_MESSAGING: booleanValue(true),
     FEATURE_COMMUNITY: booleanValue(false),
@@ -144,6 +162,32 @@ const apiEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["MFA_SECRET"],
         message: "MFA secret must be distinct from session, CSRF, and OTP secrets",
+      });
+    }
+    if (
+      value.PASSWORD_PEPPER instanceof SecretValue &&
+      value.SESSION_SECRET instanceof SecretValue &&
+      value.CSRF_SECRET instanceof SecretValue &&
+      value.OTP_SECRET instanceof SecretValue &&
+      value.MFA_SECRET instanceof SecretValue &&
+      [
+        value.SESSION_SECRET.reveal(),
+        value.CSRF_SECRET.reveal(),
+        value.OTP_SECRET.reveal(),
+        value.MFA_SECRET.reveal(),
+      ].includes(value.PASSWORD_PEPPER.reveal())
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["PASSWORD_PEPPER"],
+        message: "Password pepper must be distinct from session, CSRF, OTP, and MFA secrets",
+      });
+    }
+    if (value.PASSWORD_RECOVERY_COOLDOWN_SECONDS >= value.PASSWORD_RECOVERY_TTL_SECONDS) {
+      context.addIssue({
+        code: "custom",
+        path: ["PASSWORD_RECOVERY_COOLDOWN_SECONDS"],
+        message: "Password recovery cooldown must be shorter than the recovery lifetime",
       });
     }
     if (value.ADMIN_SESSION_IDLE_TTL_SECONDS > value.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS) {

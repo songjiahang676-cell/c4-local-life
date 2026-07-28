@@ -21,6 +21,7 @@ const apiInput = {
   SESSION_SECRET: "session-secret-value-that-is-long-enough",
   OTP_SECRET: "otp-secret-value-that-is-long-enough",
   MFA_SECRET: "mfa-secret-value-that-is-long-enough",
+  PASSWORD_PEPPER: "password-pepper-value-that-is-long-enough",
   CSRF_SECRET: "csrf-secret-value-that-is-long-enough",
 };
 
@@ -43,9 +44,11 @@ assert.equal(apiEnvironment.FEATURE_PAYMENTS, false);
 assert.equal(apiEnvironment.SESSION_SECRET.reveal(), apiInput.SESSION_SECRET);
 assert.equal(apiEnvironment.OTP_SECRET.reveal(), apiInput.OTP_SECRET);
 assert.equal(apiEnvironment.MFA_SECRET.reveal(), apiInput.MFA_SECRET);
+assert.equal(apiEnvironment.PASSWORD_PEPPER.reveal(), apiInput.PASSWORD_PEPPER);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.SESSION_SECRET), false);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.OTP_SECRET), false);
 assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.MFA_SECRET), false);
+assert.equal(JSON.stringify(apiEnvironment).includes(apiInput.PASSWORD_PEPPER), false);
 
 const workerEnvironment = parseWorkerEnvironment({
   NODE_ENV: "test",

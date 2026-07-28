@@ -14,6 +14,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "s3-media-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "s3-media-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "s3-media-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "s3-media-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "s3-media-csrf-secret-with-more-than-32-bytes",
   S3_ENDPOINT: "http://localhost:9000",
   S3_REGION: "us-west-2",

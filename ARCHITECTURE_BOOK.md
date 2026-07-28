@@ -723,6 +723,13 @@ reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 
 `MfaRecoveryCode` 只保存域分离 hash 与消费时间，`credential + hash` 唯一。激活、时间步消费和恢复码
 消费均在事务内追加最小化 `AuditLog`，并用条件更新使并发重放最多一个成功。
 
+`AUTH-004` 在 User 上增加可空版本化 `password_hash`、`password_changed_at`、有界失败计数与锁定时间。
+`PasswordAuthAttempt` 只保存 identifier/IP/device 的域分离 hash、可空 user 关联和
+PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存凭据或 PII 原文。
+`PasswordRecoveryRequest` 保存可空 user、channel、destination/token/IP/device hash、冷却/到期、
+失败次数、消费/取代时间；窗口、终态与失败次数由数据库 check 约束。成功恢复在同一事务更新 User、
+撤销全部 `AuthSession`、消费请求并追加 `auth.password.recovered` 审计，保证重放和部分提交失败关闭。
+
 ### Media 聚合
 
 `MediaAsset` 在任何业务资源绑定前记录上传所有权、用途、类型、声明字节数、SHA-256、私有 bucket/key、
@@ -1118,6 +1125,17 @@ Next.js app 通过同源 `/v1` BFF 仅代理认证与 Admin session allowlist，
 普通特权与敏感动作两个服务端状态。它仍不是业务授权凭证；真实后台 controller 必须声明对应 Policy。
 OpenAPI 不提供禁用/重置接口，防止自助降级；人工恢复流程必须由后续审计、身份核验和会话全撤销切片实现。
 
+`AUTH-004` 新增三个公开、`no-store` 的可选密码端点：
+
+- `POST /auth/password/login` 接受 email/E.164 与密码，成功建立普通 PRIMARY Session；
+- `POST /auth/password/recovery` 对存在/不存在目的地返回同形 202，恢复证明经 side channel 交付；
+- `POST /auth/password/recovery/confirm` 在冷却后单次消费证明、替换密码并撤销全部 Session，不自动登录。
+
+三个端点都要求 16–128 字符的 opaque `X-Device-Id`；登录和恢复分别按 identifier/destination、IP、
+device 限流。错误凭据不区分账号存在、账号状态或密码状态；冷却/限流返回 bounded `Retry-After`。
+OpenAPI/共享 Zod 契约只暴露请求 ID、恢复请求 ID 和时间窗，不回传 token、hash、联系方式状态或
+provider 错误。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：
@@ -1209,7 +1227,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 41 个 path、83 个 schema、50 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 44 个 path、88 个 schema、53 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1870,6 +1888,20 @@ MFA 成功会轮换 bearer Session，旧 token 立即失效；MFA Session 默认
 角色撤销不会等待 MFA Session 到期。设置、TOTP 验证和恢复码消费都写最小化 `AuditLog`，不记录
 secret、code、token、IP 原文或 PII。当前不提供低保证的 MFA 关闭/重置；恢复需要后续受审计身份核验
 流程并撤销全部 Session。
+
+`AUTH-004` 把密码认证保持为可选能力：密码先做 NFC 规范化和 15–128 Unicode code point 长度检查，
+拒绝控制字符与内置常见/泄漏密码 blocklist，再使用独立 `PASSWORD_PEPPER` 域分离 HMAC 和
+scrypt `N=2^17,r=8,p=1`、32-byte 随机 salt、64-byte verifier。数据库只保存版本化 verifier，不保存
+密码、pepper 或恢复 token。登录对未知账号、未设置密码、错误密码和状态不可用账号使用同一 401，并对
+identifier、IP、device 三个维度串行限流；连续失败达到阈值后持久锁定，锁定期间仍执行 dummy KDF，
+降低账号枚举和时序差异。
+
+密码设置/恢复使用 256-bit 单次随机 token，只保存域分离 hash；请求对存在/不存在账号返回相同 202
+投影，并受 destination、IP、device 限流。证明必须等待默认五分钟安全冷却且在默认三十分钟内消费，
+错误证明最多五次，新请求会使旧请求失效。成功后在同一 PostgreSQL 事务内更换 verifier、清除失败状态、
+消费恢复记录、撤销该用户全部 Session 并追加不含 token/PII 的 `AuditLog`，然后发送密码变更通知；
+绝不自动登录。通知端口在未配置真实 provider 时 fail-closed，真实邮件/SMS durable adapter 仍由
+`NOTIF-001`/`EVT-001` 接入。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
@@ -2717,6 +2749,13 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 `Retry-After` 的锁定，跨站 Cookie 写被拒绝。MFA Session 使用更短绝对/闲置期限；近期认证窗口过期后
 `admin:sensitive:access` 失败，重新验证后恢复。所有 MFA 结果 no-store、写审计且不含 secret/code。
 TOTP 算法必须通过 RFC 向量、真实 PostgreSQL 事务/约束和中文/英文移动/键盘界面测试。
+
+`AUTH-004` 可选密码验收：verifier 必须使用版本化强 KDF、随机 salt 与独立 pepper，常见密码、短密码、
+控制字符和异常长度失败；登录对未知账号/错误密码/未设置密码返回通用 401，identifier、IP、device
+限流与持久失败锁定不可并发绕过。恢复请求不泄露账号存在性，token 只经 side channel 交付且数据库只存
+hash；冷却前、过期、错误、已消费、已取代和重放证明均失败。成功恢复必须原子替换密码、撤销全部
+Session、写最小审计、发送变更通知且不自动登录。空库 12 个 migration、上一发布基线升级、数据库
+约束负例、真实 Repository 事务、HTTP 契约与 abuse 测试必须通过。
 
 ## 22.4 Listing 验收
 

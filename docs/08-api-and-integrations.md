@@ -134,6 +134,17 @@ Next.js app 通过同源 `/v1` BFF 仅代理认证与 Admin session allowlist，
 普通特权与敏感动作两个服务端状态。它仍不是业务授权凭证；真实后台 controller 必须声明对应 Policy。
 OpenAPI 不提供禁用/重置接口，防止自助降级；人工恢复流程必须由后续审计、身份核验和会话全撤销切片实现。
 
+`AUTH-004` 新增三个公开、`no-store` 的可选密码端点：
+
+- `POST /auth/password/login` 接受 email/E.164 与密码，成功建立普通 PRIMARY Session；
+- `POST /auth/password/recovery` 对存在/不存在目的地返回同形 202，恢复证明经 side channel 交付；
+- `POST /auth/password/recovery/confirm` 在冷却后单次消费证明、替换密码并撤销全部 Session，不自动登录。
+
+三个端点都要求 16–128 字符的 opaque `X-Device-Id`；登录和恢复分别按 identifier/destination、IP、
+device 限流。错误凭据不区分账号存在、账号状态或密码状态；冷却/限流返回 bounded `Retry-After`。
+OpenAPI/共享 Zod 契约只暴露请求 ID、恢复请求 ID 和时间窗，不回传 token、hash、联系方式状态或
+provider 错误。
+
 ## 8.6 响应投影
 
 不同场景使用明确 DTO：
@@ -225,7 +236,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 41 个 path、83 个 schema、50 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 44 个 path、88 个 schema、53 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 

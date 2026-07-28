@@ -21,6 +21,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "taxonomy-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "taxonomy-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "taxonomy-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "taxonomy-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "taxonomy-csrf-secret-with-more-than-32-bytes",
 });
 

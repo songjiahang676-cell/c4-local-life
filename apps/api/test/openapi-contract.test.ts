@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { canonicalOpenApiPath } from "../src/common/openapi-document";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
+import { hashPassword } from "../src/modules/auth/password-crypto";
 import { decodeBase32, totpCode } from "../src/modules/admin/mfa-crypto";
 import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
 import {
@@ -20,6 +21,10 @@ import { MemoryOrganizationStore } from "./support/memory-organization.store";
 import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-media.store";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 import { MemoryMfaStore } from "./support/memory-mfa.store";
+import {
+  CapturingPasswordNotificationGateway,
+  MemoryPasswordStore,
+} from "./support/memory-password.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -49,6 +54,7 @@ const environment = parseApiEnvironment({
   SESSION_SECRET: "contract-session-secret-with-more-than-32-bytes",
   OTP_SECRET: "contract-otp-secret-with-more-than-32-bytes",
   MFA_SECRET: "contract-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "contract-password-pepper-with-more-than-32-bytes",
   CSRF_SECRET: "contract-csrf-secret-with-more-than-32-bytes",
 });
 const contractUserId = "20000000-0000-4000-8000-000000000001";
@@ -60,6 +66,8 @@ describe("canonical OpenAPI contract", () => {
   let contract: DereferencedOpenApi;
   let sessions: AuthSessionService;
   let otpDelivery: CapturingOtpDeliveryGateway;
+  let passwordStore: MemoryPasswordStore;
+  let passwordNotifications: CapturingPasswordNotificationGateway;
   const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
 
   beforeAll(async () => {
@@ -139,6 +147,17 @@ describe("canonical OpenAPI contract", () => {
     const otpChallengeStore = new MemoryOtpChallengeStore();
     otpChallengeStore.userId = contractUserId;
     otpDelivery = new CapturingOtpDeliveryGateway();
+    passwordStore = new MemoryPasswordStore();
+    passwordNotifications = new CapturingPasswordNotificationGateway();
+    passwordStore.registerAccount({
+      userId: contractUserId,
+      identifier: "contract-password@example.invalid",
+      passwordHash: await hashPassword(
+        "Contract password authentication 2026!",
+        environment.PASSWORD_PEPPER.reveal(),
+      ),
+      locale: "en-US",
+    });
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore,
@@ -149,6 +168,8 @@ describe("canonical OpenAPI contract", () => {
       mediaObjectStorage: new CapturingMediaObjectStorage(),
       taxonomyStore,
       mfaStore: new MemoryMfaStore(),
+      passwordStore,
+      passwordNotificationGateway: passwordNotifications,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -174,9 +195,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(41);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(83);
-    expect(operationIds).toHaveLength(50);
+    expect(Object.keys(contract.paths)).toHaveLength(44);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(88);
+    expect(operationIds).toHaveLength(53);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -213,8 +234,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(41);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(41);
+    expect(Object.keys(servedJson.paths)).toHaveLength(44);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(44);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -291,6 +312,67 @@ describe("canonical OpenAPI contract", () => {
     expect(verified.statusCode).toBe(200);
     expect(ajv.validate(acceptedSchema ?? false, requested.json())).toBe(true);
     expect(ajv.validate(sessionSchema ?? false, verified.json())).toBe(true);
+  });
+
+  it("validates password login and cooldown recovery responses against the contract", async () => {
+    const login = await server.inject({
+      method: "POST",
+      url: "/v1/auth/password/login",
+      headers: { "x-device-id": "contract-password-device-01" },
+      payload: {
+        identifier: "contract-password@example.invalid",
+        password: "Contract password authentication 2026!",
+      },
+    });
+    const recovery = await server.inject({
+      method: "POST",
+      url: "/v1/auth/password/recovery",
+      headers: { "x-device-id": "contract-password-device-02" },
+      payload: {
+        channel: "EMAIL",
+        destination: "contract-password@example.invalid",
+      },
+    });
+    const recoveryBody = recovery.json<{ recoveryRequestId: string }>();
+    const message = passwordNotifications.messages.at(-1);
+    if (!message || message.kind !== "RECOVERY_REQUESTED") {
+      throw new Error("Expected a password recovery notification");
+    }
+    passwordStore.makeRecoveryReady(recoveryBody.recoveryRequestId);
+    const completed = await server.inject({
+      method: "POST",
+      url: "/v1/auth/password/recovery/confirm",
+      headers: { "x-device-id": "contract-password-device-02" },
+      payload: {
+        recoveryRequestId: recoveryBody.recoveryRequestId,
+        token: message.token,
+        newPassword: "Contract replacement password 2026!",
+      },
+    });
+
+    const loginSchema =
+      contract.paths["/auth/password/login"]?.post?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    const recoverySchema =
+      contract.paths["/auth/password/recovery"]?.post?.responses["202"]?.content?.[
+        "application/json"
+      ]?.schema;
+    const completedSchema =
+      contract.paths["/auth/password/recovery/confirm"]?.post?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+
+    expect(login.statusCode).toBe(200);
+    expect(recovery.statusCode).toBe(202);
+    expect(completed.statusCode).toBe(200);
+    expect(ajv.validate(loginSchema ?? false, login.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    expect(ajv.validate(recoverySchema ?? false, recovery.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(
+      ajv.validate(completedSchema ?? false, completed.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
   });
 
   it("validates profile and session-device projections against the contract", async () => {
