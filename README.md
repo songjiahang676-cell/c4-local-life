@@ -157,9 +157,10 @@ SCANNING + Outbox，以及 Worker 的实际字节/hash/magic-byte 复核、ClamA
 方向校正/去 EXIF/ICC、THUMBNAIL/CARD/FULL 三个确定性 WebP 变体和 lifecycleVersion 幂等
 READY/REJECTED。第 14 个迁移已从全新空库部署，数据库 baseline 19 个负例、升级和 57 项真实
 PostgreSQL 测试通过；全仓 55 个文件/203 项测试通过，本机 Redis/ClamAV 两项集成因服务不存在明确
-跳过，受保护 CI 已被契约要求提供真实 Redis/clamd。Windows 中等完整性进程在 Admin standalone
-最终复制阶段不能创建 symlink；编译、类型和静态页面生成已通过，完整 Linux 构建、E2E、四镜像和真实
-ClamAV 测试以该任务 PR 的托管结果为准。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
+跳过。PR #16 / run `30406971001` 已在真实 Redis/clamd 上通过 57 个文件/205 项测试，并通过完整
+Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非 root 镜像。Windows 中等完整性进程
+在 Admin standalone 最终复制阶段不能创建 symlink；本地编译、类型和静态页面生成已通过，该宿主限制
+没有在 Linux 托管构建复现。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
 
 ## 七、规划容量与服务目标
 

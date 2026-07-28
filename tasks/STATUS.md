@@ -7,13 +7,13 @@
 - Gate：G1 Identity / Taxonomy / Media
 - 目标：安全身份上下文、主数据、动态表单和隔离上传
 - 进度：12/13 个 G1 任务、30/101 个总任务完成
-- 风险：MEDIA-002 本机没有 Docker/clamd/Redis，真实 ClamAV 与 Redis 集成由受保护托管检查强制执行；Windows 中等完整性进程不能创建 Next standalone symlink，Admin 本地最终打包失败但编译、类型和静态生成已通过；真实短信/邮件提供商适配器仍由 NOTIF-001 提供
+- 风险：MEDIA-002 本机没有 Docker/clamd/Redis，等价的真实 ClamAV/Redis、完整 Linux 构建/E2E 和四镜像已由 PR #16 / run `30406971001` 通过；Windows 中等完整性进程不能创建 Next standalone symlink；真实短信/邮件提供商适配器仍由 NOTIF-001 提供
 
 ## 正在进行
 
-| Task      | Owner                | Started    | Target            | Status      | Notes                                                                                                 |
-| --------- | -------------------- | ---------- | ----------------- | ----------- | ----------------------------------------------------------------------------------------------------- |
-| MEDIA-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | local-ready | HEAD closure、ClamAV/Sharp、3 WebP variants、lifecycleVersion；hosted ClamAV/container checks pending |
+| Task      | Owner                | Started    | Target            | Status         | Notes                                                                                            |
+| --------- | -------------------- | ---------- | ----------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| MEDIA-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | ready-to-merge | HEAD closure、ClamAV/Sharp、3 WebP variants、lifecycleVersion；PR #16 / run `30406971001` passed |
 
 ## Gate Evidence
 
@@ -73,6 +73,7 @@
 | EVT-001 protected merge         | PR #15 / merge `490efa4`           | protected merge completed                                                 | 2026-07-28 |
 | MEDIA-002 local database        | fresh 14-migration empty database  | baseline 19 negatives；upgrade preserved sentinel；57 tests passed        | 2026-07-28 |
 | MEDIA-002 local quality         | `pnpm ci:quality`                  | 55 files / 203 tests passed；Redis/ClamAV skipped；Admin standalone EPERM | 2026-07-28 |
+| MEDIA-002 protected checks      | PR #16 / run `30406971001`         | 57 files / 205 tests with real Redis/ClamAV；build/E2E/4 images passed    | 2026-07-28 |
 
 ## Decisions / Blocks
 
