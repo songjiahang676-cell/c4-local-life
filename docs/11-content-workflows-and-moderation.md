@@ -17,6 +17,13 @@ PUBLISHED
 
 `ContentStatus` 表达用户可见生命周期，`ModerationStatus` 表达审核决策；两者不可混为一个字段。状态变更只通过明确 use case，记录 actor、原因、版本和审计。
 
+`LIST-001` 的可执行状态机覆盖 `SUBMIT`、自动/人工批准、升级、退回草稿、暂停、到期、owner
+归档和软删除。自动批准只接受尚未升级的 `PENDING_REVIEW`；升级后的提交只能由 moderator 批准或
+退回。发布会同时写入 UTC `publishedAt` 和基于显式 1–365 天策略计算的 `expiresAt`，到期前调用
+`EXPIRE` 必须失败。删除以 `DELETED + deletedAt` 表达且不可重复执行；过期、归档和暂停保留原发布
+证据。每次转换先验证重建快照的不变式和 `expectedVersion`，再返回包含 actor、原因码、前后双状态
+与前后版本的事件；持久化和 Outbox 原子提交由后续 Listing application/repository 切片完成。
+
 ## 11.2 风险分层
 
 ### 低风险

@@ -10,14 +10,18 @@
 
 ## G1 Identity / Taxonomy / Media
 
-- [ ] Auth/OTP/session/organization 权限负面测试。
-- [ ] Admin MFA 与最小权限。
-- [ ] 地区/分类/表单版本可发布回滚。
-- [ ] 上传 quarantine、扫描、重编码和私有验证文件。
+- [x] Auth/OTP/session/organization 权限负面测试。
+- [x] Admin MFA 与最小权限。
+- [x] 地区/分类/表单版本可发布回滚。
+- [x] 普通媒体 upload quarantine、扫描、重编码和安全变体。
+
+Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证。`ORG-002` 虽在 Backlog
+标记为 G1/P1，但显式依赖 Gate 2 的 `NOTIF-001`，因此按依赖顺序延后；受限验证文件由
+`MEDIA-003`/Gate 4 完成，不能把它混入普通公开媒体的 Gate 1 边界。
 
 ## G2 Listings / Moderation
 
-- [ ] 五类 Listing 状态机和动态字段。
+- [x] 五类 Listing 共享状态机、type-detail、价格和过期不变式。
 - [ ] 草稿/提交/审核/发布/编辑/过期完整。
 - [ ] 审核、举报、申诉、审计和通知。
 - [ ] 移动端中英文发布 E2E。

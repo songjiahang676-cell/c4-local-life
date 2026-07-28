@@ -162,6 +162,13 @@ Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非
 在 Admin standalone 最终复制阶段不能创建 symlink；本地编译、类型和静态页面生成已通过，该宿主限制
 没有在 Linux 托管构建复现。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
 
+PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随后受保护合并为
+`d4abece`，Gate 1 实施主线完成。Backlog 中的 `ORG-002` 是 G1/P1，但显式依赖 Gate 2
+`NOTIF-001`；受限验证文件 `MEDIA-003` 属于 Gate 4，因此两者按依赖延后而不提前跨 Gate。
+当前进入 `LIST-001`：五类 Listing 共用纯领域状态机，严格校验 type-detail、最小货币单位价格、
+内容/审核双状态、乐观版本、1–365 天发布期限及非法转换；Repository、安全投影和 HTTP use case
+仍按 `LIST-002/003` 顺序实现。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

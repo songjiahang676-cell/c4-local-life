@@ -20,7 +20,9 @@
 
 - NestJS + Fastify 启动、Swagger、全局验证和 Problem Details 异常过滤器。
 - Health 模块。
-- Listing 示例模块，当前主要用于说明 Controller/DTO/Service 边界；需要替换为真实 repository、policy 和状态机。
+- Listing HTTP 示例仍只说明 Controller/DTO/Service 边界；`LIST-001` 已增加纯领域状态机，覆盖五类
+  type-detail、价格、审核/内容双状态、版本和过期不变式。真实 repository、安全投影和 use case 接线
+  由 `LIST-002/003` 替换现有内存 Service。
 
 ### `apps/worker`
 

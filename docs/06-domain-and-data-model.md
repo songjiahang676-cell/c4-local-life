@@ -45,6 +45,19 @@
 6. 每次更新递增 `version`，并用乐观并发控制。
 7. 重大字段变化产生新的审核快照，而不是覆盖审核证据。
 
+`LIST-001` 将这些规则实现为不依赖 Nest/Prisma 的纯领域边界
+`apps/api/src/modules/listings/listing-domain.ts`。五类 detail 使用 `kind` 判别联合并在运行时再次校验
+必须与 Listing `type` 一致；金额只接受 `bigint` 最小货币单位和 `USD`，`FREE/NEGOTIABLE`
+必须没有金额，其余价格必须为正数且不超过数据库精度。Job 薪资上下限、Rental 房间/押金、
+Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有有界规则。
+
+内容状态和审核状态保持正交但受组合矩阵约束：草稿只能 `NOT_REVIEWED|REJECTED`，提交态只能
+`PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
+`REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
+只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
+`expiresAt`。Repository、权限投影和持久化事务仍由 `LIST-002/003` 接入，领域规则本身不直接操作
+Prisma，也不自行决定运营发布期限。
+
 ### Organization 聚合
 
 Organization 是可多人管理的商业主体。商家、师傅团队和供应商共享成员模型，但对应 profile/verification 能力不同。
