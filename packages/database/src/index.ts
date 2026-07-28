@@ -34,12 +34,21 @@ export {
   type OrganizationRepositoryOptions,
 } from "./repositories/organization.repository";
 export {
+  CategoryFormSchemaRepository,
   normalizeTaxonomyAlias,
   TaxonomyRepository,
+  type CategoryFormSchemaLifecycle,
+  type CategoryFormSchemaMutationResult,
+  type CategoryFormSchemaRecord,
+  type CategoryFormSchemaRepositoryOptions,
   type CategoryTaxonomyRecord,
   type ListCategoryTaxonomyInput,
   type ListRegionTaxonomyInput,
+  type MaterializedCategoryField,
+  type PublishCategoryFormSchemaDraftInput,
   type RegionTaxonomyRecord,
+  type RollbackCategoryFormSchemaInput,
+  type SaveCategoryFormSchemaDraftInput,
   type TaxonomyAliasProjection,
   type TaxonomyRepositoryOptions,
 } from "./taxonomy";

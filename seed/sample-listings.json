@@ -15,8 +15,8 @@
         "unit": "HOURLY"
       },
       "attributes": {
-        "employmentType": "FULL_TIME",
-        "language": "中文/英文"
+        "employmentType": "full-time",
+        "language": ["zh-hans", "english"]
       }
     },
     {
@@ -66,7 +66,7 @@
         "unit": "FIXED"
       },
       "attributes": {
-        "condition": "LIKE_NEW"
+        "condition": "like-new"
       }
     },
     {

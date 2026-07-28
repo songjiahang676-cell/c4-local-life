@@ -750,12 +750,15 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 ## 6.6 版本与历史
 
-当前 Schema 包含业务实体的当前快照。实施阶段应增加以下历史能力：
+当前 Schema 包含业务实体的当前快照。`TAX-002` 已增加
+`category_form_schema_versions`：一个 Category 最多一个 draft、已发布记录由数据库保护为不可变，
+回滚追加新版本；`listings.form_schema_version` 固定旧草稿的校验事实源，`category_fields` 只是当前
+发布版本的可重建查询投影。后续仍应增加以下历史能力：
 
 - `listing_revisions`：提交/发布/重大编辑时保存规范化快照、diff、actor、风险结果。
 - `moderation_rule_hits`：规则版本、输入摘要和结果。
 - `payment_webhook_receipts`：原始事件引用、签名校验结果、处理状态。
-- `config_versions`：分类、首页编排、同义词和规则配置版本。
+- 首页编排、同义词和规则的专用版本表（分类表单不再使用泛化 `config_versions`）。
 - `deletion_requests`：账户删除工作流。
 
 历史表应设置分区/保留，而不是无限增长。
@@ -1051,7 +1054,13 @@ Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMI
 原始受控别名与层级树；父级、type/vertical 与 `q` 提供直接子级或扁平匹配。`q` 最长 80 字符，
 拒绝控制/双向字符，Repository 使用参数化查询和受控 NFKC 别名键。公开接口的 `activeOnly` 只能
 为 true，响应使用五分钟 public cache 与 stale-while-revalidate；未启用 taxonomy 不通过匿名接口
-暴露。动态 form schema 的发布/回滚仍属于 TAX-002。
+暴露。
+
+`TAX-002` 实现公开 `GET /categories/{categoryId}/form-schema`。缺省读取当前已发布版本，显式
+`version` 只读取不可变历史已发布版本；两者均不返回 draft、actor/audit 字段或内部物化配置。响应
+返回强 ETag，历史版本可长期 immutable 缓存。应用层同时提供 draft/preview/publish/rollback 与
+按精确版本校验 attributes 的服务端能力；管理 HTTP 写端点延后到 `ADMIN-001`，届时必须复用这些
+能力并增加 SSO/MFA/RBAC，不能绕过 Repository 直接写 Prisma。
 
 ## 8.6 响应投影
 
@@ -1778,6 +1787,13 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
 控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID
 协调并受唯一/FK 约束，不接收用户生成文本，也不把非权威 seed 中心点描述成精确地址。
+
+`TAX-002` 的匿名表单端点只读取 active Category 的已发布版本，draft 和审计 actor 永不进入公开
+DTO。已发布定义在数据库层禁止 update/delete；draft revision、当前版本和 Category 行锁共同防止
+丢失更新，回滚追加新版本并保留来源。配置验证限制字段/选项数量和字符串长度，拒绝未知属性、任意
+脚本、回溯引用、lookaround 与嵌套量词，降低配置注入和 ReDoS 风险。PHONE/EMAIL 动态字段必须
+OWNER_ONLY/MODERATOR_ONLY 且不可进入搜索/筛选投影。Listing attributes 在服务端按其保存的精确
+schema version 验证，不能信任前端表单隐藏或当前版本替代历史授权/校验事实。
 
 ## 14.6 输入、输出和内容安全
 
@@ -2736,6 +2752,24 @@ US
 - 条件逻辑采用受控表达式，不执行任意 JavaScript。
 - 服务端根据保存时 schema/version 验证；前端 schema 只是体验增强。
 - 搜索可筛选字段必须有规范化映射，不从自由 JSON 临时推断。
+
+`TAX-002` 将上述约束落为 `category_form_schema_versions`。每个 Category 最多有一个未发布
+draft；draft 用 `revision` 做乐观并发，发布前再次核对 Category 当前版本。发布在同一事务内写入
+`publishedAt/publishedById`、推进 `categories.form_schema_version`，并重建受控的
+`category_fields` 投影。数据库触发器禁止更新或删除已发布记录；回滚复制目标历史定义并发布为新的
+单调递增版本，`basedOnVersion` 保存来源，绝不把当前指针倒退或覆盖历史。
+
+每条 Listing 保存 `form_schema_version`。服务端校验草稿时读取该 Category 的精确已发布版本，
+因此 version 2 新增 required 字段不会让 version 1 草稿失效。公开
+`GET /categories/{categoryId}/form-schema` 默认返回当前已发布版本，也可用正整数 `version`
+读取历史已发布版本；draft、停用 Category 和未知版本统一不可见。当前版本短缓存，显式历史版本使用
+immutable cache，并以 SHA-256 内容哈希作为强 ETag。
+
+表单字段和选项均有数量/长度上限，key/option value 唯一。SELECT/MULTISELECT 必须来自显式
+option；可筛选类型进入白名单。PHONE/EMAIL 必须是非公开、不可搜索/筛选字段。pattern 禁止回溯引用、
+lookaround 和嵌套量词等高风险构造，不接受脚本或任意 UI component。管理端 draft/preview/publish/
+rollback HTTP adapter 必须等 `ADMIN-001` 的 SSO/MFA/RBAC shell 完成后接入；本切片已提供可复用的
+应用服务和原子 Repository，不会先暴露匿名管理写口。
 
 ## 23.5 分类变更治理
 

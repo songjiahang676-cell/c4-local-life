@@ -33,6 +33,7 @@
 - Added a fail-closed Actor/RequestContext/Policy framework with declarative controller actions, PII-minimized request actors, resource owner/organization rules, and reusable authorization matrix tests.
 - Added atomic organization-plus-OWNER creation, membership-scoped organization reads, signed OWNER/ADMIN member pagination, and a fail-closed five-role action matrix.
 - Added bilingual Region/Category trees, FK-constrained normalized aliases, active-only public taxonomy filters, and idempotent alias seed/migration coverage.
+- Added immutable versioned category form schemas with optimistic drafts, atomic publish/materialization, append-only rollback, historical Listing validation, private contact-field controls, and a cacheable public read contract.
 
 ## 0.1.0 — Architecture handoff package
 

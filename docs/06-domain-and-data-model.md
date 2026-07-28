@@ -121,12 +121,15 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 ## 6.6 版本与历史
 
-当前 Schema 包含业务实体的当前快照。实施阶段应增加以下历史能力：
+当前 Schema 包含业务实体的当前快照。`TAX-002` 已增加
+`category_form_schema_versions`：一个 Category 最多一个 draft、已发布记录由数据库保护为不可变，
+回滚追加新版本；`listings.form_schema_version` 固定旧草稿的校验事实源，`category_fields` 只是当前
+发布版本的可重建查询投影。后续仍应增加以下历史能力：
 
 - `listing_revisions`：提交/发布/重大编辑时保存规范化快照、diff、actor、风险结果。
 - `moderation_rule_hits`：规则版本、输入摘要和结果。
 - `payment_webhook_receipts`：原始事件引用、签名校验结果、处理状态。
-- `config_versions`：分类、首页编排、同义词和规则配置版本。
+- 首页编排、同义词和规则的专用版本表（分类表单不再使用泛化 `config_versions`）。
 - `deletion_requests`：账户删除工作流。
 
 历史表应设置分区/保留，而不是无限增长。

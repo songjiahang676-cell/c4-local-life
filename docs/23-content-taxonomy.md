@@ -90,6 +90,24 @@ US
 - 服务端根据保存时 schema/version 验证；前端 schema 只是体验增强。
 - 搜索可筛选字段必须有规范化映射，不从自由 JSON 临时推断。
 
+`TAX-002` 将上述约束落为 `category_form_schema_versions`。每个 Category 最多有一个未发布
+draft；draft 用 `revision` 做乐观并发，发布前再次核对 Category 当前版本。发布在同一事务内写入
+`publishedAt/publishedById`、推进 `categories.form_schema_version`，并重建受控的
+`category_fields` 投影。数据库触发器禁止更新或删除已发布记录；回滚复制目标历史定义并发布为新的
+单调递增版本，`basedOnVersion` 保存来源，绝不把当前指针倒退或覆盖历史。
+
+每条 Listing 保存 `form_schema_version`。服务端校验草稿时读取该 Category 的精确已发布版本，
+因此 version 2 新增 required 字段不会让 version 1 草稿失效。公开
+`GET /categories/{categoryId}/form-schema` 默认返回当前已发布版本，也可用正整数 `version`
+读取历史已发布版本；draft、停用 Category 和未知版本统一不可见。当前版本短缓存，显式历史版本使用
+immutable cache，并以 SHA-256 内容哈希作为强 ETag。
+
+表单字段和选项均有数量/长度上限，key/option value 唯一。SELECT/MULTISELECT 必须来自显式
+option；可筛选类型进入白名单。PHONE/EMAIL 必须是非公开、不可搜索/筛选字段。pattern 禁止回溯引用、
+lookaround 和嵌套量词等高风险构造，不接受脚本或任意 UI component。管理端 draft/preview/publish/
+rollback HTTP adapter 必须等 `ADMIN-001` 的 SSO/MFA/RBAC shell 完成后接入；本切片已提供可复用的
+应用服务和原子 Repository，不会先暴露匿名管理写口。
+
 ## 23.5 分类变更治理
 
 Draft → Review → Preview → Publish → Observe → Rollback。分类合并/移动需：slug redirect、旧 Listing 映射、搜索重建、SEO canonical、报表连续性和推广库存影响评估。

@@ -117,6 +117,22 @@ try {
     `SELECT to_regclass('public.region_aliases') AS region_aliases,
             to_regclass('public.category_aliases') AS category_aliases`,
   );
+  const categoryFormSchemaStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.category_form_schema_versions') AS versions,
+       EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'listings'
+            AND column_name = 'form_schema_version'
+            AND is_nullable = 'NO'
+       ) AS listing_version,
+       EXISTS (
+         SELECT 1 FROM pg_trigger
+          WHERE tgname = 'category_form_schema_versions_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_trigger`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -126,7 +142,10 @@ try {
     profileVersionColumn.rows[0].is_nullable !== "NO" ||
     accountStateTrigger.rowCount !== 1 ||
     taxonomyAliasTables.rows[0].region_aliases !== "region_aliases" ||
-    taxonomyAliasTables.rows[0].category_aliases !== "category_aliases"
+    taxonomyAliasTables.rows[0].category_aliases !== "category_aliases" ||
+    categoryFormSchemaStorage.rows[0].versions !== "category_form_schema_versions" ||
+    !categoryFormSchemaStorage.rows[0].listing_version ||
+    !categoryFormSchemaStorage.rows[0].immutable_trigger
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -143,6 +162,7 @@ try {
       profileVersionColumn: true,
       accountStateTrigger: true,
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
+      categoryFormSchemaStorage: true,
     }),
   );
 } finally {

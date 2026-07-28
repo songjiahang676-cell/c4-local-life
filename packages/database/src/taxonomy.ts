@@ -8,3 +8,14 @@ export {
   type TaxonomyAliasProjection,
   type TaxonomyRepositoryOptions,
 } from "./repositories/taxonomy.repository";
+export {
+  CategoryFormSchemaRepository,
+  type CategoryFormSchemaLifecycle,
+  type CategoryFormSchemaMutationResult,
+  type CategoryFormSchemaRecord,
+  type CategoryFormSchemaRepositoryOptions,
+  type MaterializedCategoryField,
+  type PublishCategoryFormSchemaDraftInput,
+  type RollbackCategoryFormSchemaInput,
+  type SaveCategoryFormSchemaDraftInput,
+} from "./repositories/category-form-schema.repository";

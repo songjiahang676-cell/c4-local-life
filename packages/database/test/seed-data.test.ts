@@ -13,6 +13,9 @@ describe("seed data and test factories", () => {
       seed.regions.metros[0]?.children.find((region) => region.code === "US-CA-LA")?.aliases,
     ).toEqual(expect.arrayContaining([{ locale: "und", value: "LA" }]));
     expect(seed.categories.verticals).toHaveLength(5);
+    expect(seed.categories.verticals.every((category) => category.formFields.length > 0)).toBe(
+      true,
+    );
     expect(
       seed.categories.verticals.find((category) => category.type === "SERVICE")?.aliases,
     ).toEqual(expect.arrayContaining([{ locale: "zh-Hans", value: "找师傅" }]));
