@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   ContentStatus,
   ListingType,
@@ -16,10 +17,26 @@ export type SeedSummary = {
   regionAliases: number;
   categories: number;
   categoryAliases: number;
+  categoryFields: number;
+  formSchemaVersions: number;
   listings: number;
   users: number;
   sourceVersion: number;
 };
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`;
+}
+
+function hashDefinition(value: unknown): string {
+  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+}
 
 function slugFromCode(code: string): string {
   return code.toLowerCase();
@@ -36,6 +53,8 @@ export async function seedDatabaseInTransaction(
   const regionIds = new Map<string, string>();
   let regionAliasCount = 0;
   let categoryAliasCount = 0;
+  let categoryFieldCount = 0;
+  let formSchemaVersionCount = 0;
 
   const syncRegionAliases = async (
     regionId: string,
@@ -151,6 +170,7 @@ export async function seedDatabaseInTransaction(
   }
 
   const categoryIds = new Map<string, string>();
+  const seedFormActorId = stableSeedUuid("user:synthetic-seed-owner");
   const syncCategoryAliases = async (
     categoryId: string,
     categoryKey: string,
@@ -187,6 +207,95 @@ export async function seedDatabaseInTransaction(
     categoryAliasCount += aliasIds.length;
   };
 
+  const syncCategoryFormSchema = async (input: {
+    categoryId: string;
+    categoryKey: string;
+    fields: SeedData["categories"]["verticals"][number]["formFields"];
+    lifetimeDays?: number;
+    manualReview?: "risk_based" | "always";
+  }): Promise<void> => {
+    const definition = {
+      categoryId: input.categoryId,
+      version: 1,
+      fields: input.fields,
+      publicationPolicy: {
+        ...(input.lifetimeDays === undefined ? {} : { defaultLifetimeDays: input.lifetimeDays }),
+        ...(input.manualReview === undefined
+          ? {}
+          : { manualReviewRequired: input.manualReview === "always" }),
+        phoneVerificationRequired: false,
+        maxMedia: 20,
+        allowExactAddress: false,
+      },
+    };
+    const contentHash = hashDefinition(definition);
+    const existing = await transaction.categoryFormSchemaVersion.findUnique({
+      where: {
+        categoryId_version: {
+          categoryId: input.categoryId,
+          version: 1,
+        },
+      },
+      select: { contentHash: true, publishedAt: true },
+    });
+    if (!existing) {
+      await transaction.categoryFormSchemaVersion.create({
+        data: {
+          id: stableSeedUuid(`category-form-schema:${input.categoryKey}:1`),
+          categoryId: input.categoryId,
+          version: 1,
+          definition: definition as Prisma.InputJsonValue,
+          contentHash,
+          createdById: seedFormActorId,
+          updatedById: seedFormActorId,
+          publishedById: seedFormActorId,
+          publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      });
+    } else if (existing.contentHash !== contentHash || !existing.publishedAt) {
+      throw new Error(
+        `Published seed form schema changed for ${input.categoryKey}; add a new version instead`,
+      );
+    }
+    const fieldIds: string[] = [];
+    for (const field of input.fields) {
+      const id = stableSeedUuid(`category-field:${input.categoryKey}:${field.key}`);
+      fieldIds.push(id);
+      const values = {
+        categoryId: input.categoryId,
+        key: field.key,
+        labelZhHans: field.label["zh-Hans"],
+        labelEn: field.label["en-US"],
+        helpText: field.helpText as Prisma.InputJsonValue | undefined,
+        fieldType: field.type,
+        isRequired: field.required,
+        isFilterable: field.filterable,
+        isSearchable: field.searchable,
+        visibility: field.visibility,
+        options: field.options as Prisma.InputJsonValue | undefined,
+        validation: field.validation as Prisma.InputJsonValue | undefined,
+        sortOrder: field.sortOrder,
+      };
+      await transaction.categoryField.upsert({
+        where: { id },
+        create: { id, ...values },
+        update: values,
+      });
+    }
+    await transaction.categoryField.deleteMany({
+      where: {
+        categoryId: input.categoryId,
+        ...(fieldIds.length > 0 ? { id: { notIn: fieldIds } } : {}),
+      },
+    });
+    await transaction.category.update({
+      where: { id: input.categoryId },
+      data: { formSchemaVersion: 1 },
+    });
+    categoryFieldCount += fieldIds.length;
+    formSchemaVersionCount += 1;
+  };
+
   for (const vertical of seed.categories.verticals) {
     const verticalType = ListingType[vertical.type];
     const rootId = stableSeedUuid(`category:${vertical.type}:${vertical.slug}`);
@@ -210,6 +319,13 @@ export async function seedDatabaseInTransaction(
     });
     categoryIds.set(`${vertical.type}:${vertical.slug}`, rootId);
     await syncCategoryAliases(rootId, `${vertical.type}:${vertical.slug}`, vertical.aliases);
+    await syncCategoryFormSchema({
+      categoryId: rootId,
+      categoryKey: `${vertical.type}:${vertical.slug}`,
+      fields: vertical.formFields,
+      lifetimeDays: vertical.lifetimeDays,
+      manualReview: vertical.manualReview,
+    });
 
     for (const child of vertical.children) {
       const id = stableSeedUuid(`category:${vertical.type}:${vertical.slug}:${child.slug}`);
@@ -239,6 +355,13 @@ export async function seedDatabaseInTransaction(
         `${vertical.type}:${vertical.slug}:${child.slug}`,
         child.aliases,
       );
+      await syncCategoryFormSchema({
+        categoryId: id,
+        categoryKey: `${vertical.type}:${vertical.slug}:${child.slug}`,
+        fields: vertical.formFields,
+        lifetimeDays: vertical.lifetimeDays,
+        manualReview: vertical.manualReview,
+      });
     }
   }
   for (const category of seed.categories.communityCategories) {
@@ -261,9 +384,14 @@ export async function seedDatabaseInTransaction(
     });
     categoryIds.set(`COMMUNITY:${category.slug}`, id);
     await syncCategoryAliases(id, `COMMUNITY:${category.slug}`, category.aliases);
+    await syncCategoryFormSchema({
+      categoryId: id,
+      categoryKey: `COMMUNITY:${category.slug}`,
+      fields: [],
+    });
   }
 
-  const seedOwnerId = stableSeedUuid("user:synthetic-seed-owner");
+  const seedOwnerId = seedFormActorId;
   await transaction.user.upsert({
     where: { id: seedOwnerId },
     create: {
@@ -329,6 +457,8 @@ export async function seedDatabaseInTransaction(
     regionAliases: regionAliasCount,
     categories: categoryIds.size,
     categoryAliases: categoryAliasCount,
+    categoryFields: categoryFieldCount,
+    formSchemaVersions: formSchemaVersionCount,
     listings: seed.listings.listings.length,
     users: 1,
     sourceVersion: seed.regions.version,

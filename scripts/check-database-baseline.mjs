@@ -45,6 +45,7 @@ try {
     "20260726044453_otp_challenges",
     "20260728090000_account_management",
     "20260728184415_taxonomy_aliases",
+    "20260728190935_category_form_schema_versions",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -69,7 +70,8 @@ try {
             to_regclass('public.reviews') AS reviews,
             to_regclass('public.orders') AS orders,
             to_regclass('public.region_aliases') AS region_aliases,
-            to_regclass('public.category_aliases') AS category_aliases`,
+            to_regclass('public.category_aliases') AS category_aliases,
+            to_regclass('public.category_form_schema_versions') AS category_form_schema_versions`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -180,6 +182,34 @@ try {
     throw new Error("Taxonomy alias foreign keys are missing or do not cascade");
   }
 
+  const formSchemaStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'listings'
+            AND column_name = 'form_schema_version'
+            AND is_nullable = 'NO'
+       ) AS listing_version,
+       EXISTS (
+         SELECT 1 FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'category_form_schema_versions_one_draft_per_category'
+       ) AS one_draft_index,
+       EXISTS (
+         SELECT 1 FROM pg_trigger
+          WHERE tgname = 'category_form_schema_versions_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_trigger`,
+  );
+  if (
+    !formSchemaStorage.rows[0]?.listing_version ||
+    !formSchemaStorage.rows[0]?.one_draft_index ||
+    !formSchemaStorage.rows[0]?.immutable_trigger
+  ) {
+    throw new Error("Category form schema version storage or immutability controls are missing");
+  }
+
   await client.query("BEGIN");
   await client.query(
     `INSERT INTO users (id, email, updated_at)
@@ -288,6 +318,30 @@ try {
     "23503",
   );
   await client.query(
+    `INSERT INTO category_form_schema_versions (
+       id, category_id, version, revision, definition, content_hash,
+       created_at, updated_at, published_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000011',
+       '00000000-0000-4000-8000-000000000003',
+       1,
+       1,
+       '{"categoryId":"00000000-0000-4000-8000-000000000003","version":1,"fields":[]}'::jsonb,
+       repeat('a', 64),
+       now(),
+       now(),
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "published form schema immutability",
+    `UPDATE category_form_schema_versions
+        SET content_hash = repeat('b', 64)
+      WHERE id = '00000000-0000-4000-8000-000000000011'`,
+    "55000",
+  );
+  await client.query(
     `INSERT INTO region_aliases (id, region_id, locale, value, normalized_value)
      VALUES (
        '00000000-0000-4000-8000-000000000009',
@@ -349,7 +403,8 @@ try {
       profileVersionColumn: true,
       accountStateTrigger: true,
       taxonomyAliasTables: ["region_aliases", "category_aliases"],
-      negativeCases: 4,
+      categoryFormSchemaStorage: true,
+      negativeCases: 5,
     }),
   );
 } finally {

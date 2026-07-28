@@ -449,9 +449,20 @@ paths:
       operationId: getCategoryFormSchema
       parameters:
         - $ref: "#/components/parameters/CategoryId"
+        - name: version
+          in: query
+          description: Published historical version; omit for the category's current published version.
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
           description: Versioned dynamic form definition
+          headers:
+            ETag:
+              description: Strong content hash for the immutable published version.
+              schema: { type: string }
+            Cache-Control:
+              description: Public cache policy for an immutable or current schema response.
+              schema: { type: string }
           content:
             application/json:
               schema:
@@ -1576,18 +1587,56 @@ components:
     CategoryFormSchema:
       type: object
       required: [categoryId, version, fields]
+      additionalProperties: false
       properties:
         categoryId: { type: string, format: uuid }
         version: { type: integer, minimum: 1 }
         fields:
           type: array
+          maxItems: 100
           items:
             $ref: "#/components/schemas/FormField"
+        publicationPolicy:
+          $ref: "#/components/schemas/FormPublicationPolicy"
+    LocalizedText:
+      type: object
+      required: [zh-Hans, en-US]
+      additionalProperties: false
+      properties:
+        zh-Hans: { type: string, minLength: 1, maxLength: 120 }
+        en-US: { type: string, minLength: 1, maxLength: 120 }
+    FormOption:
+      type: object
+      required: [value, label]
+      additionalProperties: false
+      properties:
+        value: { type: string, minLength: 1, maxLength: 80, pattern: "^[a-z0-9][a-zA-Z0-9_-]*$" }
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+    FormFieldValidation:
+      type: object
+      additionalProperties: false
+      properties:
+        min: { type: number }
+        max: { type: number }
+        minLength: { type: integer, minimum: 0, maximum: 10000 }
+        maxLength: { type: integer, minimum: 1, maximum: 10000 }
+        pattern: { type: string, minLength: 1, maxLength: 256 }
+    FormPublicationPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        defaultLifetimeDays: { type: integer, minimum: 1, maximum: 365 }
+        manualReviewRequired: { type: boolean }
+        phoneVerificationRequired: { type: boolean }
+        maxMedia: { type: integer, minimum: 0, maximum: 20 }
+        allowExactAddress: { type: boolean }
     FormField:
       type: object
-      required: [key, type, label, required, filterable]
+      required: [key, type, label, required, filterable, searchable, visibility, sortOrder]
+      additionalProperties: false
       properties:
-        key: { type: string }
+        key: { type: string, minLength: 2, maxLength: 80, pattern: "^[a-z][a-zA-Z0-9_]{1,79}$" }
         type:
           {
             type: string,
@@ -1607,23 +1656,24 @@ components:
               ],
           }
         label:
-          type: object
-          additionalProperties: { type: string }
+          $ref: "#/components/schemas/LocalizedText"
+        helpText:
+          $ref: "#/components/schemas/LocalizedText"
         required: { type: boolean }
         filterable: { type: boolean }
+        searchable: { type: boolean }
         options:
           type: array
+          maxItems: 100
           items:
-            type: object
-            required: [value, label]
-            properties:
-              value: { type: string }
-              label:
-                type: object
-                additionalProperties: { type: string }
+            $ref: "#/components/schemas/FormOption"
         validation:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/FormFieldValidation"
+        visibility:
+          type: string
+          enum: [PUBLIC, OWNER_ONLY, MODERATOR_ONLY]
+          default: PUBLIC
+        sortOrder: { type: integer, minimum: 0 }
     Money:
       type: object
       required: [amount, currency]

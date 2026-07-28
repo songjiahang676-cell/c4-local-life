@@ -95,6 +95,13 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 控制符，长度限制为 80；Repository 参数化 SQL，别名归一化键不返回客户端。种子别名按稳定父 ID
 协调并受唯一/FK 约束，不接收用户生成文本，也不把非权威 seed 中心点描述成精确地址。
 
+`TAX-002` 的匿名表单端点只读取 active Category 的已发布版本，draft 和审计 actor 永不进入公开
+DTO。已发布定义在数据库层禁止 update/delete；draft revision、当前版本和 Category 行锁共同防止
+丢失更新，回滚追加新版本并保留来源。配置验证限制字段/选项数量和字符串长度，拒绝未知属性、任意
+脚本、回溯引用、lookaround 与嵌套量词，降低配置注入和 ReDoS 风险。PHONE/EMAIL 动态字段必须
+OWNER_ONLY/MODERATOR_ONLY 且不可进入搜索/筛选投影。Listing attributes 在服务端按其保存的精确
+schema version 验证，不能信任前端表单隐藏或当前版本替代历史授权/校验事实。
+
 ## 14.6 输入、输出和内容安全
 
 - API DTO 白名单、长度/嵌套/body 限制；未知字段按策略拒绝。

@@ -424,6 +424,7 @@ model Category {
   children          Category[]        @relation("CategoryTree")
   aliases           CategoryAlias[]
   fields            CategoryField[]
+  formSchemaVersions CategoryFormSchemaVersion[]
   listings          Listing[]
   businessProfiles  BusinessProfile[]
   providerProfiles  ProviderProfile[]
@@ -452,9 +453,12 @@ model CategoryField {
   key          String   @db.VarChar(80)
   labelZhHans  String   @map("label_zh_hans") @db.VarChar(120)
   labelEn      String   @map("label_en") @db.VarChar(120)
+  helpText     Json?    @map("help_text")
   fieldType    String   @map("field_type") @db.VarChar(40)
   isRequired   Boolean  @default(false) @map("is_required")
   isFilterable Boolean  @default(false) @map("is_filterable")
+  isSearchable Boolean  @default(false) @map("is_searchable")
+  visibility   String   @default("PUBLIC") @db.VarChar(24)
   options      Json?
   validation   Json?
   sortOrder    Int      @default(0) @map("sort_order")
@@ -465,12 +469,34 @@ model CategoryField {
   @@map("category_fields")
 }
 
+model CategoryFormSchemaVersion {
+  id             String    @id @default(uuid()) @db.Uuid
+  categoryId     String    @map("category_id") @db.Uuid
+  version        Int
+  revision       Int       @default(1)
+  definition     Json
+  contentHash    String    @map("content_hash") @db.Char(64)
+  basedOnVersion Int?      @map("based_on_version")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  updatedById    String?   @map("updated_by_id") @db.Uuid
+  publishedById  String?   @map("published_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  category       Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([categoryId, version])
+  @@index([categoryId, publishedAt(sort: Desc)])
+  @@map("category_form_schema_versions")
+}
+
 model Listing {
   id                String                    @id @default(uuid()) @db.Uuid
   type              ListingType
   ownerId           String                    @map("owner_id") @db.Uuid
   organizationId    String?                   @map("organization_id") @db.Uuid
   categoryId        String                    @map("category_id") @db.Uuid
+  formSchemaVersion Int                       @default(1) @map("form_schema_version")
   regionId          String                    @map("region_id") @db.Uuid
   status            ContentStatus             @default(DRAFT)
   moderationStatus  ModerationStatus          @default(NOT_REVIEWED) @map("moderation_status")

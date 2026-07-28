@@ -7,6 +7,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
+import type { CategoryFormSchemaVersionRecord } from "../src/modules/taxonomy/taxonomy.store";
 
 const environment = parseApiEnvironment({
   NODE_ENV: "test",
@@ -161,6 +162,61 @@ const categories: CategoryTaxonomyRecord[] = [
   },
 ];
 
+const formSchemaDefinition = {
+  categoryId: jobsId,
+  version: 1,
+  fields: [
+    {
+      key: "employmentType",
+      type: "SELECT",
+      label: { "zh-Hans": "雇佣类型", "en-US": "Employment type" },
+      required: true,
+      filterable: true,
+      searchable: true,
+      visibility: "PUBLIC",
+      sortOrder: 10,
+      options: [
+        {
+          value: "full-time",
+          label: { "zh-Hans": "全职", "en-US": "Full time" },
+        },
+      ],
+    },
+  ],
+} as const;
+const formSchemaVersions: CategoryFormSchemaVersionRecord[] = [
+  {
+    id: "70000000-0000-4000-8000-000000000001",
+    categoryId: jobsId,
+    version: 1,
+    revision: 1,
+    definition: formSchemaDefinition,
+    contentHash: "a".repeat(64),
+    basedOnVersion: null,
+    createdById: null,
+    updatedById: null,
+    publishedById: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+  },
+  {
+    id: "70000000-0000-4000-8000-000000000002",
+    categoryId: jobsId,
+    version: 2,
+    revision: 1,
+    definition: { ...formSchemaDefinition, version: 2 },
+    contentHash: "b".repeat(64),
+    basedOnVersion: null,
+    createdById: null,
+    updatedById: null,
+    publishedById: null,
+    createdAt: new Date("2026-01-02T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    publishedAt: null,
+  },
+];
+
 describe("taxonomy HTTP boundary", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
@@ -168,7 +224,7 @@ describe("taxonomy HTTP boundary", () => {
   beforeAll(async () => {
     app = await createApiApplication(environment, {
       logger: false,
-      taxonomyStore: new MemoryTaxonomyStore(regions, categories),
+      taxonomyStore: new MemoryTaxonomyStore(regions, categories, formSchemaVersions),
       observability: createObservabilityRuntime({
         serviceName: "socal-api-taxonomy-test",
         serviceVersion: "0.1.0",
@@ -249,6 +305,36 @@ describe("taxonomy HTTP boundary", () => {
     expect(bypass.statusCode).toBe(400);
   });
 
+  it("serves only published form schema versions with strong cache identity", async () => {
+    const [current, historical, draft, missing] = await Promise.all([
+      server.inject({ method: "GET", url: `/v1/categories/${jobsId}/form-schema` }),
+      server.inject({
+        method: "GET",
+        url: `/v1/categories/${jobsId}/form-schema?version=1`,
+      }),
+      server.inject({
+        method: "GET",
+        url: `/v1/categories/${jobsId}/form-schema?version=2`,
+      }),
+      server.inject({
+        method: "GET",
+        url: "/v1/categories/60000000-0000-4000-8000-000000000099/form-schema",
+      }),
+    ]);
+
+    expect(current.statusCode).toBe(200);
+    expect(current.headers.etag).toBe(`"${"a".repeat(64)}"`);
+    expect(current.headers["cache-control"]).toBe(
+      "public, max-age=300, stale-while-revalidate=3600",
+    );
+    expect(current.json()).toEqual(formSchemaDefinition);
+    expect(historical.statusCode).toBe(200);
+    expect(historical.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(draft.statusCode).toBe(404);
+    expect(missing.statusCode).toBe(404);
+    expect(draft.body).not.toContain("bbbb");
+  });
+
   it("rejects ambiguous, over-posted, malformed, and control-character queries", async () => {
     const responses = await Promise.all([
       server.inject({ method: "GET", url: "/v1/regions?activeOnly=1" }),
@@ -258,9 +344,13 @@ describe("taxonomy HTTP boundary", () => {
         method: "GET",
         url: `/v1/categories?q=${encodeURIComponent("unsafe\u202Equery")}`,
       }),
+      server.inject({
+        method: "GET",
+        url: `/v1/categories/${jobsId}/form-schema?version=0`,
+      }),
     ]);
 
-    expect(responses.map((response) => response.statusCode)).toEqual([400, 400, 400, 400]);
+    expect(responses.map((response) => response.statusCode)).toEqual([400, 400, 400, 400, 400]);
     for (const response of responses) {
       expect(response.json()).toMatchObject({
         title: "Bad Request",

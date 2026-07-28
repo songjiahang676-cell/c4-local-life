@@ -934,25 +934,47 @@ export interface components {
             readonly categoryId: string;
             readonly version: number;
             readonly fields: readonly components["schemas"]["FormField"][];
+            readonly publicationPolicy?: components["schemas"]["FormPublicationPolicy"];
+        };
+        readonly LocalizedText: {
+            readonly "zh-Hans": string;
+            readonly "en-US": string;
+        };
+        readonly FormOption: {
+            readonly value: string;
+            readonly label: components["schemas"]["LocalizedText"];
+        };
+        readonly FormFieldValidation: {
+            readonly min?: number;
+            readonly max?: number;
+            readonly minLength?: number;
+            readonly maxLength?: number;
+            readonly pattern?: string;
+        };
+        readonly FormPublicationPolicy: {
+            readonly defaultLifetimeDays?: number;
+            readonly manualReviewRequired?: boolean;
+            readonly phoneVerificationRequired?: boolean;
+            readonly maxMedia?: number;
+            readonly allowExactAddress?: boolean;
         };
         readonly FormField: {
             readonly key: string;
             /** @enum {string} */
             readonly type: "TEXT" | "TEXTAREA" | "NUMBER" | "MONEY" | "SELECT" | "MULTISELECT" | "BOOLEAN" | "DATE" | "LOCATION" | "PHONE" | "EMAIL";
-            readonly label: {
-                readonly [key: string]: string;
-            };
+            readonly label: components["schemas"]["LocalizedText"];
+            readonly helpText?: components["schemas"]["LocalizedText"];
             readonly required: boolean;
             readonly filterable: boolean;
-            readonly options?: readonly {
-                readonly value: string;
-                readonly label: {
-                    readonly [key: string]: string;
-                };
-            }[];
-            readonly validation?: {
-                readonly [key: string]: unknown;
-            };
+            readonly searchable: boolean;
+            readonly options?: readonly components["schemas"]["FormOption"][];
+            readonly validation?: components["schemas"]["FormFieldValidation"];
+            /**
+             * @default PUBLIC
+             * @enum {string}
+             */
+            readonly visibility: "PUBLIC" | "OWNER_ONLY" | "MODERATOR_ONLY";
+            readonly sortOrder: number;
         };
         readonly Money: {
             readonly amount: string;
@@ -1900,7 +1922,10 @@ export interface operations {
     };
     readonly getCategoryFormSchema: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /** @description Published historical version; omit for the category's current published version. */
+                readonly version?: number;
+            };
             readonly header?: never;
             readonly path: {
                 readonly categoryId: components["parameters"]["CategoryId"];
@@ -1912,6 +1937,10 @@ export interface operations {
             /** @description Versioned dynamic form definition */
             readonly 200: {
                 headers: {
+                    /** @description Strong content hash for the immutable published version. */
+                    readonly ETag?: string;
+                    /** @description Public cache policy for an immutable or current schema response. */
+                    readonly "Cache-Control"?: string;
                     readonly [name: string]: unknown;
                 };
                 content: {

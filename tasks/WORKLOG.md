@@ -395,3 +395,25 @@ Observability: Existing bounded route/status telemetry covers public taxonomy 20
 Docs: Updated taxonomy、domain/data、API/integrations、security/privacy、seed、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
 
 Known gaps: TAX-002 owns immutable dynamic form schema draft/preview/publish/rollback；production GIS boundaries、approved launch cities/categories、SEO allowlists and licensed taxonomy import provenance still require owner/operations input；search synonym/analyzer lifecycle remains SEARCH-001/004 and inactive taxonomy administration remains ADMIN work
+
+## TAX-002 — 动态表单 schema 版本与发布
+
+Task: TAX-002 动态表单 schema 版本与发布
+
+Changed: Added strict dynamic-form Zod/JSON/OpenAPI contracts；`CategoryFormSchemaRepository` and Taxonomy application/store lifecycle implement optimistic draft、preview、atomic publish/materialization and append-only rollback；public Category form-schema read supports current or explicit published history with strong ETag；Listing now stores `formSchemaVersion`；versioned seed publishes schema version 1 for all 58 Categories and materializes 93 fields
+
+Contracts: OpenAPI remains 37 paths/46 operations and grows from 66 to 70 schemas；`GET /categories/{categoryId}/form-schema` adds positive historical `version`、ETag/cache headers and complete strict field/policy shapes；generated TypeScript and Zod enforce 100-field/option bounds、bilingual text、unique key/options、select options、filterable type allowlist、private contact fields and safe regex；Prisma grows from 39 to 40 models with `CategoryFormSchemaVersion`、current-field metadata and required `Listing.formSchemaVersion`
+
+Migrations: `20260728190935_category_form_schema_versions` additively creates version history/constraints/indexes/immutable trigger，adds conservative current-field columns and stamps existing Listings as version 1；empty/current deploy and previous-baseline upgrade passed；application rollback retains additive history/columns，physical rollback requires stopped writers and backup because dropping the Listing version severs old-draft provenance；migration-local `ROLLBACK.md` documents recovery
+
+Security: Public read requires an active Category and a published row；draft/audit actors and inactive categories are never returned；published rows reject direct update/delete in PostgreSQL；Category row lock、expected current version and draft revision close lost-update races；rollback appends a new version with `basedOnVersion`；configuration rejects unknown/executable fields、unsafe regex backreferences/lookaround/nested quantifiers、unbounded strings/options and public/indexed PHONE/EMAIL；attributes reject unknown keys and validate against the Listing's exact published version
+
+Tests run: `pnpm ci:quality` with real PostgreSQL passed 9 typechecks、9 lints、36/36 test files、131/131 tests and 8 builds（79.69% statements、82.37% lines）；database integration passed 13 files/42 tests，including draft revision conflict、atomic publish/current-field projection、rollback provenance、direct-adapter immutability and idempotent 58-version/93-field seed；all 8 migrations deployed，baseline checks include immutable trigger/one-draft index and 55000 negative case，previous-baseline upgrade preserved sentinel；OpenAPI lint/generation drift、migration safety and seed validation passed；architecture validation passed 101 tasks/40 models/37 paths/70 schemas/36 JSON；runtime observability check and Chromium desktop/mobile E2E passed 4/4
+
+Not run: Local Docker runtime smoke（Docker CLI unavailable）；protected hosted Linux/container jobs pending
+
+Observability: Existing bounded route/status telemetry covers public schema 200/400/404 without category/query/hash/audit actor metric labels；current responses use five-minute stale-while-revalidate，explicit immutable history uses one-year cache，ETag is content-only SHA-256 and contains no PII
+
+Docs: Updated dynamic taxonomy、domain/data、API/integrations、security/privacy、seed、migration operations/rollback、OpenAPI/generated contracts、README、changelog、status、backlog、architecture book and this worklog
+
+Known gaps: `ADMIN-001` must expose the existing management lifecycle behind SSO/MFA/RBAC rather than adding anonymous TAX writes；`LIST-001/002` must call exact-version attribute validation when real Listing persistence replaces the current skeleton；production category templates、moderation policy and search mappings still require owner/operations approval；hosted protected PR must prove clean Linux and non-root images

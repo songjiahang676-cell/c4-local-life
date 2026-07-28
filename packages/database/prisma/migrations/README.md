@@ -14,6 +14,8 @@
    revocation after user status/deletion changes.
 7. `20260728184415_taxonomy_aliases` adds FK-constrained, normalized lookup aliases for Regions and
    Categories.
+8. `20260728190935_category_form_schema_versions` adds append-only dynamic form history,
+   materialized field metadata, and the Listing schema-version stamp.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -117,6 +119,21 @@ on Region/Category; normalized alias values are derived lookup state.
   window requires physical removal, stop alias writers, back up, drop category aliases before region
   aliases, and rebuild them from the versioned source when rolling forward. See the migration-local
   `ROLLBACK.md`.
+
+## `20260728190935_category_form_schema_versions`
+
+Adds one draft plus append-only published versions per Category. PostgreSQL enforces positive
+versions/revisions, one unpublished draft, content-hash shape, and blocks direct update/delete of a
+published row. Publishing or rollback changes `categories.form_schema_version` and replaces the
+materialized `category_fields` in the same transaction. Existing Listings receive version `1`,
+which is the only truthful baseline for pre-versioning drafts.
+
+- Roll forward: deploy before the TAX-002 application, seed published version `1`, then verify
+  draft revision conflicts, atomic publish/materialization, rollback provenance, immutable-row
+  negative cases, and old-draft validation against its exact saved version.
+- Rollback: redeploy the previous application and retain the additive schema/history. A physical
+  rollback would sever old Listing validation provenance and therefore requires a backup,
+  stopped writers, and a reviewed maintenance plan. See the migration-local `ROLLBACK.md`.
 
 ## Roll-forward and recovery
 

@@ -43,6 +43,13 @@ export type RegionCollectionResponse =
   operations["listRegions"]["responses"][200]["content"]["application/json"];
 export type CategoryCollectionResponse =
   operations["listCategories"]["responses"][200]["content"]["application/json"];
+export type CategoryFormSchema = components["schemas"]["CategoryFormSchema"];
+export type FormField = components["schemas"]["FormField"];
+export type FormFieldValidation = components["schemas"]["FormFieldValidation"];
+export type FormPublicationPolicy = components["schemas"]["FormPublicationPolicy"];
+export type GetCategoryFormSchemaQuery = NonNullable<
+  operations["getCategoryFormSchema"]["parameters"]["query"]
+>;
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -326,3 +333,234 @@ export const listCategoriesQuerySchema: z.ZodType<ListCategoriesQuery> = z
     q: taxonomyQueryTextSchema.optional(),
   })
   .strict();
+
+export const getCategoryFormSchemaQuerySchema: z.ZodType<GetCategoryFormSchemaQuery> = z
+  .object({
+    version: z.coerce.number().int().min(1).optional(),
+  })
+  .strict();
+
+const localizedTextSchema = z
+  .object({
+    "zh-Hans": z.string().trim().min(1).max(120),
+    "en-US": z.string().trim().min(1).max(120),
+  })
+  .strict();
+
+const formOptionSchema = z
+  .object({
+    value: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9][a-zA-Z0-9_-]*$/),
+    label: localizedTextSchema,
+  })
+  .strict();
+
+function isSafeFormPattern(value: string): boolean {
+  if (
+    /\\(?:[1-9]|k<)/.test(value) ||
+    /\(\?[=!<]/.test(value) ||
+    /\([^)]*(?:[+*]|\{\d+,?\d*\})[^)]*\)(?:[+*]|\{\d+,?\d*\})/.test(value)
+  ) {
+    return false;
+  }
+  try {
+    void new RegExp(value, "u");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const formFieldValidationSchema = z
+  .object({
+    min: z.number().finite().optional(),
+    max: z.number().finite().optional(),
+    minLength: z.number().int().min(0).max(10_000).optional(),
+    maxLength: z.number().int().min(1).max(10_000).optional(),
+    pattern: z
+      .string()
+      .min(1)
+      .max(256)
+      .refine(isSafeFormPattern, "Unsafe regular expression")
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.min !== undefined && value.max !== undefined && value.min > value.max) {
+      context.addIssue({ code: "custom", path: ["max"], message: "max must be >= min" });
+    }
+    if (
+      value.minLength !== undefined &&
+      value.maxLength !== undefined &&
+      value.minLength > value.maxLength
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["maxLength"],
+        message: "maxLength must be >= minLength",
+      });
+    }
+  });
+
+const selectableFieldTypes = new Set(["SELECT", "MULTISELECT"]);
+const filterableFieldTypes = new Set([
+  "NUMBER",
+  "MONEY",
+  "SELECT",
+  "MULTISELECT",
+  "BOOLEAN",
+  "DATE",
+]);
+
+export const formFieldSchema: z.ZodType<FormField> = z
+  .object({
+    key: z
+      .string()
+      .min(2)
+      .max(80)
+      .regex(/^[a-z][a-zA-Z0-9_]{1,79}$/),
+    type: z.enum([
+      "TEXT",
+      "TEXTAREA",
+      "NUMBER",
+      "MONEY",
+      "SELECT",
+      "MULTISELECT",
+      "BOOLEAN",
+      "DATE",
+      "LOCATION",
+      "PHONE",
+      "EMAIL",
+    ]),
+    label: localizedTextSchema,
+    helpText: localizedTextSchema.optional(),
+    required: z.boolean(),
+    filterable: z.boolean(),
+    searchable: z.boolean(),
+    options: z.array(formOptionSchema).max(100).optional(),
+    validation: formFieldValidationSchema.optional(),
+    visibility: z.enum(["PUBLIC", "OWNER_ONLY", "MODERATOR_ONLY"]),
+    sortOrder: z.number().int().min(0),
+  })
+  .strict()
+  .superRefine((field, context) => {
+    const selectable = selectableFieldTypes.has(field.type);
+    if (selectable && (!field.options || field.options.length === 0)) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Selectable fields require at least one option",
+      });
+    }
+    if (!selectable && field.options !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Only selectable fields may define options",
+      });
+    }
+    if (field.filterable && !filterableFieldTypes.has(field.type)) {
+      context.addIssue({
+        code: "custom",
+        path: ["filterable"],
+        message: "Field type is not eligible for normalized filtering",
+      });
+    }
+    if (
+      (field.type === "PHONE" || field.type === "EMAIL") &&
+      (field.visibility === "PUBLIC" || field.searchable || field.filterable)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["visibility"],
+        message: "Contact fields must be private and cannot be indexed",
+      });
+    }
+    const validation = field.validation;
+    if (
+      validation &&
+      (validation.min !== undefined || validation.max !== undefined) &&
+      field.type !== "NUMBER" &&
+      field.type !== "MONEY"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["validation"],
+        message: "Numeric bounds apply only to NUMBER or MONEY fields",
+      });
+    }
+    if (
+      validation &&
+      (validation.minLength !== undefined || validation.maxLength !== undefined) &&
+      field.type !== "TEXT" &&
+      field.type !== "TEXTAREA" &&
+      field.type !== "MULTISELECT" &&
+      field.type !== "PHONE" &&
+      field.type !== "EMAIL"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["validation"],
+        message: "Length bounds apply only to text or MULTISELECT fields",
+      });
+    }
+    if (
+      validation?.pattern !== undefined &&
+      field.type !== "TEXT" &&
+      field.type !== "TEXTAREA" &&
+      field.type !== "PHONE" &&
+      field.type !== "EMAIL"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["validation", "pattern"],
+        message: "Patterns apply only to text fields",
+      });
+    }
+    const optionValues = new Set<string>();
+    for (const [index, option] of (field.options ?? []).entries()) {
+      if (optionValues.has(option.value)) {
+        context.addIssue({
+          code: "custom",
+          path: ["options", index, "value"],
+          message: "Option values must be unique",
+        });
+      }
+      optionValues.add(option.value);
+    }
+  });
+
+export const formPublicationPolicySchema: z.ZodType<FormPublicationPolicy> = z
+  .object({
+    defaultLifetimeDays: z.number().int().min(1).max(365).optional(),
+    manualReviewRequired: z.boolean().optional(),
+    phoneVerificationRequired: z.boolean().optional(),
+    maxMedia: z.number().int().min(0).max(20).optional(),
+    allowExactAddress: z.boolean().optional(),
+  })
+  .strict();
+
+export const categoryFormSchemaSchema: z.ZodType<CategoryFormSchema> = z
+  .object({
+    categoryId: z.uuid(),
+    version: z.number().int().min(1),
+    fields: z.array(formFieldSchema).max(100),
+    publicationPolicy: formPublicationPolicySchema.optional(),
+  })
+  .strict()
+  .superRefine((definition, context) => {
+    const fieldKeys = new Set<string>();
+    for (const [index, field] of definition.fields.entries()) {
+      if (fieldKeys.has(field.key)) {
+        context.addIssue({
+          code: "custom",
+          path: ["fields", index, "key"],
+          message: "Field keys must be unique",
+        });
+      }
+      fieldKeys.add(field.key);
+    }
+  });

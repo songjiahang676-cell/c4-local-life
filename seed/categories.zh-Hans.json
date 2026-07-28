@@ -15,6 +15,56 @@
       ],
       "lifetimeDays": 30,
       "manualReview": "risk_based",
+      "formFields": [
+        {
+          "key": "employmentType",
+          "type": "SELECT",
+          "label": { "zh-Hans": "雇佣类型", "en-US": "Employment type" },
+          "required": true,
+          "filterable": true,
+          "searchable": true,
+          "options": [
+            {
+              "value": "full-time",
+              "label": { "zh-Hans": "全职", "en-US": "Full time" }
+            },
+            {
+              "value": "part-time",
+              "label": { "zh-Hans": "兼职", "en-US": "Part time" }
+            },
+            {
+              "value": "contract",
+              "label": { "zh-Hans": "合同工", "en-US": "Contract" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        },
+        {
+          "key": "language",
+          "type": "MULTISELECT",
+          "label": { "zh-Hans": "工作语言", "en-US": "Working languages" },
+          "required": false,
+          "filterable": true,
+          "searchable": true,
+          "options": [
+            {
+              "value": "zh-hans",
+              "label": { "zh-Hans": "中文", "en-US": "Chinese" }
+            },
+            {
+              "value": "english",
+              "label": { "zh-Hans": "英语", "en-US": "English" }
+            },
+            {
+              "value": "spanish",
+              "label": { "zh-Hans": "西班牙语", "en-US": "Spanish" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 20
+        }
+      ],
       "children": [
         {
           "slug": "restaurant",
@@ -109,6 +159,40 @@
       ],
       "lifetimeDays": 30,
       "manualReview": "risk_based",
+      "formFields": [
+        {
+          "key": "bedrooms",
+          "type": "NUMBER",
+          "label": { "zh-Hans": "卧室数", "en-US": "Bedrooms" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 0, "max": 20 },
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        },
+        {
+          "key": "bathrooms",
+          "type": "NUMBER",
+          "label": { "zh-Hans": "浴室数", "en-US": "Bathrooms" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 0, "max": 20 },
+          "visibility": "PUBLIC",
+          "sortOrder": 20
+        },
+        {
+          "key": "furnished",
+          "type": "BOOLEAN",
+          "label": { "zh-Hans": "带家具", "en-US": "Furnished" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "visibility": "PUBLIC",
+          "sortOrder": 30
+        }
+      ],
       "children": [
         {
           "slug": "room",
@@ -182,6 +266,18 @@
       ],
       "lifetimeDays": 45,
       "manualReview": "always",
+      "formFields": [
+        {
+          "key": "includesInventory",
+          "type": "BOOLEAN",
+          "label": { "zh-Hans": "包含库存", "en-US": "Inventory included" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        }
+      ],
       "children": [
         {
           "slug": "restaurant",
@@ -255,6 +351,36 @@
       ],
       "lifetimeDays": 45,
       "manualReview": "risk_based",
+      "formFields": [
+        {
+          "key": "condition",
+          "type": "SELECT",
+          "label": { "zh-Hans": "物品成色", "en-US": "Condition" },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "options": [
+            {
+              "value": "new",
+              "label": { "zh-Hans": "全新", "en-US": "New" }
+            },
+            {
+              "value": "like-new",
+              "label": { "zh-Hans": "几乎全新", "en-US": "Like new" }
+            },
+            {
+              "value": "good",
+              "label": { "zh-Hans": "良好", "en-US": "Good" }
+            },
+            {
+              "value": "fair",
+              "label": { "zh-Hans": "一般", "en-US": "Fair" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        }
+      ],
       "children": [
         {
           "slug": "furniture",
@@ -328,6 +454,29 @@
       ],
       "lifetimeDays": 90,
       "manualReview": "risk_based",
+      "formFields": [
+        {
+          "key": "serviceRadiusMiles",
+          "type": "NUMBER",
+          "label": { "zh-Hans": "服务半径（英里）", "en-US": "Service radius (miles)" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 1, "max": 100 },
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        },
+        {
+          "key": "insured",
+          "type": "BOOLEAN",
+          "label": { "zh-Hans": "已投保", "en-US": "Insured" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "visibility": "PUBLIC",
+          "sortOrder": 20
+        }
+      ],
       "children": [
         {
           "slug": "remodeling",

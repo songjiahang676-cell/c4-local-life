@@ -75,6 +75,13 @@ integration("idempotent database seed", () => {
     );
   }
 
+  function categoryFieldCount(): number {
+    return seed.categories.verticals.reduce(
+      (total, vertical) => total + (vertical.children.length + 1) * vertical.formFields.length,
+      0,
+    );
+  }
+
   beforeAll(async () => {
     seed = await loadSeedData();
     database = createIntegrationDatabase(databaseUrl);
@@ -95,6 +102,8 @@ integration("idempotent database seed", () => {
         regionAliases: regionAliasCount(),
         categories: categoryIds().length,
         categoryAliases: categoryAliasCount(),
+        categoryFields: categoryFieldCount(),
+        formSchemaVersions: categoryIds().length,
         listings: listingIds().length,
         users: 1,
       });
@@ -111,12 +120,26 @@ integration("idempotent database seed", () => {
         transaction.categoryAlias.count({ where: { categoryId: { in: categoryIds() } } }),
       ).resolves.toBe(categoryAliasCount());
       await expect(
+        transaction.categoryField.count({ where: { categoryId: { in: categoryIds() } } }),
+      ).resolves.toBe(categoryFieldCount());
+      await expect(
+        transaction.categoryFormSchemaVersion.count({
+          where: { categoryId: { in: categoryIds() }, version: 1, publishedAt: { not: null } },
+        }),
+      ).resolves.toBe(categoryIds().length);
+      await expect(
         transaction.listing.count({ where: { id: { in: listingIds() } } }),
       ).resolves.toBe(listingIds().length);
 
       const listings = await transaction.listing.findMany({
         where: { id: { in: listingIds() } },
-        select: { status: true, moderationStatus: true, title: true, publishedAt: true },
+        select: {
+          status: true,
+          moderationStatus: true,
+          title: true,
+          formSchemaVersion: true,
+          publishedAt: true,
+        },
       });
       expect(listings).toHaveLength(5);
       expect(
@@ -125,6 +148,7 @@ integration("idempotent database seed", () => {
             listing.status === "DRAFT" &&
             listing.moderationStatus === "NOT_REVIEWED" &&
             listing.title.startsWith("[示例]") &&
+            listing.formSchemaVersion === 1 &&
             listing.publishedAt === null,
         ),
       ).toBe(true);

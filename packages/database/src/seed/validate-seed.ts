@@ -23,6 +23,10 @@ console.log(
           0,
         ),
       verticals: seed.categories.verticals.length,
+      categoryFormTemplates: seed.categories.verticals.reduce(
+        (total, vertical) => total + vertical.formFields.length,
+        0,
+      ),
       categoryAliases:
         seed.categories.verticals.reduce(
           (total, vertical) =>

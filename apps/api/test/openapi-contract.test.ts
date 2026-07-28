@@ -167,7 +167,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(37);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(66);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(70);
     expect(operationIds).toHaveLength(46);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });

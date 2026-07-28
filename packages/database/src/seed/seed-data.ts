@@ -91,6 +91,123 @@ const categoryNodeSchema = z
   })
   .strict();
 
+const formOptionSchema = z
+  .object({
+    value: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9][a-zA-Z0-9_-]*$/),
+    label: localizedNameSchema,
+  })
+  .strict();
+
+const seedFormFieldSchema = z
+  .object({
+    key: z
+      .string()
+      .min(2)
+      .max(80)
+      .regex(/^[a-z][a-zA-Z0-9_]{1,79}$/),
+    type: z.enum([
+      "TEXT",
+      "TEXTAREA",
+      "NUMBER",
+      "MONEY",
+      "SELECT",
+      "MULTISELECT",
+      "BOOLEAN",
+      "DATE",
+      "LOCATION",
+      "PHONE",
+      "EMAIL",
+    ]),
+    label: localizedNameSchema,
+    helpText: localizedNameSchema.optional(),
+    required: z.boolean(),
+    filterable: z.boolean(),
+    searchable: z.boolean(),
+    options: z.array(formOptionSchema).min(1).max(100).optional(),
+    validation: z
+      .object({
+        min: z.number().finite().optional(),
+        max: z.number().finite().optional(),
+        minLength: z.number().int().min(0).max(10_000).optional(),
+        maxLength: z.number().int().min(1).max(10_000).optional(),
+        pattern: z.string().min(1).max(256).optional(),
+      })
+      .strict()
+      .optional(),
+    visibility: z.enum(["PUBLIC", "OWNER_ONLY", "MODERATOR_ONLY"]),
+    sortOrder: z.number().int().min(0),
+  })
+  .strict()
+  .superRefine((field, context) => {
+    const selectable = field.type === "SELECT" || field.type === "MULTISELECT";
+    if (selectable && (!field.options || field.options.length === 0)) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Selectable seed fields require options",
+      });
+    }
+    if (!selectable && field.options !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Only selectable seed fields may define options",
+      });
+    }
+    if (
+      field.filterable &&
+      !["NUMBER", "MONEY", "SELECT", "MULTISELECT", "BOOLEAN", "DATE"].includes(field.type)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["filterable"],
+        message: "Seed field type is not eligible for normalized filtering",
+      });
+    }
+    if (
+      (field.type === "PHONE" || field.type === "EMAIL") &&
+      (field.visibility === "PUBLIC" || field.filterable || field.searchable)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["visibility"],
+        message: "Seed contact fields must remain private and unindexed",
+      });
+    }
+    const optionValues = new Set<string>();
+    for (const [index, option] of (field.options ?? []).entries()) {
+      if (optionValues.has(option.value)) {
+        context.addIssue({
+          code: "custom",
+          path: ["options", index, "value"],
+          message: "Seed option values must be unique",
+        });
+      }
+      optionValues.add(option.value);
+    }
+  });
+
+const seedFormFieldsSchema = z
+  .array(seedFormFieldSchema)
+  .max(100)
+  .superRefine((fields, context) => {
+    const keys = new Set<string>();
+    for (const [index, field] of fields.entries()) {
+      if (keys.has(field.key)) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "key"],
+          message: "Seed field keys must be unique",
+        });
+      }
+      keys.add(field.key);
+    }
+  });
+
 const listingTypeSchema = z.enum(["JOB", "RENTAL", "TRANSFER", "SECONDHAND", "SERVICE"]);
 const priceUnitSchema = z.enum([
   "FIXED",
@@ -113,6 +230,7 @@ const categoriesSchema = z
           type: listingTypeSchema,
           lifetimeDays: z.number().int().min(1).max(365),
           manualReview: z.enum(["risk_based", "always"]),
+          formFields: seedFormFieldsSchema,
           children: z.array(categoryNodeSchema).min(1),
         }),
       )
