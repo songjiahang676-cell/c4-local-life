@@ -17,6 +17,7 @@ function actorFromSession(identity: SessionIdentityContext | null): PolicyActor 
     accountStatus: identity.response.user.status,
     verificationBadges: Object.freeze([...(identity.response.user.verificationBadges ?? [])]),
     permissions: Object.freeze([...identity.response.permissions]),
+    platformRoles: Object.freeze([...identity.response.platformRoles]),
     organizations: Object.freeze(
       (identity.response.organizations ?? []).map((organization) =>
         Object.freeze({
@@ -32,8 +33,14 @@ function actorFromSession(identity: SessionIdentityContext | null): PolicyActor 
 @Injectable()
 export class RequestContextAccessor {
   readonly #contexts = new WeakMap<FastifyRequest, PolicyRequestContext>();
+  readonly #identities = new WeakMap<FastifyRequest, SessionIdentityContext>();
 
   initialize(request: FastifyRequest, identity: SessionIdentityContext | null): void {
+    if (identity) {
+      this.#identities.set(request, identity);
+    } else {
+      this.#identities.delete(request);
+    }
     this.#contexts.set(
       request,
       Object.freeze({
@@ -47,6 +54,10 @@ export class RequestContextAccessor {
 
   get(request: FastifyRequest): PolicyRequestContext | null {
     return this.#contexts.get(request) ?? null;
+  }
+
+  identity(request: FastifyRequest): SessionIdentityContext | null {
+    return this.#identities.get(request) ?? null;
   }
 
   require(request: FastifyRequest): PolicyRequestContext {

@@ -183,6 +183,12 @@ export async function createApiApplication(
 
   fastify.addHook("onSend", (request, reply, payload, done) => {
     void reply.header("x-request-id", request.id);
+    if (request.url.split("?", 1)[0]?.startsWith("/v1/admin/")) {
+      void reply
+        .header("cache-control", "no-store")
+        .header("pragma", "no-cache")
+        .header("vary", "Cookie");
+    }
     const state = requestStates.get(request);
     if (state) {
       const durationSeconds = Number(process.hrtime.bigint() - state.startedAt) / 1_000_000_000;

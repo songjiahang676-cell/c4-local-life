@@ -33,6 +33,7 @@
     "db:generate": "pnpm --filter @socal/database prisma:generate",
     "db:validate": "pnpm --filter @socal/database prisma:validate",
     "db:migrate:deploy": "pnpm --filter @socal/database exec prisma migrate deploy",
+    "db:migrate:status": "pnpm --filter @socal/database exec prisma migrate status",
     "db:migrate:safety": "tsx scripts/check-migration-safety.ts",
     "db:baseline:check": "node scripts/check-database-baseline.mjs",
     "db:upgrade:check": "node scripts/check-database-upgrade.mjs",

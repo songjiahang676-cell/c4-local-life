@@ -62,6 +62,7 @@ describe("canonical OpenAPI contract", () => {
   beforeAll(async () => {
     const authSessionStore = new MemoryAuthSessionStore();
     authSessionStore.registerSubject(buildActiveSubject({ id: contractUserId }));
+    authSessionStore.registerPlatformRole(contractUserId, "READ_ONLY_AUDITOR");
     authSessionStore.registerOrganization(contractUserId, {
       id: contractOrganizationId,
       type: "MERCHANT",
@@ -169,9 +170,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(37);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(70);
-    expect(operationIds).toHaveLength(46);
+    expect(Object.keys(contract.paths)).toHaveLength(38);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(75);
+    expect(operationIds).toHaveLength(47);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -208,8 +209,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(37);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(37);
+    expect(Object.keys(servedJson.paths)).toHaveLength(38);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(38);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -387,6 +388,22 @@ describe("canonical OpenAPI contract", () => {
 
     expect(response.statusCode).toBe(201);
     expect(schema).toBeDefined();
+    expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+  });
+
+  it("validates the operator-only Admin session projection against the contract", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/admin/session",
+      headers: { cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}` },
+    });
+    const schema =
+      contract.paths["/admin/session"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
   });
 

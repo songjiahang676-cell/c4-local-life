@@ -4,6 +4,7 @@ import type { ApiEnvironment } from "@socal/config";
 import { API_ENVIRONMENT } from "./common/api-environment.token";
 import { AuthorizationModule } from "./common/authorization/authorization.module";
 import { CsrfOriginGuard } from "./common/csrf-origin.guard";
+import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
@@ -35,6 +36,7 @@ export class AppModule {
       imports: [
         AuthorizationModule,
         AuthModule.register(environment, authSessionStore, otpChallengeStore, otpDeliveryGateway),
+        AdminModule,
         HealthModule,
         ListingsModule,
         MediaModule.register(environment, mediaStore, mediaObjectStorage),

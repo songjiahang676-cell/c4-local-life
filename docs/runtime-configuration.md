@@ -62,6 +62,15 @@
 
 功能开关 `FEATURE_PAYMENTS`、`FEATURE_MESSAGING`、`FEATURE_COMMUNITY`、`FEATURE_CROSS_BORDER` 只接受 `true` 或 `false`。
 
+## Web / Admin 服务端配置
+
+| 变量           | 必需 | 敏感 | 用途                                                          |
+| -------------- | ---- | ---- | ------------------------------------------------------------- |
+| `API_BASE_URL` | 是   | 否   | Next.js 服务端/BFF 访问 API 的内部 `/v1` 地址，不暴露给浏览器 |
+
+Admin 的同源 BFF 只代理代码内 allowlist 的认证与 Admin Session 路径；`API_BASE_URL` 不能来自请求
+参数，也不能指向非 HTTP(S) scheme。生产网络策略还应只允许 Admin workload 连接受信 API service。
+
 ## Worker 配置
 
 | 变量                 | 必需 | 用途                              |

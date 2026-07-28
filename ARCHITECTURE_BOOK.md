@@ -599,6 +599,13 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 - 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
 - `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助、`listing:draft:create` 和 `media:upload:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿和媒体上传 intent POST 已由各自 Policy 动作强制执行。
 
+`ADMIN-001` 将平台角色与组织角色分开持久化到 `platform_role_assignments`。每条授权保留 reason、
+grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
+未过期授权，不把客户端 claims 当作事实。`admin:console:access` 只授予 ACTIVE 且至少有一个有效平台
+角色的 Actor。`GET /admin/session` 再次执行服务端 Policy，并只返回安全用户投影、去重后的角色和服务端
+计算的工作区导航；普通 ACTIVE 用户和带角色的 LIMITED 用户都收到不泄露角色细节的 403。当前
+`security.privilegedActionsAllowed=false`，在 `AUTH-005` 完成 MFA/step-up 前没有后台数据或写动作开放。
+
 ## 5.6 权限测试最小矩阵
 
 每个资源至少测试：未登录、资源拥有者、同组织不同角色、无关普通用户、受限用户、正确后台角色、错误后台角色、跨组织 ID、已删除/下架状态、批量接口部分越权。默认拒绝，未知动作不得隐式放行。
@@ -648,7 +655,7 @@ membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 
 | Commerce      | SKU、订单、支付、退款、积分账本        | orders, payments, wallet_entries              |
 | Advertising   | 活动、素材、库存、排期、履约           | ad_campaigns, creatives, placements           |
 | Analytics     | 事件契约、聚合指标、实验               | event stream / warehouse projections          |
-| Admin/Audit   | 后台授权、配置、审计                   | audit_logs, config versions                   |
+| Admin/Audit   | 后台授权、配置、审计                   | platform_role_assignments, audit_logs         |
 
 模块可在同一数据库中使用独立 repository 和 service 边界。禁止把“同库”理解为可任意跨表写入。
 
@@ -693,6 +700,12 @@ display name、受控头像、角色和加入时间，不读取邮箱、手机�
 避免多端编辑静默覆盖；联系方式和内部信任状态不属于自助资料 DTO。会话只保存 bearer token 的域分离
 HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
 用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
+
+`PlatformRoleAssignment` 是与组织 Membership 分离的平台员工授权历史。它保存显式角色、可选最小范围、
+reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 scope 为 JSON object、到期晚于授予、
+撤销时间/操作者同时存在，并禁止同一用户/角色出现两个未撤销 grant。过期授权仍保留为审计历史，并须由
+后续受控授权工作流显式撤销后再授予。认证 Repository 每次解析 Session 时按当前时间过滤过期/撤销行，
+所以降权不依赖客户端 token 刷新；`ADMIN-001` 不提供角色写 API，bootstrap 只能走受审计维护流程。
 
 ### Media 聚合
 
@@ -1068,8 +1081,17 @@ Repository，跨组织和未知 ID 共用通用 404。成员列表仅 OWNER/ADMI
 `TAX-002` 实现公开 `GET /categories/{categoryId}/form-schema`。缺省读取当前已发布版本，显式
 `version` 只读取不可变历史已发布版本；两者均不返回 draft、actor/audit 字段或内部物化配置。响应
 返回强 ETag，历史版本可长期 immutable 缓存。应用层同时提供 draft/preview/publish/rollback 与
-按精确版本校验 attributes 的服务端能力；管理 HTTP 写端点延后到 `ADMIN-001`，届时必须复用这些
-能力并增加 SSO/MFA/RBAC，不能绕过 Repository 直接写 Prisma。
+按精确版本校验 attributes 的服务端能力。`ADMIN-001` 只交付安全 Admin 壳层和角色导航，不提前开放
+taxonomy 写端点；后续管理切片必须复用这些能力并增加 MFA/step-up、原因与审计，不能绕过 Repository
+直接写 Prisma。
+
+`ADMIN-001` 新增 `GET /admin/session`。它只接受安全 Cookie Session，由后端从 PostgreSQL 当前
+有效的平台角色计算 `admin:console:access` 和工作区导航；客户端不能提交 role、permission 或 scope。
+未登录返回通用 401，普通/受限用户返回不泄露角色状态的通用 403。成功响应只含安全用户投影、角色、
+导航与安全门状态，所有 `/v1/admin/*` 成功或错误响应统一 `Cache-Control: no-store`。独立 Admin
+Next.js app 通过同源 `/v1` BFF 仅代理认证与 Admin session allowlist，过滤 hop-by-hop headers，不把
+内部 API 地址或任意代理能力暴露给浏览器。当前 `privilegedActionsAllowed=false`；真实后台数据/写动作
+等待 `AUTH-005` MFA/step-up 和对应领域任务。
 
 ## 8.6 响应投影
 
@@ -1162,7 +1184,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 31 个 path、52 个 schema、38 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 38 个 path、75 个 schema、47 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1803,6 +1825,14 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
 成员列表 SQL 还要求 OWNER/ADMIN，以减少并发降权后的越权窗口。返回成员仅含 display name、受控头像、
 角色和加入时间，cursor 绑定 actor 与 organization；不返回联系方式、账号风险、token/IP 或验证材料。
+
+`ADMIN-001` 把平台角色保存在独立、可撤销/到期且带 grant/revoke provenance 的表中，认证 Repository
+每次请求读取当前有效授权，避免长效客户端 claims 造成降权延迟。Admin API 对 guest 返回 401，对普通
+ACTIVE 或 LIMITED 员工账号返回同样不泄露内部角色的 403；所有结果包括错误都 no-store。Admin app
+只使用同源 allowlist BFF，设置 nonce-based script CSP、frame denial、no-referrer、noindex 和
+Permissions-Policy，并且从服务端返回的导航渲染入口。OTP 只能建立普通 Session；在 `AUTH-005`
+完成 MFA/step-up 前，服务端明确返回 `privilegedActionsAllowed=false`，本切片不开放任何后台数据、
+导出或写动作，不能把 UI 隐藏当作授权。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
@@ -2638,6 +2668,12 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - 管理后台强制 MFA；普通用户无法访问任何 Admin API。
 - 账户删除请求存在冷静期、阻塞条件和审计。
 
+`ADMIN-001` 前置验收：独立 Admin app 具有 noindex/no-store、严格 script CSP、中文/英文、移动/键盘
+状态；guest 可看到登录边界，普通或 LIMITED 账户的 `GET /admin/session` 返回通用 403，只有 ACTIVE
+且具有当前有效平台角色的 Session 获得服务端计算导航。其安全投影必须保持
+`privilegedActionsAllowed=false`，直到 `AUTH-005` 真实完成 MFA/step-up；因此本切片不能被当作上面
+“后台强制 MFA”最终验收已经完成。
+
 ## 22.4 Listing 验收
 
 对五种类型逐项：
@@ -3259,6 +3295,22 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 ## 28.7 Admin API
 
 使用 `/v1/admin/*`，与普通 endpoint 共用领域 use case 或专用 command，不能直接绕过业务不变式。批量查询/导出限制日期、记录数和字段。所有 Admin response 设置 `Cache-Control: no-store`。
+
+## 28.8 ADMIN-001 实施基线
+
+- `apps/admin` 是独立 Next.js app/domain；`/` 跳转 `/admin`，已知工作区路径只渲染同一个安全壳层，
+  未知路径 404。页面声明 noindex/nofollow，所有 Admin 页面设置 no-store、nonce-based script CSP、
+  frame denial、no-referrer 和最小 Permissions-Policy。
+- Admin browser 只访问同源 `/v1` BFF。BFF allowlist 仅包含 `auth/session`、
+  `auth/otp/request`、`auth/otp/verify` 与 `admin/session`，过滤请求/响应 headers、禁止开放代理并把
+  上游失败清理为通用 503。
+- `GET /v1/admin/session` 由普通会话认证、`admin:console:access` Policy 与 PostgreSQL 当前有效
+  `PlatformRoleAssignment` 共同决定。平台角色与组织角色不混用；过期/撤销授权在下一请求即失效。
+- 导航完全来自 API 的角色映射，前端不推断权限。响应不包含 email、phone、token、scope、trust score
+  或操作数据；guest 401、普通/受限用户 403，成功/失败全部 no-store。
+- 本切片的登录表单复用 EMAIL OTP，但 OTP 不是 Admin MFA。API 明确返回
+  `mfaRequired=true`、`privilegedActionsAllowed=false`，因此工作区仅显示安全占位/空态。AUTH-005
+  完成 MFA、step-up 与近期认证前，禁止接入任何特权数据、写动作、PII reveal 或导出。
 
 ---
 

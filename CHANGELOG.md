@@ -35,6 +35,7 @@
 - Added bilingual Region/Category trees, FK-constrained normalized aliases, active-only public taxonomy filters, and idempotent alias seed/migration coverage.
 - Added immutable versioned category form schemas with optimistic drafts, atomic publish/materialization, append-only rollback, historical Listing validation, private contact-field controls, and a cacheable public read contract.
 - Added owner-scoped, idempotent media upload intents with serialized count/byte quotas, checksum-bound five-minute S3/MinIO PUTs, opaque private quarantine keys, and verification-document fail-closed handling.
+- Added an independent no-store Admin shell, same-origin allowlist BFF, auditable expiring platform-role grants, server-computed RBAC navigation, generic 401/403 boundaries, and a fail-closed MFA gate that exposes no privileged data or writes.
 
 ## 0.1.0 — Architecture handoff package
 

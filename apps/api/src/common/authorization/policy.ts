@@ -16,6 +16,10 @@ export const activeUserPolicyActions = {
   organizationCreate: "organization:create",
 } as const;
 
+export const adminPolicyActions = {
+  consoleAccess: "admin:console:access",
+} as const;
+
 export const organizationPolicyActions = {
   profileRead: "organization:profile:read",
   profileEditContent: "organization:profile:edit",
@@ -60,6 +64,16 @@ export type AuthenticatedActor = {
   accountStatus: "ACTIVE" | "LIMITED" | "SUSPENDED" | "DELETED";
   verificationBadges: readonly string[];
   permissions: readonly string[];
+  platformRoles: readonly (
+    | "SUPPORT"
+    | "MODERATOR"
+    | "SENIOR_MODERATOR"
+    | "AD_OPS"
+    | "FINANCE"
+    | "TAXONOMY_ADMIN"
+    | "PLATFORM_ADMIN"
+    | "READ_ONLY_AUDITOR"
+  )[];
   organizations: readonly OrganizationActorMembership[];
 };
 

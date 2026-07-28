@@ -4,6 +4,7 @@ import {
   UserStatus,
   type MembershipRole,
   type OrganizationType,
+  type PlatformRole,
   type Prisma,
 } from "../../generated/prisma/client";
 
@@ -46,6 +47,7 @@ export type AuthSessionPrincipal = {
     slug: string;
     role: MembershipRole;
   }>;
+  platformRoles: PlatformRole[];
 };
 
 export type AuthSessionRepositoryOptions = {
@@ -119,6 +121,13 @@ const activeSessionInclude = {
         },
         include: { organization: true },
       },
+      platformRoles: {
+        select: {
+          role: true,
+          revokedAt: true,
+          expiresAt: true,
+        },
+      },
     },
   },
 } satisfies Prisma.AuthSessionInclude;
@@ -127,7 +136,7 @@ type SessionWithPrincipal = Prisma.AuthSessionGetPayload<{
   include: typeof activeSessionInclude;
 }>;
 
-function mapPrincipal(row: SessionWithPrincipal): AuthSessionPrincipal | null {
+function mapPrincipal(row: SessionWithPrincipal, now: Date): AuthSessionPrincipal | null {
   const profile = row.user.profile;
   if (!profile) return null;
   if (row.user.status !== UserStatus.ACTIVE && row.user.status !== UserStatus.LIMITED) return null;
@@ -155,6 +164,17 @@ function mapPrincipal(row: SessionWithPrincipal): AuthSessionPrincipal | null {
       slug: organization.slug,
       role,
     })),
+    platformRoles: [
+      ...new Set(
+        row.user.platformRoles
+          .filter(
+            (assignment) =>
+              assignment.revokedAt === null &&
+              (assignment.expiresAt === null || assignment.expiresAt > now),
+          )
+          .map((assignment) => assignment.role),
+      ),
+    ].sort(),
   };
 }
 
@@ -177,7 +197,7 @@ async function findActive(
     },
     include: activeSessionInclude,
   });
-  return row ? mapPrincipal(row) : null;
+  return row ? mapPrincipal(row, now) : null;
 }
 
 function isRepositoryOptions(

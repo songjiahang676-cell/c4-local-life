@@ -43,6 +43,17 @@ enum MembershipRole {
   ANALYST
 }
 
+enum PlatformRole {
+  SUPPORT
+  MODERATOR
+  SENIOR_MODERATOR
+  AD_OPS
+  FINANCE
+  TAXONOMY_ADMIN
+  PLATFORM_ADMIN
+  READ_ONLY_AUDITOR
+}
+
 enum RegionType {
   COUNTRY
   STATE
@@ -238,34 +249,37 @@ enum OutboxStatus {
 }
 
 model User {
-  id                String                    @id @default(uuid()) @db.Uuid
-  email             String?                   @unique @db.VarChar(320)
-  phoneE164         String?                   @unique @map("phone_e164") @db.VarChar(32)
-  passwordHash      String?                   @map("password_hash") @db.VarChar(255)
-  status            UserStatus                @default(ACTIVE)
-  trustScore        Int                       @default(0) @map("trust_score")
-  lastLoginAt       DateTime?                 @map("last_login_at") @db.Timestamptz(6)
-  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt         DateTime?                 @map("deleted_at") @db.Timestamptz(6)
-  profile           UserProfile?
-  providerProfile   ProviderProfile?
-  identities        Identity[]
-  sessions          AuthSession[]
-  otpChallenges     OtpChallenge[]
-  memberships       OrganizationMembership[]
-  listings          Listing[]
-  favorites         Favorite[]
-  participants      ConversationParticipant[]
-  messages          Message[]                 @relation("MessageSender")
-  reviews           Review[]                  @relation("ReviewAuthor")
-  reports           Report[]                  @relation("ReportReporter")
-  assignedCases     ModerationCase[]          @relation("CaseAssignee")
-  moderationActions ModerationAction[]        @relation("ActionActor")
-  notifications     Notification[]
-  orders            Order[]
-  mediaAssets       MediaAsset[]
-  auditLogs         AuditLog[]                @relation("AuditActor")
+  id                      String                    @id @default(uuid()) @db.Uuid
+  email                   String?                   @unique @db.VarChar(320)
+  phoneE164               String?                   @unique @map("phone_e164") @db.VarChar(32)
+  passwordHash            String?                   @map("password_hash") @db.VarChar(255)
+  status                  UserStatus                @default(ACTIVE)
+  trustScore              Int                       @default(0) @map("trust_score")
+  lastLoginAt             DateTime?                 @map("last_login_at") @db.Timestamptz(6)
+  createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt               DateTime?                 @map("deleted_at") @db.Timestamptz(6)
+  profile                 UserProfile?
+  providerProfile         ProviderProfile?
+  identities              Identity[]
+  sessions                AuthSession[]
+  otpChallenges           OtpChallenge[]
+  memberships             OrganizationMembership[]
+  listings                Listing[]
+  favorites               Favorite[]
+  participants            ConversationParticipant[]
+  messages                Message[]                 @relation("MessageSender")
+  reviews                 Review[]                  @relation("ReviewAuthor")
+  reports                 Report[]                  @relation("ReportReporter")
+  assignedCases           ModerationCase[]          @relation("CaseAssignee")
+  moderationActions       ModerationAction[]        @relation("ActionActor")
+  notifications           Notification[]
+  orders                  Order[]
+  mediaAssets             MediaAsset[]
+  auditLogs               AuditLog[]                @relation("AuditActor")
+  platformRoles           PlatformRoleAssignment[]  @relation("PlatformRoleSubject")
+  platformRoleGrants      PlatformRoleAssignment[]  @relation("PlatformRoleGranter")
+  platformRoleRevocations PlatformRoleAssignment[]  @relation("PlatformRoleRevoker")
 
   @@index([status, createdAt])
   @@map("users")
@@ -320,21 +334,21 @@ model AuthSession {
 }
 
 model OtpChallenge {
-  id              String      @id @default(uuid()) @db.Uuid
-  userId          String?     @map("user_id") @db.Uuid
+  id              String     @id @default(uuid()) @db.Uuid
+  userId          String?    @map("user_id") @db.Uuid
   channel         OtpChannel
-  destination     String      @db.VarChar(320)
-  destinationHash String      @map("destination_hash") @db.VarChar(128)
+  destination     String     @db.VarChar(320)
+  destinationHash String     @map("destination_hash") @db.VarChar(128)
   purpose         OtpPurpose
-  locale          String      @default("zh-Hans") @db.VarChar(16)
-  codeHash        String      @map("code_hash") @db.VarChar(128)
-  ipHash          String      @map("ip_hash") @db.VarChar(128)
-  deviceHash      String      @map("device_hash") @db.VarChar(128)
-  expiresAt       DateTime    @map("expires_at") @db.Timestamptz(6)
-  consumedAt      DateTime?   @map("consumed_at") @db.Timestamptz(6)
-  failedAttempts  Int         @default(0) @map("failed_attempts")
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  locale          String     @default("zh-Hans") @db.VarChar(16)
+  codeHash        String     @map("code_hash") @db.VarChar(128)
+  ipHash          String     @map("ip_hash") @db.VarChar(128)
+  deviceHash      String     @map("device_hash") @db.VarChar(128)
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(6)
+  consumedAt      DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  failedAttempts  Int        @default(0) @map("failed_attempts")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([destinationHash, purpose, createdAt(sort: Desc)])
   @@index([ipHash, createdAt(sort: Desc)])
@@ -378,6 +392,26 @@ model OrganizationMembership {
   @@map("organization_memberships")
 }
 
+model PlatformRoleAssignment {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  role        PlatformRole
+  scope       Json?
+  reasonCode  String       @map("reason_code") @db.VarChar(80)
+  grantedById String?      @map("granted_by_id") @db.Uuid
+  revokedById String?      @map("revoked_by_id") @db.Uuid
+  grantedAt   DateTime     @default(now()) @map("granted_at") @db.Timestamptz(6)
+  expiresAt   DateTime?    @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime?    @map("revoked_at") @db.Timestamptz(6)
+  subject     User         @relation("PlatformRoleSubject", fields: [userId], references: [id], onDelete: Restrict)
+  grantedBy   User?        @relation("PlatformRoleGranter", fields: [grantedById], references: [id], onDelete: Restrict)
+  revokedBy   User?        @relation("PlatformRoleRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([role, revokedAt, expiresAt])
+  @@map("platform_role_assignments")
+}
+
 model Region {
   id               String            @id @default(uuid()) @db.Uuid
   parentId         String?           @map("parent_id") @db.Uuid
@@ -418,25 +452,25 @@ model RegionAlias {
 }
 
 model Category {
-  id                String            @id @default(uuid()) @db.Uuid
-  parentId          String?           @map("parent_id") @db.Uuid
-  vertical          ListingType?
-  slug              String            @db.VarChar(120)
-  nameZhHans        String            @map("name_zh_hans") @db.VarChar(120)
-  nameEn            String            @map("name_en") @db.VarChar(120)
-  description       String?           @db.VarChar(500)
-  iconKey           String?           @map("icon_key") @db.VarChar(80)
-  formSchemaVersion Int               @default(1) @map("form_schema_version")
-  isActive          Boolean           @default(true) @map("is_active")
-  sortOrder         Int               @default(0) @map("sort_order")
-  parent            Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children          Category[]        @relation("CategoryTree")
-  aliases           CategoryAlias[]
-  fields            CategoryField[]
+  id                 String                      @id @default(uuid()) @db.Uuid
+  parentId           String?                     @map("parent_id") @db.Uuid
+  vertical           ListingType?
+  slug               String                      @db.VarChar(120)
+  nameZhHans         String                      @map("name_zh_hans") @db.VarChar(120)
+  nameEn             String                      @map("name_en") @db.VarChar(120)
+  description        String?                     @db.VarChar(500)
+  iconKey            String?                     @map("icon_key") @db.VarChar(80)
+  formSchemaVersion  Int                         @default(1) @map("form_schema_version")
+  isActive           Boolean                     @default(true) @map("is_active")
+  sortOrder          Int                         @default(0) @map("sort_order")
+  parent             Category?                   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children           Category[]                  @relation("CategoryTree")
+  aliases            CategoryAlias[]
+  fields             CategoryField[]
   formSchemaVersions CategoryFormSchemaVersion[]
-  listings          Listing[]
-  businessProfiles  BusinessProfile[]
-  providerProfiles  ProviderProfile[]
+  listings           Listing[]
+  businessProfiles   BusinessProfile[]
+  providerProfiles   ProviderProfile[]
 
   @@unique([parentId, slug])
   @@index([vertical, isActive, sortOrder])
@@ -646,22 +680,22 @@ model ListingMedia {
 }
 
 model MediaAsset {
-  id             String       @id @default(uuid()) @db.Uuid
-  ownerId        String       @map("owner_id") @db.Uuid
-  purpose        MediaPurpose
-  kind           MediaKind
-  status         MediaStatus  @default(UPLOADING)
-  bucket         String       @db.VarChar(63)
-  objectKey      String       @unique @map("object_key") @db.VarChar(512)
-  mimeType       String       @map("mime_type") @db.VarChar(120)
-  byteSize       Int          @map("byte_size")
-  sha256         String       @db.Char(64)
-  idempotencyKey String       @map("idempotency_key") @db.VarChar(128)
-  requestHash    String       @map("request_hash") @db.Char(64)
+  id              String       @id @default(uuid()) @db.Uuid
+  ownerId         String       @map("owner_id") @db.Uuid
+  purpose         MediaPurpose
+  kind            MediaKind
+  status          MediaStatus  @default(UPLOADING)
+  bucket          String       @db.VarChar(63)
+  objectKey       String       @unique @map("object_key") @db.VarChar(512)
+  mimeType        String       @map("mime_type") @db.VarChar(120)
+  byteSize        Int          @map("byte_size")
+  sha256          String       @db.Char(64)
+  idempotencyKey  String       @map("idempotency_key") @db.VarChar(128)
+  requestHash     String       @map("request_hash") @db.Char(64)
   uploadExpiresAt DateTime     @map("upload_expires_at") @db.Timestamptz(6)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner          User         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner           User         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   @@unique([ownerId, idempotencyKey])
   @@index([ownerId, status, uploadExpiresAt])

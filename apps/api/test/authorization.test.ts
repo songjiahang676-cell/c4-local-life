@@ -29,6 +29,7 @@ function authenticatedActor(overrides: Partial<AuthenticatedActor> = {}): Authen
     accountStatus: "ACTIVE",
     verificationBadges: [],
     permissions: [],
+    platformRoles: [],
     organizations: [],
     ...overrides,
   };
@@ -258,6 +259,7 @@ describe("RequestContextAccessor", () => {
       },
       expiresAt: "2026-07-29T00:00:00.000Z",
       permissions: ["account:profile:read"],
+      platformRoles: ["SUPPORT"],
       organizations: [
         {
           id: organizationId,
@@ -281,6 +283,7 @@ describe("RequestContextAccessor", () => {
       accountStatus: "ACTIVE",
       verificationBadges: [],
       permissions: ["account:profile:read"],
+      platformRoles: ["SUPPORT"],
       organizations: [{ organizationId, role: "OWNER" }],
     });
     expect(JSON.stringify(actor)).not.toContain("Must not enter actor");

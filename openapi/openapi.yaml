@@ -1092,6 +1092,28 @@ paths:
                 properties:
                   data:
                     $ref: "#/components/schemas/AdCampaign"
+  /admin/session:
+    get:
+      tags: [Admin]
+      summary: Resolve the current operator console session
+      description: |
+        Returns only the current operator's active platform roles and server-computed workspace
+        navigation. This bootstrap endpoint does not grant privileged data access or satisfy MFA.
+      operationId: getAdminSession
+      responses:
+        "200":
+          description: Authorized operator console projection
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSessionResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /admin/moderation/cases:
     get:
       tags: [Admin]
@@ -1356,18 +1378,94 @@ components:
           $ref: "#/components/schemas/Session"
     Session:
       type: object
-      required: [user, expiresAt, permissions]
+      required: [user, expiresAt, permissions, platformRoles]
+      additionalProperties: false
       properties:
         user:
           $ref: "#/components/schemas/UserSummary"
         expiresAt: { type: string, format: date-time }
         permissions:
           type: array
+          uniqueItems: true
           items: { type: string }
+        platformRoles:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PlatformRole"
         organizations:
           type: array
           items:
             $ref: "#/components/schemas/OrganizationSummary"
+    PlatformRole:
+      type: string
+      enum:
+        [
+          SUPPORT,
+          MODERATOR,
+          SENIOR_MODERATOR,
+          AD_OPS,
+          FINANCE,
+          TAXONOMY_ADMIN,
+          PLATFORM_ADMIN,
+          READ_ONLY_AUDITOR,
+        ]
+    AdminNavigationItem:
+      type: object
+      required: [key, href]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          enum: [moderation, people, taxonomy, commerce, ads, audit, system]
+        href:
+          type: string
+          enum:
+            [
+              /admin/moderation/listings,
+              /admin/users,
+              /admin/taxonomy/categories,
+              /admin/commerce/orders,
+              /admin/ads/campaigns,
+              /admin/audit,
+              /admin/system/health,
+            ]
+    AdminSecurityState:
+      type: object
+      required: [mfaRequired, privilegedActionsAllowed]
+      additionalProperties: false
+      properties:
+        mfaRequired: { type: boolean, const: true }
+        privilegedActionsAllowed:
+          type: boolean
+          description: Remains false until AUTH-005 establishes and verifies an MFA-bound Admin session.
+    AdminSession:
+      type: object
+      required: [operator, roles, navigation, security]
+      additionalProperties: false
+      properties:
+        operator:
+          $ref: "#/components/schemas/UserSummary"
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PlatformRole"
+        navigation:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AdminNavigationItem"
+        security:
+          $ref: "#/components/schemas/AdminSecurityState"
+    AdminSessionResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminSession"
     MyProfileResponse:
       type: object
       required: [data]

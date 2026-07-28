@@ -19,7 +19,7 @@
 | Commerce      | SKU、订单、支付、退款、积分账本        | orders, payments, wallet_entries              |
 | Advertising   | 活动、素材、库存、排期、履约           | ad_campaigns, creatives, placements           |
 | Analytics     | 事件契约、聚合指标、实验               | event stream / warehouse projections          |
-| Admin/Audit   | 后台授权、配置、审计                   | audit_logs, config versions                   |
+| Admin/Audit   | 后台授权、配置、审计                   | platform_role_assignments, audit_logs         |
 
 模块可在同一数据库中使用独立 repository 和 service 边界。禁止把“同库”理解为可任意跨表写入。
 
@@ -64,6 +64,12 @@ display name、受控头像、角色和加入时间，不读取邮箱、手机�
 避免多端编辑静默覆盖；联系方式和内部信任状态不属于自助资料 DTO。会话只保存 bearer token 的域分离
 HMAC，设备管理投影不暴露 token/IP hash。`users.status` 或 `deleted_at` 变化时数据库 trigger 撤销该
 用户全部未撤销 session，确保 Admin、删除编排或后续 application service 都不能绕过账户状态不变量。
+
+`PlatformRoleAssignment` 是与组织 Membership 分离的平台员工授权历史。它保存显式角色、可选最小范围、
+reason code、grant/revoke actor、授予/到期/撤销时间；数据库要求 scope 为 JSON object、到期晚于授予、
+撤销时间/操作者同时存在，并禁止同一用户/角色出现两个未撤销 grant。过期授权仍保留为审计历史，并须由
+后续受控授权工作流显式撤销后再授予。认证 Repository 每次解析 Session 时按当前时间过滤过期/撤销行，
+所以降权不依赖客户端 token 刷新；`ADMIN-001` 不提供角色写 API，bootstrap 只能走受审计维护流程。
 
 ### Media 聚合
 

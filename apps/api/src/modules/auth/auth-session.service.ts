@@ -6,6 +6,7 @@ import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import {
   accountSelfServicePermissions,
   activeUserPermissions,
+  adminPolicyActions,
 } from "../../common/authorization/policy";
 import {
   AUTH_SESSION_STORE,
@@ -75,6 +76,8 @@ function hashIpAddress(ipAddress: string | undefined, secret: string): string | 
 
 function toSessionResponse(principal: AuthSessionPrincipal): Session {
   const effectiveExpiry = earlierDate(principal.session.expiresAt, principal.session.idleExpiresAt);
+  const platformRoles =
+    principal.user.status === "ACTIVE" ? [...principal.platformRoles].sort() : [];
   return {
     user: {
       id: principal.user.id,
@@ -87,8 +90,12 @@ function toSessionResponse(principal: AuthSessionPrincipal): Session {
     expiresAt: effectiveExpiry.toISOString(),
     permissions:
       principal.user.status === "ACTIVE"
-        ? [...activeUserPermissions]
+        ? [
+            ...activeUserPermissions,
+            ...(platformRoles.length > 0 ? [adminPolicyActions.consoleAccess] : []),
+          ]
         : [...accountSelfServicePermissions],
+    platformRoles,
     organizations: principal.organizations.map((organization) => ({
       id: organization.id,
       type: organization.type,
