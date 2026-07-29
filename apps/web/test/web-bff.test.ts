@@ -6,6 +6,8 @@ describe("public Web API proxy allowlist", () => {
 
   it("allows only the account, notification, form, draft, submission, taxonomy and media routes", () => {
     expect(isAllowedWebApiPath("GET", "auth/session")).toBe(true);
+    expect(isAllowedWebApiPath("GET", "me/listings")).toBe(true);
+    expect(isAllowedWebApiPath("POST", "me/listings/actions")).toBe(true);
     expect(isAllowedWebApiPath("GET", "notifications")).toBe(true);
     expect(isAllowedWebApiPath("PUT", `notifications/${id}/read`)).toBe(true);
     expect(isAllowedWebApiPath("GET", "categories")).toBe(true);
@@ -26,6 +28,7 @@ describe("public Web API proxy allowlist", () => {
 
   it("fails closed for over-broad, malformed and method-confused routes", () => {
     expect(isAllowedWebApiPath("GET", "admin/session")).toBe(false);
+    expect(isAllowedWebApiPath("DELETE", "me/listings/actions")).toBe(false);
     expect(isAllowedWebApiPath("DELETE", `listings/${id}`)).toBe(false);
     expect(isAllowedWebApiPath("POST", `listings/${id}`)).toBe(false);
     expect(isAllowedWebApiPath("GET", "media/not-a-uuid")).toBe(false);

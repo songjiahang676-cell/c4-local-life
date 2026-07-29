@@ -401,6 +401,13 @@
 
 用户中心默认 `noindex`，所有数据通过鉴权 API 获取。
 
+`LIST-009` 将 `/[locale]/account/listings` 落地为单一管理入口：草稿、审核中、已发布和已归档使用
+可键盘操作的 tab 与服务端计数，类型筛选和“加载更多”不改变页面索引策略。页面只在 Session 确认后
+请求当前账号投影，支持最多 20 项选择、批量归档/删除、删除确认与逐项失败提示；操作按钮由服务端
+允许动作投影驱动，但最终授权仍由 API 执行。草稿通过
+`/[locale]/account/listings/[listingId]/edit?type=...` 继续编辑并从 owner API 加载精确资源与强
+ETag，不从 URL 推导 owner。加载、空态、错误、未登录和会话不可用均有中英文独立状态。
+
 ## 3.5 多角色后台入口
 
 设计图底部的“平台后台入口”在真实产品中不应把所有入口公开展示给未授权用户。登录后根据权限显示：用户中心、商家后台、师傅后台、供应商后台、广告主后台、审核/运营后台、客服、财务。后台路径与公开站分域或独立应用，并执行后端权限校验。
@@ -983,6 +990,19 @@ PENDING/ACCEPTED/REVOKED/EXPIRED 单向状态证据；部分唯一索引禁止�
 constraint trigger 在事务结束时检查组织至少保留一名 Owner，使先提升后降级的转移可原子提交，同时
 拒绝直接删除或降级最后一名 Owner。
 
+### LIST-009 用户中心查询投影
+
+用户中心不新增业务表或派生事实源。Repository 从 canonical `listings`、当前组织 membership、
+taxonomy 与最近不可变 revision 生成最小摘要，并复用 `(owner_id,status,created_at)` 和
+`(organization_id,status,created_at)` 索引。DRAFT 映射草稿，SUBMITTED 映射审核中；仍标记为
+PUBLISHED 但 `expires_at <= now()` 的行在查询时直接映射已归档，避免依赖异步过期 Worker 的时序。
+ARCHIVED/EXPIRED/SUSPENDED 也归入已归档，DELETED 永不返回。
+
+分页使用 `(created_at DESC,id DESC)`，签名 cursor 绑定 actor、bucket、type、organization、limit
+和边界。计数和列表共享相同 actor/组织可见谓词；组织读取角色可以查看管理摘要，所有写操作仍由对象
+级生命周期 Policy 与 Repository 版本条件独立复核。批量端点只是最多 20 次有界应用层编排，不创建
+跨 Listing 大事务，也不改变既有 Audit/Outbox 与软删除幂等模型。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1525,6 +1545,21 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 - 这些都是 `/v1` 向后兼容增量：草稿 PATCH 的既有客户端无需幂等键，新增 collection/schema 与
   nullable owner 字段不改变公共响应。OpenAPI 与生成 TypeScript 是唯一 REST 契约事实源。
 
+## 8.20 私有 Listing 管理契约
+
+- `GET /me/listings` 要求当前 Session，接受 `bucket=DRAFT|PENDING|PUBLISHED|ARCHIVED`、可选
+  Listing type/organization、1–50 limit 和不透明 cursor。响应只包含最小管理摘要、server-derived
+  `availableActions`、四 bucket 计数、分页信息和生成时间，并强制 `no-store`。
+- cursor 使用独立 domain 签名并绑定 actor、bucket、type、organization、limit 与稳定
+  `(createdAt,id)` 边界；篡改、跨账号或跨筛选重放返回通用 400。
+- `POST /me/listings/actions` 仅接受 ARCHIVE/DELETE，以及 1–20 个唯一
+  `{listingId,version}`。响应顺序与请求一致，每项为 APPLIED、NOT_FOUND、VERSION_CONFLICT 或
+  STATE_CONFLICT；一个对象失败不会授权另一个对象，也不会回滚已经独立成功的对象。
+- 批量写要求 ACTIVE actor 和可信同源 Cookie mutation；每项继续使用既有强版本、对象 Policy、
+  行锁、Audit/Outbox 与目标状态幂等语义。只读组织角色和跨 owner 对象统一映射 NOT_FOUND。
+- 两个端点、生成 TypeScript、Zod 边界、API Controller、Web BFF allowlist 与契约测试同步更新；
+  OpenAPI 仍是唯一 REST 事实源。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -1759,6 +1794,18 @@ Session 边界确认账号，再读取账号范围通知；提供未读总数、
 `ORG-002` 扩展通知资源为 `ORGANIZATION_INVITATION`；Web parser 只接受契约白名单资源类型并显示本地化
 “组织邀请”标签。接受/撤销仍通过受保护 API 完成，通知正文不拼接组织私有字段或联系方式。
 
+## 10.11 用户中心信息管理
+
+`LIST-009` 的 `/{locale}/account/listings` 先确认 Session，再渲染草稿、审核中、已发布和已归档
+四个带计数的 tab。页面保持中英文完整文案、语义 heading/nav/fieldset、可见焦点、live region、
+至少 44px 的移动触控目标和无横向溢出；加载、空、失败、未登录、会话不可用和部分批量失败均提供
+下一步。类型筛选、选择本页可操作项、20 项上限、批量归档、删除确认和加载更多不会把私有状态写入
+URL 或持久客户端缓存。
+
+草稿“继续编辑”进入账号范围编辑路由，从 owner API 读取精确 DRAFT 与 ETag，复用动态表单和 READY
+媒体规则；服务器资源优先于设备恢复副本。被审核下架的 SUSPENDED 内容不展示删除动作，以保留申诉
+入口。页面、BFF 与 API 都 no-store，metadata noindex/nofollow，公开爬虫不能获得标题或状态列表。
+
 ---
 
 <!-- source: docs\11-content-workflows-and-moderation.md -->
@@ -1964,6 +2011,17 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   至少中风险人工复核。新 revision、evaluation/hits、case/snapshot、Audit 和 Outbox 原子提交。
 - 重大编辑获批只能恢复 revision 保存的原发布时间与到期时间；到期则转为 `EXPIRED`，不能借编辑免费
   续期。Case ETag、Listing version、revision/evaluation 关联和事务行锁共同阻止旧审核覆盖新内容。
+
+## 11.16 LIST-009 用户中心状态与批量动作
+
+- 管理 bucket 是用户界面投影，不是新的领域状态：DRAFT、SUBMITTED、PUBLISHED 与
+  ARCHIVED/EXPIRED/SUSPENDED 分别映射草稿、审核中、已发布、已归档。
+- 查询时间已过期的 PUBLISHED 直接显示为已归档；异步 Worker 之后仍以 canonical version predicate
+  转为 EXPIRED，管理投影不修改数据库，也不产生重复事件。
+- 批量 ARCHIVE/DELETE 按输入顺序逐项调用既有生命周期 use case；每项重新执行对象授权、强版本与
+  状态检查。成功项独立提交，未知/无权、陈旧版本和非法状态返回有界结果，不扩大事务或权限范围。
+- DELETE 的目标状态重试保持幂等且不重复 Audit/Outbox；ARCHIVE 对已归档精确重试收敛。SUSPENDED
+  内容不向界面提供删除动作，申诉仍通过既有独立流程处理。
 
 ---
 
@@ -2517,6 +2575,20 @@ Idempotency-Key 或请求哈希。
   request hash、revision 唯一键及 Case/version 检查使精确重试收敛、键冲突失败、旧审核不能覆盖新版本。
 - 免费续期/证据篡改：重大编辑保存原 `published_at/expires_at`，审批只恢复该窗口，已过期则进入
   EXPIRED；数据库触发器禁止 revision UPDATE/DELETE，修订、审核、Audit 和 Outbox 原子追加。
+
+## 14.22 LIST-009 私有管理威胁和缓解
+
+- 横向越权/对象枚举：owner ID 永不由请求提供；Repository 只接受 server-derived actor 并同时验证
+  个人 owner 或当前 ACTIVE 组织 membership。未知、跨 owner、已删除与组织只读批量写统一返回
+  NOT_FOUND 项，不暴露对象存在性或当前版本。
+- cursor/筛选重放：独立 HMAC domain 绑定 actor、bucket、type、organization、limit 与排序边界，
+  篡改、超长和跨筛选 cursor 失败关闭。私有响应、BFF 与页面均 no-store/noindex。
+- 数据最小化：管理摘要不返回 body、attributes、精确位置、联系方式、owner ID、完整 revision
+  snapshot/diff、请求摘要或规则阈值；日志和指标只保留有界路由/结果，不记录标题或选择清单。
+- 批量扩大影响：契约限制 1–20 个唯一 UUID 与正整数强版本，Service 顺序逐项执行既有 use case，
+  每项事务内再次授权和检查版本/状态；只读角色的全局 ACTIVE 身份不能替代对象写权限。
+- 误删/重放：界面要求删除确认并只允许选择 server-derived 动作；软删除和归档复用目标状态幂等、
+  Audit/Outbox 去重与强 ETag。SUSPENDED 不向界面提供删除，以免破坏申诉路径。
 
 ---
 
@@ -3143,6 +3215,18 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   `no-store`、Problem Details 和 BFF 精确 allowlist；全量质量门禁继续运行格式、类型、lint、单元/
   集成、生产构建、运行时和 Chromium 桌面/移动回归。
 
+## 18.24 LIST-009 用户中心管理验证增量
+
+- 契约测试覆盖四 bucket、type/organization filter、limit/cursor coercion、未知字段拒绝、1–20 项、
+  UUID/版本边界和重复 Listing ID 拒绝；OpenAPI response/Problem Details 与生成类型保持同步。
+- Service/HTTP 测试覆盖账号隔离、组织读取角色、只读组织成员批量写的通用 NOT_FOUND、受限账号只读/
+  禁止写、expiry-aware bucket、签名 cursor 篡改、部分成功顺序、版本/状态冲突和删除精确重试不重复
+  Audit/Outbox。
+- PostgreSQL 集成覆盖个人与组织 Listing、四状态和过期映射、计数/过滤/稳定分页以及摘要敏感字段
+  负断言，并验证既有 owner/organization 状态索引足够，不为 UI 新增事实表。
+- Web 单元测试覆盖 guest、正常列表与部分批量失败；BFF 测试锁定两个精确 method/path。
+  Chromium 桌面/移动生产回归覆盖英文未登录边界、no-store/noindex、登录入口和无横向溢出。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3591,6 +3675,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 非 Owner 角色变更使用强 ETag；self、Owner 与最后 Owner 不能通过通用变更/删除接口移除。
 - Owner 转移要求当前 OWNER、近期 MFA 与幂等键，并在并发/失败/重试下始终至少保留一名 Owner。
 - 邀请创建事件生成可重复消费的双语站内通知；API、数据库、Worker、Web parser 和真实迁移验证通过。
+
+## 22.10 LIST-009 用户中心信息管理验收
+
+- 认证用户可按草稿、审核中、已发布、已归档查看个人及当前组织可读的最小摘要和准确计数；过期公开行
+  不会继续显示在已发布，DELETED 永不返回。
+- 分页按 `(createdAt,id)` 稳定，cursor 绑定账号和全部筛选；篡改、跨账号/筛选重放及越界 limit 失败。
+- 批量归档/删除最多 20 个唯一对象并携带各自强版本；结果保持请求顺序、支持部分成功，跨 owner、
+  只读组织角色、未知、版本冲突和状态冲突不造成越权或对象存在性泄漏。
+- 删除/归档精确重试不重复 Audit/Outbox；SUSPENDED 不显示删除动作，受限账号可读但不能批量写。
+- 中英文、移动/桌面、键盘、触控、loading/empty/error/guest/部分失败、删除确认、noindex/no-store
+  和草稿精确编辑入口均有自动化验证；OpenAPI、生成类型、Zod、BFF 和实现一致。
 
 ---
 
@@ -4052,25 +4147,28 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 
 ## 27.2 发布与账户
 
-| Route                                | 说明          |
-| ------------------------------------ | ------------- |
-| `/[locale]/post`                     | 选择发布类型  |
-| `/[locale]/post/[type]/new`          | 创建草稿/表单 |
-| `/[locale]/post/[type]/[id]/edit`    | 编辑          |
-| `/[locale]/post/[type]/[id]/preview` | 私有预览      |
-| `/[locale]/account`                  | 总览          |
-| `/[locale]/account/listings`         | 我的信息      |
-| `/[locale]/account/favorites`        | 收藏          |
-| `/[locale]/account/messages`         | 会话列表      |
-| `/[locale]/account/messages/[id]`    | 会话          |
-| `/[locale]/account/notifications`    | 通知          |
-| `/[locale]/account/orders`           | 订单          |
-| `/[locale]/account/wallet`           | 积分/信用     |
+| Route                                  | 说明           |
+| -------------------------------------- | -------------- |
+| `/[locale]/post`                       | 选择发布类型   |
+| `/[locale]/post/[type]/new`            | 创建草稿/表单  |
+| `/[locale]/post/[type]/[id]/edit`      | 编辑           |
+| `/[locale]/post/[type]/[id]/preview`   | 私有预览       |
+| `/[locale]/account`                    | 总览           |
+| `/[locale]/account/listings`           | 我的信息       |
+| `/[locale]/account/listings/[id]/edit` | 账号内草稿编辑 |
+| `/[locale]/account/favorites`          | 收藏           |
+| `/[locale]/account/messages`           | 会话列表       |
+| `/[locale]/account/messages/[id]`      | 会话           |
+| `/[locale]/account/notifications`      | 通知           |
+| `/[locale]/account/orders`             | 订单           |
+| `/[locale]/account/wallet`             | 积分/信用      |
 
 当前五类规范创建路由为 `/[locale]/post/rental/new`、`/[locale]/post/job/new`、
 `/[locale]/post/transfer/new`、`/[locale]/post/secondhand/new` 和
 `/[locale]/post/service/new`；首页相应快速发布入口指向各自页面。它们均为 noindex 私有草稿页，
 复用账号/locale/vertical 隔离恢复、动态 schema、READY 媒体绑定、强并发控制和幂等提交审核动作。
+账号内草稿编辑路由由 `LIST-009` 使用，必须先从 owner API 读取精确 DRAFT 与 ETag；`type` 查询参数只
+选择已实现的表单视图，不能用于推导 owner、授权或 Listing 类型事实。
 | `/[locale]/account/organizations` | 组织与成员 |
 | `/[locale]/account/profile` | 资料 |
 | `/[locale]/account/verification` | 验证 |
@@ -4470,6 +4568,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingRevisionRepository` 在 PostgreSQL 行锁内重新授权并原子追加 revision/evaluation/case/
 snapshot/Audit/Outbox。人工审核仍由 `ModerationService` 发出领域命令，Repository 独立校验 revision
 保存的原 publication window，Controller 和 Web BFF 都不导入 Prisma。
+
+`LIST-009` 沿用同一边界：`AccountListingsController` 只验证严格 query/body、应用 Policy 和设置
+no-store；`ListingsService` 持有账号绑定 cursor、bucket 映射、最小 DTO 与逐项批量编排；
+`ListingRepository` 使用 canonical Listing/membership/taxonomy/revision 和现有索引完成投影。
+批量动作重新调用既有 archive/delete use case，不从 Controller 直接访问 Prisma，也不新增跨对象
+事务。Web 的账号页面只通过同源 BFF 和生成契约类型通信，设备草稿恢复不能覆盖明确加载的服务器草稿。
 
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的

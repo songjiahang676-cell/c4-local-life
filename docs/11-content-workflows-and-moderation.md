@@ -199,3 +199,14 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   至少中风险人工复核。新 revision、evaluation/hits、case/snapshot、Audit 和 Outbox 原子提交。
 - 重大编辑获批只能恢复 revision 保存的原发布时间与到期时间；到期则转为 `EXPIRED`，不能借编辑免费
   续期。Case ETag、Listing version、revision/evaluation 关联和事务行锁共同阻止旧审核覆盖新内容。
+
+## 11.16 LIST-009 用户中心状态与批量动作
+
+- 管理 bucket 是用户界面投影，不是新的领域状态：DRAFT、SUBMITTED、PUBLISHED 与
+  ARCHIVED/EXPIRED/SUSPENDED 分别映射草稿、审核中、已发布、已归档。
+- 查询时间已过期的 PUBLISHED 直接显示为已归档；异步 Worker 之后仍以 canonical version predicate
+  转为 EXPIRED，管理投影不修改数据库，也不产生重复事件。
+- 批量 ARCHIVE/DELETE 按输入顺序逐项调用既有生命周期 use case；每项重新执行对象授权、强版本与
+  状态检查。成功项独立提交，未知/无权、陈旧版本和非法状态返回有界结果，不扩大事务或权限范围。
+- DELETE 的目标状态重试保持幂等且不重复 Audit/Outbox；ARCHIVE 对已归档精确重试收敛。SUSPENDED
+  内容不向界面提供删除动作，申诉仍通过既有独立流程处理。

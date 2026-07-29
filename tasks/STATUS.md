@@ -6,18 +6,18 @@
 
 - Gate：G2 Listings / Moderation
 - 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
-- 进度：13/16 个 G2 任务、43/101 个总任务完成
-- 风险：`MOD-002` 已由 PR #28 受保护合并且最终 main 门禁通过；`LIST-008` 的不可变修订、真实 diff、
-  重大编辑复审和原发布期限保护已完成实现、完整本地质量、真实 PostgreSQL、运行时和生产浏览器验证，
-  正在执行受保护托管门禁；Windows 本机无 Redis/ClamAV/Docker，真实服务集成与四镜像 smoke 将由
-  GitHub Linux 门禁执行；生产重大字段策略、
+- 进度：14/16 个 G2 任务、44/101 个总任务完成
+- 风险：`LIST-008` 已由 PR #29 受保护合并且最终 main 门禁通过；`LIST-009` 的私有四状态信息管理、
+  组织读取边界、强版本批量动作、草稿继续编辑、noindex/no-store 与移动中英界面已通过完整本地质量、
+  真实 PostgreSQL、运行时和生产 Chromium，正在执行受保护托管门禁；Windows 本机无
+  Redis/ClamAV/Docker，真实服务集成与四镜像 smoke 将由 GitHub Linux 门禁执行；生产重大字段策略、
   两年修订清理/legal hold 和数据库加密配置仍需运营/法律/基础设施确认
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target  | Status           | Notes                                                        |
-| -------- | -------------------- | ---------- | ------- | ---------------- | ------------------------------------------------------------ |
-| LIST-008 | @songjiahang676-cell | 2026-07-29 | pending | protected checks | 不可变 revision/真实 diff/重大编辑复审/owner 原因/原期限保护 |
+| Task     | Owner                | Started    | Target  | Status           | Notes                                                                 |
+| -------- | -------------------- | ---------- | ------- | ---------------- | --------------------------------------------------------------------- |
+| LIST-009 | @songjiahang676-cell | 2026-07-29 | pending | protected checks | 四状态管理/签名分页/组织读取/强版本批量动作/草稿编辑/noindex/no-store |
 
 ## Gate Evidence
 
@@ -170,6 +170,13 @@
 | LIST-008 runtime/browser        | API runtime + Chromium desktop/mobile | 65 paths / 143 schemas；14/14 production E2E passed                        | 2026-07-29 |
 | LIST-008 architecture           | `scripts/check-architecture.sh`       | 101 tasks；55 models；65 paths；143 schemas；36 JSON files passed          | 2026-07-29 |
 | LIST-008 protected checks       | PR #29 / run `30457140384`            | 358 real-service tests；Linux 14/14 E2E and four non-root images passed    | 2026-07-29 |
+| LIST-008 evidence-head checks   | PR #29 / run `30457838971`            | final review head quality and four non-root images passed                  | 2026-07-29 |
+| LIST-008 protected merge        | PR #29 / merge `c09c17c`              | protected squash merge completed                                           | 2026-07-29 |
+| LIST-008 final main quality     | GitHub Actions run `30458526726`      | merged-head quality and four non-root images passed                        | 2026-07-29 |
+| LIST-009 database lifecycle     | 25 migrations / real PostgreSQL       | current；baseline 42 negatives；23-migration upgrade；24 files / 87 tests  | 2026-07-29 |
+| LIST-009 local quality          | `pnpm ci:quality`                     | 81 files / 364 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-29 |
+| LIST-009 runtime/browser        | API runtime + Chromium desktop/mobile | 67 paths / 152 schemas；16/16 production E2E passed                        | 2026-07-29 |
+| LIST-009 architecture           | `scripts/check-architecture.sh`       | 101 tasks；55 models；67 paths；152 schemas；36 JSON files passed          | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -177,10 +184,10 @@
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
 - Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`；LIST-002 已由受保护 PR #18 / final run `30410107716` 合并为 `a8db956`；LIST-003 已由受保护 PR #19 / final run `30412407859` 合并为 `c9a6db2`；LIST-004 已由受保护 PR #20 / final run `30415124557` 合并为 `fd27e19`；MOD-001 已由受保护 PR #21 / final run `30417062067` 合并为 `d9f632d`；ADMIN-002 已由受保护 PR #22 / final run `30419743207` 合并为 `cb02bda`；LIST-005 已由受保护 PR #23 / final run `30430614404` 合并为 `7a42b00`；NOTIF-001 已由受保护 PR #24 / final run `30435034353` 合并为 `19a6176`。
 - `ORG-002` 保留原 G1/P1 标签并已由 PR #25 受保护合并；`LIST-006` 已由 PR #26 / final main run
-  `30443279395` 受保护合并；`LIST-007` 已由 PR #27 / final main run `30447479457` 受保护合并；现按
-  `IMPLEMENTATION_SEQUENCE.md` 完成 `MOD-002` 的 PR #28 / final main run `30452750250` 后执行
-  `LIST-008`。`MEDIA-003` 仍属于
-  G4 受限验证文件。
+  `30443279395` 受保护合并；`LIST-007` 已由 PR #27 / final main run `30447479457` 受保护合并；
+  `MOD-002` 已由 PR #28 / final main run `30452750250` 受保护合并；`LIST-008` 已由 PR #29 /
+  final main run `30458526726` 受保护合并；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `LIST-009`。
+  `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。

@@ -1,11 +1,13 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
 import type {
+  BatchListingActionResponse,
   CreateListingInput,
   ListingCollection,
   ListingOwnerResponse,
   ListingRevisionCollection,
   ListingSubmissionResponse,
+  MyListingCollection,
   ProblemDetails,
 } from "@socal/contracts";
 import { createObservabilityRuntime } from "@socal/observability";
@@ -511,6 +513,15 @@ describe("listing draft HTTP boundary", () => {
       headers: { ...mutationHeaders(billingId), "if-match": '"listing-v1"' },
       payload: { title: "Billing must not edit" },
     });
+    const billingBatchWrite = await server.inject({
+      method: "POST",
+      url: "/v1/me/listings/actions",
+      headers: mutationHeaders(billingId),
+      payload: {
+        action: "DELETE",
+        items: [{ listingId, version: 1 }],
+      },
+    });
     const editorWrite = await server.inject({
       method: "PATCH",
       url: `/v1/listings/${listingId}`,
@@ -542,6 +553,18 @@ describe("listing draft HTTP boundary", () => {
     });
     expect(billingRead.statusCode).toBe(200);
     expect(billingWrite.statusCode).toBe(403);
+    expect(billingBatchWrite.statusCode).toBe(200);
+    expect(billingBatchWrite.json<BatchListingActionResponse>()).toMatchObject({
+      appliedCount: 0,
+      data: [
+        {
+          listingId,
+          outcome: "NOT_FOUND",
+          currentVersion: null,
+          currentBucket: null,
+        },
+      ],
+    });
     expect(editorWrite.statusCode).toBe(200);
     expect(editorWrite.headers.etag).toBe('"listing-v2"');
     expect(editorSubmit.statusCode).toBe(202);
@@ -740,6 +763,128 @@ describe("listing draft HTTP boundary", () => {
     expect(listingStore.outboxEvents.filter((event) => event === "listing.deleted")).toHaveLength(
       deleteOutboxCount + 1,
     );
+  });
+
+  it("serves isolated account buckets and bounds per-item batch lifecycle actions", async () => {
+    const draft = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-account-center-0001"),
+      payload: draftPayload("Account center draft"),
+    });
+    const publishedDraft = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-account-center-0002"),
+      payload: draftPayload("Account center published item"),
+    });
+    const publishedId = publishedDraft.json<ListingOwnerResponse>().data.id;
+    await server.inject({
+      method: "POST",
+      url: `/v1/listings/${publishedId}/submit`,
+      headers: {
+        ...mutationHeaders(ownerId, "listing-submit-account-center-0001"),
+        "if-match": '"listing-v1"',
+      },
+    });
+
+    const guest = await server.inject({
+      method: "GET",
+      url: "/v1/me/listings?bucket=DRAFT",
+    });
+    const ownerPage = await server.inject({
+      method: "GET",
+      url: "/v1/me/listings?bucket=DRAFT&limit=1",
+      headers: { cookie: cookies.get(ownerId) },
+    });
+    const ownerBody = ownerPage.json<MyListingCollection>();
+    const outsiderPage = await server.inject({
+      method: "GET",
+      url: "/v1/me/listings?bucket=DRAFT",
+      headers: { cookie: cookies.get(outsiderId) },
+    });
+    const limitedPage = await server.inject({
+      method: "GET",
+      url: "/v1/me/listings?bucket=DRAFT",
+      headers: { cookie: cookies.get(limitedId) },
+    });
+    expect(guest.statusCode).toBe(401);
+    expect(ownerPage.statusCode).toBe(200);
+    expect(ownerPage.headers["cache-control"]).toBe("no-store");
+    expect(ownerPage.headers.pragma).toBe("no-cache");
+    expect(ownerBody.data).toHaveLength(1);
+    expect(ownerBody.counts.draft).toBeGreaterThanOrEqual(1);
+    expect(ownerBody.data[0]).not.toHaveProperty("body");
+    expect(ownerBody.data[0]).not.toHaveProperty("attributes");
+    expect(ownerBody.data[0]).not.toHaveProperty("ownerId");
+    expect(outsiderPage.statusCode).toBe(200);
+    expect(outsiderPage.json<MyListingCollection>().data).toEqual([]);
+    expect(limitedPage.statusCode).toBe(200);
+
+    const tampered = await server.inject({
+      method: "GET",
+      url: `/v1/me/listings?bucket=DRAFT&limit=1&cursor=${encodeURIComponent(
+        `${ownerBody.page.nextCursor ?? ""}x`,
+      )}`,
+      headers: { cookie: cookies.get(ownerId) },
+    });
+    expect(tampered.statusCode).toBe(400);
+
+    const batch = await server.inject({
+      method: "POST",
+      url: "/v1/me/listings/actions",
+      headers: mutationHeaders(ownerId),
+      payload: {
+        action: "ARCHIVE",
+        items: [
+          { listingId: publishedId, version: 3 },
+          { listingId: "90000000-0000-4000-8000-000000000099", version: 1 },
+        ],
+      },
+    });
+    expect(batch.statusCode).toBe(200);
+    expect(batch.headers["cache-control"]).toBe("no-store");
+    expect(batch.json<BatchListingActionResponse>()).toMatchObject({
+      appliedCount: 1,
+      data: [
+        {
+          listingId: publishedId,
+          outcome: "APPLIED",
+          currentVersion: 4,
+          currentBucket: "ARCHIVED",
+        },
+        {
+          listingId: "90000000-0000-4000-8000-000000000099",
+          outcome: "NOT_FOUND",
+          currentVersion: null,
+          currentBucket: null,
+        },
+      ],
+    });
+
+    const limitedBatch = await server.inject({
+      method: "POST",
+      url: "/v1/me/listings/actions",
+      headers: mutationHeaders(limitedId),
+      payload: {
+        action: "DELETE",
+        items: [{ listingId: draft.json<ListingOwnerResponse>().data.id, version: 1 }],
+      },
+    });
+    const oversized = await server.inject({
+      method: "POST",
+      url: "/v1/me/listings/actions",
+      headers: mutationHeaders(ownerId),
+      payload: {
+        action: "DELETE",
+        items: Array.from({ length: 21 }, () => ({
+          listingId: draft.json<ListingOwnerResponse>().data.id,
+          version: 1,
+        })),
+      },
+    });
+    expect(limitedBatch.statusCode).toBe(403);
+    expect(oversized.statusCode).toBe(400);
   });
 
   it("rejects unsafe, over-posted, unready-media, and restricted-account writes", async () => {

@@ -186,6 +186,53 @@ export interface paths {
         readonly patch: operations["updateMyProfile"];
         readonly trace?: never;
     };
+    readonly "/me/listings": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List listings managed by the current account
+         * @description Returns a no-store account-center projection for personal Listings and Listings belonging
+         *     to organizations where the current user is an active member. Management buckets are stable:
+         *     DRAFT maps to editable drafts, PENDING to submitted review, PUBLISHED to public content, and
+         *     ARCHIVED to archived, expired, or suspended content. The signed cursor is bound to the
+         *     current actor, bucket, type, organization filter, and page size.
+         */
+        readonly get: operations["listMyListings"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/me/listings/actions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Apply a bounded action to managed listings
+         * @description Applies ARCHIVE or DELETE to at most 20 unique Listings. Each item carries its own strong
+         *     Listing version so one stale or foreign item cannot authorize another. Processing is
+         *     intentionally non-atomic and returns one generic result per item; successful target-state
+         *     retries do not append duplicate lifecycle evidence.
+         */
+        readonly post: operations["batchManageMyListings"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/me/sessions": {
         readonly parameters: {
             readonly query?: never;
@@ -2009,6 +2056,86 @@ export interface components {
             /** Format: date-time */
             readonly generatedAt: string;
         };
+        /**
+         * @default DRAFT
+         * @enum {string}
+         */
+        readonly OwnerListingBucket: "DRAFT" | "PENDING" | "PUBLISHED" | "ARCHIVED";
+        readonly MyListingLatestRevision: {
+            readonly revisionNumber: number;
+            /** @enum {string} */
+            readonly classification: "SUBMISSION" | "MINOR_EDIT" | "MAJOR_EDIT";
+            readonly reasonCodes: readonly components["schemas"]["ListingRevisionReasonCode"][];
+            /** @enum {string} */
+            readonly reviewState: "NOT_REQUIRED" | "PENDING" | "ESCALATED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
+        readonly MyListingSummaryView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["ListingType"];
+            readonly bucket: components["schemas"]["OwnerListingBucket"];
+            readonly status: components["schemas"]["ContentStatus"];
+            readonly moderationStatus: components["schemas"]["ModerationStatus"];
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly summary: string | null;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly region: components["schemas"]["ListingRegionView"];
+            readonly category: components["schemas"]["ListingCategoryView"];
+            readonly organization: components["schemas"]["ListingOrganizationSummaryView"] | null;
+            readonly isFeatured: boolean;
+            /** Format: date-time */
+            readonly publishedAt: string | null;
+            /** Format: date-time */
+            readonly expiresAt: string | null;
+            readonly latestRevision: components["schemas"]["MyListingLatestRevision"] | null;
+            readonly availableActions: readonly ("EDIT" | "SUBMIT" | "ARCHIVE" | "DELETE" | "VIEW_REVISIONS")[];
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
+        readonly MyListingCounts: {
+            readonly draft: number;
+            readonly pending: number;
+            readonly published: number;
+            readonly archived: number;
+        };
+        readonly MyListingCollection: {
+            readonly data: readonly components["schemas"]["MyListingSummaryView"][];
+            readonly page: components["schemas"]["CursorPage"];
+            readonly counts: components["schemas"]["MyListingCounts"];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly BatchListingActionItem: {
+            /** Format: uuid */
+            readonly listingId: string;
+            readonly version: number;
+        };
+        readonly BatchListingActionRequest: {
+            /** @enum {string} */
+            readonly action: "ARCHIVE" | "DELETE";
+            readonly items: readonly components["schemas"]["BatchListingActionItem"][];
+        };
+        readonly BatchListingActionResult: {
+            /** Format: uuid */
+            readonly listingId: string;
+            /** @enum {string} */
+            readonly outcome: "APPLIED" | "NOT_FOUND" | "VERSION_CONFLICT" | "STATE_CONFLICT";
+            readonly currentVersion: number | null;
+            readonly currentBucket: components["schemas"]["OwnerListingBucket"] | null;
+        };
+        readonly BatchListingActionResponse: {
+            readonly data: readonly components["schemas"]["BatchListingActionResult"][];
+            readonly appliedCount: number;
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
         readonly PublicListingSummaryView: {
             /** Format: uuid */
             readonly id: string;
@@ -3139,6 +3266,66 @@ export interface operations {
             readonly 400: components["responses"]["BadRequest"];
             readonly 401: components["responses"]["Unauthorized"];
             readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly listMyListings: {
+        readonly parameters: {
+            readonly query?: {
+                readonly bucket?: components["schemas"]["OwnerListingBucket"];
+                readonly type?: components["schemas"]["ListingType"];
+                readonly organizationId?: string;
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Cursor-paginated private Listing management projection */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly Pragma?: "no-cache";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MyListingCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly batchManageMyListings: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["BatchListingActionRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Ordered per-item results */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly Pragma?: "no-cache";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["BatchListingActionResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
         };
     };
     readonly listMySessions: {

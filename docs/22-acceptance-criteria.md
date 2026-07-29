@@ -201,3 +201,14 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 非 Owner 角色变更使用强 ETag；self、Owner 与最后 Owner 不能通过通用变更/删除接口移除。
 - Owner 转移要求当前 OWNER、近期 MFA 与幂等键，并在并发/失败/重试下始终至少保留一名 Owner。
 - 邀请创建事件生成可重复消费的双语站内通知；API、数据库、Worker、Web parser 和真实迁移验证通过。
+
+## 22.10 LIST-009 用户中心信息管理验收
+
+- 认证用户可按草稿、审核中、已发布、已归档查看个人及当前组织可读的最小摘要和准确计数；过期公开行
+  不会继续显示在已发布，DELETED 永不返回。
+- 分页按 `(createdAt,id)` 稳定，cursor 绑定账号和全部筛选；篡改、跨账号/筛选重放及越界 limit 失败。
+- 批量归档/删除最多 20 个唯一对象并携带各自强版本；结果保持请求顺序、支持部分成功，跨 owner、
+  只读组织角色、未知、版本冲突和状态冲突不造成越权或对象存在性泄漏。
+- 删除/归档精确重试不重复 Audit/Outbox；SUSPENDED 不显示删除动作，受限账号可读但不能批量写。
+- 中英文、移动/桌面、键盘、触控、loading/empty/error/guest/部分失败、删除确认、noindex/no-store
+  和草稿精确编辑入口均有自动化验证；OpenAPI、生成类型、Zod、BFF 和实现一致。

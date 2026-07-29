@@ -16,6 +16,9 @@ import type {
   FindPublishedRevisionRetryResult,
   ListListingRevisionsInput,
   ListListingRevisionsResult,
+  OwnerListingBucket,
+  OwnerListingListInput,
+  OwnerListingListResult,
   OwnerListingProjection,
   OwnerListingTransitionInput,
   OwnerListingTransitionResult,
@@ -751,6 +754,82 @@ export class MemoryListingStore implements ListingStore {
         rows.length > input.limit && last
           ? { publishedAt: new Date(last.publishedAt), id: last.id }
           : null,
+    });
+  }
+
+  listForOwner(input: OwnerListingListInput): Promise<OwnerListingListResult> {
+    const bucket = (row: OwnerListingProjection): OwnerListingBucket =>
+      row.status === "DRAFT"
+        ? "DRAFT"
+        : row.status === "SUBMITTED"
+          ? "PENDING"
+          : row.status === "PUBLISHED" && row.expiresAt && row.expiresAt > input.now
+            ? "PUBLISHED"
+            : "ARCHIVED";
+    const scoped = [...this.#rows.values()]
+      .filter(
+        (row) =>
+          row.status !== "DELETED" &&
+          this.#canRead(input.actorUserId, row) &&
+          (!input.organizationId || row.organizationId === input.organizationId) &&
+          (!input.type || row.type === input.type),
+      )
+      .sort(
+        (left, right) =>
+          right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id),
+      );
+    const filtered = scoped.filter(
+      (row) =>
+        bucket(row) === input.bucket &&
+        (!input.cursor ||
+          row.createdAt < input.cursor.createdAt ||
+          (row.createdAt.getTime() === input.cursor.createdAt.getTime() &&
+            row.id < input.cursor.id)),
+    );
+    const page = filtered.slice(0, input.limit);
+    const last = page.at(-1);
+    return Promise.resolve({
+      items: page.map((row) => ({
+        id: row.id,
+        type: row.type,
+        ownerId: row.ownerId,
+        organizationId: row.organizationId,
+        bucket: bucket(row),
+        status: row.status,
+        moderationStatus: row.moderationStatus,
+        locale: row.locale,
+        title: row.title,
+        summary: row.summary,
+        price: structuredClone(row.price),
+        region: structuredClone(row.region),
+        category: structuredClone(row.category),
+        organization: structuredClone(row.organization),
+        isFeatured: row.isFeatured,
+        publishedAt: row.publishedAt ? new Date(row.publishedAt) : null,
+        expiresAt: row.expiresAt ? new Date(row.expiresAt) : null,
+        latestRevision: row.latestRevision
+          ? {
+              revisionNumber: row.latestRevision.revisionNumber,
+              classification: row.latestRevision.classification,
+              reasonCodes: [...row.latestRevision.reasonCodes],
+              reviewState: row.latestRevision.reviewState,
+              createdAt: new Date(row.latestRevision.createdAt),
+            }
+          : null,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+        version: row.version,
+      })),
+      nextCursor:
+        filtered.length > input.limit && last
+          ? { createdAt: new Date(last.createdAt), id: last.id }
+          : null,
+      counts: {
+        draft: scoped.filter((row) => bucket(row) === "DRAFT").length,
+        pending: scoped.filter((row) => bucket(row) === "PENDING").length,
+        published: scoped.filter((row) => bucket(row) === "PUBLISHED").length,
+        archived: scoped.filter((row) => bucket(row) === "ARCHIVED").length,
+      },
     });
   }
 

@@ -339,3 +339,17 @@ Idempotency-Key 或请求哈希。
   request hash、revision 唯一键及 Case/version 检查使精确重试收敛、键冲突失败、旧审核不能覆盖新版本。
 - 免费续期/证据篡改：重大编辑保存原 `published_at/expires_at`，审批只恢复该窗口，已过期则进入
   EXPIRED；数据库触发器禁止 revision UPDATE/DELETE，修订、审核、Audit 和 Outbox 原子追加。
+
+## 14.22 LIST-009 私有管理威胁和缓解
+
+- 横向越权/对象枚举：owner ID 永不由请求提供；Repository 只接受 server-derived actor 并同时验证
+  个人 owner 或当前 ACTIVE 组织 membership。未知、跨 owner、已删除与组织只读批量写统一返回
+  NOT_FOUND 项，不暴露对象存在性或当前版本。
+- cursor/筛选重放：独立 HMAC domain 绑定 actor、bucket、type、organization、limit 与排序边界，
+  篡改、超长和跨筛选 cursor 失败关闭。私有响应、BFF 与页面均 no-store/noindex。
+- 数据最小化：管理摘要不返回 body、attributes、精确位置、联系方式、owner ID、完整 revision
+  snapshot/diff、请求摘要或规则阈值；日志和指标只保留有界路由/结果，不记录标题或选择清单。
+- 批量扩大影响：契约限制 1–20 个唯一 UUID 与正整数强版本，Service 顺序逐项执行既有 use case，
+  每项事务内再次授权和检查版本/状态；只读角色的全局 ACTIVE 身份不能替代对象写权限。
+- 误删/重放：界面要求删除确认并只允许选择 server-derived 动作；软删除和归档复用目标状态幂等、
+  Audit/Outbox 去重与强 ETag。SUSPENDED 不向界面提供删除，以免破坏申诉路径。

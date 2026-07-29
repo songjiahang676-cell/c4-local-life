@@ -298,9 +298,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(65);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(143);
-    expect(operationIds).toHaveLength(75);
+    expect(Object.keys(contract.paths)).toHaveLength(67);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(152);
+    expect(operationIds).toHaveLength(77);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -337,8 +337,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(65);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(65);
+    expect(Object.keys(servedJson.paths)).toHaveLength(67);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(67);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -484,6 +484,62 @@ describe("canonical OpenAPI contract", () => {
     expect(ajv.validate(archiveSchema ?? false, archived.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
+  });
+
+  it("validates the private account Listing collection and bounded action response", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "contract-account-listing-create-0001",
+      },
+      payload: {
+        type: "RENTAL",
+        locale: "en-US",
+        categoryId: memoryListingCategoryId,
+        regionCode: memoryListingRegionCode,
+        title: "Synthetic account contract rental",
+        body: "A fictional Listing used to validate the account management contract.",
+        attributes: {},
+        mediaIds: [],
+        contactMode: "IN_APP",
+      },
+    });
+    const listingId = created.json<{ data: { id: string } }>().data.id;
+    const collection = await server.inject({
+      method: "GET",
+      url: "/v1/me/listings?bucket=DRAFT&limit=20",
+      headers: { cookie },
+    });
+    const batch = await server.inject({
+      method: "POST",
+      url: "/v1/me/listings/actions",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+      payload: {
+        action: "DELETE",
+        items: [{ listingId, version: 1 }],
+      },
+    });
+    const collectionSchema =
+      contract.paths["/me/listings"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+    const batchSchema =
+      contract.paths["/me/listings/actions"]?.post?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(collection.statusCode).toBe(200);
+    expect(batch.statusCode).toBe(200);
+    expect(
+      ajv.validate(collectionSchema ?? false, collection.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
+    expect(ajv.validate(batchSchema ?? false, batch.json()), ajv.errorsText(ajv.errors)).toBe(true);
   });
 
   it("validates the implemented current-session projection against the contract", async () => {

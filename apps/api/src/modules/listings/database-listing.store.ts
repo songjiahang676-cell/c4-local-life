@@ -13,6 +13,8 @@ import {
 } from "@socal/database/listing-draft";
 import {
   ListingRepository,
+  type OwnerListingListInput,
+  type OwnerListingListResult,
   type OwnerListingProjection,
   type OwnerListingTransitionInput,
   type OwnerListingTransitionResult,
@@ -82,6 +84,10 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
 
   listPublic(input: PublicListingListInput): Promise<PublicListingListResult> {
     return this.#listings.listPublic(input);
+  }
+
+  listForOwner(input: OwnerListingListInput): Promise<OwnerListingListResult> {
+    return this.#listings.listForOwner(input);
   }
 
   findPublicById(input: PublicListingReadInput): Promise<PublicListingProjection | null> {

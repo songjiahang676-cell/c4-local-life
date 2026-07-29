@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a private bilingual Listing management center with draft/pending/published/archived
+  buckets, expiry-aware counts, account-bound signed cursors, organization-aware reads, strong
+  versioned archive/delete batches capped at 20, partial-failure feedback, noindex/no-store
+  boundaries, and safe draft editing from the exact account resource.
 - Added immutable Listing submission/edit revisions with normalized redacted snapshots and diffs,
   owner-only revision history, exact-retry published edits, conservative minor-versus-major
   classification, mandatory re-review for material changes, and original publication-window

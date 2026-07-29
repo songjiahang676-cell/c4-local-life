@@ -259,3 +259,15 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - OpenAPI/生成类型/HTTP 测试覆盖 owner revision collection、`ListingOwnerView.latestRevision`、
   `no-store`、Problem Details 和 BFF 精确 allowlist；全量质量门禁继续运行格式、类型、lint、单元/
   集成、生产构建、运行时和 Chromium 桌面/移动回归。
+
+## 18.24 LIST-009 用户中心管理验证增量
+
+- 契约测试覆盖四 bucket、type/organization filter、limit/cursor coercion、未知字段拒绝、1–20 项、
+  UUID/版本边界和重复 Listing ID 拒绝；OpenAPI response/Problem Details 与生成类型保持同步。
+- Service/HTTP 测试覆盖账号隔离、组织读取角色、只读组织成员批量写的通用 NOT_FOUND、受限账号只读/
+  禁止写、expiry-aware bucket、签名 cursor 篡改、部分成功顺序、版本/状态冲突和删除精确重试不重复
+  Audit/Outbox。
+- PostgreSQL 集成覆盖个人与组织 Listing、四状态和过期映射、计数/过滤/稳定分页以及摘要敏感字段
+  负断言，并验证既有 owner/organization 状态索引足够，不为 UI 新增事实表。
+- Web 单元测试覆盖 guest、正常列表与部分批量失败；BFF 测试锁定两个精确 method/path。
+  Chromium 桌面/移动生产回归覆盖英文未登录边界、no-store/noindex、登录入口和无横向溢出。

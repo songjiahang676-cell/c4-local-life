@@ -123,3 +123,15 @@ Session 边界确认账号，再读取账号范围通知；提供未读总数、
 
 `ORG-002` 扩展通知资源为 `ORGANIZATION_INVITATION`；Web parser 只接受契约白名单资源类型并显示本地化
 “组织邀请”标签。接受/撤销仍通过受保护 API 完成，通知正文不拼接组织私有字段或联系方式。
+
+## 10.11 用户中心信息管理
+
+`LIST-009` 的 `/{locale}/account/listings` 先确认 Session，再渲染草稿、审核中、已发布和已归档
+四个带计数的 tab。页面保持中英文完整文案、语义 heading/nav/fieldset、可见焦点、live region、
+至少 44px 的移动触控目标和无横向溢出；加载、空、失败、未登录、会话不可用和部分批量失败均提供
+下一步。类型筛选、选择本页可操作项、20 项上限、批量归档、删除确认和加载更多不会把私有状态写入
+URL 或持久客户端缓存。
+
+草稿“继续编辑”进入账号范围编辑路由，从 owner API 读取精确 DRAFT 与 ETag，复用动态表单和 READY
+媒体规则；服务器资源优先于设备恢复副本。被审核下架的 SUSPENDED 内容不展示删除动作，以保留申诉
+入口。页面、BFF 与 API 都 no-store，metadata noindex/nofollow，公开爬虫不能获得标题或状态列表。

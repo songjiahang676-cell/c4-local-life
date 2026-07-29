@@ -34,25 +34,28 @@
 
 ## 27.2 发布与账户
 
-| Route                                | 说明          |
-| ------------------------------------ | ------------- |
-| `/[locale]/post`                     | 选择发布类型  |
-| `/[locale]/post/[type]/new`          | 创建草稿/表单 |
-| `/[locale]/post/[type]/[id]/edit`    | 编辑          |
-| `/[locale]/post/[type]/[id]/preview` | 私有预览      |
-| `/[locale]/account`                  | 总览          |
-| `/[locale]/account/listings`         | 我的信息      |
-| `/[locale]/account/favorites`        | 收藏          |
-| `/[locale]/account/messages`         | 会话列表      |
-| `/[locale]/account/messages/[id]`    | 会话          |
-| `/[locale]/account/notifications`    | 通知          |
-| `/[locale]/account/orders`           | 订单          |
-| `/[locale]/account/wallet`           | 积分/信用     |
+| Route                                  | 说明           |
+| -------------------------------------- | -------------- |
+| `/[locale]/post`                       | 选择发布类型   |
+| `/[locale]/post/[type]/new`            | 创建草稿/表单  |
+| `/[locale]/post/[type]/[id]/edit`      | 编辑           |
+| `/[locale]/post/[type]/[id]/preview`   | 私有预览       |
+| `/[locale]/account`                    | 总览           |
+| `/[locale]/account/listings`           | 我的信息       |
+| `/[locale]/account/listings/[id]/edit` | 账号内草稿编辑 |
+| `/[locale]/account/favorites`          | 收藏           |
+| `/[locale]/account/messages`           | 会话列表       |
+| `/[locale]/account/messages/[id]`      | 会话           |
+| `/[locale]/account/notifications`      | 通知           |
+| `/[locale]/account/orders`             | 订单           |
+| `/[locale]/account/wallet`             | 积分/信用      |
 
 当前五类规范创建路由为 `/[locale]/post/rental/new`、`/[locale]/post/job/new`、
 `/[locale]/post/transfer/new`、`/[locale]/post/secondhand/new` 和
 `/[locale]/post/service/new`；首页相应快速发布入口指向各自页面。它们均为 noindex 私有草稿页，
 复用账号/locale/vertical 隔离恢复、动态 schema、READY 媒体绑定、强并发控制和幂等提交审核动作。
+账号内草稿编辑路由由 `LIST-009` 使用，必须先从 owner API 读取精确 DRAFT 与 ETag；`type` 查询参数只
+选择已实现的表单视图，不能用于推导 owner、授权或 Listing 类型事实。
 | `/[locale]/account/organizations` | 组织与成员 |
 | `/[locale]/account/profile` | 资料 |
 | `/[locale]/account/verification` | 验证 |

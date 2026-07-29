@@ -902,6 +902,46 @@ test("completes Transfer, Secondhand, and Service forms through save and submiss
   }
 });
 
+test("renders the private listing-management sign-in boundary without indexing or overflow", async ({
+  page,
+}) => {
+  await page.route("**/v1/auth/session", async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        type: "https://socal.life/problems/unauthorized",
+        title: "Unauthorized",
+        status: 401,
+        detail: "Authentication required",
+        instance: "/v1/auth/session",
+        requestId: "playwright-account-listings-guest",
+      }),
+    });
+  });
+
+  const response = await page.goto("/en-US/account/listings");
+
+  expect(response?.ok()).toBe(true);
+  expect(response?.headers()["cache-control"]).toContain("no-store");
+  await expect(page).toHaveTitle(/My Listings/);
+  await expect(page.getByRole("heading", { level: 1, name: "My listings" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Sign in to manage listings" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+    "href",
+    "/en-US/auth/login?returnTo=%2Fen-US%2Faccount%2Flistings",
+  );
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    /noindex.*nofollow|nofollow.*noindex/,
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("renders and updates the private bilingual notification center", async ({ page }) => {
   const userId = "10000000-0000-4000-8000-000000000081";
   const notificationId = "20000000-0000-4000-8000-000000000081";
@@ -971,6 +1011,7 @@ test("renders and updates the private bilingual notification center", async ({ p
 
   const response = await page.goto("/zh-Hans/account/notifications");
   expect(response?.ok()).toBe(true);
+  expect(response?.headers()["cache-control"]).toContain("no-store");
   await expect(page.getByRole("heading", { level: 1, name: "站内通知" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "信息已发布" })).toBeVisible();
   await expect(page.getByText("1 条未读")).toBeVisible();
@@ -1013,8 +1054,8 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   };
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
-  expect(Object.keys(contract.paths)).toHaveLength(65);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(143);
+  expect(Object.keys(contract.paths)).toHaveLength(67);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(152);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);
