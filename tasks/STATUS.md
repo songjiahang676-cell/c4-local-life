@@ -6,17 +6,17 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：先完成版本化 Listing 索引、公开字段、双语 analyzer、geo 和真实 OpenSearch 契约，再进入索引消费
-- 进度：16/16 个 G2 任务、46/101 个总任务完成
+- 进度：1 个 G3 任务、47/101 个总任务完成
 - 风险：`WEB-004` 已由 PR #32 受保护合并为 `1bdcab9`，evidence-head 和 merged-main 的 Linux
   真实服务、18/18 E2E 与四镜像门禁均通过，Gate 2 已关闭。`SEARCH-001` 的本地单元/静态检查通过，
-  但此 Windows 主机没有 Docker/OpenSearch，真实 analyzer、alias、geo 和 strict mapping 负例必须由
-  新增的托管 OpenSearch 2.19.5 CI service 证明后才可完成
+  托管 run `30476171572` 已用 OpenSearch 2.19.5 证明 analyzer、alias、geo 和 strict mapping 负例，
+  并通过完整真实服务、E2E 与四镜像门禁；正在固化 evidence-head，之后仍需受保护合并和 merged-main 复验
 
 ## 正在进行
 
-| Task       | Owner                | Started    | Target             | Status       | Notes                                                              |
-| ---------- | -------------------- | ---------- | ------------------ | ------------ | ------------------------------------------------------------------ |
-| SEARCH-001 | @songjiahang676-cell | 2026-07-29 | protected CI green | implementing | v1 index、read/write alias、strict public mapping、zh/en/geo tests |
+| Task       | Owner                | Started    | Target          | Status               | Notes                                                              |
+| ---------- | -------------------- | ---------- | --------------- | -------------------- | ------------------------------------------------------------------ |
+| SEARCH-001 | @songjiahang676-cell | 2026-07-29 | protected merge | evidence-head checks | v1 index、read/write alias、strict public mapping、zh/en/geo tests |
 
 ## Gate Evidence
 
@@ -195,6 +195,7 @@
 | WEB-004 evidence-head checks    | PR #32 / run `30472954506`            | evidence head quality、Linux E2E and four non-root images passed           | 2026-07-29 |
 | WEB-004 protected merge         | PR #32 / merge `1bdcab9`              | protected squash merge completed                                           | 2026-07-29 |
 | WEB-004 final main quality      | GitHub Actions run `30473551979`      | merged-head quality and four non-root images passed                        | 2026-07-29 |
+| SEARCH-001 protected checks     | PR #33 / run `30476171572`            | 385 real-service tests incl. OpenSearch；18/18 E2E；four images passed     | 2026-07-29 |
 
 ## Decisions / Blocks
 
