@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task      | Owner                | Started    | Target            | Status      | Notes                                                            |
-| --------- | -------------------- | ---------- | ----------------- | ----------- | ---------------------------------------------------------------- |
-| NOTIF-001 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | Listing 状态事件幂等站内投影、不可变双语模板、私有通知中心与已读 |
+| Task      | Owner                | Started    | Target            | Status       | Notes                                                            |
+| --------- | -------------------- | ---------- | ----------------- | ------------ | ---------------------------------------------------------------- |
+| NOTIF-001 | @songjiahang676-cell | 2026-07-29 | protected task PR | hosted green | Listing 状态事件幂等站内投影、不可变双语模板、私有通知中心与已读 |
 
 ## Gate Evidence
 
@@ -129,6 +129,7 @@
 | NOTIF-001 local quality         | type/lint/test/build + static checks  | 75 files / 302 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | NOTIF-001 runtime/browser       | API runtime + Chromium desktop/mobile | canonical contract and notification flow；10/10 production E2E passed     | 2026-07-29 |
 | NOTIF-001 architecture          | `scripts/check-architecture.sh`       | 101 tasks、51 models、49 paths、113 schemas passed                        | 2026-07-29 |
+| NOTIF-001 protected checks      | PR #24 / run `30434003970`            | 304 real-service tests、Linux build/E2E and four non-root images passed   | 2026-07-29 |
 
 ## Decisions / Blocks
 
