@@ -20,10 +20,28 @@ describe("seed data and test factories", () => {
       seed.categories.verticals.find((category) => category.type === "SERVICE")?.aliases,
     ).toEqual(expect.arrayContaining([{ locale: "zh-Hans", value: "找师傅" }]));
     expect(seed.listings.listings).toHaveLength(5);
+    expect(seed.homepage.slots.every((slot) => !("html" in slot.source))).toBe(true);
     expect(() =>
       parseSeedData({
         ...seed,
         listings: { ...seed.listings, disclaimer: "Looks like production data." },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseSeedData({
+        ...seed,
+        homepage: {
+          ...seed.homepage,
+          slots: [
+            {
+              ...seed.homepage.slots[0],
+              source: {
+                ...seed.homepage.slots[0]?.source,
+                html: "<script>unsafe()</script>",
+              },
+            },
+          ],
+        },
       }),
     ).toThrow();
     expect(() =>

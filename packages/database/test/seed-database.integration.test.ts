@@ -104,6 +104,7 @@ integration("idempotent database seed", () => {
         categoryAliases: categoryAliasCount(),
         categoryFields: categoryFieldCount(),
         formSchemaVersions: categoryIds().length,
+        homepageLayouts: 2,
         listings: listingIds().length,
         users: 1,
       });
@@ -127,6 +128,20 @@ integration("idempotent database seed", () => {
           where: { categoryId: { in: categoryIds() }, version: 1, publishedAt: { not: null } },
         }),
       ).resolves.toBe(categoryIds().length);
+      await expect(
+        transaction.homepageLayoutVersion.count({
+          where: { version: 1, publishedAt: { not: null } },
+        }),
+      ).resolves.toBe(2);
+      await expect(
+        transaction.homepageLayoutState.findMany({
+          orderBy: { locale: "asc" },
+          select: { locale: true, regionCode: true, currentVersion: true },
+        }),
+      ).resolves.toEqual([
+        { locale: "en-US", regionCode: seed.homepage.regionCode, currentVersion: 1 },
+        { locale: "zh-Hans", regionCode: seed.homepage.regionCode, currentVersion: 1 },
+      ]);
       await expect(
         transaction.listing.count({ where: { id: { in: listingIds() } } }),
       ).resolves.toBe(listingIds().length);

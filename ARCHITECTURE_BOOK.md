@@ -1053,6 +1053,14 @@ content hash、revision、创建/编辑/发布 actor 和追加回滚来源。每
 每日重复贡献；查询按 locale/region/time、query/time 和 expiresAt 有界索引。数据库约束 hash、locale、
 region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COUNT(DISTINCT source_hash) >= 5`。
 
+## 6.10 TAX-003 首页布局版本
+
+`homepage_layout_states` 以 locale 与可选 region code 唯一标识一个 scope，保存当前发布版本、草稿版本
+和单调递增 revision。`homepage_layout_versions` 保存规范化配置、SHA-256 内容 hash、创建者、发布时间
+和可选回滚来源版本；每个 scope 同时最多一个草稿。发布版本通过 trigger 禁止 UPDATE/DELETE，回滚会
+复制历史配置并追加更高版本，绝不改写历史。发布/回滚和 `homepage.layout.published` Outbox 事件在同一
+事务提交，PostgreSQL 继续是唯一事实源。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1663,6 +1671,13 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
   再经 Store/Repository 保存、双人发布或追加式回滚。未来 Admin UI 必须复用该应用服务与 Policy，
   Controller 不得直接调用 Prisma。
 
+## 8.25 TAX-003 首页布局内部契约
+
+`HomepageLayoutService` 是应用层边界，负责严格验证、规范化和内容 hash；Store/Repository 负责
+scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共 HTTP endpoint，因而 OpenAPI 不变；
+`WEB-002` 必须复用该服务生成 `GET /v1/homepage` 的公开投影，不得让 Controller 直接访问 Prisma。
+发布事件是最小化 cache-invalidation 信号，不携带 layout 正文，消费者须从 PostgreSQL 重读指定版本。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -2002,6 +2017,12 @@ URL 或持久客户端缓存。
 “我的信息”“通知”“发布信息”，只显示已实现能力，不用禁用占位项制造虚假完整度。组织列表将内部
 类型/角色枚举映射为中英文用户文案，不显示联系方式。loading、未登录、Session 不可用、重试、受限
 账号和无组织均有独立可访问状态；私有页面始终 noindex/no-store。
+
+## 10.12 首页布局配置约束
+
+配置只决定已批准模块的顺序、开关和有界参数，不允许注入组件、任意样式或 HTML。每个 slot 使用稳定
+key，用户可见字符串引用可本地化 content key，图片引用受控 asset key；广告模块必须呈现明确赞助标识。
+禁用或无真实数据的模块由渲染层隐藏或显示诚实空态，不用占位数字补齐版面。
 
 ---
 
@@ -2909,6 +2930,16 @@ Idempotency-Key 或请求哈希。
 - 降级扩大：只有固定垂类、无 q/price/geo/cursor 且为默认/最新排序的首屏可降级 PostgreSQL；搜索和
   canonical cursor 不互换，降级页不暴露后续 cursor，避免筛选语义或快照边界被静默改变。
 
+## 14.30 TAX-003 配置滥用控制
+
+- 所有 layout 与 slot 对象均严格拒绝未知字段；十类 source 使用判别联合白名单，不接受 HTML、脚本、
+  URL、SQL、对象 key 或联系方式。
+- 启用广告必须声明 sponsored disclosure；商业和师傅模块只能指定 verified-only。
+- revision、expected current version 和 scope 行锁阻止丢失更新；发布历史由数据库强制不可变，回滚
+  只能追加。
+- Outbox 只发送版本定位信息和内容 hash；日志、指标和事件不得包含配置正文或 PII。未来写入口必须
+  叠加 Admin MFA、近期认证、Policy、审计和速率限制。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3032,6 +3063,13 @@ reconciliation 仍属于 `EVT-002`。
 - 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
   taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
   本地 fixture 延迟宣称生产 SLO。
+
+## 15.12 首页配置缓存一致性
+
+发布与回滚在同一数据库事务追加 `homepage.layout.published`，避免已提交配置没有失效信号。消费者按
+locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读；Redis/CDN 只保存可重建
+派生状态。TTL 由严格配置限制在 0–86400 秒，故障时允许短暂读取最后一个已发布版本，不得读取草稿或
+静默拼接不同版本模块。
 
 ---
 
@@ -3314,6 +3352,13 @@ dictionary/sample/suggestions/trending/retention，和固定 outcome：
 success/empty/recorded/duplicate/rejected_bot/rejected_sensitive/unavailable。不得添加 query、query hash、
 source hash、IP、User-Agent、region、locale、dictionary version、count 或资源 ID 标签。HTTP RED
 继续覆盖两个公开端点；热门内容、来源数和测试样本数不得作为生产 Dashboard 数据。
+
+## 17.15 TAX-003 首页配置信号
+
+发布/回滚沿用 Outbox 通用 dispatch、retry、oldest-age 和 terminal-failure 指标，event type 固定为
+`homepage.layout.published`。允许的诊断字段只有 operation、locale 类别、版本和固定 outcome；配置
+正文、content key、region code、actor ID 和内容 hash 不进入指标标签。`WEB-002` 接入消费者时再增加
+固定 outcome 的 cache invalidation 指标，TAX-003 不虚构尚未存在的消费端可用性。
 
 ---
 
@@ -3682,6 +3727,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 全仓格式、类型、lint、单元/集成、八应用构建、API 运行时、架构和四镜像保护门禁继续执行。本任务
   不修改 OpenAPI、Prisma 或 migration；真实 OpenSearch 查询回归继续由既有 SEARCH 测试承担。
 
+## 18.32 TAX-003 首页布局验证增量
+
+- Contracts/JSON Schema 拒绝未知模块、未知 source 字段、任意 HTML 和未披露广告，并验证 slot key 唯一；
+  架构检查器还会用 Draft 2020-12 schema 验证实际首页 seed，防止两份契约静默漂移。
+- Service 单元测试覆盖新 scope 草稿、乐观冲突、发布、历史回滚、规范化 hash 和无正文 Outbox 契约。
+- PostgreSQL 集成测试覆盖原子发布/回滚、当前版本切换、事件唯一性和直接 UPDATE/DELETE 已发布版本
+  的数据库负例；种子测试覆盖中英文结构且不含真实/伪造业务内容。
+- Prisma validate/generate、迁移安全、全仓质量、API runtime、架构检查和受保护 CI 均须真实通过；本地
+  缺少 PostgreSQL 时明确记录 skip，不能把 skip 当作通过。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3929,6 +3984,14 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   开启 redirect 或为排障记录完整 URL query。
 - 回滚 Web 应用不改变 API/数据库；旧 `/housing/rent`、`/business-transfer` 和 `/classified` 当前仅由
   首页链接切换到 canonical 新路由，正式 301/slug 历史表仍由 `SEO-001` 统一处理。
+
+## 20.18 首页布局发布异常
+
+若新首页版本未生效，先核对 scope 当前发布版本、对应 immutable version 和
+`homepage.layout.published` Outbox 的 pending/processing/failed 状态。可重试 dispatcher/消费者，
+但不得手工 UPDATE 已发布 JSON 或把草稿设为公开。内容错误使用应用层 rollback：复制已知安全历史版本、
+追加更高版本并产生新失效事件。只有 migration 故障才按随迁移提供的 roll-forward/rollback 说明处理，
+删除表前必须确认版本历史和 Outbox 均已备份。
 
 ---
 
@@ -4282,6 +4345,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   复杂筛选显示通用恢复状态。搜索/筛选/cursor 页面 `noindex,follow`。
 - 单元/组件/生产 Chromium 桌面和移动覆盖 SSR HTML、双语、label/skip/focus/44px/reflow、列表/详情、
   空态/错误、推广/状态和无横向溢出；完整质量与受保护门禁有真实证据后才可标记 done。
+
+## 22.18 TAX-003 首页布局配置验收
+
+- 十类模块 source 有严格白名单，未知字段、任意 HTML、重复 slot key、未披露广告和越界 TTL/limit
+  被契约与应用层拒绝；中英文 seed 只含结构。
+- locale/region scope 可创建草稿、乐观更新、发布和从历史版本追加回滚；并发旧 revision/version
+  失败且不会覆盖新配置。
+- 发布版本在 PostgreSQL 中不可 UPDATE/DELETE；发布/回滚与最小化 cache-invalidation Outbox 事件
+  原子提交，事件不携带正文或 PII。
+- JSON Schema、Zod、Prisma、migration/回滚说明、单元与 PostgreSQL 负例、种子、全仓质量和受保护
+  CI 有真实证据后才可标记完成。公共首页聚合 API 和模块数据隔离仍属于 `WEB-002`。
 
 ---
 
@@ -4719,6 +4793,15 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 - 模块级 `cacheTag`：homepage config、region、listing type、ads。
 - Hero 图片优化且不压过文本 LCP。
 - 非首屏模块延迟 hydration；避免每个小卡片成为 client component。
+
+## 26.7 TAX-003 可发布布局契约
+
+首页布局现在按 locale 与可选 region code 版本化。一个定义最多 32 个稳定 key slot，类型限定为
+Hero、热门搜索、城市、Listing feed、商家、师傅、广告、行情、资源产品和门户链接；每类 source 只
+包含其执行所需的有界枚举、ID、content/asset/placement/collection key 和 limit/TTL。配置不含实时
+业务数据、任意 HTML、外部 URL、查询表达式或私有字段。草稿可 preview；publish 切换 canonical
+版本；rollback 复制历史配置为新版本并发送原子失效事件。`WEB-002` 负责从各领域公开投影装配数据，
+模块失败需隔离为真实空态/错误态，不能从 layout seed 伪造 500 条内容或生产指标。
 
 ---
 
@@ -5299,3 +5382,10 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 事实表、迁移、服务或消息范式。简单首屏降级仍调用 API 的 PostgreSQL 公共 projection，不直接访问
 数据库。E2E fixture 是 Playwright 独立进程且只提供虚构数据，不会进入应用 runtime 或生产镜像。因此
 该实现保持模块化单体和既有 REST/事实源边界，不需要 ADR。
+
+## 30.12 TAX-003 首页布局实现边界
+
+共享 Contracts 与独立 JSON Schema 描述严格可序列化 layout；Database 包保存状态、不可变版本、种子和
+事务 Outbox；API 的 `HomepageLayoutService` 通过 Store 端口调用 Repository。当前模块没有 Controller，
+不会提前改变 68-path 公共 REST 契约，也不会让 Web/Admin 导入 Prisma。`WEB-002` 只需装配该应用服务
+与各领域公共读模型；未来 Admin 编辑器同样必须通过授权 use case，不能绕过版本与审计边界。

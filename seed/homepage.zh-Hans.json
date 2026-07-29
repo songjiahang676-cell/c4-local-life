@@ -8,8 +8,8 @@
       "kind": "HERO",
       "enabled": true,
       "source": {
-        "type": "CMS",
-        "entry": "homepage-hero"
+        "contentKey": "homepage.hero",
+        "imageAssetKey": "homepage/hero-socal"
       },
       "limit": 1,
       "cacheTtlSeconds": 300
@@ -19,8 +19,8 @@
       "kind": "HOT_SEARCHES",
       "enabled": true,
       "source": {
-        "type": "ANALYTICS_TRENDING",
-        "windowHours": 24
+        "window": "DAY_1",
+        "regionScoped": true
       },
       "limit": 7,
       "cacheTtlSeconds": 120
@@ -30,17 +30,7 @@
       "kind": "CITY_CHIPS",
       "enabled": true,
       "source": {
-        "type": "STATIC_REGION_CODES",
-        "values": [
-          "US-CA-LA",
-          "US-CA-IRVINE",
-          "US-CA-SGV",
-          "US-CA-MONTEREY-PARK",
-          "US-CA-ARCADIA",
-          "US-CA-WALNUT",
-          "US-CA-CITY-OF-INDUSTRY",
-          "US-CA-LONG-BEACH"
-        ]
+        "regionType": "CITY"
       },
       "limit": 8,
       "cacheTtlSeconds": 3600
@@ -50,11 +40,7 @@
       "kind": "LISTING_FEED",
       "enabled": true,
       "source": {
-        "type": "SEARCH",
-        "filters": {
-          "listingType": "JOB",
-          "status": "PUBLISHED"
-        },
+        "listingType": "JOB",
         "sort": "NEWEST"
       },
       "limit": 5,
@@ -65,11 +51,7 @@
       "kind": "LISTING_FEED",
       "enabled": true,
       "source": {
-        "type": "SEARCH",
-        "filters": {
-          "listingType": "RENTAL",
-          "status": "PUBLISHED"
-        },
+        "listingType": "RENTAL",
         "sort": "NEWEST"
       },
       "limit": 5,
@@ -80,11 +62,7 @@
       "kind": "LISTING_FEED",
       "enabled": true,
       "source": {
-        "type": "SEARCH",
-        "filters": {
-          "listingType": "TRANSFER",
-          "status": "PUBLISHED"
-        },
+        "listingType": "TRANSFER",
         "sort": "NEWEST"
       },
       "limit": 5,
@@ -95,11 +73,7 @@
       "kind": "LISTING_FEED",
       "enabled": true,
       "source": {
-        "type": "SEARCH",
-        "filters": {
-          "listingType": "SECONDHAND",
-          "status": "PUBLISHED"
-        },
+        "listingType": "SECONDHAND",
         "sort": "NEWEST"
       },
       "limit": 5,
@@ -110,7 +84,7 @@
       "kind": "AD",
       "enabled": true,
       "source": {
-        "placementKey": "HOME_RIGHT_360X102"
+        "placementKey": "home.right-rail"
       },
       "limit": 1,
       "sponsoredDisclosure": true,
@@ -121,7 +95,7 @@
       "kind": "BUSINESS_CAROUSEL",
       "enabled": true,
       "source": {
-        "type": "FEATURED_VERIFIED"
+        "verifiedOnly": true
       },
       "limit": 4,
       "sponsoredDisclosure": true,
@@ -132,7 +106,7 @@
       "kind": "PROVIDER_CAROUSEL",
       "enabled": true,
       "source": {
-        "type": "QUALITY_AND_PROXIMITY"
+        "verifiedOnly": true
       },
       "limit": 4,
       "sponsoredDisclosure": false,
@@ -143,8 +117,7 @@
       "kind": "PRICE_METRIC",
       "enabled": true,
       "source": {
-        "type": "ANALYTICS_AGGREGATE",
-        "dataset": "market-price-weekly"
+        "metricKeys": ["RENTAL_MEDIAN", "WAGE_MEDIAN", "SERVICE_PRICE_MEDIAN"]
       },
       "limit": 5,
       "cacheTtlSeconds": 3600
@@ -154,7 +127,7 @@
       "kind": "RESOURCE_PRODUCTS",
       "enabled": false,
       "source": {
-        "type": "SUPPLIER_CATALOG"
+        "collectionKey": "cross-border-products"
       },
       "limit": 3,
       "sponsoredDisclosure": true,

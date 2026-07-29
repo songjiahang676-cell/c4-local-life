@@ -266,26 +266,156 @@ const sampleListingsSchema = z
   })
   .strict();
 
+const homepageConfigurationKeySchema = z
+  .string()
+  .min(2)
+  .max(80)
+  .regex(/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/);
+const homepageSlotCommon = {
+  key: homepageConfigurationKeySchema,
+  enabled: z.boolean(),
+  limit: z.number().int().min(1).max(100),
+  sponsoredDisclosure: z.boolean().default(false),
+  cacheTtlSeconds: z.number().int().min(0).max(86_400).default(300),
+} as const;
+const verifiedCollectionSourceSchema = z
+  .object({
+    verifiedOnly: z.literal(true),
+    categoryId: z.uuid().optional(),
+  })
+  .strict();
+const homepageSlotSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("HERO"),
+      source: z
+        .object({
+          contentKey: homepageConfigurationKeySchema,
+          imageAssetKey: z
+            .string()
+            .min(2)
+            .max(160)
+            .regex(/^[a-z0-9][a-z0-9/_-]*[a-z0-9]$/)
+            .optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("HOT_SEARCHES"),
+      source: z
+        .object({
+          window: z.enum(["DAY_1", "DAY_7", "DAY_30"]),
+          regionScoped: z.boolean().default(true),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("CITY_CHIPS"),
+      source: z.object({ regionType: z.literal("CITY") }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("LISTING_FEED"),
+      source: z
+        .object({
+          listingType: listingTypeSchema,
+          sort: z.enum(["NEWEST", "PRICE_ASC", "PRICE_DESC"]).default("NEWEST"),
+          categoryId: z.uuid().optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("BUSINESS_CAROUSEL"),
+      source: verifiedCollectionSourceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("PROVIDER_CAROUSEL"),
+      source: verifiedCollectionSourceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("AD"),
+      source: z.object({ placementKey: homepageConfigurationKeySchema }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("PRICE_METRIC"),
+      source: z
+        .object({
+          metricKeys: z
+            .array(z.enum(["RENTAL_MEDIAN", "WAGE_MEDIAN", "SERVICE_PRICE_MEDIAN"]))
+            .min(1)
+            .max(10)
+            .refine((values) => new Set(values).size === values.length),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("RESOURCE_PRODUCTS"),
+      source: z.object({ collectionKey: homepageConfigurationKeySchema }).strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ...homepageSlotCommon,
+      kind: z.literal("PORTAL_LINKS"),
+      source: z.object({ audience: z.enum(["PUBLIC", "AUTHENTICATED", "ROLE_SCOPED"]) }).strict(),
+    })
+    .strict(),
+]);
 const homepageSchema = z
   .object({
     version: z.literal(1),
     locale: z.literal("zh-Hans"),
-    regionCode: z.string().regex(/^[A-Z0-9-]{2,80}$/),
-    slots: z.array(
-      z
-        .object({
-          key: z.string().regex(/^[a-z0-9-]{1,80}$/),
-          kind: z.string().regex(/^[A-Z_]{2,80}$/),
-          enabled: z.boolean(),
-          source: z.record(z.string(), z.unknown()),
-          limit: z.number().int().min(1).max(100),
-          sponsoredDisclosure: z.boolean().optional(),
-          cacheTtlSeconds: z.number().int().min(1).max(86_400),
-        })
-        .strict(),
-    ),
+    regionCode: z
+      .string()
+      .min(2)
+      .max(80)
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+    slots: z.array(homepageSlotSchema).max(32),
   })
-  .strict();
+  .strict()
+  .superRefine((layout, context) => {
+    const keys = layout.slots.map((slot) => slot.key);
+    if (new Set(keys).size !== keys.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["slots"],
+        message: "Seed homepage slot keys must be unique",
+      });
+    }
+    for (const [index, slot] of layout.slots.entries()) {
+      if (slot.kind === "AD" && slot.enabled && !slot.sponsoredDisclosure) {
+        context.addIssue({
+          code: "custom",
+          path: ["slots", index, "sponsoredDisclosure"],
+          message: "Enabled seed ad slots require sponsored disclosure",
+        });
+      }
+    }
+  });
 
 export type SeedRegions = z.infer<typeof regionsSchema>;
 export type SeedCategories = z.infer<typeof categoriesSchema>;

@@ -170,3 +170,11 @@ query/source/UTC day 只贡献一次，原 IP/User-Agent 不入样本表。
 词典草稿必须不同审核人发布，发布版本由数据库 trigger 保护不可变，回滚只能追加。cursor v2 固定
 词典版本；加载不到已绑定历史版本时失败为 503，不静默改变查询。样本默认 30 天、硬上限 90 天，
 日志/指标不得包含 query、hash、source、region 或 dictionary version。
+
+## 首页运营配置边界
+
+首页 layout 只接受契约列出的十类模块和逐类严格 source，不接受任意 HTML、脚本、外部 URL、查询语句
+或未知字段。启用广告必须声明 sponsored disclosure，商业/师傅模块只能请求已验证公开投影。草稿使用
+scope revision 与当前版本双重乐观校验；已发布版本由数据库触发器禁止更新和删除，回滚只能追加新版本。
+发布事件只含 locale、region、版本、内容 hash、操作和时间，不含配置正文、用户输入或 PII。未来 Admin
+入口仍须经 MFA、近期认证、Policy 和审计，不能把本内部 Store 直接暴露为匿名 mutation。

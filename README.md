@@ -288,6 +288,11 @@ active taxonomy 或至少五个独立 HMAC 来源的非 bot、非敏感、有效
 的单垂类首屏降级到 PostgreSQL 公开列表，且不混用两种 cursor；复杂筛选显示明确恢复状态。任意搜索、
 cursor 和筛选页先行 `noindex,follow`，完整 canonical/hreflang/schema/sitemap 仍由 `SEO-001` 负责。
 
+`TAX-003` 已把首页模块编排收敛为严格、版本化的运营配置：十类模块各自使用可序列化 source
+白名单，不接受任意 HTML、URL 或未知字段；locale/region scope 采用乐观并发草稿、不可变发布历史和
+追加式回滚。发布与回滚在同一 PostgreSQL 事务写入最小化 `homepage.layout.published` Outbox 事件，
+供 `WEB-002` 失效派生缓存；中英文种子只提供结构，不伪造业务内容。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

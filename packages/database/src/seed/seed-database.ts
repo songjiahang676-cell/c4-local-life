@@ -19,6 +19,7 @@ export type SeedSummary = {
   categoryAliases: number;
   categoryFields: number;
   formSchemaVersions: number;
+  homepageLayouts: number;
   listings: number;
   users: number;
   sourceVersion: number;
@@ -419,6 +420,68 @@ export async function seedDatabaseInTransaction(
     },
   });
 
+  const homepageDefinitions = [
+    seed.homepage,
+    {
+      ...seed.homepage,
+      locale: "en-US" as const,
+    },
+  ];
+  for (const definition of homepageDefinitions) {
+    const layoutId = stableSeedUuid(
+      `homepage-layout:${definition.locale}:${definition.regionCode}`,
+    );
+    await transaction.homepageLayoutState.upsert({
+      where: {
+        locale_regionCode: {
+          locale: definition.locale,
+          regionCode: definition.regionCode,
+        },
+      },
+      create: {
+        id: layoutId,
+        locale: definition.locale,
+        regionCode: definition.regionCode,
+      },
+      update: {},
+    });
+    const contentHash = hashDefinition(definition);
+    const existing = await transaction.homepageLayoutVersion.findUnique({
+      where: {
+        layoutId_version: {
+          layoutId,
+          version: definition.version,
+        },
+      },
+      select: { contentHash: true, publishedAt: true },
+    });
+    if (!existing) {
+      await transaction.homepageLayoutVersion.create({
+        data: {
+          id: stableSeedUuid(
+            `homepage-layout-version:${definition.locale}:${definition.regionCode}:1`,
+          ),
+          layoutId,
+          version: definition.version,
+          definition: definition as Prisma.InputJsonValue,
+          contentHash,
+          createdById: seedOwnerId,
+          updatedById: seedOwnerId,
+          publishedById: seedOwnerId,
+          publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      });
+    } else if (existing.contentHash !== contentHash || !existing.publishedAt) {
+      throw new Error(
+        `Published seed homepage layout changed for ${definition.locale}/${definition.regionCode}; add a new version instead`,
+      );
+    }
+    await transaction.homepageLayoutState.update({
+      where: { id: layoutId },
+      data: { currentVersion: definition.version },
+    });
+  }
+
   for (const [index, listing] of seed.listings.listings.entries()) {
     const id = stableSeedUuid(`listing:${listing.type}:${index}`);
     const categoryId = categoryIds.get(`${listing.type}:${listing.categorySlug}`);
@@ -459,6 +522,7 @@ export async function seedDatabaseInTransaction(
     categoryAliases: categoryAliasCount,
     categoryFields: categoryFieldCount,
     formSchemaVersions: formSchemaVersionCount,
+    homepageLayouts: homepageDefinitions.length,
     listings: seed.listings.listings.length,
     users: 1,
     sourceVersion: seed.regions.version,

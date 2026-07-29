@@ -154,3 +154,11 @@
   开启 redirect 或为排障记录完整 URL query。
 - 回滚 Web 应用不改变 API/数据库；旧 `/housing/rent`、`/business-transfer` 和 `/classified` 当前仅由
   首页链接切换到 canonical 新路由，正式 301/slug 历史表仍由 `SEO-001` 统一处理。
+
+## 20.18 首页布局发布异常
+
+若新首页版本未生效，先核对 scope 当前发布版本、对应 immutable version 和
+`homepage.layout.published` Outbox 的 pending/processing/failed 状态。可重试 dispatcher/消费者，
+但不得手工 UPDATE 已发布 JSON 或把草稿设为公开。内容错误使用应用层 rollback：复制已知安全历史版本、
+追加更高版本并产生新失效事件。只有 migration 故障才按随迁移提供的 roll-forward/rollback 说明处理，
+删除表前必须确认版本历史和 Outbox 均已备份。

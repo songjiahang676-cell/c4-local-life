@@ -192,6 +192,17 @@ export {
   type OrganizationRepositoryOptions,
 } from "./repositories/organization.repository";
 export {
+  HomepageLayoutRepository,
+  type HomepageLayoutLifecycle,
+  type HomepageLayoutMutationResult,
+  type HomepageLayoutRecord,
+  type HomepageLayoutRepositoryOptions,
+  type HomepageLayoutScope,
+  type PublishHomepageLayoutDraftInput,
+  type RollbackHomepageLayoutInput,
+  type SaveHomepageLayoutDraftInput,
+} from "./repositories/homepage-layout.repository";
+export {
   OutboxEventRepository,
   type AppendOutboxEventInput,
   type ClaimedOutboxEvent,

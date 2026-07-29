@@ -369,3 +369,11 @@ content hash、revision、创建/编辑/发布 actor 和追加回滚来源。每
 独立 HMAC source hash、UTC window date 和到期时间。`(query_hash,source_hash,window_date)` 防止同源
 每日重复贡献；查询按 locale/region/time、query/time 和 expiresAt 有界索引。数据库约束 hash、locale、
 region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COUNT(DISTINCT source_hash) >= 5`。
+
+## 6.10 TAX-003 首页布局版本
+
+`homepage_layout_states` 以 locale 与可选 region code 唯一标识一个 scope，保存当前发布版本、草稿版本
+和单调递增 revision。`homepage_layout_versions` 保存规范化配置、SHA-256 内容 hash、创建者、发布时间
+和可选回滚来源版本；每个 scope 同时最多一个草稿。发布版本通过 trigger 禁止 UPDATE/DELETE，回滚会
+复制历史配置并追加更高版本，绝不改写历史。发布/回滚和 `homepage.layout.published` Outbox 事件在同一
+事务提交，PostgreSQL 继续是唯一事实源。
