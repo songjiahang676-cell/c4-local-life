@@ -30,6 +30,15 @@ import {
   type SubmitListingInput,
   type SubmitListingResult,
 } from "@socal/database/listing-submission";
+import {
+  ListingRevisionRepository,
+  type FindPublishedRevisionRetryInput,
+  type FindPublishedRevisionRetryResult,
+  type ListListingRevisionsInput,
+  type ListListingRevisionsResult,
+  type RevisePublishedListingInput,
+  type RevisePublishedListingResult,
+} from "@socal/database/listing-revision";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import type { ListingStore } from "./listing.store";
 
@@ -38,6 +47,7 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
   readonly #drafts: ListingDraftRepository;
   readonly #listings: ListingRepository;
   readonly #submissions: ListingSubmissionRepository;
+  readonly #revisions: ListingRevisionRepository;
 
   constructor(@Inject(API_ENVIRONMENT) environment: ApiEnvironment) {
     const options = {
@@ -47,6 +57,7 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     this.#drafts = new ListingDraftRepository(options);
     this.#listings = new ListingRepository(options);
     this.#submissions = new ListingSubmissionRepository(options);
+    this.#revisions = new ListingRevisionRepository(options);
   }
 
   resolveReferences(
@@ -102,7 +113,26 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     return this.#submissions.submit(input);
   }
 
+  findPublishedRevisionRetry(
+    input: FindPublishedRevisionRetryInput,
+  ): Promise<FindPublishedRevisionRetryResult> {
+    return this.#revisions.findRetry(input);
+  }
+
+  revisePublished(input: RevisePublishedListingInput): Promise<RevisePublishedListingResult> {
+    return this.#revisions.revise(input);
+  }
+
+  listRevisions(input: ListListingRevisionsInput): Promise<ListListingRevisionsResult> {
+    return this.#revisions.list(input);
+  }
+
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.#drafts.close(), this.#listings.close(), this.#submissions.close()]);
+    await Promise.all([
+      this.#drafts.close(),
+      this.#listings.close(),
+      this.#submissions.close(),
+      this.#revisions.close(),
+    ]);
   }
 }

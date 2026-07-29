@@ -49,6 +49,27 @@ export {
   type SubmitListingResult,
 } from "./repositories/listing-submission.repository";
 export {
+  ListingRevisionRepository,
+  type FindPublishedRevisionRetryInput,
+  type FindPublishedRevisionRetryResult,
+  type ListingRevisionCursor,
+  type ListingRevisionRepositoryOptions,
+  type ListListingRevisionsInput,
+  type ListListingRevisionsResult,
+  type RevisePublishedListingInput,
+  type RevisePublishedListingResult,
+} from "./repositories/listing-revision.repository";
+export {
+  listingRevisionDiffFields,
+  listingRevisionReasonCodes,
+  type ListingRevisionDiffEntry,
+  type ListingRevisionDiffField,
+  type ListingRevisionProjection,
+  type ListingRevisionReasonCode,
+  type ListingRevisionReviewState,
+  type ListingRevisionSnapshot,
+} from "./repositories/listing-revision";
+export {
   ModerationCaseRepository,
   type CommitModerationActionInput,
   type CommitModerationActionResult,

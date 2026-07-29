@@ -324,6 +324,21 @@ complete policy-acknowledged details.
 - Rollback: disable the affected posting/listing flows and retain the additive constraints/indexes.
   Exceptional pre-production physical recovery is documented in the migration-local `ROLLBACK.md`.
 
+## `20260730060000_listing_revision_workflow`
+
+Adds append-only `listing_revisions` for normalized redacted submission/edit snapshots, field-level
+diffs, stable classification/reason evidence, risk/rule provenance, actor-scoped exact retry and the
+original publication window. It also records the previous Listing state on moderation evaluations
+and links each evaluation to at most one revision. Checks bound hashes, versions, actor/session,
+risk/rule and publication-window coherence; a trigger rejects revision updates and deletes.
+
+- Roll forward: deploy before enabling published Listing edits or revision reads; verify initial and
+  resubmission revisions, exact retry, minor edits retaining visibility, major edits re-entering
+  moderation, immutable-row negatives, real previous-snapshot diffs and original-window approval.
+- Rollback: disable the revision collection and published-edit path, then redeploy the previous
+  application while retaining additive history and columns. Do not drop audit/revision evidence;
+  exceptional stopped-writer physical recovery is documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

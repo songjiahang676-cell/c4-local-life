@@ -78,8 +78,8 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
 `LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
 `LIST-007` 已继续完成 Transfer/Secondhand/Service 的 schema、明细持久化、政策确认、双语移动提交、
-安全公开读取和过期。五类垂直基线均已验收；revision/重大编辑复审、账户管理和搜索派生状态仍由
-后续任务完成，因此整个 22.4 尚不能标记完成。
+安全公开读取和过期。`LIST-008` 已验收不可变 revision、真实前后 diff、owner 原因和重大编辑复审；
+账户管理和搜索派生状态仍由后续任务完成，因此整个 22.4 尚不能标记完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
@@ -93,8 +93,8 @@ Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复�
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
 覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；Listing
-举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成。重新提交的历史 revision diff 和搜索索引
-消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成；重新提交和重大编辑的历史 revision diff
+已由 `LIST-008` 完成。搜索索引消费仍由后续 Gate 3 切片负责，因此整个 Listing 生命周期尚未完成。
 
 `MOD-002` 已验收 Listing 举报/申诉切片：ACTIVE actor、同源、幂等键、每账号小时配额和活动目标
 唯一约束保护接收；并发同目标举报只写一条 Report/脱敏快照/案件/Audit。公共 receipt 和 MFA
@@ -125,6 +125,13 @@ OWNER_ONLY 财务免责声明并始终人工审核；Secondhand 要求成色、�
 upsert 且类型严格耦合，数据库约束阻止应用旁路。五类公共 list/detail、签名 cursor、归档/软删除和
 到期处理统一；v3 禁售品规则只保留字段级证据。三个中英文 noindex 发布页复用账号/locale/vertical
 隔离恢复、READY 图片、强 ETag 和幂等提交，桌面/移动 E2E 覆盖三类填写、保存与提交。
+
+`LIST-008` 已验收修订与重大编辑：首次/重新提交和已发布编辑都追加数据库不可变、哈希绑定的规范化
+脱敏 snapshot/diff；Owner 私有 collection 使用 actor/Listing 绑定的签名 cursor 并显示稳定分类、
+原因、风险和审核状态。小型文字修正保留公开状态与原期限；价格、分类、区域、联系、位置、媒体、
+attributes、locale 或风险信号变化立即重新人工审核并从公开读消失。revision/evaluation/case/Audit/
+Outbox 原子提交，精确重试不重复写；批准只恢复原 publication window，已到期直接 EXPIRED，旧案件或
+旧事件不能覆盖较新版本。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory

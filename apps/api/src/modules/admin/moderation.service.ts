@@ -199,12 +199,23 @@ function snapshotDiff(
     ["category", snapshot.category],
     ["region", snapshot.region],
   ];
-  return fields.map(([field, after]) => ({
-    field,
-    kind: "ADDED",
-    before: null,
-    after,
-  }));
+  return fields.flatMap(([field, after]) => {
+    const before =
+      snapshot.previous == null
+        ? null
+        : field === "locationPrecision"
+          ? (snapshot.previous.location as { precision?: unknown } | null | undefined)?.precision
+          : snapshot.previous[field];
+    if (canonicalJson(before) === canonicalJson(after)) return [];
+    return [
+      {
+        field,
+        kind: before === null || before === undefined ? "ADDED" : "CHANGED",
+        before: before ?? null,
+        after,
+      },
+    ];
+  });
 }
 
 function asListingAggregate(detail: ModerationCaseDetail): ListingAggregate {
@@ -232,6 +243,18 @@ function transitionCommand(
   const metadata = { actorId: actorUserId, expectedVersion, reasonCode, occurredAt };
   switch (action) {
     case "APPROVE":
+      if (
+        detail.snapshot.revision?.classification === "MAJOR_EDIT" &&
+        detail.snapshot.revision.originalPublishedAt &&
+        detail.snapshot.revision.originalExpiresAt
+      ) {
+        return {
+          kind: "MODERATOR_APPROVE_REVISION",
+          originalPublishedAt: new Date(detail.snapshot.revision.originalPublishedAt),
+          originalExpiresAt: new Date(detail.snapshot.revision.originalExpiresAt),
+          ...metadata,
+        };
+      }
       return {
         kind: "MODERATOR_APPROVE",
         lifetimeDays: detail.snapshot.defaultLifetimeDays,

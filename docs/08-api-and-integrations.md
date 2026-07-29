@@ -353,3 +353,16 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
   `Idempotency-Key`。Report 动作是 DISMISS/REMOVE_CONTENT/ESCALATE；Appeal 动作是 UPHOLD/RESTORE，
   每个动作只接受配套原因码。失效角色、跨资源、原审核员复核、陈旧版本、键冲突和非法状态均返回
   通用 Problem Details，不暴露内部存在性或规则阈值。
+
+## 8.19 Listing 修订与重大编辑契约
+
+- `GET /listings/{listingId}/revisions` 是 owner/组织读取角色专用、`no-store` 的 cursor collection；
+  返回 revision number、分类、稳定原因、脱敏字段级 diff、风险/规则版本、审核状态、actor 和发生时间，
+  不返回完整 snapshot、哈希、session、幂等证据或私有值。未知/跨 owner/已删除 Listing 统一 404。
+- `ListingOwnerView.latestRevision` 返回可空的最近 revision 摘要，使 owner 在草稿详情响应中看到重大
+  编辑为什么重审；公共 `PublicListingView` 不增加审核历史。
+- 对 `PUBLISHED` Listing 的 `PATCH /listings/{listingId}` 必须同时携带强 `If-Match` 和
+  `Idempotency-Key`。精确重试返回原 revision/result；同 key 不同 request 返回 409。minor edit
+  仍返回公开 owner view；major edit 返回新的 SUBMITTED/PENDING_REVIEW 或 ESCALATED 状态。
+- 这些都是 `/v1` 向后兼容增量：草稿 PATCH 的既有客户端无需幂等键，新增 collection/schema 与
+  nullable owner 字段不改变公共响应。OpenAPI 与生成 TypeScript 是唯一 REST 契约事实源。

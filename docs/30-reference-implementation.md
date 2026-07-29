@@ -126,6 +126,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingRepository`。Web 五类发布页复用同一个 schema-driven 组件，但保持路由、本地恢复 key 和
 动态字段按 vertical 隔离。
 
+`LIST-008` 继续保持模块化单体依赖方向：Controller 只解析 `If-Match`、幂等键与 cursor；
+`ListingsService` 负责 owner Policy、脱敏 diff、minor/major 保守分类和风险规则；
+`ListingRevisionRepository` 在 PostgreSQL 行锁内重新授权并原子追加 revision/evaluation/case/
+snapshot/Audit/Outbox。人工审核仍由 `ModerationService` 发出领域命令，Repository 独立校验 revision
+保存的原 publication window，Controller 和 Web BFF 都不导入 Prisma。
+
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
 `NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。

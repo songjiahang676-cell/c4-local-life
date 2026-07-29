@@ -24,7 +24,9 @@ const occurredAt = new Date("2026-07-29T20:00:00.000Z");
 
 async function createFixture(transaction: Prisma.TransactionClient): Promise<{
   actorUserId: string;
+  categoryId: string;
   listingId: string;
+  regionId: string;
 }> {
   const actorUserId = randomUUID();
   const categoryId = randomUUID();
@@ -91,7 +93,7 @@ async function createFixture(transaction: Prisma.TransactionClient): Promise<{
       updatedAt: new Date("2026-07-20T00:00:00.000Z"),
     },
   });
-  return { actorUserId, listingId };
+  return { actorUserId, categoryId, listingId, regionId };
 }
 
 function lowRiskInput(fixture: { actorUserId: string; listingId: string }): SubmitListingInput {
@@ -167,6 +169,9 @@ integration("ListingSubmissionRepository with PostgreSQL", () => {
         where: { listingId: fixture.listingId },
         include: { ruleHits: true, moderationCase: true },
       });
+      const revision = await transaction.listingRevision.findFirstOrThrow({
+        where: { listingId: fixture.listingId },
+      });
 
       expect(candidate).toMatchObject({
         id: fixture.listingId,
@@ -198,6 +203,18 @@ integration("ListingSubmissionRepository with PostgreSQL", () => {
       });
       expect(evaluation.ruleHits).toEqual([]);
       expect(evaluation.moderationCase).toBeNull();
+      expect(revision).toMatchObject({
+        revisionNumber: 1,
+        baseListingVersion: 1,
+        resultListingVersion: 3,
+        classification: "SUBMISSION",
+        reasonCodes: ["INITIAL_SUBMISSION"],
+        riskTier: ModerationRiskTier.LOW,
+      });
+      expect(revision.snapshotHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(revision.diff).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: "title", kind: "ADDED" })]),
+      );
       expect(
         await transaction.auditLog.count({
           where: { targetId: fixture.listingId, action: "listing.submission.evaluated" },
@@ -218,6 +235,22 @@ integration("ListingSubmissionRepository with PostgreSQL", () => {
             SET "rule_set_version" = 2
             WHERE "id" = '${evaluation.id}'::uuid;
             RAISE EXCEPTION 'immutability trigger did not reject mutation';
+          EXCEPTION
+            WHEN OTHERS THEN
+              IF SQLERRM NOT LIKE '%immutable%' THEN
+                RAISE;
+              END IF;
+          END;
+        END
+        $$;
+      `);
+      await transaction.$executeRawUnsafe(`
+        DO $$
+        BEGIN
+          BEGIN
+            DELETE FROM "listing_revisions"
+            WHERE "id" = '${revision.id}'::uuid;
+            RAISE EXCEPTION 'immutability trigger did not reject deletion';
           EXCEPTION
             WHEN OTHERS THEN
               IF SQLERRM NOT LIKE '%immutable%' THEN
@@ -297,6 +330,76 @@ integration("ListingSubmissionRepository with PostgreSQL", () => {
       if (!moderationCase.evaluation) throw new Error("Expected linked evaluation");
       expect(JSON.stringify(moderationCase.evaluation.ruleHits)).not.toMatch(
         /gift|bitcoin|phone|email/i,
+      );
+
+      await transaction.listing.update({
+        where: { id: fixture.listingId },
+        data: {
+          status: ContentStatus.DRAFT,
+          moderationStatus: ModerationStatus.REJECTED,
+          title: "Synthetic corrected resubmission listing",
+          version: 5,
+          updatedAt: new Date(occurredAt.getTime() + 2_000),
+        },
+      });
+      const resubmittedAt = new Date(occurredAt.getTime() + 3_000);
+      const resubmitted = await repository.submit({
+        ...lowRiskInput(fixture),
+        expectedVersion: 5,
+        idempotencyKey: "repository-submit-resubmission-0001",
+        requestHash: "e".repeat(64),
+        occurredAt: resubmittedAt,
+        inputHash: "f".repeat(64),
+        decision: {
+          contentStatus: ContentStatus.PUBLISHED,
+          moderationStatus: ModerationStatus.AUTO_APPROVED,
+          publishedAt: resubmittedAt,
+          expiresAt: new Date(resubmittedAt.getTime() + 30 * 86_400_000),
+          resultVersion: 7,
+          transitions: [
+            {
+              eventType: "listing.submitted",
+              previousStatus: ContentStatus.DRAFT,
+              currentStatus: ContentStatus.SUBMITTED,
+              previousModerationStatus: ModerationStatus.REJECTED,
+              currentModerationStatus: ModerationStatus.PENDING_REVIEW,
+              aggregateVersion: 6,
+              reasonCode: "RISK_EVALUATED",
+            },
+            {
+              eventType: "listing.published",
+              previousStatus: ContentStatus.SUBMITTED,
+              currentStatus: ContentStatus.PUBLISHED,
+              previousModerationStatus: ModerationStatus.PENDING_REVIEW,
+              currentModerationStatus: ModerationStatus.AUTO_APPROVED,
+              aggregateVersion: 7,
+              reasonCode: "LOW_RISK_AUTO_APPROVED",
+            },
+          ],
+        },
+      });
+      expect(resubmitted).toMatchObject({
+        kind: "submitted",
+        submission: {
+          previousModerationStatus: ModerationStatus.REJECTED,
+          currentStatus: ContentStatus.PUBLISHED,
+          version: 7,
+        },
+      });
+      const revisions = await transaction.listingRevision.findMany({
+        where: { listingId: fixture.listingId },
+        orderBy: { revisionNumber: "asc" },
+      });
+      expect(revisions).toHaveLength(2);
+      expect(revisions[1]).toMatchObject({
+        revisionNumber: 2,
+        classification: "SUBMISSION",
+        reasonCodes: ["RESUBMISSION"],
+        baseListingVersion: 5,
+        resultListingVersion: 7,
+      });
+      expect(revisions[1]?.diff).toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: "title", kind: "CHANGED" })]),
       );
     });
   });

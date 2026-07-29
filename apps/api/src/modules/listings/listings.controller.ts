@@ -23,10 +23,13 @@ import {
 import {
   createListingSchema,
   idempotencyKeySchema,
+  listListingRevisionsQuerySchema,
   listListingsQuerySchema,
   updateListingSchema,
   type CreateListingInput,
   type ListListingsQuery,
+  type ListListingRevisionsQuery,
+  type ListingRevisionCollection,
   type ListingOwnerResponse,
   type ListingResponse,
   type ListingSubmissionResponse,
@@ -132,6 +135,22 @@ export class ListingsController {
     }
   }
 
+  @Get(":listingId/revisions")
+  @Header("Cache-Control", "no-store")
+  async listRevisions(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Param("listingId", new ParseUUIDPipe({ version: "4" })) listingId: string,
+    @Query(new SchemaValidationPipe(listListingRevisionsQuerySchema))
+    query: ListListingRevisionsQuery,
+  ): Promise<ListingRevisionCollection> {
+    try {
+      return await this.listings.listRevisions(this.contexts.require(request), listingId, query);
+    } catch (error) {
+      this.#rethrow(error, reply);
+    }
+  }
+
   @Get(":listingId")
   async get(
     @Req() request: FastifyRequest,
@@ -158,18 +177,24 @@ export class ListingsController {
     @Res({ passthrough: true }) reply: FastifyReply,
     @Param("listingId", new ParseUUIDPipe({ version: "4" })) listingId: string,
     @Headers("if-match") rawIfMatch: string | undefined,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
     @Body(new SchemaValidationPipe(updateListingSchema)) input: UpdateListingInput,
   ): Promise<ListingOwnerResponse> {
     const expectedVersion = listingVersionFromEtag(rawIfMatch);
     if (!expectedVersion) {
       throw new BadRequestException("A valid If-Match Listing ETag is required");
     }
+    const idempotencyKey =
+      rawIdempotencyKey === undefined
+        ? undefined
+        : new SchemaValidationPipe(idempotencyKeySchema).transform(rawIdempotencyKey);
     try {
       const response = await this.listings.update(
         this.contexts.require(request),
         listingId,
         expectedVersion,
         input,
+        idempotencyKey,
       );
       void reply.header("ETag", listingEtag(response.data.version));
       return response;

@@ -140,8 +140,8 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
 
 - 队列按 priority 降序、createdAt/UUID 升序稳定分页；高风险 15 分钟、普通提交 4 小时的计划 SLA
   在响应和双语界面明确展示。cursor 与 actor/筛选 HMAC 绑定，limit 最大 50。
-- 每个案件读取提交事务生成的不可变脱敏快照。当前仅存在首次提交历史，因此 diff 明确把字段标记为
-  ADDED；后续 `listing_revisions` 上线后可在不改变当前契约的情况下增加 previous published diff。
+- 每个案件读取提交事务生成的不可变脱敏快照。`LIST-008` 将当前与上一不可变 revision 一并绑定，
+  初次提交显示 ADDED，重新提交与重大编辑显示真实字段级前后 diff，不从可变 Listing 当前行反推历史。
 - 详情同时展示非 LOW 规则代码/版本/严重度/字段名、媒体扫描结果和发布者状态聚合；不展示规则阈值、
   命中原文、联系方式、精确坐标、原始对象 key 或请求 hash。
 - 审核员可批准、要求修改、拒绝或升级，动作与稳定原因码绑定。读取要求 MFA + 当前
@@ -185,3 +185,17 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   同事务提交。
 - SLA 响应字段以举报 24 小时、申诉 3 个 UTC 工作日计算；节假日日历、人员班次、恶意举报信誉和
   审核质量仪表盘分别由运营配置与 `MOD-004` 完成，当前不会自动定罪或因新账号自动忽略证据。
+
+## 11.15 LIST-008 修订、diff 与重大编辑复审
+
+- 首次提交、要求修改后的重新提交及所有已发布编辑都会追加不可变 `listing_revisions`；快照使用公开/
+  审核安全字段，diff 对私有 attributes 只记录变化的 key，不复制联系方式、地址或敏感值。
+- Owner 通过 `GET /listings/{listingId}/revisions` 查看按 revision/UUID 稳定分页的历史、分类、
+  原因、风险、审核状态和脱敏 diff；cursor 与 actor、Listing 和 limit 绑定，跨账号/篡改失败关闭。
+- 已发布 `PATCH` 继续要求强 ETag，并额外要求 actor-scoped `Idempotency-Key`。有界的小型文字修正为
+  `MINOR_EDIT`，保留 `PUBLISHED`、审核状态和原到期时间；分类、区域、价格、联系方式、位置、媒体、
+  attributes、locale 或风险信号变化为 `MAJOR_EDIT`。
+- 重大编辑即时转回 `SUBMITTED/PENDING_REVIEW`，高风险进入 `ESCALATED`；低风险重大变化也提升到
+  至少中风险人工复核。新 revision、evaluation/hits、case/snapshot、Audit 和 Outbox 原子提交。
+- 重大编辑获批只能恢复 revision 保存的原发布时间与到期时间；到期则转为 `EXPIRED`，不能借编辑免费
+  续期。Case ETag、Listing version、revision/evaluation 关联和事务行锁共同阻止旧审核覆盖新内容。

@@ -82,6 +82,8 @@ function detail(item: ModerationCase): ModerationCaseDetailResponse {
         formSchemaVersion: 1,
         defaultLifetimeDays: 30,
         sensitiveFieldsRedacted: true,
+        previous: null,
+        revision: null,
         capturedAt: now,
       },
       diff: [

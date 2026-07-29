@@ -14,6 +14,7 @@ import {
   type ModerationRiskTier,
   type PriceUnit,
 } from "../../generated/prisma/client";
+import { listingRevisionReasonCodes, type ListingRevisionReasonCode } from "./listing-revision";
 
 export type ModerationCaseRepositoryOptions = {
   connectionString: string;
@@ -60,6 +61,14 @@ export type ModerationListingSnapshot = {
   defaultLifetimeDays: number;
   sensitiveFieldsRedacted: true;
   capturedAt: string;
+  previous: Record<string, unknown> | null;
+  revision: {
+    id: string;
+    classification: "SUBMISSION" | "MINOR_EDIT" | "MAJOR_EDIT";
+    reasonCodes: ListingRevisionReasonCode[];
+    originalPublishedAt: string | null;
+    originalExpiresAt: string | null;
+  } | null;
 };
 
 export type ModerationCaseListItem = {
@@ -305,6 +314,19 @@ function isPriceUnit(value: unknown): value is PriceUnit {
   );
 }
 
+function isListingRevisionClassification(
+  value: unknown,
+): value is "SUBMISSION" | "MINOR_EDIT" | "MAJOR_EDIT" {
+  return value === "SUBMISSION" || value === "MINOR_EDIT" || value === "MAJOR_EDIT";
+}
+
+function isListingRevisionReasonCode(value: unknown): value is ListingRevisionReasonCode {
+  return (
+    typeof value === "string" &&
+    listingRevisionReasonCodes.some((reasonCode) => reasonCode === value)
+  );
+}
+
 function parseSnapshot(value: Prisma.JsonValue): ModerationListingSnapshot | null {
   if (
     !isObject(value) ||
@@ -343,6 +365,43 @@ function parseSnapshot(value: Prisma.JsonValue): ModerationListingSnapshot | nul
           }
         : undefined;
   if (price === undefined) return null;
+  const previous =
+    value.previous === undefined || value.previous === null
+      ? null
+      : isObject(value.previous)
+        ? value.previous
+        : undefined;
+  if (previous === undefined) return null;
+  const revisionValue = value.revision;
+  const revision =
+    revisionValue === undefined || revisionValue === null
+      ? null
+      : isObject(revisionValue) &&
+          typeof revisionValue.id === "string" &&
+          isListingRevisionClassification(revisionValue.classification) &&
+          Array.isArray(revisionValue.reasonCodes) &&
+          revisionValue.reasonCodes.every(isListingRevisionReasonCode) &&
+          (revisionValue.originalPublishedAt === undefined ||
+            revisionValue.originalPublishedAt === null ||
+            typeof revisionValue.originalPublishedAt === "string") &&
+          (revisionValue.originalExpiresAt === undefined ||
+            revisionValue.originalExpiresAt === null ||
+            typeof revisionValue.originalExpiresAt === "string")
+        ? {
+            id: revisionValue.id,
+            classification: revisionValue.classification,
+            reasonCodes: [...revisionValue.reasonCodes],
+            originalPublishedAt:
+              typeof revisionValue.originalPublishedAt === "string"
+                ? revisionValue.originalPublishedAt
+                : null,
+            originalExpiresAt:
+              typeof revisionValue.originalExpiresAt === "string"
+                ? revisionValue.originalExpiresAt
+                : null,
+          }
+        : undefined;
+  if (revision === undefined) return null;
   return {
     listingId: value.listingId,
     listingVersion: value.listingVersion,
@@ -362,6 +421,8 @@ function parseSnapshot(value: Prisma.JsonValue): ModerationListingSnapshot | nul
     defaultLifetimeDays: value.defaultLifetimeDays,
     sensitiveFieldsRedacted: true,
     capturedAt: value.capturedAt,
+    previous,
+    revision,
   };
 }
 
@@ -874,6 +935,17 @@ export class ModerationCaseRepository {
           priority: true,
           version: true,
           updatedAt: true,
+          evaluation: {
+            select: {
+              listingRevision: {
+                select: {
+                  classification: true,
+                  originalPublishedAt: true,
+                  originalExpiresAt: true,
+                },
+              },
+            },
+          },
         },
       });
       if (!currentCase) return { kind: "not_found" };
@@ -917,9 +989,21 @@ export class ModerationCaseRepository {
       if (input.occurredAt < listing.updatedAt || input.occurredAt < currentCase.updatedAt) {
         return { kind: "time_conflict", currentCaseVersion: currentCase.version };
       }
+      const revision = currentCase.evaluation?.listingRevision;
+      const revisionPublishedAt =
+        revision?.classification === "MAJOR_EDIT" ? revision.originalPublishedAt : null;
+      const revisionExpiresAt =
+        revision?.classification === "MAJOR_EDIT" ? revision.originalExpiresAt : null;
+      const revisionApproval =
+        input.action === "APPROVE" && revisionPublishedAt !== null && revisionExpiresAt !== null;
       const expectedOutcome =
         input.action === "APPROVE"
-          ? [ContentStatus.PUBLISHED, ModerationStatus.APPROVED]
+          ? [
+              revisionApproval && input.occurredAt >= revisionExpiresAt
+                ? ContentStatus.EXPIRED
+                : ContentStatus.PUBLISHED,
+              ModerationStatus.APPROVED,
+            ]
           : input.action === "REQUEST_CHANGES"
             ? [ContentStatus.DRAFT, ModerationStatus.REJECTED]
             : input.action === "REJECT"
@@ -928,6 +1012,13 @@ export class ModerationCaseRepository {
       if (
         input.nextListing.status !== expectedOutcome[0] ||
         input.nextListing.moderationStatus !== expectedOutcome[1]
+      ) {
+        return { kind: "state_conflict", currentCaseVersion: currentCase.version };
+      }
+      if (
+        revisionApproval &&
+        (input.nextListing.publishedAt?.getTime() !== revisionPublishedAt.getTime() ||
+          input.nextListing.expiresAt?.getTime() !== revisionExpiresAt.getTime())
       ) {
         return { kind: "state_conflict", currentCaseVersion: currentCase.version };
       }
@@ -1023,7 +1114,9 @@ export class ModerationCaseRepository {
       });
       const eventType =
         input.action === "APPROVE"
-          ? "listing.published"
+          ? input.nextListing.status === ContentStatus.EXPIRED
+            ? "listing.expired"
+            : "listing.published"
           : input.action === "REQUEST_CHANGES"
             ? "listing.moderation.returned"
             : input.action === "REJECT"

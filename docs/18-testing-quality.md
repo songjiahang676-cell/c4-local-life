@@ -245,3 +245,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   email、phone、contact/address 与原始私有 attributes。
 - 空库 baseline 要求 24 个 migration、40 条已发布双语 Listing 模板、8 个举报/申诉 check 和 42 个
   数据库负例；上一发行版升级必须回填遗留 Report 的幂等证据并保留既有 Listing/审核哨兵。
+
+## 18.23 LIST-008 修订与重大编辑验证增量
+
+- 纯规则/API 测试覆盖发布后缺少幂等键、精确重试、强 ETag、文字 typo minor、价格/分类/区域/联系/
+  位置/媒体/attributes/locale/risk major、跨 owner 404、签名分页 cursor 和响应敏感字段负断言。
+- PostgreSQL 集成覆盖初次提交 revision、被要求修改后 resubmit diff、minor 保持公开及原期限、
+  major 进入人工审核并从公共读移除、低风险提升、Case previous snapshot、owner-only 分页和并发重试。
+- 数据库负例必须证明 revision UPDATE/DELETE 均被不可变触发器阻止，并验证版本/哈希/风险/actor/
+  publication-window check；baseline/upgrade 同时要求表、索引、触发器和旧数据 sentinel 存活。
+- 审核测试使用 previous revision 生成真实 diff；批准重大编辑保留原 `published_at/expires_at`，
+  审批时已到期则直接 EXPIRED，陈旧 Case/Listing version 不能覆盖较新修订或产生免费续期。
+- OpenAPI/生成类型/HTTP 测试覆盖 owner revision collection、`ListingOwnerView.latestRevision`、
+  `no-store`、Problem Details 和 BFF 精确 allowlist；全量质量门禁继续运行格式、类型、lint、单元/
+  集成、生产构建、运行时和 Chromium 桌面/移动回归。

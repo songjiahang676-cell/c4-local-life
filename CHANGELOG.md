@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added immutable Listing submission/edit revisions with normalized redacted snapshots and diffs,
+  owner-only revision history, exact-retry published edits, conservative minor-versus-major
+  classification, mandatory re-review for material changes, and original publication-window
+  preservation so approval cannot grant a free renewal.
 - Added Listing-only abuse reports with per-user quotas, concurrent active-target deduplication,
   immutable redacted evidence, MFA/recent-auth moderator decisions, 30-day owner appeals,
   independent-reviewer enforcement, atomic removal/restoration evidence and bilingual in-app

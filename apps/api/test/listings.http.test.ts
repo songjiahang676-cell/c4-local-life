@@ -4,6 +4,7 @@ import type {
   CreateListingInput,
   ListingCollection,
   ListingOwnerResponse,
+  ListingRevisionCollection,
   ListingSubmissionResponse,
   ProblemDetails,
 } from "@socal/contracts";
@@ -352,6 +353,118 @@ describe("listing draft HTTP boundary", () => {
     expect(retried.statusCode).toBe(202);
     expect(retried.json()).toEqual(response);
     expect(changedRetry.statusCode).toBe(409);
+  });
+
+  it("keeps minor published edits public and sends material edits through owner-visible review", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-revision-0001"),
+      payload: draftPayload("Published revision boundary"),
+    });
+    const listingId = created.json<ListingOwnerResponse>().data.id;
+    const submitted = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        ...mutationHeaders(ownerId, "listing-submit-revision-0001"),
+        "if-match": '"listing-v1"',
+      },
+    });
+    expect(submitted.statusCode).toBe(202);
+
+    const missingIdempotency = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listingId}`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v3"' },
+      payload: { title: "Published revision boundary!" },
+    });
+    expect(missingIdempotency.statusCode).toBe(422);
+
+    const minorHeaders = {
+      ...mutationHeaders(ownerId, "listing-edit-revision-minor-0001"),
+      "if-match": '"listing-v3"',
+    };
+    const minor = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listingId}`,
+      headers: minorHeaders,
+      payload: { title: "Published revision boundary!" },
+    });
+    const minorRetry = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listingId}`,
+      headers: minorHeaders,
+      payload: { title: "Published revision boundary!" },
+    });
+    expect(minor.statusCode).toBe(200);
+    expect(minor.headers.etag).toBe('"listing-v4"');
+    expect(minor.json<ListingOwnerResponse>()).toMatchObject({
+      data: {
+        status: "PUBLISHED",
+        moderationStatus: "AUTO_APPROVED",
+        latestRevision: {
+          classification: "MINOR_EDIT",
+          reasonCodes: ["MINOR_TEXT_EDIT"],
+          reviewState: "NOT_REQUIRED",
+        },
+      },
+    });
+    expect(minorRetry.statusCode).toBe(200);
+    expect(minorRetry.json()).toEqual(minor.json());
+
+    const history = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}/revisions?limit=1`,
+      headers: { cookie: cookies.get(ownerId) },
+    });
+    const historyPage = history.json<ListingRevisionCollection>();
+    expect(history.statusCode).toBe(200);
+    expect(history.headers["cache-control"]).toBe("no-store");
+    expect(historyPage.data).toHaveLength(1);
+    expect(historyPage.data[0]).toMatchObject({
+      classification: "MINOR_EDIT",
+      reasonCodes: ["MINOR_TEXT_EDIT"],
+    });
+    expect(historyPage.page.hasMore).toBe(true);
+    expect(JSON.stringify(historyPage)).not.toMatch(/snapshotHash|diffHash|requestHash/i);
+
+    const ownerOnly = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}/revisions`,
+      headers: { cookie: cookies.get(outsiderId) },
+    });
+    expect(ownerOnly.statusCode).toBe(404);
+
+    const major = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listingId}`,
+      headers: {
+        ...mutationHeaders(ownerId, "listing-edit-revision-major-0001"),
+        "if-match": '"listing-v4"',
+      },
+      payload: { price: { amount: "2650.00", currency: "USD", unit: "MONTHLY" } },
+    });
+    expect(major.statusCode).toBe(200);
+    expect(major.headers.etag).toBe('"listing-v5"');
+    expect(major.json<ListingOwnerResponse>()).toMatchObject({
+      data: {
+        status: "SUBMITTED",
+        moderationStatus: "PENDING_REVIEW",
+        publishedAt: null,
+        expiresAt: null,
+        latestRevision: {
+          classification: "MAJOR_EDIT",
+          reasonCodes: ["PRICE_CHANGED"],
+          reviewState: "PENDING",
+        },
+      },
+    });
+    const publicRead = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}`,
+    });
+    expect(publicRead.statusCode).toBe(404);
   });
 
   it("binds only registered READY media and supports ordered removal on autosave", async () => {

@@ -17,8 +17,13 @@ export type ListingOwnerView = components["schemas"]["ListingOwnerView"];
 export type ListingResponse = components["schemas"]["ListingResponse"];
 export type ListingOwnerResponse = components["schemas"]["ListingOwnerResponse"];
 export type ListingSubmissionResponse = components["schemas"]["ListingSubmissionResponse"];
+export type ListingRevisionView = components["schemas"]["ListingRevisionView"];
+export type ListingRevisionCollection = components["schemas"]["ListingRevisionCollection"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
+export type ListListingRevisionsQuery = NonNullable<
+  operations["listListingRevisions"]["parameters"]["query"]
+>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
 export type Session = components["schemas"]["Session"];
 export type SessionResponse = components["schemas"]["SessionResponse"];
@@ -368,6 +373,13 @@ export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
     type: listingTypeSchema.default("RENTAL"),
     categoryId: z.uuid().optional(),
     regionCode: z.string().trim().min(2).max(80).optional(),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export const listListingRevisionsQuerySchema: z.ZodType<ListListingRevisionsQuery> = z
+  .object({
     cursor: z.string().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(20),
   })

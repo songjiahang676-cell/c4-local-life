@@ -30,6 +30,9 @@
       "listing-submission": [
         "src/repositories/listing-submission.repository.ts"
       ],
+      "listing-revision": [
+        "src/repositories/listing-revision.repository.ts"
+      ],
       "moderation-case": [
         "src/repositories/moderation-case.repository.ts"
       ],
@@ -91,6 +94,11 @@
       "types": "./src/repositories/listing-submission.repository.ts",
       "require": "./dist/src/repositories/listing-submission.repository.js",
       "default": "./dist/src/repositories/listing-submission.repository.js"
+    },
+    "./listing-revision": {
+      "types": "./src/repositories/listing-revision.repository.ts",
+      "require": "./dist/src/repositories/listing-revision.repository.js",
+      "default": "./dist/src/repositories/listing-revision.repository.js"
     },
     "./moderation-case": {
       "types": "./src/repositories/moderation-case.repository.ts",

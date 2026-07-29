@@ -45,6 +45,7 @@ const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
     /^categories$/,
     new RegExp(`^categories/${uuid}/form-schema$`),
     new RegExp(`^listings/${uuid}$`),
+    new RegExp(`^listings/${uuid}/revisions$`),
     new RegExp(`^media/${uuid}$`),
   ],
   POST: [

@@ -240,6 +240,47 @@ describe("ListingsService", () => {
     ).rejects.toBeInstanceOf(ListingIdempotencyConflictError);
   });
 
+  it("routes a sensitive attribute-only published edit to review without retaining its value", async () => {
+    const { service } = createService();
+    const created = await service.create(
+      ownerContext(),
+      "create-draft-sensitive-edit",
+      createInput(),
+    );
+    await service.submit(ownerContext(), created.data.id, 1, "submit-sensitive-edit");
+
+    const revised = await service.update(
+      ownerContext("PATCH"),
+      created.data.id,
+      3,
+      { attributes: { contactEmail: "private-owner@example.invalid" } },
+      "published-sensitive-edit",
+    );
+
+    expect(revised.data).toMatchObject({
+      status: "SUBMITTED",
+      moderationStatus: "PENDING_REVIEW",
+      version: 4,
+      latestRevision: {
+        classification: "MAJOR_EDIT",
+        reasonCodes: ["ATTRIBUTES_CHANGED"],
+        reviewState: "PENDING",
+        riskTier: "MEDIUM",
+        diff: [
+          {
+            field: "attributes",
+            kind: "CHANGED",
+            before: { changedKeys: ["contactEmail"] },
+            after: { changedKeys: ["contactEmail"] },
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(revised.data.latestRevision)).not.toContain(
+      "private-owner@example.invalid",
+    );
+  });
+
   it("escalates a high-risk submission into a moderation case", async () => {
     const { service } = createService();
     const created = await service.create(

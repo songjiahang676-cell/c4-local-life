@@ -52,6 +52,8 @@ const snapshot = {
   formSchemaVersion: 1,
   defaultLifetimeDays: 30,
   sensitiveFieldsRedacted: true as const,
+  previous: null,
+  revision: null,
   capturedAt: createdAt.toISOString(),
 };
 

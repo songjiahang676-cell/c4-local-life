@@ -30,6 +30,19 @@ import type {
   SubmitListingInput,
   SubmitListingResult,
 } from "@socal/database/listing-submission";
+import type {
+  FindPublishedRevisionRetryInput,
+  FindPublishedRevisionRetryResult,
+  ListListingRevisionsInput,
+  ListListingRevisionsResult,
+  ListingRevisionCursor,
+  ListingRevisionDiffEntry,
+  ListingRevisionProjection,
+  ListingRevisionReasonCode,
+  ListingRevisionSnapshot,
+  RevisePublishedListingInput,
+  RevisePublishedListingResult,
+} from "@socal/database/listing-revision";
 
 export const LISTING_STORE = Symbol("LISTING_STORE");
 
@@ -54,6 +67,11 @@ export type ListingStore = {
     listingId: string;
   }): Promise<ListingSubmissionCandidate | null>;
   submit(input: SubmitListingInput): Promise<SubmitListingResult>;
+  findPublishedRevisionRetry(
+    input: FindPublishedRevisionRetryInput,
+  ): Promise<FindPublishedRevisionRetryResult>;
+  revisePublished(input: RevisePublishedListingInput): Promise<RevisePublishedListingResult>;
+  listRevisions(input: ListListingRevisionsInput): Promise<ListListingRevisionsResult>;
 };
 
 export type {
@@ -81,4 +99,15 @@ export type {
   ListingSubmissionTransitionEvidence,
   SubmitListingInput,
   SubmitListingResult,
+  FindPublishedRevisionRetryInput,
+  FindPublishedRevisionRetryResult,
+  ListListingRevisionsInput,
+  ListListingRevisionsResult,
+  RevisePublishedListingInput,
+  RevisePublishedListingResult,
+  ListingRevisionCursor,
+  ListingRevisionDiffEntry,
+  ListingRevisionProjection,
+  ListingRevisionReasonCode,
+  ListingRevisionSnapshot,
 };

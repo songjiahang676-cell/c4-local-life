@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   CreateListingDraftInput,
   CreateListingDraftResult,
@@ -10,6 +11,11 @@ import type {
   FindListingSubmissionRetryResult,
   ListingSubmissionCandidate,
   ListingSubmissionProjection,
+  ListingRevisionProjection,
+  FindPublishedRevisionRetryInput,
+  FindPublishedRevisionRetryResult,
+  ListListingRevisionsInput,
+  ListListingRevisionsResult,
   OwnerListingProjection,
   OwnerListingTransitionInput,
   OwnerListingTransitionResult,
@@ -21,6 +27,8 @@ import type {
   UpdateListingDraftResult,
   SubmitListingInput,
   SubmitListingResult,
+  RevisePublishedListingInput,
+  RevisePublishedListingResult,
 } from "../../src/modules/listings/listing.store";
 import { MemoryTaxonomyStore } from "./memory-taxonomy.store";
 
@@ -154,7 +162,19 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
         definition: {
           categoryId: memoryListingCategoryId,
           version: 1,
-          fields: [],
+          fields: [
+            {
+              key: "contactEmail",
+              type: "TEXT",
+              label: { "zh-Hans": "联系邮箱", "en-US": "Contact email" },
+              required: false,
+              filterable: false,
+              searchable: false,
+              visibility: "OWNER_ONLY",
+              sortOrder: 10,
+              validation: { maxLength: 254 },
+            },
+          ],
           publicationPolicy: {
             defaultLifetimeDays: 30,
             manualReviewRequired: false,
@@ -523,6 +543,7 @@ function rowFromCreate(input: CreateListingDraftInput): OwnerListingProjection {
     featuredUntil: null,
     publishedAt: null,
     expiresAt: null,
+    latestRevision: null,
     createdAt: new Date(input.occurredAt),
     updatedAt: new Date(input.occurredAt),
     version: 1,
@@ -584,6 +605,11 @@ export class MemoryListingStore implements ListingStore {
     string,
     { hash: string; submission: ListingSubmissionProjection }
   >();
+  readonly #revisionIdempotency = new Map<
+    string,
+    { hash: string; listingId: string; revision: ListingRevisionProjection }
+  >();
+  readonly #revisions = new Map<string, ListingRevisionProjection[]>();
   readonly #organizationReaders = new Map<string, Set<string>>();
   readonly #organizationWriters = new Map<string, Set<string>>();
   readonly #readyMedia = new Set<string>();
@@ -851,9 +877,38 @@ export class MemoryListingStore implements ListingStore {
     if (row.version !== input.expectedVersion) {
       return Promise.resolve({ kind: "version_conflict", currentVersion: row.version });
     }
-    if (row.status !== "DRAFT" || row.moderationStatus !== "NOT_REVIEWED") {
+    if (
+      row.status !== "DRAFT" ||
+      (row.moderationStatus !== "NOT_REVIEWED" && row.moderationStatus !== "REJECTED")
+    ) {
       return Promise.resolve({ kind: "state_conflict", currentVersion: row.version });
     }
+    const revision: ListingRevisionProjection = {
+      id: randomUUID(),
+      revisionNumber: (this.#revisions.get(row.id)?.length ?? 0) + 1,
+      baseListingVersion: row.version,
+      resultListingVersion: input.decision.resultVersion,
+      classification: "SUBMISSION",
+      reasonCodes: [row.moderationStatus === "REJECTED" ? "RESUBMISSION" : "INITIAL_SUBMISSION"],
+      reviewState:
+        input.decision.contentStatus === "PUBLISHED"
+          ? "APPROVED"
+          : input.decision.moderationStatus === "ESCALATED"
+            ? "ESCALATED"
+            : "PENDING",
+      riskTier: input.riskTier,
+      ruleSetVersion: input.ruleSetVersion,
+      diff: [
+        {
+          field: "title",
+          kind: "ADDED",
+          before: null,
+          after: row.title,
+        },
+      ],
+      createdAt: input.occurredAt,
+    };
+    this.#revisions.set(row.id, [...(this.#revisions.get(row.id) ?? []), revision]);
     const updated: OwnerListingProjection = {
       ...row,
       status: input.decision.contentStatus,
@@ -862,6 +917,7 @@ export class MemoryListingStore implements ListingStore {
       expiresAt: input.decision.expiresAt,
       updatedAt: input.occurredAt,
       version: input.decision.resultVersion,
+      latestRevision: revision,
     };
     this.#rows.set(updated.id, updated);
     if (updated.status === "PUBLISHED" && updated.publishedAt && updated.expiresAt) {
@@ -894,7 +950,7 @@ export class MemoryListingStore implements ListingStore {
       resourceId: row.id,
       previousStatus: "DRAFT" as const,
       currentStatus: input.decision.contentStatus,
-      previousModerationStatus: "NOT_REVIEWED" as const,
+      previousModerationStatus: row.moderationStatus,
       currentModerationStatus: input.decision.moderationStatus,
       riskTier: input.riskTier,
       ruleSetVersion: input.ruleSetVersion,
@@ -906,6 +962,137 @@ export class MemoryListingStore implements ListingStore {
     this.auditActions.push("listing.submission.evaluated");
     this.outboxEvents.push(...input.decision.transitions.map((event) => event.eventType));
     return Promise.resolve({ kind: "submitted", submission: structuredClone(submission) });
+  }
+
+  findPublishedRevisionRetry(
+    input: FindPublishedRevisionRetryInput,
+  ): Promise<FindPublishedRevisionRetryResult> {
+    const evidence = this.#revisionIdempotency.get(`${input.actorUserId}:${input.idempotencyKey}`);
+    if (!evidence) return Promise.resolve({ kind: "missing" });
+    if (evidence.hash !== input.requestHash) return Promise.resolve({ kind: "conflict" });
+    const listing = this.#rows.get(evidence.listingId);
+    return Promise.resolve(
+      listing && this.#canRead(input.actorUserId, listing)
+        ? {
+            kind: "exact_retry",
+            listing: cloneOwner(listing),
+            revision: structuredClone(evidence.revision),
+          }
+        : { kind: "conflict" },
+    );
+  }
+
+  revisePublished(input: RevisePublishedListingInput): Promise<RevisePublishedListingResult> {
+    const key = `${input.actorUserId}:${input.idempotencyKey}`;
+    const retry = this.#revisionIdempotency.get(key);
+    if (retry) {
+      const listing = this.#rows.get(retry.listingId);
+      return Promise.resolve(
+        retry.hash === input.requestHash && listing
+          ? {
+              kind: "exact_retry",
+              listing: cloneOwner(listing),
+              revision: structuredClone(retry.revision),
+            }
+          : { kind: "idempotency_conflict" },
+      );
+    }
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canWrite(input.actorUserId, row)) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    if (row.version !== input.expectedVersion) {
+      return Promise.resolve({ kind: "version_conflict", currentVersion: row.version });
+    }
+    if (row.status !== "PUBLISHED") {
+      return Promise.resolve({ kind: "state_conflict", currentVersion: row.version });
+    }
+    const major = input.classification === "MAJOR_EDIT";
+    const revision: ListingRevisionProjection = {
+      id: randomUUID(),
+      revisionNumber: (this.#revisions.get(row.id)?.length ?? 0) + 1,
+      baseListingVersion: row.version,
+      resultListingVersion: row.version + 1,
+      classification: input.classification,
+      reasonCodes: [...input.reasonCodes],
+      reviewState: major ? (input.riskTier === "HIGH" ? "ESCALATED" : "PENDING") : "NOT_REQUIRED",
+      riskTier: major && input.riskTier === "LOW" ? "MEDIUM" : input.riskTier,
+      ruleSetVersion: input.ruleSetVersion,
+      diff: structuredClone([...input.diff]),
+      createdAt: input.occurredAt,
+    };
+    const updatedFields = applyFields(row, input, input.occurredAt);
+    const updated: OwnerListingProjection = {
+      ...updatedFields,
+      status: major ? "SUBMITTED" : "PUBLISHED",
+      moderationStatus: major
+        ? input.riskTier === "HIGH"
+          ? "ESCALATED"
+          : "PENDING_REVIEW"
+        : row.moderationStatus,
+      publishedAt: major ? null : row.publishedAt,
+      expiresAt: major ? null : row.expiresAt,
+      latestRevision: revision,
+    };
+    this.#rows.set(row.id, updated);
+    this.#revisions.set(row.id, [...(this.#revisions.get(row.id) ?? []), revision]);
+    this.#revisionIdempotency.set(key, {
+      hash: input.requestHash,
+      listingId: row.id,
+      revision,
+    });
+    if (major) {
+      this.#publicRows.delete(row.id);
+    } else {
+      const publicRow = this.#publicRows.get(row.id);
+      if (publicRow) {
+        this.#publicRows.set(row.id, {
+          ...publicRow,
+          title: updated.title,
+          summary: updated.summary,
+          body: updated.body,
+          price: structuredClone(updated.price),
+          version: updated.version,
+          updatedAt: updated.updatedAt,
+        });
+      }
+    }
+    this.auditActions.push(major ? "listing.revision.submitted" : "listing.revision.applied");
+    this.outboxEvents.push(major ? "listing.submitted" : "listing.revised");
+    return Promise.resolve({
+      kind: "revised",
+      listing: cloneOwner(updated),
+      revision: structuredClone(revision),
+    });
+  }
+
+  listRevisions(input: ListListingRevisionsInput): Promise<ListListingRevisionsResult> {
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canRead(input.actorUserId, row)) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    const rows = [...(this.#revisions.get(input.listingId) ?? [])]
+      .sort(
+        (left, right) =>
+          right.createdAt.getTime() - left.createdAt.getTime() || right.id.localeCompare(left.id),
+      )
+      .filter(
+        (revision) =>
+          !input.cursor ||
+          revision.createdAt < input.cursor.createdAt ||
+          (revision.createdAt.getTime() === input.cursor.createdAt.getTime() &&
+            revision.id < input.cursor.id),
+      );
+    const page = rows.slice(0, input.limit);
+    const last = page.at(-1);
+    return Promise.resolve({
+      kind: "listed",
+      items: structuredClone(page),
+      nextCursor:
+        rows.length > input.limit && last
+          ? { createdAt: new Date(last.createdAt), id: last.id }
+          : null,
+    });
   }
 
   #canRead(actorUserId: string, row: OwnerListingProjection): boolean {
