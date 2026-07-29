@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target     | Status      | Notes                                                               |
-| -------- | -------------------- | ---------- | ---------- | ----------- | ------------------------------------------------------------------- |
-| LIST-007 | @songjiahang676-cell | 2026-07-29 | PR pending | local green | Transfer/Secondhand/Service 明细、政策、公开/过期与三类双语移动 E2E |
+| Task     | Owner                | Started    | Target | Status       | Notes                                                               |
+| -------- | -------------------- | ---------- | ------ | ------------ | ------------------------------------------------------------------- |
+| LIST-007 | @songjiahang676-cell | 2026-07-29 | PR #27 | hosted green | Transfer/Secondhand/Service 明细、政策、公开/过期与三类双语移动 E2E |
 
 ## Gate Evidence
 
@@ -150,6 +150,7 @@
 | LIST-007 local quality          | `pnpm ci:quality`                     | 76 passed files / 329 tests；2 service skips；9 checks；8 builds passed    | 2026-07-29 |
 | LIST-007 runtime/browser        | API runtime + Chromium desktop/mobile | canonical contract；five vertical journeys；14/14 production E2E passed    | 2026-07-29 |
 | LIST-007 architecture           | `scripts/check-architecture.sh`       | semantic check；101 tasks、53 models、57 paths、123 schemas passed         | 2026-07-29 |
+| LIST-007 protected checks       | PR #27 / run `30445735838`            | 331 real-service tests、Linux 14/14 E2E and four non-root images passed    | 2026-07-29 |
 
 ## Decisions / Blocks
 
