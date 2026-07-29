@@ -36,7 +36,12 @@ Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证�
 - [x] 不可变 revision、真实 diff、owner 原因和重大编辑复审/原期限保护。
 - [x] 私有用户中心四状态分组、组织读取边界、强版本批量归档/删除和草稿继续编辑。
 - [x] 版本化重复文本/图片/联系方式候选、dry-run、不可变人工反馈与误杀指标。
+- [x] 共享账户壳、短效 no-store 能力快照、主动重验、失败关闭和双语错误状态。
 - [x] 五类移动端中英文发布 E2E。
+
+Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实 PostgreSQL 与生产 Chromium 回归；
+最终退出还要求 `WEB-004` 的受保护 Linux 真实服务和四镜像门禁、evidence-head、受保护合并及
+merged-main 复验全部通过，证据记录在 `tasks/STATUS.md`。
 
 ## G3 Search / Web / SEO
 

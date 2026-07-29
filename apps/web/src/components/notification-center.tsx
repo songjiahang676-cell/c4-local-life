@@ -7,10 +7,10 @@ import type {
 } from "@socal/contracts";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAccountSession } from "./account-shell";
 
 export type NotificationLocale = "zh-Hans" | "en-US";
 
-type AuthState = "loading" | "authenticated" | "unauthenticated" | "unavailable";
 type LoadState = "idle" | "loading" | "ready" | "failed";
 
 const text = {
@@ -137,7 +137,7 @@ async function fetchNotificationPage(
 
 export function NotificationCenter({ locale }: { locale: NotificationLocale }) {
   const copy = text[locale];
-  const [authState, setAuthState] = useState<AuthState>("loading");
+  const { refresh: refreshSession, status: authState } = useAccountSession();
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [notifications, setNotifications] = useState<readonly InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -155,29 +155,6 @@ export function NotificationCenter({ locale }: { locale: NotificationLocale }) {
       }),
     [locale],
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch("/v1/auth/session", {
-          cache: "no-store",
-          credentials: "same-origin",
-          signal: controller.signal,
-        });
-        if (response.status === 401) {
-          setAuthState("unauthenticated");
-          return;
-        }
-        setAuthState(response.ok ? "authenticated" : "unavailable");
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setAuthState("unavailable");
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
 
   const applyPage = useCallback((page: NotificationCollection, append: boolean) => {
     setNotifications((current) => (append ? [...current, ...page.data] : page.data));
@@ -268,9 +245,12 @@ export function NotificationCenter({ locale }: { locale: NotificationLocale }) {
 
   if (authState === "unavailable") {
     return (
-      <p className="notificationError" role="alert">
-        {copy.serviceUnavailable}
-      </p>
+      <div className="notificationError" role="alert">
+        <p>{copy.serviceUnavailable}</p>
+        <button onClick={() => void refreshSession()} type="button">
+          {copy.retry}
+        </button>
+      </div>
     );
   }
 

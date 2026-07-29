@@ -9,10 +9,10 @@ import type {
 } from "@socal/contracts";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAccountSession } from "./account-shell";
 
 export type AccountListingsLocale = "zh-Hans" | "en-US";
 
-type AuthState = "loading" | "authenticated" | "unauthenticated" | "unavailable";
 type LoadState = "idle" | "loading" | "ready" | "failed";
 type TypeFilter = ListingType | "ALL";
 
@@ -308,7 +308,7 @@ function editHref(locale: AccountListingsLocale, listing: MyListingSummaryView):
 
 export function AccountListings({ locale }: { locale: AccountListingsLocale }) {
   const text = copy[locale];
-  const [authState, setAuthState] = useState<AuthState>("loading");
+  const { refresh: refreshSession, status: authState } = useAccountSession();
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [bucket, setBucket] = useState<OwnerListingBucket>("DRAFT");
   const [type, setType] = useState<TypeFilter>("ALL");
@@ -334,31 +334,6 @@ export function AccountListings({ locale }: { locale: AccountListingsLocale }) {
       }),
     [locale],
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/v1/auth/session", {
-      cache: "no-store",
-      credentials: "same-origin",
-      signal: controller.signal,
-    })
-      .then((response) => {
-        const nextAuthState =
-          response.status === 401
-            ? "unauthenticated"
-            : response.ok
-              ? "authenticated"
-              : "unavailable";
-        if (nextAuthState === "authenticated") setLoadState("loading");
-        setAuthState(nextAuthState);
-      })
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setAuthState("unavailable");
-        }
-      });
-    return () => controller.abort();
-  }, []);
 
   const applyPage = useCallback((page: MyListingCollection, append: boolean) => {
     setListings((current) => (append ? [...current, ...page.data] : page.data));
@@ -470,9 +445,12 @@ export function AccountListings({ locale }: { locale: AccountListingsLocale }) {
   }
   if (authState === "unavailable") {
     return (
-      <p className="accountListingsError" role="alert">
-        {text.unavailable}
-      </p>
+      <div className="accountListingsError" role="alert">
+        <p>{text.unavailable}</p>
+        <button onClick={() => void refreshSession()} type="button">
+          {text.retry}
+        </button>
+      </div>
     );
   }
 

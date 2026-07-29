@@ -124,3 +124,13 @@ Audit、Outbox 和日志均不包含联系方式值、精确位置、原始私�
 结果从 UNREVIEWED 一次写定。只有当前 MFA moderator 可读取 no-store 最小候选摘要，动作仍要求近期
 认证、强 ETag、actor-scoped 幂等键和事务内角色复核。阈值调整必须新增版本并先 dry-run；HMAC 密钥
 轮换与指纹清理必须按保留/重建计划执行。
+
+## 账户能力缓存边界
+
+Web 账户壳只在当前组件树内存中保存 `GET /auth/session` 的安全摘要，禁止把 Session、permission、
+组织关系或 token 写入 localStorage、sessionStorage、URL、共享缓存、错误文本或日志。读取强制
+no-store，并在可见状态下每 15 秒、focus、pageshow、恢复可见和绝对到期时重验；并发刷新去重。
+
+401、过期、网络/服务错误以及 malformed、重复或越界响应都会清空旧能力并失败关闭。导航隐藏仅用于
+减少无效入口，不构成授权；每个 owner/组织资源和 mutation 仍由 API 当前 Actor、Policy、Repository
+对象范围、版本与幂等规则独立验证。账号切换、角色撤销或受限状态不能继承上一快照的能力。

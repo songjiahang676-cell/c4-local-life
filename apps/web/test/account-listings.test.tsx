@@ -3,6 +3,7 @@ import type { MyListingCollection, MyListingSummaryView } from "@socal/contracts
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountListings, parseMyListingCollection } from "../src/components/account-listings";
+import { AccountSessionProvider } from "../src/components/account-shell";
 
 const listing = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -71,6 +72,31 @@ function jsonResponse(value: unknown, status = 200): Response {
   });
 }
 
+const accountSession = {
+  data: {
+    user: {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      displayName: "Synthetic Listing Owner",
+      avatarUrl: null,
+      locale: "en-US",
+      status: "ACTIVE",
+      verificationBadges: [],
+    },
+    expiresAt: "2099-07-30T01:00:00.000Z",
+    permissions: ["account:listings:read", "listing:draft:create"],
+    platformRoles: [],
+    organizations: [],
+  },
+};
+
+function renderAccountListings(locale: "zh-Hans" | "en-US" = "en-US") {
+  return render(
+    <AccountSessionProvider>
+      <AccountListings locale={locale} />
+    </AccountSessionProvider>,
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -81,7 +107,7 @@ describe("account Listing management", () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AccountListings locale="en-US" />);
+    renderAccountListings();
 
     expect(
       await screen.findByRole("heading", { name: "Sign in to manage listings" }),
@@ -96,7 +122,7 @@ describe("account Listing management", () => {
   it("switches buckets and archives a selected current-version Listing", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ data: { user: { id: "owner" } } }))
+      .mockResolvedValueOnce(jsonResponse(accountSession))
       .mockResolvedValueOnce(
         jsonResponse(
           collection([], {
@@ -143,7 +169,7 @@ describe("account Listing management", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AccountListings locale="en-US" />);
+    renderAccountListings();
 
     fireEvent.click(await screen.findByRole("button", { name: /Published/ }));
     expect(await screen.findByRole("heading", { name: listing.title })).toBeVisible();

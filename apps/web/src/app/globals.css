@@ -2785,3 +2785,267 @@ input:focus-visible {
     flex-direction: column;
   }
 }
+
+.accountShell {
+  min-height: 60vh;
+}
+
+.accountShellHeader {
+  width: min(100% - 32px, 1080px);
+  margin: 18px auto 0;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: color-mix(in srgb, white 94%, var(--blue-soft));
+  border: 1px solid #dce5f0;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgb(19 47 82 / 7%);
+}
+
+.accountShellIdentity {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.accountShellIdentity > span,
+.accountOverviewHeader > p {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.accountShellIdentity > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountShellIdentity > small {
+  color: var(--muted);
+}
+
+.accountShellNav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.accountShellNav a {
+  min-height: 40px;
+  padding: 9px 12px;
+  display: inline-grid;
+  place-items: center;
+  color: #29445f;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.accountShellNav a:hover {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.accountShellNav a.isPrimary,
+.accountOverviewPrimary {
+  color: white;
+  background: var(--blue);
+}
+
+.accountShellNav a:focus-visible,
+.accountOverview a:focus-visible,
+.accountOverview button:focus-visible {
+  outline: 3px solid #ffbd4a;
+  outline-offset: 2px;
+}
+
+.accountOverview {
+  width: min(100% - 32px, 1080px);
+  padding-block: 28px 56px;
+}
+
+.accountOverview > nav {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.accountOverview > nav a {
+  color: var(--blue);
+}
+
+.accountOverviewHeader {
+  max-width: 780px;
+  margin: 28px 0;
+  display: grid;
+  gap: 9px;
+}
+
+.accountOverviewHeader h1 {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 48px);
+  letter-spacing: -0.035em;
+}
+
+.accountOverviewHeader > span {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.accountOverviewHeader > strong {
+  padding: 10px 12px;
+  color: #744700;
+  background: #fff5d6;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.accountOverviewHeader > small {
+  color: var(--muted);
+}
+
+.accountOverviewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.accountOverviewCard {
+  min-height: 150px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  color: inherit;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.accountOverviewCard:hover {
+  border-color: #9bb9df;
+  transform: translateY(-2px);
+}
+
+.accountOverviewCard > strong {
+  color: var(--blue);
+  font-size: 19px;
+}
+
+.accountOverviewCard > span,
+.accountOrganizations > p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.accountOrganizations {
+  margin-top: 18px;
+}
+
+.accountOrganizations h2 {
+  margin: 0;
+}
+
+.accountOrganizations ul {
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+}
+
+.accountOrganizations li {
+  padding: 11px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f7f9fc;
+  border-radius: 8px;
+}
+
+.accountOrganizations li span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.accountOverviewGate,
+.accountOverviewError,
+.accountOverviewStatus {
+  max-width: 640px;
+  margin: 36px auto;
+}
+
+.accountOverviewGate h1 {
+  margin-top: 0;
+}
+
+.accountOverviewPrimary,
+.accountOverviewError button {
+  min-height: 42px;
+  padding: 10px 16px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.accountOverviewError {
+  padding: 16px;
+  color: #8b1d1d;
+  background: #fff1f1;
+  border: 1px solid #efb5b5;
+  border-radius: 10px;
+}
+
+.accountOverviewError button {
+  color: white;
+  background: #8b1d1d;
+}
+
+@media (max-width: 760px) {
+  .accountShellHeader {
+    width: min(100% - 20px, 1080px);
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .accountShellNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .accountOverview {
+    width: min(100% - 20px, 1080px);
+    padding-top: 20px;
+  }
+
+  .accountOverviewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .accountOverviewCard {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .accountShellNav {
+    grid-template-columns: 1fr;
+  }
+
+  .accountOrganizations li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

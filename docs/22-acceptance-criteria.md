@@ -227,3 +227,15 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   阈值版本解释误杀率，不伪造生产准确率。
 - OpenAPI、生成契约、Prisma/migration、回滚说明、真实 PostgreSQL、完整质量、生产浏览器和托管
   保护门禁全部通过后方可标记完成。
+
+## 22.12 WEB-004 账户中心壳验收
+
+- `/[locale]/account` 与现有账户子页共享一份 no-store 内存 Session；并发读取去重，15 秒可见窗口、
+  focus、pageshow、visibilitychange 和绝对到期会重新验证。
+- 401、过期、网络/服务错误和 malformed/越界 payload 都清空旧能力并失败关闭；Session/permission
+  不进入 Web Storage、URL、公开缓存、日志或错误文本。
+- 导航只显示服务端返回且当前已实现的能力；缺少通知/发布/信息读取能力时对应入口不存在，受限账号、
+  guest、loading、unavailable、retry 与无组织状态均有中英文可访问界面。
+- 用户/组织只使用安全摘要并本地化角色/类型；服务端仍对每个资源与 mutation 独立授权。
+- 私有页 noindex/no-store、桌面/移动无横向溢出、键盘焦点、组件回归和生产 Chromium 门禁通过；
+  OpenAPI/Prisma/migration 无变化并明确记录。
