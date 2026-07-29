@@ -7,12 +7,14 @@
     "dev": "tsx --env-file=../../.env watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "search:index:ensure": "tsx --env-file=../../.env src/search/ensure-listing-index.ts",
     "lint": "eslint src test --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts --project @socal/worker --reporter=default"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1096.0",
+    "@opensearch-project/opensearch": "2.13.0",
     "@socal/config": "workspace:*",
     "@socal/database": "workspace:*",
     "@socal/observability": "workspace:*",

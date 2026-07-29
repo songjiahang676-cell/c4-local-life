@@ -55,6 +55,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 60
+      opensearch:
+        image: opensearchproject/opensearch:2.19.5
+        env:
+          discovery.type: single-node
+          plugins.security.disabled: "true"
+          bootstrap.memory_lock: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+          --ulimit memlock=-1:-1
 
     env:
       NODE_ENV: test
@@ -65,6 +80,9 @@ jobs:
       REDIS_INTEGRATION_URL: redis://localhost:6379/0
       CLAMAV_INTEGRATION_HOST: 127.0.0.1
       CLAMAV_INTEGRATION_PORT: "3310"
+      OPENSEARCH_NODE: http://localhost:9200
+      OPENSEARCH_INTEGRATION_URL: http://localhost:9200
+      OPENSEARCH_INDEX_PREFIX: socal_ci
       SESSION_SECRET: ci-only-session-secret-at-least-32-bytes
       OTP_SECRET: ci-only-dedicated-otp-secret-at-least-32-bytes
       MFA_SECRET: ci-only-dedicated-mfa-secret-at-least-32-bytes
@@ -257,6 +275,7 @@ jobs:
             --env LOG_LEVEL=info \
             --env DATABASE_URL=postgresql://socal:socal@database.invalid:5432/socal?schema=public \
             --env REDIS_URL=redis://socal-redis:6379/0 \
+            --env OPENSEARCH_NODE=http://opensearch.invalid:9200 \
             socal-worker-runtime:ci
 
           wait_for_health socal-web http://127.0.0.1:3000/health/ready

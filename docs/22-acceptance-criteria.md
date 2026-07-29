@@ -239,3 +239,16 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 用户/组织只使用安全摘要并本地化角色/类型；服务端仍对每个资源与 mutation 独立授权。
 - 私有页 noindex/no-store、桌面/移动无横向溢出、键盘焦点、组件回归和生产 Chromium 门禁通过；
   OpenAPI/Prisma/migration 无变化并明确记录。
+
+## 22.13 SEARCH-001 版本索引验收
+
+- v1 物理索引、read/write alias 和 `_meta` 版本可重复创建/验证；已有 mapping 或 write alias 漂移时
+  失败关闭，不执行不可审查的原地修补。
+- 中文 CJK bigram、英文 stop/stem、双语和前缀 analyzer 在目标 OpenSearch 版本真实执行；结构化分类、
+  地区、价格、attributes、内容版本和模糊公开 geo point 有确定 mapping。
+- TypeScript 文档 DTO 与 `dynamic: strict` mapping 都不允许电话、邮箱、精确地址、审核备注、风险分、
+  object key 或认证材料；真实节点写入额外电话字段返回 400。
+- CI 固定版本化 OpenSearch service 并健康检查，真实运行 analyzer、alias、index/search、geo 和负例；
+  本地缺少 Docker 时必须明确记录，不能把跳过当通过。
+- PostgreSQL、OpenAPI、Prisma 和 migration 不变；后续 Worker、query API、同义词和重建任务保持各自
+  Backlog 边界。

@@ -37,6 +37,11 @@ const optionalSecretSchema = () =>
 const optionalStringSchema = () =>
   z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional());
 
+const openSearchIndexPrefixSchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]{1,39}$/)
+  .default("socal_local");
+
 const commonServerSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema,
   APP_ENV: applicationEnvironmentSchema,
@@ -59,6 +64,7 @@ const apiEnvironmentSchema = commonServerSchema
     OPENSEARCH_NODE: z.string().url(),
     OPENSEARCH_USERNAME: z.string().optional().default(""),
     OPENSEARCH_PASSWORD: optionalSecretSchema(),
+    OPENSEARCH_INDEX_PREFIX: openSearchIndexPrefixSchema,
     S3_ENDPOINT: z.string().url().optional().or(z.literal("")).default(""),
     S3_REGION: z.string().min(1).max(64).default("us-west-2"),
     S3_QUARANTINE_BUCKET: z
@@ -212,6 +218,13 @@ const apiEnvironmentSchema = commonServerSchema
         message: "S3 access key and secret key must be supplied together",
       });
     }
+    if (Boolean(value.OPENSEARCH_USERNAME) !== Boolean(value.OPENSEARCH_PASSWORD)) {
+      context.addIssue({
+        code: "custom",
+        path: ["OPENSEARCH_USERNAME"],
+        message: "OpenSearch username and password must be supplied together",
+      });
+    }
   });
 
 const workerEnvironmentSchema = commonServerSchema
@@ -219,6 +232,10 @@ const workerEnvironmentSchema = commonServerSchema
     DATABASE_URL: z.string().url(),
     DATABASE_POOL_MAX: positiveInteger(10, 100),
     REDIS_URL: z.string().url(),
+    OPENSEARCH_NODE: z.string().url(),
+    OPENSEARCH_USERNAME: z.string().optional().default(""),
+    OPENSEARCH_PASSWORD: optionalSecretSchema(),
+    OPENSEARCH_INDEX_PREFIX: openSearchIndexPrefixSchema,
     WORKER_CONCURRENCY: positiveInteger(5, 100),
     WORKER_HEALTH_PORT: positiveInteger(4001, 65_535),
     LISTING_EXPIRY_BATCH_SIZE: positiveInteger(50, 500),
@@ -267,6 +284,13 @@ const workerEnvironmentSchema = commonServerSchema
         code: "custom",
         path: ["S3_ACCESS_KEY"],
         message: "S3 access key and secret key must be supplied together",
+      });
+    }
+    if (Boolean(value.OPENSEARCH_USERNAME) !== Boolean(value.OPENSEARCH_PASSWORD)) {
+      context.addIssue({
+        code: "custom",
+        path: ["OPENSEARCH_USERNAME"],
+        message: "OpenSearch username and password must be supplied together",
       });
     }
   });

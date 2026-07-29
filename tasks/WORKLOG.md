@@ -900,4 +900,26 @@ Observability: No new metrics or high-cardinality logs；existing HTTP RED metri
 
 Docs: Updated information architecture、roles/permissions、system cache strategy、API consumption boundary、UI system、security/privacy、testing、acceptance criteria、route catalog、reference implementation、Gate checklist/status、Backlog、README、SECURITY、changelog、generated architecture book and this worklog
 
-Known gaps: Message、favorite、orders、wallet、profile/security/privacy and later organization-management pages remain owned by their Backlog tasks and intentionally have no placeholder navigation；cross-tab immediate invalidation is not implemented because no safe server push contract exists，so visible staleness is bounded to 15 seconds and every API action reauthorizes；protected hosted checks、evidence-head、merge and final main evidence remain pending；the Prisma PostgreSQL adapter still emits its documented `pg@9` future-deprecation warning under parallel integration tests
+Known gaps: Message、favorite、orders、wallet、profile/security/privacy and later organization-management pages remain owned by their Backlog tasks and intentionally have no placeholder navigation；cross-tab immediate invalidation is not implemented because no safe server push contract exists，so visible staleness is bounded to 15 seconds and every API action reauthorizes；the Prisma PostgreSQL adapter still emits its documented `pg@9` future-deprecation warning under parallel integration tests；PR #32 evidence-head run `30472954506`、protected merge `1bdcab9` and final main run `30473551979` subsequently passed
+
+## SEARCH-001 — 版本化 Listing index/mapping/analyzers
+
+Task: SEARCH-001 版本化 Listing index/mapping/analyzers
+
+Changed: Added a strict public `ListingSearchDocument`、v1 physical index/read-write aliases、bilingual/CJK/English/prefix analyzers、structured category/region/price/attributes and fuzzy public geo mapping；added create-or-validate manager、official OpenSearch client adapter、safe CLI、Worker runtime config、Compose wiring、real-service integration tests and versioned CI service
+
+Contracts: Public OpenAPI and generated REST contracts unchanged；the new internal OpenSearch contract is versioned by physical index name and mapping `_meta`，and rejects unknown fields
+
+Migrations: None；Prisma/schema/PostgreSQL unchanged；rollback deletes the derived v1 index or restores the prior code/config，with no canonical data loss；mapping changes require a new schema version and later SEARCH-005 alias workflow rather than in-place rollback
+
+Security: TypeScript DTO and `dynamic: strict` mapping both exclude phone/email/exact address/contact policy/moderation/risk/object-key/credential data；only fuzzy public geo is accepted；OpenSearch credentials are paired SecretValue inputs and never logged；mapping/alias drift fails closed
+
+Tests run: Target Worker unit suite passed 12 files / 51 tests with 3 explicitly skipped local service integrations；Worker typecheck and lint passed；Config 8/8 tests、runtime config、CI workflow and container contract checks passed；architecture checker passed 101 tasks / 57 Prisma models / 67 OpenAPI paths / 153 schemas / 36 JSON files；root `pnpm ci:quality` passed workflow/governance/config/container/seed/migration/OpenAPI/format/Prisma checks、9 typechecks、9 lints、65 test files / 311 tests with 22 service integration files / 74 tests explicitly skipped、8 production builds and 54.18% statements / 56.86% lines；hosted real-service checks remain pending
+
+Not run: Real OpenSearch、Redis and ClamAV integrations are skipped locally because Docker CLI and those local nodes are unavailable；the installed PostgreSQL service rejects the repository `.env` account and the safety guard correctly refused using the non-test `socal` database as disposable，so 19 PostgreSQL integration files were also skipped on the final successful local run；the protected CI service must execute all of them before this task can be marked done
+
+Observability: CLI emits only fixed event、outcome、index/alias names and schema version；failure logging contains fixed code/type and excludes node URL、credentials、documents and query text；no new production metric until indexing Worker work in SEARCH-002
+
+Docs: Updated README、search architecture、security/privacy、testing、acceptance criteria、reference implementation、Gate checklist and task status
+
+Known gaps: SEARCH-002 owns Outbox consumption、external-version ordering、deletion priority and reconciliation；SEARCH-003 owns query/facets/cursor/geo API；SEARCH-004 owns synonyms/suggestions/trending privacy；SEARCH-005 owns rebuild and atomic alias switch；production shard/replica sizing still requires Beta capacity evidence；protected hosted checks、merge and final main evidence remain pending

@@ -97,3 +97,26 @@ natural_score =
 离线：建立中英双语查询集和 relevance judgments，测 NDCG@10、MRR、Recall、零结果率。
 
 在线：搜索到详情率、有效联系率、筛选使用、改写率、快速返回、举报率和推广点击质量。A/B 实验必须有样本、停止规则和负面指标，不仅追点击率。
+
+## 9.11 SEARCH-001 可执行索引契约
+
+`apps/worker/src/search/listing-index-definition.ts` 固化首个 Listing 公共搜索投影：
+
+- schema version 为 `1`，物理索引为 `<prefix>_listings_v1`，读写 alias 分别为
+  `<prefix>_listings_read` 和 `<prefix>_listings_write`；
+- 根对象和所有结构化子对象均为 `dynamic: strict`，mapping `_meta` 固定记录版本、PostgreSQL
+  canonical source、公共投影和 PII 排除声明；
+- 标题、摘要、正文、分类、地区和公开显示名提供双语、中文 CJK bigram、英文 stop/stem 及前缀字段；
+  分类/地区路径、价格、动态属性、模糊公开 `geo_point`、公开发布者信号、推广标志和内容版本保持结构化；
+- 电话、邮箱、精确地址、联系方式策略、审核状态/备注、风险分、媒体 object key 和认证材料不在
+  `ListingSearchDocument` 或 mapping 中。
+
+`ListingIndexManager` 是可重复执行的 create-or-validate 边界。`pnpm search:index:ensure` 只在目标物理
+索引不存在时创建 v1 和两个 alias；已有索引必须同时满足 `_meta` 与 alias 契约，否则失败关闭，禁止
+原地悄悄修改 mapping。改变字段或 analyzer 必须提升 schema version，并由 `SEARCH-005` 的重建、
+追赶、校验和原子 alias 切换流程发布。该命令不读取或写入 PostgreSQL；索引删除不影响 canonical
+业务数据。
+
+本地 Compose 与托管 CI 使用相同的 OpenSearch 2.19.5 基线。CI 对真实节点执行 analyzer、mapping、
+读写 alias、中文/英文命中、geo filter 和 strict-mapping PII 拒绝测试；单节点 replica 导致 yellow
+是预期可服务状态，生产副本数仍由基础设施模板和容量评审确定。
