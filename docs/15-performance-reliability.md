@@ -78,6 +78,8 @@ reconciliation 仍属于 `EVT-002`。
 - 索引 alias、版本、全量重建和回滚。
 - 分片大小目标基于实测，首期避免过度分片。
 - 查询 timeout、terminate/结果窗口限制、昂贵聚合白名单。
+- 当前公共查询默认 1500 ms、最长 5000 ms，limit 最大 50；使用最长 300 秒（默认 120 秒）的 PIT
+  与 search_after，不开放 offset/deep pagination、任意脚本、字段或聚合。
 - 索引写入与查询可分优先级；下架事件最高优先。
 - 监控 cluster health、heap、磁盘水位、rejections、latency、refresh lag。
 

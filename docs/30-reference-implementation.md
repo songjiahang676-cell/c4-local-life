@@ -199,3 +199,11 @@ Worker，校验 Outbox、构造版本化文档并调用 `OpenSearchListingIndex`
 
 同一 BullMQ Listing job 可以顺序执行搜索和通知 handler；失败后整个 job 重试，各 handler 必须保持
 幂等。下架优先级通过通用 Outbox claim 配置和 BullMQ priority 传递，不创建第二队列或服务。
+
+## 30.9 SEARCH-003 查询边界
+
+`SearchController` 只做生成契约校验、no-store 与稳定 Problem Details 映射；`SearchService` 持有
+query-bound HMAC cursor、PIT 生命周期、分页编排和低基数结果指标；`OpenSearchSearchStore` 是唯一
+OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为最小公共 DTO。Controller/Service
+不导入 Prisma，adapter 不写 PostgreSQL 或 OpenSearch 文档；Worker 仍独占索引写入。Web/Admin
+不导入搜索 adapter，PostgreSQL 始终是 canonical，新增搜索功能没有改变进程、数据库或 REST 版本。

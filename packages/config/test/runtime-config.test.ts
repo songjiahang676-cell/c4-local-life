@@ -48,6 +48,8 @@ describe("runtime configuration", () => {
     expect(environment.MEDIA_UPLOAD_MAX_ACTIVE).toBe(20);
     expect(environment.MEDIA_UPLOAD_DAILY_BYTES).toBe(209_715_200);
     expect(environment.OPENSEARCH_INDEX_PREFIX).toBe("socal_local");
+    expect(environment.SEARCH_QUERY_TIMEOUT_MS).toBe(1_500);
+    expect(environment.SEARCH_PIT_KEEP_ALIVE_SECONDS).toBe(120);
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.MFA_SECRET)).toBe('"[REDACTED]"');
@@ -152,6 +154,18 @@ describe("runtime configuration", () => {
       parseApiEnvironment({
         ...validApiEnvironment,
         OPENSEARCH_INDEX_PREFIX: "Invalid-Prefix",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        SEARCH_QUERY_TIMEOUT_MS: "5001",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        SEARCH_PIT_KEEP_ALIVE_SECONDS: "301",
       }),
     ).toThrow(RuntimeConfigError);
   });

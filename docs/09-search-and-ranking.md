@@ -140,3 +140,27 @@ BullMQ priority 1（普通事件为 10）入队；同一事件同时驱动搜索
 公开行缺失或版本落后会重建，不公开行若仍存在则删除；完成全表后从头开始。索引版本领先 PostgreSQL
 无法安全降级，按失败处理并保留重复告警，后续由 `SEARCH-005` 新索引重建。周期和批量由
 `SEARCH_RECONCILIATION_INTERVAL_MS` / `SEARCH_RECONCILIATION_BATCH_SIZE` 有界配置控制。
+
+## 9.13 SEARCH-003 查询、facets、cursor 与 geo
+
+`GET /v1/search` 只读取 `<prefix>_listings_read`，不会读取或写回 PostgreSQL，也不参与 Listing
+状态变更。请求通过生成 OpenAPI 类型和严格 Zod 边界限制为 query、Listing type、category UUID、
+region code、两位十进制价格、成对 lat/lon、1–100 英里半径、五种排序、短效 cursor 和最大 50 条。
+文本先 trim + NFKC，空值、控制符、双向控制符、未知参数、单边坐标、无坐标距离排序和倒置价格均拒绝。
+
+每个第一页请求创建最长 120 秒的 OpenSearch PIT；后续 cursor 由独立 HMAC domain 签名并绑定全部
+筛选、排序与 limit，只携带 query SHA-256 fingerprint、PIT、固定 `snapshotAt` 和上一页 sort values。
+查询以相同 `snapshotAt` 过滤过期和计算 freshness，并通过 `_score/publishedAt/id`、`publishedAt/id`、
+`price/publishedAt/id` 或 `distance/publishedAt/id` 稳定排序。读取 `limit + 1` 判断下一页，终页主动
+关闭 PIT；篡改/跨查询重放返回 400，cursor/PIT 过期返回 410。
+
+OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/source/facet allowlist、
+`track_total_hits=false`、禁止 partial search、最多 1500 ms 默认执行时间。响应只映射公开 Listing
+摘要、固定 type/category/region/price-unit facets 和可选模糊 point；正文、qualityScore、promotion
+引用、indexedAt、审核字段、联系方式和精确位置不进入 `_source` 或 HTTP DTO。任何 source/mapping
+漂移失败为 503，不用宽松转换掩盖泄漏。OpenSearch transport/查询超时返回 504，不可用返回 503，
+因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
+
+`socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
+分类/地区、坐标和金额均不记录。SEARCH-004 才负责同义词、建议和热门查询隐私，SEARCH-005 才负责
+全量重建与 alias 回滚。

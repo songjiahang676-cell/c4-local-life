@@ -21,6 +21,9 @@ type SearchIndexOperation = "upsert" | "delete";
 type SearchIndexOutcome = "applied" | "stale" | "missing" | "failed";
 type SearchIndexPriority = "urgent" | "normal";
 type SearchReconciliationOutcome = "current" | "upserted" | "deleted" | "failed";
+type SearchQueryOutcome =
+  "success" | "empty" | "invalid_cursor" | "expired_cursor" | "timeout" | "unavailable";
+type SearchQuerySort = "RELEVANCE" | "NEWEST" | "PRICE_ASC" | "PRICE_DESC" | "DISTANCE";
 
 type Histogram = {
   count: number;
@@ -103,6 +106,7 @@ export class MetricsRegistry {
   readonly #searchIndexEvents = new Map<string, number>();
   readonly #searchIndexFreshness = new Map<string, Histogram>();
   readonly #searchReconciliations = new Map<SearchReconciliationOutcome, number>();
+  readonly #searchQueries = new Map<string, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -187,6 +191,17 @@ export class MetricsRegistry {
 
   searchReconciliation(outcome: SearchReconciliationOutcome): void {
     this.#searchReconciliations.set(outcome, (this.#searchReconciliations.get(outcome) ?? 0) + 1);
+  }
+
+  searchQuery(input: { outcome: SearchQueryOutcome; sort: SearchQuerySort; geo: boolean }): void {
+    increment(
+      this.#searchQueries,
+      labelKey({
+        outcome: input.outcome,
+        sort: input.sort,
+        geo: input.geo ? "true" : "false",
+      }),
+    );
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -291,6 +306,13 @@ export class MetricsRegistry {
     );
     for (const [outcome, value] of [...this.#searchReconciliations].sort()) {
       lines.push(`socal_search_reconciliation_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_search_queries_total Public search queries by bounded outcome, sort, and geo mode.",
+      "# TYPE socal_search_queries_total counter",
+    );
+    for (const [key, value] of [...this.#searchQueries].sort()) {
+      lines.push(`socal_search_queries_total${labels(parseLabelKey(key))} ${value}`);
     }
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",

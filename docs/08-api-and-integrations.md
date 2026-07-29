@@ -403,3 +403,14 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 permission/role、用户状态及最多 50 个最小组织摘要。`permissions` 只决定已实现导航是否出现；
 页面数据继续调用各自 no-store owner API，任何 mutation 继续使用服务端 Policy、对象授权、并发和
 幂等契约。401 表示未登录；其他失败或 malformed payload 不降级为匿名假数据，也不保留旧能力。
+
+## 8.23 SEARCH-003 公共查询契约
+
+- `GET /search` 是无认证、`no-store` 的 Listing 搜索端点；只接受 OpenAPI 明示的 q/type/category/
+  region/price/geo/sort/cursor/limit，limit 最大 50，unknown query key 返回 400。
+- `SearchListingResult` 是独立最小 DTO，不复用包含 body、moderation、stats 等字段的 `Listing`。
+  `SearchFacets` 固定为 types/categories/regions/priceUnits，不能由 provider 返回任意聚合名。
+- `SearchCursorPage.nextCursor` 最长 2048 且必须与全部 query 条件一致；失效 cursor 返回 410。
+  OpenSearch 超时返回 504，依赖或投影不可用返回 503，全部使用 RFC 9457 Problem Details。
+- 价格输入是最多两位小数的 decimal string，响应复用 `Money`；距离仅在 DISTANCE 排序时返回，
+  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 在 SEARCH-004 前固定为 null。

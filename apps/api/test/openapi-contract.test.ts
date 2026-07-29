@@ -34,6 +34,11 @@ import {
   MemoryPasswordStore,
 } from "./support/memory-password.store";
 import { MemoryTrustSafetyStore } from "./support/memory-trust-safety.store";
+import {
+  MemorySearchStore,
+  searchStoreResult,
+  syntheticSearchResult,
+} from "./support/memory-search.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -257,6 +262,15 @@ describe("canonical OpenAPI contract", () => {
       ),
       locale: "en-US",
     });
+    const searchStore = new MemorySearchStore();
+    searchStore.results.push(
+      searchStoreResult([
+        {
+          result: syntheticSearchResult(),
+          sort: [1, "2026-07-28T12:00:00.000Z", "81000000-0000-4000-8000-000000000001"],
+        },
+      ]),
+    );
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore,
@@ -273,6 +287,7 @@ describe("canonical OpenAPI contract", () => {
       trustSafetyStore: new MemoryTrustSafetyStore(),
       passwordStore,
       passwordNotificationGateway: passwordNotifications,
+      searchStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-api-contract-test",
         serviceVersion: "0.1.0",
@@ -299,7 +314,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(67);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(153);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(160);
     expect(operationIds).toHaveLength(77);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -360,6 +375,20 @@ describe("canonical OpenAPI contract", () => {
     expect(invalidResponse.statusCode).toBe(400);
     expect(ajv.validate(healthSchema ?? false, healthResponse.json())).toBe(true);
     expect(ajv.validate(problemSchema ?? false, invalidResponse.json())).toBe(true);
+  });
+
+  it("validates the minimal public search response against its dedicated contract", async () => {
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/search?q=Irvine&sort=NEWEST&limit=20",
+    });
+    const schema =
+      contract.paths["/search"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+
+    expect(schema).toBeDefined();
+    expect(response.statusCode).toBe(200);
+    expect(ajv.validate(schema ?? false, response.json())).toBe(true);
+    expect(JSON.stringify(response.json())).not.toContain("moderationStatus");
   });
 
   it("declares authentication failures for protected listing creation", () => {

@@ -1617,6 +1617,17 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
 页面数据继续调用各自 no-store owner API，任何 mutation 继续使用服务端 Policy、对象授权、并发和
 幂等契约。401 表示未登录；其他失败或 malformed payload 不降级为匿名假数据，也不保留旧能力。
 
+## 8.23 SEARCH-003 公共查询契约
+
+- `GET /search` 是无认证、`no-store` 的 Listing 搜索端点；只接受 OpenAPI 明示的 q/type/category/
+  region/price/geo/sort/cursor/limit，limit 最大 50，unknown query key 返回 400。
+- `SearchListingResult` 是独立最小 DTO，不复用包含 body、moderation、stats 等字段的 `Listing`。
+  `SearchFacets` 固定为 types/categories/regions/priceUnits，不能由 provider 返回任意聚合名。
+- `SearchCursorPage.nextCursor` 最长 2048 且必须与全部 query 条件一致；失效 cursor 返回 410。
+  OpenSearch 超时返回 504，依赖或投影不可用返回 503，全部使用 RFC 9457 Problem Details。
+- 价格输入是最多两位小数的 decimal string，响应复用 `Money`；距离仅在 DISTANCE 排序时返回，
+  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 在 SEARCH-004 前固定为 null。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -1763,6 +1774,30 @@ BullMQ priority 1（普通事件为 10）入队；同一事件同时驱动搜索
 公开行缺失或版本落后会重建，不公开行若仍存在则删除；完成全表后从头开始。索引版本领先 PostgreSQL
 无法安全降级，按失败处理并保留重复告警，后续由 `SEARCH-005` 新索引重建。周期和批量由
 `SEARCH_RECONCILIATION_INTERVAL_MS` / `SEARCH_RECONCILIATION_BATCH_SIZE` 有界配置控制。
+
+## 9.13 SEARCH-003 查询、facets、cursor 与 geo
+
+`GET /v1/search` 只读取 `<prefix>_listings_read`，不会读取或写回 PostgreSQL，也不参与 Listing
+状态变更。请求通过生成 OpenAPI 类型和严格 Zod 边界限制为 query、Listing type、category UUID、
+region code、两位十进制价格、成对 lat/lon、1–100 英里半径、五种排序、短效 cursor 和最大 50 条。
+文本先 trim + NFKC，空值、控制符、双向控制符、未知参数、单边坐标、无坐标距离排序和倒置价格均拒绝。
+
+每个第一页请求创建最长 120 秒的 OpenSearch PIT；后续 cursor 由独立 HMAC domain 签名并绑定全部
+筛选、排序与 limit，只携带 query SHA-256 fingerprint、PIT、固定 `snapshotAt` 和上一页 sort values。
+查询以相同 `snapshotAt` 过滤过期和计算 freshness，并通过 `_score/publishedAt/id`、`publishedAt/id`、
+`price/publishedAt/id` 或 `distance/publishedAt/id` 稳定排序。读取 `limit + 1` 判断下一页，终页主动
+关闭 PIT；篡改/跨查询重放返回 400，cursor/PIT 过期返回 410。
+
+OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/source/facet allowlist、
+`track_total_hits=false`、禁止 partial search、最多 1500 ms 默认执行时间。响应只映射公开 Listing
+摘要、固定 type/category/region/price-unit facets 和可选模糊 point；正文、qualityScore、promotion
+引用、indexedAt、审核字段、联系方式和精确位置不进入 `_source` 或 HTTP DTO。任何 source/mapping
+漂移失败为 503，不用宽松转换掩盖泄漏。OpenSearch transport/查询超时返回 504，不可用返回 503，
+因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
+
+`socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
+分类/地区、坐标和金额均不记录。SEARCH-004 才负责同义词、建议和热门查询隐私，SEARCH-005 才负责
+全量重建与 alias 回滚。
 
 ---
 
@@ -2770,6 +2805,20 @@ Idempotency-Key 或请求哈希。
 - 索引漂移/事实源反转：对账只以 PostgreSQL 状态和版本决定写删，绝不把 OpenSearch 内容写回数据库；
   OpenSearch 版本异常领先会失败并告警，不以强制降版本掩盖损坏。
 
+## 14.27 SEARCH-003 查询威胁和缓解
+
+- 查询/资源耗尽：严格 NFKC 文本与控制符校验、固定 filter/sort/facet/source、50 条上限、禁止 partial
+  search、1500 ms 默认/5000 ms 最大 timeout 和短 PIT 限制单请求与遗留资源；不接受脚本或任意字段。
+- cursor 篡改/漏重页：独立 HMAC domain 绑定 query fingerprint、全部筛选、排序和 limit；PIT 与固定
+  snapshotAt 冻结文档/过期/新鲜度语义，稳定 sort + ID 作为边界，终页尽力关闭，遗留 PIT 自动过期。
+- PII/内部字段扩散：OpenSearch `_source` allowlist 不取 body、quality、promotion 或 indexedAt；
+  adapter 对 UUID、枚举、金额、模糊 geo、attributes 和 publisher 再次 fail-closed 映射，响应 DTO
+  没有审核、联系、精确位置、campaign/placement 或全文字段。
+- 查询泄漏/枚举：cursor 只保存 query hash，不保存原 query；metrics/logs 不记录 query、cursor、PIT、
+  筛选值、坐标、金额或资源 ID。公开结果仍强制 PUBLISHED、未过期，索引漂移返回 503 而不宽松公开。
+- 依赖故障：PIT 过期、查询超时、OpenSearch 不可用分别映射 410/504/503 且 no-store；搜索 adapter
+  不在应用启动或 Listing 写入链做远程探测，详情、发布和 PostgreSQL canonical 状态保持可用。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -2854,6 +2903,8 @@ reconciliation 仍属于 `EVT-002`。
 - 索引 alias、版本、全量重建和回滚。
 - 分片大小目标基于实测，首期避免过度分片。
 - 查询 timeout、terminate/结果窗口限制、昂贵聚合白名单。
+- 当前公共查询默认 1500 ms、最长 5000 ms，limit 最大 50；使用最长 300 秒（默认 120 秒）的 PIT
+  与 search_after，不开放 offset/deep pagination、任意脚本、字段或聚合。
 - 索引写入与查询可分优先级；下架事件最高优先。
 - 监控 cluster health、heap、磁盘水位、rejections、latency、refresh lag。
 
@@ -3147,6 +3198,14 @@ hash、阈值值和审核员均不得成为标签。运行期误杀率只使用�
 
 所有标签都是固定低基数枚举；Listing/event/owner ID、标题、分类、坐标、payload、provider 错误和
 索引文档都不进入标签或结构日志。正式 Dashboard/告警阈值仍由 `OBS-002` 发布 Gate 固化。
+
+## 17.13 SEARCH-003 查询结果指标
+
+`socal_search_queries_total{outcome,sort,geo}` 的 outcome 只允许 success、empty、invalid_cursor、
+expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false。HTTP RED
+histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可变 bucket。query、cursor、PIT、
+Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
+零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
 
 ---
 
@@ -3475,6 +3534,21 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 托管质量门必须同时提供 PostgreSQL、Redis、ClamAV、OpenSearch，执行完整 test/build、Linux
   Chromium 和四个非 root 镜像；本任务不修改 OpenAPI、Prisma 或 migration。
 
+## 18.29 SEARCH-003 公共查询验证增量
+
+- 契约测试覆盖 NFKC、控制/双向字符、成对 geo、距离排序、decimal price、倒置范围、50 条 limit、
+  2048 cursor、unknown key 和独立最小 Search response；生成类型与 OpenAPI 无漂移。
+- Service 单测证明一次 PIT 跨页复用、固定 snapshotAt、`limit + 1`、稳定 search_after、终页关闭，
+  以及 cursor 篡改、跨 query/filter/limit 重放和过期在访问 backend 前失败。
+- Adapter 单测锁定公开 `_source`、固定 bool/filter/facets、geo/price minor-unit 查询、无脚本，并对
+  partial shard、timeout、malformed/PII 投影 fail closed；HTTP 测试覆盖 400/410/503/504 Problem
+  Details、no-store 和敏感字段负断言。
+- 托管 CI 的真实 OpenSearch 测试创建随机严格索引，经 read/write alias 执行文本、geo、facets、
+  PIT + search_after；第一页后新增文档不得进入既有 PIT，三条快照结果不重复/漏页。无本地节点时
+  明确 skip，不能把 skip 声称为通过。
+- metrics 测试只接受固定 outcome/sort/geo，禁止 query、cursor、PIT 或资源标识。全仓格式、类型、
+  lint、测试、八应用构建、运行时、生产 Chromium 和四镜像门禁继续执行。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3678,7 +3752,18 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - 手工验证只比较 Listing ID、canonical/index version 和是否存在，不把公开索引内容写回 PostgreSQL，
   不在工单复制标题、联系方式、坐标或完整文档。
 
-## 20.14 定期运维
+## 20.14 搜索查询异常
+
+- 先按 HTTP 410/504/503 与 `socal_search_queries_total` 的 expired_cursor/timeout/unavailable 区分
+  客户端闲置、慢查询和依赖故障；不得在日志或工单粘贴 query、cursor、PIT、坐标或完整命中文档。
+- timeout 增长时检查 cluster rejection/heap/disk、慢查询和固定 facet；不要临时开放脚本、任意聚合、
+  更大 limit 或无限 timeout。需要调整时先用版本化数据集和压测证明。
+- 410 只要求客户端从第一页重新查询；不要尝试延长或解码用户 cursor。大量 PIT 时确认终页关闭、
+  transport 错误清理和 120 秒默认 TTL，必要时先限流而非删除 canonical 数据。
+- 503 时保持详情/发布链可用并进入 OpenSearch 故障流程；source/mapping drift 也按 503 fail closed，
+  不能忽略字段验证或将索引结果写回 PostgreSQL。
+
+## 20.15 定期运维
 
 每日：关键告警、审核/队列 SLA、支付对账、备份状态。
 
@@ -3998,6 +4083,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   版本领先失败告警且不反写 PostgreSQL。
 - PUBLIC attributes 以历史 schema 白名单；EXACT 坐标、联系方式、未知/私有字段、审核/风险和媒体
   标识有真实 PostgreSQL/OpenSearch 负例；OpenAPI、Prisma 和 migration 保持不变。
+
+## 22.15 SEARCH-003 查询 API 验收
+
+- 中英 NFKC query、类型、分类、地区、decimal price、半径与距离筛选工作；未知/危险/不完整参数、
+  倒置价格和超过 50 条请求明确 400。
+- 只返回 PUBLISHED、固定快照时未过期的最小公开投影；body、审核/风险、内部 quality/promotion、
+  联系方式、精确位置和 provider detail 不进入响应。
+- PIT + search_after cursor 绑定全部筛选/排序/limit；篡改/跨查询重放失败，真实 OpenSearch 中分页
+  无重复/漏页，第一页后新写入不进入既有 PIT，终页关闭且遗留资源有短效 TTL。
+- facets 固定为 type/category/region/price unit；五种排序均有稳定 ID tie-break，distance 只在有坐标
+  时使用。query/source/facet/limit/timeout 均受 allowlist，不接受任意脚本或聚合。
+- cursor/PIT 过期、timeout 和 OpenSearch 不可用分别返回 410/504/503 与 no-store Problem Details；
+  详情、发布和 PostgreSQL canonical 写链不依赖搜索。
+- 指标只有固定 outcome/sort/geo；query/cursor/PIT/ID/筛选值/坐标/金额不进入日志或标签。OpenAPI、
+  生成类型、单元/HTTP/真实 OpenSearch、完整质量和保护门禁通过后方可标记完成。
 
 ---
 
@@ -4968,3 +5068,11 @@ Worker，校验 Outbox、构造版本化文档并调用 `OpenSearchListingIndex`
 
 同一 BullMQ Listing job 可以顺序执行搜索和通知 handler；失败后整个 job 重试，各 handler 必须保持
 幂等。下架优先级通过通用 Outbox claim 配置和 BullMQ priority 传递，不创建第二队列或服务。
+
+## 30.9 SEARCH-003 查询边界
+
+`SearchController` 只做生成契约校验、no-store 与稳定 Problem Details 映射；`SearchService` 持有
+query-bound HMAC cursor、PIT 生命周期、分页编排和低基数结果指标；`OpenSearchSearchStore` 是唯一
+OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为最小公共 DTO。Controller/Service
+不导入 Prisma，adapter 不写 PostgreSQL 或 OpenSearch 文档；Worker 仍独占索引写入。Web/Admin
+不导入搜索 adapter，PostgreSQL 始终是 canonical，新增搜索功能没有改变进程、数据库或 REST 版本。

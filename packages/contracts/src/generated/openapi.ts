@@ -2174,17 +2174,78 @@ export interface components {
             /** Format: date-time */
             readonly generatedAt: string;
         };
-        readonly SearchResponse: {
-            readonly data: readonly components["schemas"]["Listing"][];
-            readonly page: components["schemas"]["CursorPage"];
-            readonly facets: {
-                readonly [key: string]: readonly {
-                    readonly value: string;
-                    readonly count: number;
-                }[];
+        readonly SearchOrganizationSummaryView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly slug: string;
+            /** @enum {string} */
+            readonly verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
+        };
+        readonly SearchRegionView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly code: string;
+            readonly slug: string;
+            readonly nameZhHans: string;
+            readonly nameEn: string;
+        };
+        readonly SearchLocationView: {
+            /** @enum {string} */
+            readonly precision: "CITY" | "NEIGHBORHOOD" | "APPROXIMATE";
+            readonly point: components["schemas"]["GeoPoint"] | null;
+        };
+        readonly SearchFacetBucket: {
+            readonly value: string;
+            readonly count: number;
+        };
+        readonly SearchFacets: {
+            readonly types: readonly components["schemas"]["SearchFacetBucket"][];
+            readonly categories: readonly components["schemas"]["SearchFacetBucket"][];
+            readonly regions: readonly components["schemas"]["SearchFacetBucket"][];
+            readonly priceUnits: readonly components["schemas"]["SearchFacetBucket"][];
+        };
+        readonly SearchCursorPage: {
+            readonly nextCursor: string | null;
+            readonly hasMore: boolean;
+        };
+        readonly SearchListingResult: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["ListingType"];
+            /** @constant */
+            readonly status: "PUBLISHED";
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly slug: string;
+            readonly title: string;
+            readonly summary: string | null;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly region: components["schemas"]["SearchRegionView"];
+            readonly category: components["schemas"]["ListingCategoryView"];
+            readonly owner: components["schemas"]["ListingOwnerSummaryView"];
+            readonly organization: components["schemas"]["SearchOrganizationSummaryView"] | null;
+            readonly location: components["schemas"]["SearchLocationView"];
+            readonly attributes: {
+                readonly [key: string]: string | number | boolean;
             };
-            readonly correctedQuery?: string | null;
+            readonly sponsored: boolean;
+            readonly distanceMiles: number | null;
+            /** Format: date-time */
+            readonly publishedAt: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
+        readonly SearchResponse: {
+            readonly data: readonly components["schemas"]["SearchListingResult"][];
+            readonly page: components["schemas"]["SearchCursorPage"];
+            readonly facets: components["schemas"]["SearchFacets"];
+            readonly correctedQuery: string | null;
             readonly tookMs: number;
+            /** Format: date-time */
+            readonly generatedAt: string;
         };
         readonly SearchSuggestion: {
             /** @enum {string} */
@@ -2955,6 +3016,15 @@ export interface components {
         };
         /** @description Required dependency or feature is unavailable */
         readonly ServiceUnavailable: {
+            headers: {
+                readonly [name: string]: unknown;
+            };
+            content: {
+                readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
+        /** @description The request exceeded the bounded dependency timeout */
+        readonly GatewayTimeout: {
             headers: {
                 readonly [name: string]: unknown;
             };
@@ -3842,18 +3912,21 @@ export interface operations {
     readonly searchContent: {
         readonly parameters: {
             readonly query?: {
+                /** @description NFKC-normalized bilingual query text. Empty, control, and bidirectional-control input is rejected. */
                 readonly q?: string;
                 readonly type?: components["schemas"]["ListingType"];
                 readonly categoryId?: string;
                 readonly regionCode?: string;
                 readonly latitude?: number;
                 readonly longitude?: number;
+                /** @description Requires latitude and longitude. */
                 readonly radiusMiles?: number;
-                readonly minPrice?: number;
-                readonly maxPrice?: number;
+                readonly minPrice?: string;
+                readonly maxPrice?: string;
                 readonly sort?: "RELEVANCE" | "NEWEST" | "PRICE_ASC" | "PRICE_DESC" | "DISTANCE";
-                readonly cursor?: components["parameters"]["Cursor"];
-                readonly limit?: components["parameters"]["Limit"];
+                /** @description Signed opaque point-in-time cursor bound to every filter, sort, and limit. */
+                readonly cursor?: string;
+                readonly limit?: number;
             };
             readonly header?: never;
             readonly path?: never;
@@ -3870,6 +3943,10 @@ export interface operations {
                     readonly "application/json": components["schemas"]["SearchResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 410: components["responses"]["Gone"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
+            readonly 504: components["responses"]["GatewayTimeout"];
         };
     };
     readonly getSearchSuggestions: {

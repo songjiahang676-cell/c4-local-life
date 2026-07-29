@@ -89,20 +89,55 @@ describe("listing contracts", () => {
     ).toBe(false);
   });
 
-  it("tracks complete contract enums and coerces documented search numbers", () => {
+  it("normalizes bounded search text and coerces documented geo numbers", () => {
     expect(contentStatusSchema.parse("DELETED")).toBe("DELETED");
     expect(
       listingSearchSchema.parse({
+        q: "  Ｉｒｖｉｎｅ 公寓  ",
         latitude: "34.05",
         longitude: "-118.24",
         radiusMiles: "25",
       }),
     ).toMatchObject({
+      q: "Irvine 公寓",
       latitude: 34.05,
       longitude: -118.24,
       radiusMiles: 25,
       sort: "RELEVANCE",
       limit: 20,
+    });
+  });
+
+  it("rejects unbounded, ambiguous, or unsafe public search inputs", () => {
+    for (const invalidQuery of [
+      { q: "   " },
+      { q: "safe\u202eunsafe" },
+      { q: "safe\u0000unsafe" },
+      { latitude: "34.05" },
+      { longitude: "-118.24" },
+      { radiusMiles: "25" },
+      { sort: "DISTANCE" },
+      { minPrice: "10.001" },
+      { minPrice: "10.01", maxPrice: "10.00" },
+      { limit: "51" },
+      { cursor: "a".repeat(2049) },
+      { offset: "0" },
+    ]) {
+      expect(listingSearchSchema.safeParse(invalidQuery).success).toBe(false);
+    }
+
+    expect(
+      listingSearchSchema.parse({
+        latitude: "34.05",
+        longitude: "-118.24",
+        sort: "DISTANCE",
+        minPrice: "999999999999.91",
+        maxPrice: "999999999999.92",
+      }),
+    ).toMatchObject({
+      sort: "DISTANCE",
+      minPrice: "999999999999.91",
+      maxPrice: "999999999999.92",
     });
   });
 

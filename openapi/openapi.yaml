@@ -892,7 +892,8 @@ paths:
       parameters:
         - name: q
           in: query
-          schema: { type: string, maxLength: 120 }
+          description: NFKC-normalized bilingual query text. Empty, control, and bidirectional-control input is rejected.
+          schema: { type: string, minLength: 1, maxLength: 120 }
         - name: type
           in: query
           schema:
@@ -902,7 +903,11 @@ paths:
           schema: { type: string, format: uuid }
         - name: regionCode
           in: query
-          schema: { type: string }
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+            pattern: "^[A-Za-z0-9._:-]+$"
         - name: latitude
           in: query
           schema: { type: number, minimum: -90, maximum: 90 }
@@ -911,21 +916,31 @@ paths:
           schema: { type: number, minimum: -180, maximum: 180 }
         - name: radiusMiles
           in: query
+          description: Requires latitude and longitude.
           schema: { type: integer, minimum: 1, maximum: 100 }
         - name: minPrice
           in: query
-          schema: { type: number, minimum: 0 }
+          schema:
+            type: string
+            pattern: "^(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?$"
         - name: maxPrice
           in: query
-          schema: { type: number, minimum: 0 }
+          schema:
+            type: string
+            pattern: "^(?:0|[1-9][0-9]{0,11})(?:\\.[0-9]{1,2})?$"
         - name: sort
           in: query
           schema:
             type: string
             enum: [RELEVANCE, NEWEST, PRICE_ASC, PRICE_DESC, DISTANCE]
             default: RELEVANCE
-        - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
+        - name: cursor
+          in: query
+          description: Signed opaque point-in-time cursor bound to every filter, sort, and limit.
+          schema: { type: string, maxLength: 2048 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         "200":
           description: Search results and facets
@@ -933,6 +948,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "410":
+          $ref: "#/components/responses/Gone"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
   /search/suggestions:
     get:
       tags: [Search]
@@ -2369,6 +2392,12 @@ components:
             $ref: "#/components/schemas/ProblemDetails"
     ServiceUnavailable:
       description: Required dependency or feature is unavailable
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    GatewayTimeout:
+      description: The request exceeded the bounded dependency timeout
       content:
         application/problem+json:
           schema:
@@ -3875,28 +3904,156 @@ components:
         page:
           $ref: "#/components/schemas/CursorPage"
         generatedAt: { type: string, format: date-time }
+    SearchOrganizationSummaryView:
+      type: object
+      required: [id, slug, verificationStatus]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, maxLength: 120 }
+        verificationStatus:
+          { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+    SearchRegionView:
+      type: object
+      required: [id, code, slug, nameZhHans, nameEn]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, maxLength: 40 }
+        slug: { type: string, maxLength: 120 }
+        nameZhHans: { type: string, maxLength: 160 }
+        nameEn: { type: string, maxLength: 160 }
+    SearchLocationView:
+      type: object
+      required: [precision, point]
+      additionalProperties: false
+      properties:
+        precision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE] }
+        point:
+          oneOf:
+            - $ref: "#/components/schemas/GeoPoint"
+            - type: "null"
+    SearchFacetBucket:
+      type: object
+      required: [value, count]
+      additionalProperties: false
+      properties:
+        value: { type: string, maxLength: 120 }
+        count: { type: integer, minimum: 0 }
+    SearchFacets:
+      type: object
+      required: [types, categories, regions, priceUnits]
+      additionalProperties: false
+      properties:
+        types:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/SearchFacetBucket"
+        categories:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/SearchFacetBucket"
+        regions:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/SearchFacetBucket"
+        priceUnits:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/SearchFacetBucket"
+    SearchCursorPage:
+      type: object
+      required: [nextCursor, hasMore]
+      additionalProperties: false
+      properties:
+        nextCursor: { type: [string, "null"], maxLength: 2048 }
+        hasMore: { type: boolean }
+    SearchListingResult:
+      type: object
+      required:
+        [
+          id,
+          type,
+          status,
+          locale,
+          slug,
+          title,
+          summary,
+          price,
+          region,
+          category,
+          owner,
+          organization,
+          location,
+          attributes,
+          sponsored,
+          distanceMiles,
+          publishedAt,
+          expiresAt,
+          updatedAt,
+          version,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        status: { type: string, const: PUBLISHED }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        slug: { type: string, maxLength: 180 }
+        title: { type: string, maxLength: 180 }
+        summary: { type: [string, "null"], maxLength: 600 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/SearchRegionView"
+        category:
+          $ref: "#/components/schemas/ListingCategoryView"
+        owner:
+          $ref: "#/components/schemas/ListingOwnerSummaryView"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/SearchOrganizationSummaryView"
+            - type: "null"
+        location:
+          $ref: "#/components/schemas/SearchLocationView"
+        attributes:
+          type: object
+          maxProperties: 100
+          additionalProperties:
+            oneOf:
+              - { type: string, maxLength: 1000 }
+              - { type: number }
+              - { type: boolean }
+        sponsored: { type: boolean }
+        distanceMiles: { type: [number, "null"], minimum: 0 }
+        publishedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
     SearchResponse:
       type: object
-      required: [data, page, facets, tookMs]
+      required: [data, page, facets, correctedQuery, tookMs, generatedAt]
+      additionalProperties: false
       properties:
         data:
           type: array
+          maxItems: 50
           items:
-            $ref: "#/components/schemas/Listing"
+            $ref: "#/components/schemas/SearchListingResult"
         page:
-          $ref: "#/components/schemas/CursorPage"
+          $ref: "#/components/schemas/SearchCursorPage"
         facets:
-          type: object
-          additionalProperties:
-            type: array
-            items:
-              type: object
-              required: [value, count]
-              properties:
-                value: { type: string }
-                count: { type: integer, minimum: 0 }
-        correctedQuery: { type: [string, "null"] }
+          $ref: "#/components/schemas/SearchFacets"
+        correctedQuery: { type: [string, "null"], maxLength: 120 }
         tookMs: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
     SearchSuggestion:
       type: object
       required: [type, label, value]

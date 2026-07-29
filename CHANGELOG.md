@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added the public Listing search API with strict bilingual input normalization, fixed public
+  projections and facets, bounded geo/price filters, stable point-in-time `search_after`
+  pagination, query-bound HMAC cursors, explicit expired/timeout/unavailable Problem Details,
+  low-cardinality metrics, and real OpenSearch integration coverage.
 - Added canonical PostgreSQL-to-OpenSearch Listing event projection with strict envelope parsing,
   external-version upsert/removal ordering, two-stage urgent takedown priority, periodic version
   reconciliation, fuzzy public geo conversion, historical PUBLIC-attribute filtering, and bounded

@@ -945,3 +945,25 @@ Observability: Added `socal_search_index_events_total{operation,outcome,priority
 Docs: Updated README、search architecture、security/privacy、observability、testing、operations runbook、acceptance criteria、reference implementation、SECURITY、changelog、generated architecture book、Gate status and this worklog
 
 Known gaps: SEARCH-003 owns public query/facets/cursor/geo API，SEARCH-004 owns synonym/suggestion/trending privacy and SEARCH-005 owns full rebuild/atomic alias switching；reconciliation compares Listing versions and presence，while dependency display-name/taxonomy content refresh without Listing version change remains a later event/rebuild concern；production p95 claims require observed Beta traffic and are not inferred from test timing；PR #34 evidence-head run `30481617516`、protected merge `c66d59c` and final-main run `30482212485` subsequently passed
+
+## SEARCH-003 — 搜索查询、facets、cursor、geo
+
+Task: SEARCH-003 搜索查询、facets、cursor、geo
+
+Changed: Added a public Search application/controller boundary and official OpenSearch read adapter over the versioned read alias；added bounded bilingual full-text、category/type/region/price/public-attribute filters、fixed facets、geo distance and five deterministic sort modes；added short-lived PIT plus `search_after` pagination with HMAC-authenticated、query-bound、expiring cursors and best-effort PIT closure；added strict public projection parsing、dependency injection、runtime limits、Problem Details mapping and test stores
+
+Contracts: OpenAPI remains 67 paths and grows from 153 to 160 schemas；`GET /search` now has bounded Unicode/query、paired geo、decimal money、cursor and limit validation plus explicit 400/410/503/504 outcomes；its dedicated strict result excludes body、moderation/risk/internal ranking data、exact contacts and object keys；generated TypeScript and strict Zod input contracts were regenerated and runtime/E2E schema assertions updated
+
+Migrations: None；Prisma schema、PostgreSQL and all existing migrations are unchanged；OpenSearch remains rebuildable derived state；rollback removes the Search module/adapter and restores the prior broad contract without modifying canonical data or the v1 index
+
+Security: Every query is normalized and rejects controls/bidirectional overrides、unpaired geo、unbounded radius/limit/cursor and invalid exact decimal ranges；OpenSearch filters always require current `PUBLISHED` and unexpired documents at one fixed snapshot instant；cursor HMAC binds every filter/sort/limit plus PIT/snapshot/expiry and never contains raw query text；source allowlisting plus fail-closed projection parsing prevents indexed private/internal fields from crossing the API；timeouts、partial results、PIT expiry and projection drift fail closed；metrics/logs exclude query text、cursor、listing IDs、coordinates and filter values
+
+Tests run: Root `pnpm ci:quality` passed workflow/governance/runtime/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、70 passed / 24 explicitly service-skipped files with 331 passed / 77 skipped tests、8 production builds and 55.09% statements / 57.89% lines；Contracts passed 9 files / 38 tests；API passed 30 files / 178 tests plus one explicit OpenSearch skip；Config passed 8/8 and Observability passed 2/2；OpenAPI lint/generation、runtime config、API RED/trace/OpenAPI runtime and full architecture semantic validation passed against 101 tasks / 57 Prisma models / 67 paths / 160 schemas / 36 JSON files；after the first E2E run correctly exposed the stale 153-schema assertion, the affected 2/2 and complete production standalone Chromium desktop/mobile 18/18 passed
+
+Not run: Real OpenSearch integration is explicitly skipped on this Windows host because no local node or Docker CLI is available；real PostgreSQL integrations are skipped because the installed service rejects the repository test account and the disposable-test guard forbids the non-test database；Redis、ClamAV and local four-image smoke are unavailable；the protected GitHub PR must supply these real-service、Linux and non-root image results
+
+Observability: Added `socal_search_queries_total{outcome,sort,geo}` with only fixed bounded outcomes and sort/geo flags；success、empty、invalid/expired cursor、timeout and unavailable paths are counted without query text、cursor、filters、coordinates or resource identifiers；existing HTTP RED metrics/traces cover `/search`
+
+Docs: Updated API/integrations、search/ranking、security/privacy、performance/reliability、observability、testing、operations、acceptance criteria、reference implementation、runtime configuration、README、SECURITY、changelog、Gate checklist/status、Backlog、generated architecture book and this worklog
+
+Known gaps: SEARCH-004 owns versioned synonyms、suggestions and low-frequency-sensitive trending privacy；SEARCH-005 owns rebuild/catch-up/validation/atomic alias rollback；SEARCH-006 owns relevance evaluation and dashboards；WEB-001 owns public list/detail/filter pages；production relevance and latency SLO claims require observed Beta traffic；protected PR real OpenSearch、Linux E2E、four-image evidence and merge remain pending

@@ -40,6 +40,8 @@ assert.equal(apiEnvironment.MFA_LOCK_SECONDS, 300);
 assert.equal(apiEnvironment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS, 28_800);
 assert.equal(apiEnvironment.ADMIN_SESSION_IDLE_TTL_SECONDS, 1_800);
 assert.equal(apiEnvironment.ADMIN_STEP_UP_TTL_SECONDS, 600);
+assert.equal(apiEnvironment.SEARCH_QUERY_TIMEOUT_MS, 1_500);
+assert.equal(apiEnvironment.SEARCH_PIT_KEEP_ALIVE_SECONDS, 120);
 assert.equal(apiEnvironment.FEATURE_PAYMENTS, false);
 assert.equal(apiEnvironment.SESSION_SECRET.reveal(), apiInput.SESSION_SECRET);
 assert.equal(apiEnvironment.OTP_SECRET.reveal(), apiInput.OTP_SECRET);
