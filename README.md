@@ -176,7 +176,8 @@ actor-scoped `Idempotency-Key`、强 ETag/`If-Match`，Repository 以事务锁�
 创建/编辑竞态，并在成功事务中追加不含正文/PII 的 Audit 与 Outbox。15 个 migration 已从全新
 `socal_list003_empty` 空库重放；baseline 22 个负例、previous-baseline upgrade、64 项真实
 PostgreSQL 测试、全仓 61 个文件/226 项测试、8 个构建、运行时检查和 Chromium 6/6 smoke 本机通过。
-本机无 Redis/ClamAV 的 2 项服务集成明确跳过，托管 required checks 与受保护合并仍是最终完成证据。
+本机无 Redis/ClamAV 的 2 项服务集成明确跳过；PR #19 / run `30412033239` 已用真实服务通过
+Linux quality、浏览器和四镜像非 root 检查，证据提交的最终 head checks 与受保护合并仍待完成。
 
 ## 七、规划容量与服务目标
 

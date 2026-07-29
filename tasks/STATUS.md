@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status      | Notes                                                             |
-| -------- | -------------------- | ---------- | ----------------- | ----------- | ----------------------------------------------------------------- |
-| LIST-003 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | 草稿幂等创建、owner/org 读取、强 ETag 条件更新及原子 Audit/Outbox |
+| Task     | Owner                | Started    | Target            | Status       | Notes                                                             |
+| -------- | -------------------- | ---------- | ----------------- | ------------ | ----------------------------------------------------------------- |
+| LIST-003 | @songjiahang676-cell | 2026-07-29 | protected task PR | hosted green | 草稿幂等创建、owner/org 读取、强 ETag 条件更新及原子 Audit/Outbox |
 
 ## Gate Evidence
 
@@ -94,6 +94,7 @@
 | LIST-003 local quality          | `pnpm ci:quality`                  | 61 files / 226 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | LIST-003 browser/runtime        | Chromium desktop/mobile            | observability runtime and 6/6 E2E passed                                  | 2026-07-29 |
 | LIST-003 architecture           | `scripts/check-architecture.sh`    | 101 tasks、47 models、44 paths、98 schemas passed                         | 2026-07-29 |
+| LIST-003 protected checks       | PR #19 / run `30412033239`         | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
 
 ## Decisions / Blocks
 
