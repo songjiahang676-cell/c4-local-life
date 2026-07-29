@@ -7,13 +7,13 @@
 - Gate：G2 Listings / Moderation
 - 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
 - 进度：10/16 个 G2 任务、40/101 个总任务完成
-- 风险：`LIST-006` 本地全量验证已通过并等待受保护 PR；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产招聘政策词库、最低工资展示细则、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v2 只把政策风险命中送入人工队列而不自动处罚
+- 风险：`LIST-006` 已通过 PR #26 首轮托管门禁并等待证据 head 复验/受保护合并；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁已完成完整构建；生产招聘政策词库、最低工资展示细则、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v2 只把政策风险命中送入人工队列而不自动处罚
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status      | Notes                                                      |
-| -------- | -------------------- | ---------- | ----------------- | ----------- | ---------------------------------------------------------- |
-| LIST-006 | @songjiahang676-cell | 2026-07-30 | protected task PR | local green | Job 薪资/岗位字段、政策确认、审核、公开/过期与中英移动 E2E |
+| Task     | Owner                | Started    | Target | Status       | Notes                                                      |
+| -------- | -------------------- | ---------- | ------ | ------------ | ---------------------------------------------------------- |
+| LIST-006 | @songjiahang676-cell | 2026-07-30 | PR #26 | hosted green | Job 薪资/岗位字段、政策确认、审核、公开/过期与中英移动 E2E |
 
 ## Gate Evidence
 
@@ -143,6 +143,7 @@
 | LIST-006 local quality          | `pnpm ci:quality`                     | 78 files / 324 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-30 |
 | LIST-006 runtime/browser        | production Chromium desktop/mobile    | Job create/save/submit and existing journeys；12/12 E2E passed             | 2026-07-30 |
 | LIST-006 architecture           | `scripts/check-architecture.sh`       | 101 tasks、53 models、57 paths、123 schemas、36 JSON files passed          | 2026-07-30 |
+| LIST-006 protected checks       | PR #26 / run `30441538770`            | 326 real-service tests、Linux build/E2E and four non-root images passed    | 2026-07-30 |
 
 ## Decisions / Blocks
 
