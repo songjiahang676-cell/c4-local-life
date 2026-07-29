@@ -5,20 +5,22 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `TAX-003` 受保护验证后进入 `WEB-002` 首页模块化与真实数据 API
+- 目标：实现 `WEB-002` 首页模块化与真实数据 API
 - 进度：6 个 G3 任务、52/101 个总任务完成
 - 风险：`WEB-002` 必须逐模块使用 canonical 公开投影、隔离依赖错误并隐藏无真实数据模块；不能从布局 seed、测试 fixture 或未知 source 伪造首页内容
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target          | Status                | Notes             |
-| ------- | -------------------- | ---------- | --------------- | --------------------- | ----------------- |
-| TAX-003 | @songjiahang676-cell | 2026-07-29 | homepage config | evidence head pending | unlocks `WEB-002` |
+| Task    | Owner                | Started    | Target   | Status      | Notes                      |
+| ------- | -------------------- | ---------- | -------- | ----------- | -------------------------- |
+| WEB-002 | @songjiahang676-cell | 2026-07-29 | homepage | in progress | real-data modular homepage |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| TAX-003 final main quality      | run `30497890894` / `29a7d06`         | merged main quality + four non-root images passed                          | 2026-07-29 |
+| TAX-003 evidence head           | PR #38 / run `30497442795`            | final head quality + four non-root images passed                           | 2026-07-29 |
 | TAX-003 protected checks        | PR #38 / run `30496917730`            | 450 tests、22 E2E、fresh/upgrade DB、4 images passed                       | 2026-07-29 |
 | TAX-003 local quality           | `pnpm ci:quality` + runtime/E2E       | passed：450 tests、8 builds、22 E2E、API runtime                           | 2026-07-29 |
 | Static architecture check       | `scripts/check-architecture.sh`       | passed：101 tasks、31 paths、52 schemas、36 models                         | 2026-07-25 |
