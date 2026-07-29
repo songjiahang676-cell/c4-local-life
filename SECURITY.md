@@ -48,3 +48,12 @@ Repository 在每次读取及写事务内重新检查 Session 与授权，撤销
 十分钟内的 recent MFA、强 Case ETag、标准 action/reason 组合和 actor-scoped 幂等键。提交快照在
 创建时删除动态联系/地址字段且不保存精确坐标；数据库触发器阻止快照与动作 UPDATE/DELETE。内部备注
 不进入 HTTP 响应、Audit metadata、Outbox payload 或结构化日志。
+
+## 公共 Listing 生命周期边界
+
+Rental 公开列表/详情只读取批准且当前有效的 PostgreSQL 行，并在查询层同时过滤删除、期限、
+taxonomy、owner 与组织状态。列表 HMAC cursor 与筛选条件绑定，拒绝篡改和跨筛选重放；列表摘要
+不返回正文、精确坐标、联系方式、媒体绑定或审核字段。归档/删除要求 ACTIVE actor、对象级
+owner/组织写角色和强 ETag，Repository 在行锁后复核授权与版本；软删除重试不会重复 Audit/
+Outbox。过期 Worker 只处理到期 `PUBLISHED` Rental，使用 `SKIP LOCKED` 与状态/version predicate
+避免并发重复，系统审计和事件不包含正文、attributes 或 PII。

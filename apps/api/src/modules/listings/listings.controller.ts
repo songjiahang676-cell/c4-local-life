@@ -3,6 +3,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Header,
@@ -13,6 +14,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -37,6 +39,7 @@ import { RequirePolicy } from "../../common/authorization/require-policy.decorat
 import { SchemaValidationPipe } from "../../common/schema-validation.pipe";
 import {
   ListingAccessDeniedError,
+  ListingCursorError,
   ListingIdempotencyConflictError,
   listingEtag,
   ListingNotFoundError,
@@ -55,11 +58,18 @@ export class ListingsController {
   ) {}
 
   @Get()
-  list(
+  @Header("Cache-Control", "public, max-age=30")
+  async list(
     @Query(new SchemaValidationPipe(listListingsQuerySchema)) query: ListListingsQuery,
   ): ReturnType<ListingsService["list"]> {
-    void query;
-    return this.listings.list();
+    try {
+      return await this.listings.list(query);
+    } catch (error) {
+      if (error instanceof ListingCursorError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Post()
@@ -168,12 +178,62 @@ export class ListingsController {
     }
   }
 
+  @Put(":listingId/archive")
+  @RequirePolicy(activeUserPolicyActions.listingArchive)
+  @Header("Cache-Control", "no-store")
+  async archive(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Param("listingId", new ParseUUIDPipe({ version: "4" })) listingId: string,
+    @Headers("if-match") rawIfMatch: string | undefined,
+  ): Promise<ListingOwnerResponse> {
+    const expectedVersion = listingVersionFromEtag(rawIfMatch);
+    if (!expectedVersion) {
+      throw new BadRequestException("A valid If-Match Listing ETag is required");
+    }
+    try {
+      const response = await this.listings.archive(
+        this.contexts.require(request),
+        listingId,
+        expectedVersion,
+      );
+      void reply.header("ETag", listingEtag(response.data.version));
+      return response;
+    } catch (error) {
+      this.#rethrow(error, reply);
+    }
+  }
+
+  @Delete(":listingId")
+  @HttpCode(204)
+  @RequirePolicy(activeUserPolicyActions.listingDelete)
+  @Header("Cache-Control", "no-store")
+  async delete(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Param("listingId", new ParseUUIDPipe({ version: "4" })) listingId: string,
+    @Headers("if-match") rawIfMatch: string | undefined,
+  ): Promise<void> {
+    const expectedVersion = listingVersionFromEtag(rawIfMatch);
+    if (!expectedVersion) {
+      throw new BadRequestException("A valid If-Match Listing ETag is required");
+    }
+    try {
+      await this.listings.delete(this.contexts.require(request), listingId, expectedVersion);
+    } catch (error) {
+      this.#rethrow(error, reply);
+    }
+  }
+
   #rethrow(error: unknown, reply: FastifyReply): never {
     if (error instanceof ListingNotFoundError) {
       throw new NotFoundException("Listing not found");
     }
     if (error instanceof ListingAccessDeniedError) {
       throw new ForbiddenException("Access denied");
+    }
+    if (error instanceof ListingCursorError) {
+      throw new BadRequestException(error.message);
     }
     if (error instanceof ListingIdempotencyConflictError) {
       throw new ConflictException(error.message);

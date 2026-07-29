@@ -200,6 +200,13 @@ MODERATOR/SENIOR_MODERATOR 角色与 MFA；批准、要求修改、拒绝和升�
 强 Case ETag 和 actor-scoped 幂等键。Listing、Case、不可变动作、Audit 与 Outbox 在同一
 PostgreSQL 事务写入；Admin BFF 仅开放这些精确 method/path。
 
+`LIST-005` 已闭合首个 Rental 公共生命周期：公开列表只读取已批准、未过期、未删除且 taxonomy/
+发布主体有效的 PostgreSQL 事实，返回不含正文、联系方式、精确坐标和内部审核字段的摘要；HMAC
+cursor 绑定 `type/category/region` 并以 `publishedAt + id` 稳定分页。Owner/组织写角色使用强
+Listing ETag 幂等归档或软删除，状态/版本/Audit/Outbox 原子提交。Worker 以有界批次和
+`FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复轮询不重复写证据，并暴露低基数
+轮询/过期/失败指标。搜索索引最终移除仍由 Gate 3 消费者负责。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

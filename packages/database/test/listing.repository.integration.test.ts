@@ -355,6 +355,48 @@ integration("ListingRepository safe PostgreSQL projections", () => {
     });
   });
 
+  it("paginates the approved public Rental projection with a stable compound cursor", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const repository = new ListingRepository(transaction);
+
+      const first = await repository.listPublic({
+        type: "RENTAL",
+        now,
+        limit: 1,
+      });
+      expect(first.items).toHaveLength(1);
+      expect(first.nextCursor).not.toBeNull();
+      expect([fixture.publishedListingId, fixture.malformedSchemaListingId]).toContain(
+        first.items[0]?.id,
+      );
+      expect(first.items[0]?.attributes).not.toHaveProperty("ownerPrivate");
+      expect(first.items[0]?.location).not.toHaveProperty("point");
+
+      const second = await repository.listPublic({
+        type: "RENTAL",
+        now,
+        limit: 1,
+        cursor: first.nextCursor ?? undefined,
+      });
+      expect(second.items).toHaveLength(1);
+      expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+      expect(second.nextCursor).toBeNull();
+
+      const filtered = await repository.listPublic({
+        type: "RENTAL",
+        categoryId: fixture.categoryId,
+        regionCode: `TEST-${fixture.regionId}`,
+        now,
+        limit: 10,
+      });
+      expect(filtered.items).toHaveLength(2);
+      expect(filtered.items.map((item) => item.id)).not.toContain(fixture.draftListingId);
+      expect(filtered.items.map((item) => item.id)).not.toContain(fixture.unreviewedListingId);
+      expect(filtered.items.map((item) => item.id)).not.toContain(fixture.expiredListingId);
+    });
+  });
+
   it("scopes owner views to the direct owner or a current organization member", async () => {
     await database.withRollback(async (transaction) => {
       const fixture = await createFixture(transaction);
@@ -499,6 +541,134 @@ integration("ListingRepository safe PostgreSQL projections", () => {
       expect(publicView?.attributes).toEqual({});
       expect(ownerView?.attributes).toEqual({});
       expect(moderatorView?.attributes).toEqual({});
+    });
+  });
+
+  it("archives and idempotently soft-deletes with atomic Audit and Outbox evidence", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const repository = new ListingRepository(transaction);
+      const occurredAt = new Date("2026-08-01T12:00:00.000Z");
+
+      await expect(
+        repository.transitionOwner({
+          actorUserId: fixture.outsiderId,
+          listingId: fixture.publishedListingId,
+          expectedVersion: 1,
+          kind: "ARCHIVE",
+          requestId: "req-outsider-archive",
+          occurredAt,
+        }),
+      ).resolves.toEqual({ kind: "not_found" });
+      await expect(
+        repository.transitionOwner({
+          actorUserId: fixture.ownerId,
+          listingId: fixture.publishedListingId,
+          expectedVersion: 1,
+          kind: "ARCHIVE",
+          requestId: "req-owner-archive",
+          occurredAt,
+        }),
+      ).resolves.toEqual({ kind: "transitioned", version: 2 });
+      await expect(
+        repository.transitionOwner({
+          actorUserId: fixture.ownerId,
+          listingId: fixture.publishedListingId,
+          expectedVersion: 2,
+          kind: "ARCHIVE",
+          requestId: "req-owner-archive-repeat",
+          occurredAt,
+        }),
+      ).resolves.toEqual({ kind: "already_archived", version: 2 });
+
+      const deletedAt = new Date("2026-08-01T12:01:00.000Z");
+      await expect(
+        repository.transitionOwner({
+          actorUserId: fixture.ownerId,
+          listingId: fixture.publishedListingId,
+          expectedVersion: 2,
+          kind: "DELETE",
+          requestId: "req-owner-delete",
+          occurredAt: deletedAt,
+        }),
+      ).resolves.toEqual({ kind: "transitioned", version: 3 });
+      await expect(
+        repository.transitionOwner({
+          actorUserId: fixture.ownerId,
+          listingId: fixture.publishedListingId,
+          expectedVersion: 2,
+          kind: "DELETE",
+          requestId: "req-owner-delete-retry",
+          occurredAt: deletedAt,
+        }),
+      ).resolves.toEqual({ kind: "already_deleted" });
+
+      const row = await transaction.listing.findUniqueOrThrow({
+        where: { id: fixture.publishedListingId },
+        select: { status: true, deletedAt: true, version: true },
+      });
+      expect(row).toEqual({
+        status: ContentStatus.DELETED,
+        deletedAt,
+        version: 3,
+      });
+      const audits = await transaction.auditLog.findMany({
+        where: { targetId: fixture.publishedListingId },
+        orderBy: { createdAt: "asc" },
+        select: { action: true, metadata: true },
+      });
+      const events = await transaction.outboxEvent.findMany({
+        where: { aggregateId: fixture.publishedListingId },
+        orderBy: { createdAt: "asc" },
+        select: { eventType: true, payload: true },
+      });
+      expect(audits.map((entry) => entry.action)).toEqual(["listing.archived", "listing.deleted"]);
+      expect(events.map((entry) => entry.eventType)).toEqual([
+        "listing.archived",
+        "listing.deleted",
+      ]);
+      expect(JSON.stringify({ audits, events })).not.toMatch(
+        /@example\.invalid|latitude|longitude|body|contactMode/i,
+      );
+    });
+  });
+
+  it("expires each due Rental once and records the system transition atomically", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const repository = new ListingRepository(transaction);
+
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 1,
+      });
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 0,
+      });
+      const row = await transaction.listing.findUniqueOrThrow({
+        where: { id: fixture.expiredListingId },
+        select: { status: true, moderationStatus: true, version: true, deletedAt: true },
+      });
+      expect(row).toEqual({
+        status: ContentStatus.EXPIRED,
+        moderationStatus: ModerationStatus.APPROVED,
+        version: 2,
+        deletedAt: null,
+      });
+      const auditCount = await transaction.auditLog.count({
+        where: {
+          targetId: fixture.expiredListingId,
+          action: "listing.expired",
+          actorId: null,
+          actorType: "SYSTEM",
+        },
+      });
+      const outboxCount = await transaction.outboxEvent.count({
+        where: {
+          aggregateId: fixture.expiredListingId,
+          eventType: "listing.expired",
+        },
+      });
+      expect({ auditCount, outboxCount }).toEqual({ auditCount: 1, outboxCount: 1 });
     });
   });
 });

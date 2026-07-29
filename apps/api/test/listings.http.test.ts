@@ -2,6 +2,7 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
 import type {
   CreateListingInput,
+  ListingCollection,
   ListingOwnerResponse,
   ListingSubmissionResponse,
   ProblemDetails,
@@ -403,6 +404,24 @@ describe("listing draft HTTP boundary", () => {
       headers: { ...mutationHeaders(editorId), "if-match": '"listing-v1"' },
       payload: { title: "Editor updated organization draft" },
     });
+    const editorSubmit = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        ...mutationHeaders(editorId, "listing-submit-org-0001"),
+        "if-match": '"listing-v2"',
+      },
+    });
+    const editorArchive = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: { ...mutationHeaders(editorId), "if-match": '"listing-v4"' },
+    });
+    const billingArchiveRetry = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: { ...mutationHeaders(billingId), "if-match": '"listing-v4"' },
+    });
 
     expect(created.statusCode).toBe(201);
     expect(created.json()).toMatchObject({
@@ -412,6 +431,190 @@ describe("listing draft HTTP boundary", () => {
     expect(billingWrite.statusCode).toBe(403);
     expect(editorWrite.statusCode).toBe(200);
     expect(editorWrite.headers.etag).toBe('"listing-v2"');
+    expect(editorSubmit.statusCode).toBe(202);
+    expect(editorSubmit.headers.etag).toBe('"listing-v4"');
+    expect(editorArchive.statusCode).toBe(200);
+    expect(editorArchive.headers.etag).toBe('"listing-v5"');
+    expect(billingArchiveRetry.statusCode).toBe(403);
+  });
+
+  it("serves only safe public Rental summaries through a filter-bound signed cursor", async () => {
+    const publishedIds: string[] = [];
+    for (const [index, title] of ["Public rental alpha", "Public rental beta"].entries()) {
+      const created = await server.inject({
+        method: "POST",
+        url: "/v1/listings",
+        headers: mutationHeaders(ownerId, `listing-create-public-page-${index + 1}`),
+        payload: draftPayload(title),
+      });
+      const listingId = created.json<ListingOwnerResponse>().data.id;
+      const submitted = await server.inject({
+        method: "POST",
+        url: `/v1/listings/${listingId}/submit`,
+        headers: {
+          ...mutationHeaders(ownerId, `listing-submit-public-page-${index + 1}`),
+          "if-match": '"listing-v1"',
+        },
+      });
+      expect(submitted.statusCode).toBe(202);
+      publishedIds.push(listingId);
+    }
+
+    const first = await server.inject({
+      method: "GET",
+      url: "/v1/listings?type=RENTAL&limit=1",
+    });
+    const firstPage = first.json<ListingCollection>();
+    expect(first.statusCode).toBe(200);
+    expect(first.headers["cache-control"]).toBe("public, max-age=30");
+    expect(firstPage.data).toHaveLength(1);
+    expect(firstPage.page).toMatchObject({ hasMore: true });
+    expect(firstPage.page.nextCursor).toEqual(expect.any(String));
+    expect(publishedIds).toContain(firstPage.data[0]?.id);
+    expect(firstPage.data[0]).toMatchObject({
+      type: "RENTAL",
+      status: "PUBLISHED",
+      location: { precision: "APPROXIMATE" },
+    });
+    expect(firstPage.data[0]).not.toHaveProperty("body");
+    expect(firstPage.data[0]).not.toHaveProperty("createdAt");
+    expect(firstPage.data[0]).not.toHaveProperty("contactMode");
+    expect(firstPage.data[0]).not.toHaveProperty("mediaIds");
+    expect(firstPage.data[0]?.location).not.toHaveProperty("point");
+
+    const second = await server.inject({
+      method: "GET",
+      url: `/v1/listings?type=RENTAL&limit=1&cursor=${encodeURIComponent(
+        firstPage.page.nextCursor ?? "",
+      )}`,
+    });
+    const secondPage = second.json<ListingCollection>();
+    expect(second.statusCode).toBe(200);
+    expect(secondPage.data).toHaveLength(1);
+    expect(secondPage.data[0]?.id).not.toBe(firstPage.data[0]?.id);
+
+    const tampered = await server.inject({
+      method: "GET",
+      url: `/v1/listings?limit=1&cursor=${encodeURIComponent(
+        `${firstPage.page.nextCursor ?? ""}x`,
+      )}`,
+    });
+    const rebound = await server.inject({
+      method: "GET",
+      url: `/v1/listings?categoryId=${memoryListingCategoryId}&limit=1&cursor=${encodeURIComponent(
+        firstPage.page.nextCursor ?? "",
+      )}`,
+    });
+    const wrongType = await server.inject({
+      method: "GET",
+      url: "/v1/listings?type=JOB",
+    });
+    expect([tampered.statusCode, rebound.statusCode, wrongType.statusCode]).toEqual([
+      400, 400, 400,
+    ]);
+  });
+
+  it("archives and soft-deletes through owner policy, ETags, audit, and idempotent DELETE", async () => {
+    const archiveAuditCount = listingStore.auditActions.filter(
+      (action) => action === "listing.archived",
+    ).length;
+    const deleteAuditCount = listingStore.auditActions.filter(
+      (action) => action === "listing.deleted",
+    ).length;
+    const archiveOutboxCount = listingStore.outboxEvents.filter(
+      (event) => event === "listing.archived",
+    ).length;
+    const deleteOutboxCount = listingStore.outboxEvents.filter(
+      (event) => event === "listing.deleted",
+    ).length;
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-lifecycle-0001"),
+      payload: draftPayload("Lifecycle boundary rental"),
+    });
+    const listingId = created.json<ListingOwnerResponse>().data.id;
+    const submitted = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        ...mutationHeaders(ownerId, "listing-submit-lifecycle-0001"),
+        "if-match": '"listing-v1"',
+      },
+    });
+    expect(submitted.statusCode).toBe(202);
+
+    const missingPrecondition = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: mutationHeaders(ownerId),
+    });
+    const outsiderArchive = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: { ...mutationHeaders(outsiderId), "if-match": '"listing-v3"' },
+    });
+    const archived = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v3"' },
+    });
+    expect(missingPrecondition.statusCode).toBe(400);
+    expect(outsiderArchive.statusCode).toBe(404);
+    expect(archived.statusCode).toBe(200);
+    expect(archived.headers.etag).toBe('"listing-v4"');
+    expect(archived.headers["cache-control"]).toBe("no-store");
+    expect(archived.json()).toMatchObject({
+      data: { id: listingId, status: "ARCHIVED", version: 4 },
+    });
+
+    const publicAfterArchive = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}`,
+    });
+    const repeatedArchive = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v4"' },
+    });
+    expect(publicAfterArchive.statusCode).toBe(404);
+    expect(repeatedArchive.statusCode).toBe(200);
+    expect(repeatedArchive.headers.etag).toBe('"listing-v4"');
+    expect(repeatedArchive.json()).toMatchObject({
+      data: { id: listingId, status: "ARCHIVED", version: 4 },
+    });
+
+    const deleted = await server.inject({
+      method: "DELETE",
+      url: `/v1/listings/${listingId}`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v4"' },
+    });
+    const exactDeleteRetry = await server.inject({
+      method: "DELETE",
+      url: `/v1/listings/${listingId}`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v4"' },
+    });
+    const ownerAfterDelete = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}`,
+      headers: { cookie: cookies.get(ownerId) },
+    });
+    expect(deleted.statusCode).toBe(204);
+    expect(deleted.headers["cache-control"]).toBe("no-store");
+    expect(exactDeleteRetry.statusCode).toBe(204);
+    expect(ownerAfterDelete.statusCode).toBe(404);
+    expect(
+      listingStore.auditActions.filter((action) => action === "listing.archived"),
+    ).toHaveLength(archiveAuditCount + 1);
+    expect(listingStore.auditActions.filter((action) => action === "listing.deleted")).toHaveLength(
+      deleteAuditCount + 1,
+    );
+    expect(listingStore.outboxEvents.filter((event) => event === "listing.archived")).toHaveLength(
+      archiveOutboxCount + 1,
+    );
+    expect(listingStore.outboxEvents.filter((event) => event === "listing.deleted")).toHaveLength(
+      deleteOutboxCount + 1,
+    );
   });
 
   it("rejects unsafe, over-posted, unready-media, and restricted-account writes", async () => {

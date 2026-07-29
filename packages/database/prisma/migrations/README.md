@@ -33,6 +33,7 @@
     hits.
 18. `20260729150000_admin_moderation_workbench` adds immutable redacted Case snapshots, Case
     versions, and actor-scoped action idempotency.
+19. `20260729230000_listing_public_lifecycle` adds the partial Rental due-expiry polling index.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -246,6 +247,19 @@ restricted by snapshot evidence.
   exact retry/conflict, Case/Listing concurrency, Audit/Outbox atomicity, and immutable evidence.
 - Rollback: disable the workbench and retain additive evidence. Do not remove moderation history in
   an incident; exceptional pre-production physical recovery is documented in the migration-local
+  `ROLLBACK.md`.
+
+## `20260729230000_listing_public_lifecycle`
+
+Adds a partial `(expires_at, id)` index covering only visible-state Rental candidates. The Worker
+claims due rows with `FOR UPDATE SKIP LOCKED`, moves them to `EXPIRED`, and appends minimized Audit
+and Outbox evidence in the same transaction. Repeated or concurrent polls are safe because only
+`PUBLISHED` rows qualify.
+
+- Roll forward: apply before starting the Listing expiry poller; verify batch limits, concurrent
+  polling, visibility removal, and exactly one Audit/Outbox pair per transition.
+- Rollback: stop the poller and retain the additive index. It is rebuildable from canonical
+  PostgreSQL state; exceptional physical removal is documented in the migration-local
   `ROLLBACK.md`.
 
 ## Roll-forward and recovery

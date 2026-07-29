@@ -56,6 +56,7 @@ try {
     "20260729020000_listing_media_binding",
     "20260729130000_listing_submission_moderation",
     "20260729150000_admin_moderation_workbench",
+    "20260729230000_listing_public_lifecycle",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -119,10 +120,11 @@ try {
         AND indexname IN (
           'listings_geo_point_gist',
           'listings_title_trgm',
-          'listings_published_partial'
+          'listings_published_partial',
+          'listings_rental_expiry_due_idx'
         )`,
   );
-  if (customIndexes.rowCount !== 3) {
+  if (customIndexes.rowCount !== 4) {
     throw new Error("One or more custom listing indexes are missing");
   }
 

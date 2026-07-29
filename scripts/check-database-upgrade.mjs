@@ -409,6 +409,14 @@ try {
             )
        ) AS workbench_columns`,
   );
+  const listingPublicLifecycleStorage = await upgrade.query(
+    `SELECT EXISTS (
+       SELECT 1
+         FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = 'listings_rental_expiry_due_idx'
+     ) AS expiry_index`,
+  );
   const moderationSentinelSnapshot = await upgrade.query(
     `SELECT "listing_version", "snapshot"
        FROM "moderation_case_snapshots"
@@ -457,6 +465,7 @@ try {
     !moderationWorkbenchStorage.rows[0].action_idempotency ||
     moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
     moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
+    !listingPublicLifecycleStorage.rows[0].expiry_index ||
     moderationSentinelSnapshot.rowCount !== 1 ||
     moderationSentinelSnapshot.rows[0].listing_version !== 3 ||
     moderationSentinelSnapshot.rows[0].snapshot.sensitiveFieldsRedacted !== true ||
@@ -490,6 +499,7 @@ try {
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
+      listingPublicLifecycleStorage: true,
       moderationSnapshotBackfilledAndRedacted: true,
     }),
   );

@@ -107,6 +107,11 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ModerationService` 管理签名 cursor、ETag、原因与 Listing 领域转换；数据库 adapter 复核 Session/
 角色并持久化。Admin React 组件只调用同源 BFF，不导入 Prisma 或数据库模型。
 
+`LIST-005` 使用同一模块化单体边界：`ListingsController` 只解析严格 query、ETag 和 Problem Details；
+`ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
+公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
+`ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
+
 ## 30.4 生成与手写边界
 
 - Prisma client：生成，不手改。

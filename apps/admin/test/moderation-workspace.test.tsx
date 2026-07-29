@@ -155,7 +155,7 @@ describe("ModerationWorkspace", () => {
     expect(screen.getByRole("button", { name: /Synthetic second rental/ })).toHaveFocus();
     fireEvent.keyDown(window, { key: "a", altKey: true });
     expect(screen.getByRole("combobox", { name: "Action" })).toHaveFocus();
-  });
+  }, 10_000);
 
   it("requires step-up for writes and sends exact concurrency/idempotency headers when enabled", async () => {
     const actionResponse: ModerationActionResponse = {

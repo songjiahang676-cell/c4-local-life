@@ -75,19 +75,27 @@ publisher/故障测试必须通过。
 `LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
 Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
-提交、审核、发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
+Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；其余
+四个垂直类型仍须复用并验收同一闭环，不能因 Rental 通过而标记整个 22.4 完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
-规则阈值或内部输入。公开列表/详情、人工审核动作、删除和过期仍由 LIST-005/ADMIN-002 等后续
-切片完成，因此 22.4 尚不能整体标记完成。
+规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
+`LIST-005`/`ADMIN-002` 验收；其余垂直类型与搜索派生状态仍待后续切片。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
-覆盖。公开列表/详情、重新提交的历史 revision diff、通知、删除和过期仍由 LIST-005/NOTIF 等后续
-切片负责，因此整个 Listing 生命周期尚未完成。
+覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
+revision diff、通知、搜索索引消费和其余垂直类型仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+
+`LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
+安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选
+复用。公开详情继续省略精确坐标、联系方式和内部字段。Owner/组织 Writer 使用强 ETag 归档或软删除；
+归档与 DELETE 重试不重复写，状态、版本、最小 Audit 和 Outbox 在同一事务提交。Worker 通过有界批次和
+`FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
+读立即移除，搜索侧最终移除仍由后续索引消费者处理。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能

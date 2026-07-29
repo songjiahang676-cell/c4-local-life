@@ -257,3 +257,14 @@ Idempotency-Key 或请求哈希。
   evaluation/hits 仍保持不可变。
 - CSRF/代理扩大：写动作要求可信 Admin Origin；Admin 同源 BFF 使用精确 method/path 和 UUID
   allowlist，未知/方法混淆路径失败关闭。
+
+## 14.16 公共 Listing 生命周期威胁与缓解
+
+- 枚举/PII 泄露：公开列表和详情使用专用 projection；列表不返回 body、精确点位、contactMode、
+  mediaIds 或审核字段，非公开状态统一 404。
+- cursor 篡改/重放：HMAC 使用域分隔并绑定 type/category/region；签名定长比较，非法 cursor 返回
+  通用 400，不回显 payload。
+- 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
+  ETag；外部用户得到通用 404，受限账号 403。
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
+  version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。

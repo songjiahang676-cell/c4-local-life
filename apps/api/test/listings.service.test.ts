@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseApiEnvironment } from "@socal/config";
 import type { CreateListingInput } from "@socal/contracts";
 import {
   activeUserPermissions,
@@ -18,6 +19,21 @@ import {
 } from "./support/memory-listing.store";
 
 const ownerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const environment = parseApiEnvironment({
+  NODE_ENV: "test",
+  APP_ENV: "test",
+  APP_NAME: "socal-api-listing-service-test",
+  PUBLIC_WEB_URL: "http://web.example.invalid",
+  PUBLIC_ADMIN_URL: "http://admin.example.invalid",
+  DATABASE_URL: "postgresql://example.invalid/socal",
+  REDIS_URL: "redis://localhost:6379/0",
+  OPENSEARCH_NODE: "http://localhost:9200",
+  SESSION_SECRET: "listing-service-session-secret-with-more-than-32-bytes",
+  OTP_SECRET: "listing-service-otp-secret-with-more-than-32-bytes",
+  MFA_SECRET: "listing-service-mfa-secret-with-more-than-32-bytes",
+  PASSWORD_PEPPER: "listing-service-password-pepper-with-more-than-32-bytes",
+  CSRF_SECRET: "listing-service-csrf-secret-with-more-than-32-bytes",
+});
 
 function ownerContext(method = "POST"): PolicyRequestContext {
   return {
@@ -57,6 +73,7 @@ function createInput(title = "Irvine two-bedroom rental"): CreateListingInput {
 function createService(): { service: ListingsService; store: MemoryListingStore } {
   const store = new MemoryListingStore();
   const service = new ListingsService(
+    environment,
     store,
     new TaxonomyService(createMemoryListingTaxonomyStore()),
     createPolicyService(),

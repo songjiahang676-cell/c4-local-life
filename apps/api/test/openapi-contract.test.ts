@@ -254,9 +254,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(46);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(108);
-    expect(operationIds).toHaveLength(55);
+    expect(Object.keys(contract.paths)).toHaveLength(47);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(109);
+    expect(operationIds).toHaveLength(56);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -293,8 +293,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(46);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(46);
+    expect(Object.keys(servedJson.paths)).toHaveLength(47);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(47);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -325,7 +325,7 @@ describe("canonical OpenAPI contract", () => {
     expect(operation?.responses["403"]).toBeDefined();
   });
 
-  it("validates implemented listing draft create, owner-read, update, and submit responses", async () => {
+  it("validates the implemented Rental create-to-public-to-removal contract", async () => {
     const issued = await sessions.issueSession(contractUserId, {});
     const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
     const created = await server.inject({
@@ -375,6 +375,28 @@ describe("canonical OpenAPI contract", () => {
         "if-match": '"listing-v2"',
       },
     });
+    const publicList = await server.inject({
+      method: "GET",
+      url: "/v1/listings?type=RENTAL&limit=20",
+    });
+    const archived = await server.inject({
+      method: "PUT",
+      url: `/v1/listings/${listingId}/archive`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"listing-v4"',
+      },
+    });
+    const deleted = await server.inject({
+      method: "DELETE",
+      url: `/v1/listings/${listingId}`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"listing-v5"',
+      },
+    });
     const createSchema =
       contract.paths["/listings"]?.post?.responses["201"]?.content?.["application/json"]?.schema;
     const readSchema =
@@ -388,11 +410,20 @@ describe("canonical OpenAPI contract", () => {
       contract.paths["/listings/{listingId}/submit"]?.post?.responses["202"]?.content?.[
         "application/json"
       ]?.schema;
+    const listSchema =
+      contract.paths["/listings"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
+    const archiveSchema =
+      contract.paths["/listings/{listingId}/archive"]?.put?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
 
     expect(created.statusCode).toBe(201);
     expect(read.statusCode).toBe(200);
     expect(updated.statusCode).toBe(200);
     expect(submitted.statusCode).toBe(202);
+    expect(publicList.statusCode).toBe(200);
+    expect(archived.statusCode).toBe(200);
+    expect(deleted.statusCode).toBe(204);
     expect(ajv.validate(createSchema ?? false, created.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
@@ -401,6 +432,12 @@ describe("canonical OpenAPI contract", () => {
       true,
     );
     expect(ajv.validate(submitSchema ?? false, submitted.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(listSchema ?? false, publicList.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(archiveSchema ?? false, archived.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
   });

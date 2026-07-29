@@ -429,6 +429,27 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/listings/{listingId}/archive": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        /**
+         * Archive an owned published listing
+         * @description Idempotent resource-state operation. A current strong Listing ETag is required so a
+         *     concurrent moderation, expiry or owner action cannot be silently overwritten.
+         */
+        readonly put: operations["archiveListing"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/listings/{listingId}/renew": {
         readonly parameters: {
             readonly query?: never;
@@ -1514,9 +1535,43 @@ export interface components {
             /** @enum {string} */
             readonly contactMode?: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
         };
+        readonly PublicListingSummaryView: {
+            /** Format: uuid */
+            readonly id: string;
+            /** @constant */
+            readonly type: "RENTAL";
+            /** @constant */
+            readonly status: "PUBLISHED";
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly slug: string;
+            readonly summary: string | null;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly region: components["schemas"]["ListingRegionView"];
+            readonly category: components["schemas"]["ListingCategoryView"];
+            readonly owner: components["schemas"]["ListingOwnerSummaryView"];
+            readonly organization: components["schemas"]["ListingOrganizationSummaryView"] | null;
+            readonly location: components["schemas"]["ListingLocationView"];
+            readonly attributes: {
+                readonly [key: string]: unknown;
+            };
+            readonly featured: boolean;
+            /** Format: date-time */
+            readonly featuredUntil: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
         readonly ListingCollection: {
-            readonly data: readonly components["schemas"]["Listing"][];
+            readonly data: readonly components["schemas"]["PublicListingSummaryView"][];
             readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
         };
         readonly SearchResponse: {
             readonly data: readonly components["schemas"]["Listing"][];
@@ -2707,13 +2762,11 @@ export interface operations {
     readonly listListings: {
         readonly parameters: {
             readonly query?: {
-                readonly type?: components["schemas"]["ListingType"];
+                readonly type?: "RENTAL";
                 readonly categoryId?: string;
                 readonly regionCode?: string;
-                /** @description Non-public status filters require ownership or operator permissions */
-                readonly status?: components["schemas"]["ContentStatus"];
                 readonly cursor?: components["parameters"]["Cursor"];
-                readonly limit?: components["parameters"]["Limit"];
+                readonly limit?: number;
             };
             readonly header?: never;
             readonly path?: never;
@@ -2721,9 +2774,10 @@ export interface operations {
         };
         readonly requestBody?: never;
         readonly responses: {
-            /** @description Cursor-paginated listings */
+            /** @description Stable cursor-paginated public Rental summaries */
             readonly 200: {
                 headers: {
+                    readonly "Cache-Control"?: "public, max-age=30";
                     readonly [name: string]: unknown;
                 };
                 content: {
@@ -2799,7 +2853,10 @@ export interface operations {
     readonly deleteListing: {
         readonly parameters: {
             readonly query?: never;
-            readonly header?: never;
+            readonly header: {
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
             readonly path: {
                 readonly listingId: components["parameters"]["ListingId"];
             };
@@ -2810,10 +2867,16 @@ export interface operations {
             /** @description Listing soft-deleted and removed from search */
             readonly 204: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content?: never;
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
         };
     };
     readonly updateListing: {
@@ -2886,6 +2949,38 @@ export interface operations {
             readonly 404: components["responses"]["NotFound"];
             readonly 409: components["responses"]["Conflict"];
             readonly 422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    readonly archiveListing: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path: {
+                readonly listingId: components["parameters"]["ListingId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Listing archived and removed from public reads */
+            readonly 200: {
+                headers: {
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ListingOwnerResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
         };
     };
     readonly renewListing: {

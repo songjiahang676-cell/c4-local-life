@@ -11,6 +11,10 @@ import type {
   ListingSubmissionCandidate,
   ListingSubmissionProjection,
   OwnerListingProjection,
+  OwnerListingTransitionInput,
+  OwnerListingTransitionResult,
+  PublicListingListInput,
+  PublicListingListResult,
   PublicListingProjection,
   ResolveListingDraftReferencesInput,
   UpdateListingDraftInput,
@@ -312,7 +316,46 @@ export class MemoryListingStore implements ListingStore {
   }
 
   findPublicById(input: { listingId: string; now: Date }): Promise<PublicListingProjection | null> {
-    return Promise.resolve(structuredClone(this.#publicRows.get(input.listingId) ?? null));
+    const listing = this.#publicRows.get(input.listingId);
+    return Promise.resolve(
+      listing &&
+        listing.publishedAt <= input.now &&
+        listing.expiresAt > input.now &&
+        listing.status === "PUBLISHED"
+        ? structuredClone(listing)
+        : null,
+    );
+  }
+
+  listPublic(input: PublicListingListInput): Promise<PublicListingListResult> {
+    const rows = [...this.#publicRows.values()]
+      .filter(
+        (listing) =>
+          listing.type === input.type &&
+          listing.status === "PUBLISHED" &&
+          listing.publishedAt <= input.now &&
+          listing.expiresAt > input.now &&
+          (!input.categoryId || listing.category.id === input.categoryId) &&
+          (!input.regionCode || listing.region.code === input.regionCode) &&
+          (!input.cursor ||
+            listing.publishedAt < input.cursor.publishedAt ||
+            (listing.publishedAt.getTime() === input.cursor.publishedAt.getTime() &&
+              listing.id < input.cursor.id)),
+      )
+      .sort(
+        (left, right) =>
+          right.publishedAt.getTime() - left.publishedAt.getTime() ||
+          right.id.localeCompare(left.id),
+      );
+    const page = rows.slice(0, input.limit);
+    const last = page.at(-1);
+    return Promise.resolve({
+      items: structuredClone(page),
+      nextCursor:
+        rows.length > input.limit && last
+          ? { publishedAt: new Date(last.publishedAt), id: last.id }
+          : null,
+    });
   }
 
   findByIdForOwner(input: {
@@ -321,7 +364,49 @@ export class MemoryListingStore implements ListingStore {
     now: Date;
   }): Promise<OwnerListingProjection | null> {
     const row = this.#rows.get(input.listingId);
-    return Promise.resolve(row && this.#canRead(input.actorUserId, row) ? cloneOwner(row) : null);
+    return Promise.resolve(
+      row && row.status !== "DELETED" && this.#canRead(input.actorUserId, row)
+        ? cloneOwner(row)
+        : null,
+    );
+  }
+
+  transitionOwner(input: OwnerListingTransitionInput): Promise<OwnerListingTransitionResult> {
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canWrite(input.actorUserId, row)) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    if (input.kind === "DELETE" && row.status === "DELETED") {
+      return Promise.resolve({ kind: "already_deleted" });
+    }
+    if (
+      input.kind === "ARCHIVE" &&
+      row.status === "ARCHIVED" &&
+      (input.expectedVersion === row.version || input.expectedVersion === row.version - 1)
+    ) {
+      return Promise.resolve({ kind: "already_archived", version: row.version });
+    }
+    if (row.version !== input.expectedVersion) {
+      return Promise.resolve({ kind: "version_conflict", currentVersion: row.version });
+    }
+    if (input.occurredAt < row.updatedAt) {
+      return Promise.resolve({ kind: "time_conflict", currentVersion: row.version });
+    }
+    if (input.kind === "ARCHIVE" && row.status !== "PUBLISHED") {
+      return Promise.resolve({ kind: "state_conflict", currentVersion: row.version });
+    }
+    const updated: OwnerListingProjection = {
+      ...row,
+      status: input.kind === "ARCHIVE" ? "ARCHIVED" : "DELETED",
+      updatedAt: input.occurredAt,
+      version: row.version + 1,
+    };
+    this.#rows.set(updated.id, updated);
+    this.#publicRows.delete(updated.id);
+    const action = input.kind === "ARCHIVE" ? "listing.archived" : "listing.deleted";
+    this.auditActions.push(action);
+    this.outboxEvents.push(action);
+    return Promise.resolve({ kind: "transitioned", version: updated.version });
   }
 
   findSubmissionRetry(
@@ -404,6 +489,32 @@ export class MemoryListingStore implements ListingStore {
       version: input.decision.resultVersion,
     };
     this.#rows.set(updated.id, updated);
+    if (updated.status === "PUBLISHED" && updated.publishedAt && updated.expiresAt) {
+      this.#publicRows.set(updated.id, {
+        id: updated.id,
+        type: updated.type,
+        status: "PUBLISHED",
+        locale: updated.locale,
+        title: updated.title,
+        slug: updated.slug,
+        summary: updated.summary,
+        body: updated.body,
+        price: structuredClone(updated.price),
+        region: structuredClone(updated.region),
+        category: structuredClone(updated.category),
+        owner: structuredClone(updated.owner),
+        organization: structuredClone(updated.organization),
+        location: { precision: updated.location.precision },
+        attributes: structuredClone(updated.attributes),
+        featured: updated.isFeatured && Boolean(updated.featuredUntil),
+        featuredUntil: updated.featuredUntil,
+        publishedAt: updated.publishedAt,
+        expiresAt: updated.expiresAt,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        version: updated.version,
+      });
+    }
     const submission = {
       resourceId: row.id,
       previousStatus: "DRAFT" as const,
