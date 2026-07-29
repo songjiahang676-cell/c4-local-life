@@ -701,8 +701,8 @@ Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有�
 `PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
 `REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
 只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
-`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；写事务仍由
-`LIST-003` 接入。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
+`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；
+`LIST-003` 已接入草稿创建与条件更新写事务。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
 
 `LIST-002` 使用三套显式 Prisma `select` 和独立返回类型，而不是序列化完整 Listing。公开读取在 SQL
 条件中同时要求已发布、已批准、发布时间已到、尚未过期、未删除、有效地区/分类，以及可用 owner/
@@ -713,6 +713,13 @@ moderator 读取只接受当前未撤销、未过期且 region/category scope �
 绝不返回原始 JSON。公开投影不含精确坐标、联系方式、审核状态和内部评分；owner 可读取自己的精确点和
 审核状态但不含审核员字段；moderator 可读取受控内部状态和三层动态字段，但仍不读取邮箱、手机号、
 组织 legal name 或精确坐标。
+
+`LIST-003` 的草稿创建把 `owner + Idempotency-Key` 和 canonical request hash 保存为配对证据；同一
+actor/key 的精确重试返回原草稿，不同 payload 返回 409，事务级 advisory lock 防止并发重复插入。
+更新先锁定 Listing，再要求当前 `DRAFT`、当前个人 owner 或组织 `OWNER|ADMIN|EDITOR`、精确历史表单
+schema 和 `expectedVersion`；条件更新只允许一个并发请求成功。每次成功创建/更新在同一 PostgreSQL
+事务追加最小化 `AuditLog` 与版本化 Outbox，事件不含标题、正文、attributes、联系方式或幂等证据。
+组织 Listing 的创建者不享有永久旁路；移除 membership 后即失去 owner 投影视图和写权限。
 
 ### Organization 聚合
 
@@ -978,6 +985,12 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 
 所有消费者以 `eventId` 或业务幂等键去重。
 
+`LIST-003` 的草稿写入已按此边界实现：Controller 只解析严格 DTO、会话、`Idempotency-Key` 和强
+`If-Match`；application service 组合 API-004 Policy、精确 taxonomy/form-schema 校验与 Listing
+领域价格不变式；database store/repository 才执行 actor/organization scoped query、行锁、版本条件、
+Listing/AuditLog/Outbox 原子事务。创建使用 actor-scoped advisory transaction lock，使两个同时到达的
+同 key 请求只产生一行和一组证据。OpenSearch、Redis 和 Worker 不参与草稿写入的成功判定。
+
 `EVT-001` 的 dispatcher 运行在现有 Worker 进程，不新增服务边界。它短事务领取有界批次，事务提交后
 才向配置的 BullMQ 队列写入 versioned envelope；jobId 固定为 eventId。成功/重试/终态失败使用 attempt
 版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，
@@ -1211,8 +1224,15 @@ provider 错误。
 `formSchemaVersion` 读取已发布 schema，并按 `PUBLIC`、`OWNER_ONLY`、`MODERATOR_ONLY` 分层白名单
 投影。schema 缺失/损坏、重复字段和 schema 外属性都失败关闭为空对象。公开层没有精确坐标、
 `contactMode`、审核状态、owner/organization 内部关联或 `qualityScore`；owner 层没有审核员字段或内部
-评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。公共 OpenAPI 尚未
-变化；`LIST-003` 接线时才把这些内部安全投影映射到现有 HTTP 契约。
+评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。
+
+`LIST-003` 已把安全投影接入 `POST /listings`、`GET /listings/{listingId}` 和
+`PATCH /listings/{listingId}`。创建必须带 16–128 字符 `Idempotency-Key`，成功返回 201、Location、
+强 ETag 和 `no-store`；同 actor/key 精确重试返回原资源，不同 payload 返回 409。详情对当前个人
+owner/当前组织成员返回 `ListingOwnerView` 和 `no-store`，未发布草稿对 guest/无关 actor 统一 404；
+公开详情只返回 `PublicListingView`。更新是严格 merge patch，要求形如 `"listing-vN"` 的强
+`If-Match`；版本竞争返回 409 和当前 ETag，不会静默覆盖。组织 `OWNER|ADMIN|EDITOR` 可更新，
+`BILLING|ANALYST` 只读；状态/价格/分类/地区/精确历史 attributes 在服务端再次验证。
 
 ## 8.7 上传 API
 
@@ -1955,6 +1975,14 @@ taxonomy/主体状态，owner 查询绑定直接所有权或当前 organization 
 做字段 visibility 白名单，未知属性或 schema 缺失时返回空对象，避免历史配置漂移和 JSON 注入字段
 造成横向泄漏。后续 Controller 仍须通过 API-004 Policy；Repository 不是前端隐藏或单独的全部授权层。
 
+`LIST-003` 在 HTTP 与事务边界补齐双重授权：创建/更新先要求 ACTIVE actor permission，owner/org
+读取再用 Repository 当前 membership 查询并经对象 Policy；组织创建者被移出后不能靠 `owner_id`
+继续读取或写入。草稿对 guest/外部用户统一 404，能合法读取但角色只读的组织成员写入返回通用 403。
+创建幂等证据只保存受约束 key 和 SHA-256 canonical request hash，不保存 request body；数据库要求两列
+同时为空或同时为有效值，并用 `owner + key` 唯一索引与事务锁抵御重试竞态。更新使用行锁和
+version predicate；Audit/Outbox 只含 actor/Listing/type/status/version/requestId 等最小证据，不复制
+标题、正文、动态属性、精确坐标、联系方式或 provider 数据。
+
 `ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
 `INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，
@@ -2491,6 +2519,13 @@ taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization memb
 返回空 attributes，而不是原始 JSON。fixture 仅使用 `example.invalid` 与明确 synthetic 文本，并在
 事务回滚隔离中运行。
 
+`LIST-003` 增加三层写入测试。service/HTTP 层验证创建精确重试与 changed-payload 409、强 ETag、
+缺失/旧 `If-Match`、guest/outsider/limited、个人 owner 与组织五角色、未知 attributes、非空 media
+和 over-posting；真实 OpenAPI schema 验证 create/read/update 实际响应。PostgreSQL 层从全新空库
+验证 15 个 migration、22 个约束负例、配对幂等证据、并发同 key 只创建一行，以及两个版本相同的
+并发 PATCH 只成功一个；每次成功恰有一条 Audit 和一条 Outbox，序列化负例证明其中没有业务正文或
+PII。并行集成测试只按稳定 seed ID 断言 taxonomy，避免其他隔离 fixture 造成全表计数抖动。
+
 ## 18.4 授权测试
 
 为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。
@@ -2906,6 +2941,10 @@ publisher/故障测试必须通过。
 - Owner/组织成员权限正确；他人不能读取草稿或审核原因。
 - 并发编辑返回 409 而非静默覆盖。
 - 详情不泄露精确地址/联系方式/风险字段。
+
+`LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
+Audit/Outbox 和安全详情投影。自动保存/浏览器恢复与 READY 媒体绑定属于 `LIST-004`；提交、审核、
+发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3674,10 +3713,12 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 
 - NestJS + Fastify 启动、Swagger、全局验证和 Problem Details 异常过滤器。
 - Health 模块。
-- Listing HTTP 示例仍只说明 Controller/DTO/Service 边界；`LIST-001` 已增加纯领域状态机，覆盖五类
+- Listing HTTP 不再使用进程内数组示例；`LIST-001` 已增加纯领域状态机，覆盖五类
   type-detail、价格、审核/内容双状态、版本和过期不变式。`LIST-002` 已增加 PostgreSQL Repository
   及 public/owner/moderator 显式安全投影，包含对象范围、当前审核角色 scope 和精确历史动态字段
-  visibility 过滤；`LIST-003` 再用这些边界替换现有内存 Service 并接入 HTTP/并发写事务。
+  visibility 过滤；`LIST-003` 已接入数据库草稿创建/owner 读取/条件更新、actor-scoped 幂等、
+  API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。列表仍留给 `LIST-005`，
+  READY 媒体绑定与发布 UX 留给 `LIST-004`。
 
 ### `apps/worker`
 
@@ -3696,6 +3737,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - 安全的扩展引导迁移、需合并到首个建表迁移后的 PostGIS/trigram/约束 SQL，以及 fallback SQL。
 - Listing 的公开、owner 和 moderator 三类显式读取投影；对象授权条件及动态字段 visibility 在
   Repository 边界失败关闭，不直接返回 Prisma 模型。
+- Listing 草稿 Repository 对创建使用 advisory lock + owner/key 唯一证据，对更新使用行锁 +
+  version predicate，并在相同事务写 Audit/Outbox。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 

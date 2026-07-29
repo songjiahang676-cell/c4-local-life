@@ -397,6 +397,22 @@ integration("ListingRepository safe PostgreSQL projections", () => {
       expect(JSON.stringify(ownerView)).not.toContain("@example.invalid");
       expect(ownerView).not.toHaveProperty("qualityScore");
 
+      await transaction.organizationMembership.delete({
+        where: {
+          organizationId_userId: {
+            organizationId: fixture.organizationId,
+            userId: fixture.ownerId,
+          },
+        },
+      });
+      expect(
+        await repository.findByIdForOwner({
+          actorUserId: fixture.ownerId,
+          listingId: fixture.publishedListingId,
+          now,
+        }),
+      ).toBeNull();
+
       await transaction.user.update({
         where: { id: fixture.organizationMemberId },
         data: { status: UserStatus.SUSPENDED },

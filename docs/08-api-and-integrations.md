@@ -167,8 +167,15 @@ provider 错误。
 `formSchemaVersion` 读取已发布 schema，并按 `PUBLIC`、`OWNER_ONLY`、`MODERATOR_ONLY` 分层白名单
 投影。schema 缺失/损坏、重复字段和 schema 外属性都失败关闭为空对象。公开层没有精确坐标、
 `contactMode`、审核状态、owner/organization 内部关联或 `qualityScore`；owner 层没有审核员字段或内部
-评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。公共 OpenAPI 尚未
-变化；`LIST-003` 接线时才把这些内部安全投影映射到现有 HTTP 契约。
+评分；moderator 层也不读取账号邮箱/电话、organization legal name 或精确坐标。
+
+`LIST-003` 已把安全投影接入 `POST /listings`、`GET /listings/{listingId}` 和
+`PATCH /listings/{listingId}`。创建必须带 16–128 字符 `Idempotency-Key`，成功返回 201、Location、
+强 ETag 和 `no-store`；同 actor/key 精确重试返回原资源，不同 payload 返回 409。详情对当前个人
+owner/当前组织成员返回 `ListingOwnerView` 和 `no-store`，未发布草稿对 guest/无关 actor 统一 404；
+公开详情只返回 `PublicListingView`。更新是严格 merge patch，要求形如 `"listing-vN"` 的强
+`If-Match`；版本竞争返回 409 和当前 ETag，不会静默覆盖。组织 `OWNER|ADMIN|EDITOR` 可更新，
+`BILLING|ANALYST` 只读；状态/价格/分类/地区/精确历史 attributes 在服务端再次验证。
 
 ## 8.7 上传 API
 

@@ -9,6 +9,11 @@ export type ListingType = components["schemas"]["ListingType"];
 export type ContentStatus = components["schemas"]["ContentStatus"];
 export type Money = components["schemas"]["Money"];
 export type CreateListingInput = components["schemas"]["CreateListingRequest"];
+export type UpdateListingInput = components["schemas"]["UpdateListingRequest"];
+export type PublicListingView = components["schemas"]["PublicListingView"];
+export type ListingOwnerView = components["schemas"]["ListingOwnerView"];
+export type ListingResponse = components["schemas"]["ListingResponse"];
+export type ListingOwnerResponse = components["schemas"]["ListingOwnerResponse"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
@@ -130,25 +135,45 @@ export const idempotencyKeySchema = z
     "Idempotency-Key must contain only letters, digits, dot, underscore, colon or hyphen",
   );
 
+const fixedPriceUnits = [
+  "FIXED",
+  "HOURLY",
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "YEARLY",
+  "SQFT",
+] as const;
+const nonFixedPriceUnits = ["NEGOTIABLE", "FREE"] as const;
+const priceUnitSchema = z.enum([...fixedPriceUnits, ...nonFixedPriceUnits]);
+const moneyAmountSchema = z.string().regex(/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/);
+
 export const moneySchema: z.ZodType<Money> = z
   .object({
-    amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+    amount: moneyAmountSchema.nullable(),
     currency: z.literal("USD"),
-    unit: z
-      .enum([
-        "FIXED",
-        "HOURLY",
-        "DAILY",
-        "WEEKLY",
-        "MONTHLY",
-        "YEARLY",
-        "SQFT",
-        "NEGOTIABLE",
-        "FREE",
-      ])
-      .nullish(),
+    unit: priceUnitSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (nonFixedPriceUnits.includes(value.unit as (typeof nonFixedPriceUnits)[number])) {
+      if (value.amount !== null) {
+        context.addIssue({
+          code: "custom",
+          path: ["amount"],
+          message: "FREE and NEGOTIABLE prices must not include an amount",
+        });
+      }
+      return;
+    }
+    if (value.amount === null || Number(value.amount) <= 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["amount"],
+        message: "A positive amount is required for this price unit",
+      });
+    }
+  });
 
 const geoPointSchema = z
   .object({
@@ -157,28 +182,95 @@ const geoPointSchema = z
   })
   .strict();
 
+const forbiddenBidiPattern = /[\u202a-\u202e\u2066-\u2069]/u;
+
+function safeListingText(value: string, multiline: boolean): boolean {
+  if (forbiddenBidiPattern.test(value)) return false;
+  return !Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (multiline && (character === "\n" || character === "\r" || character === "\t")) {
+      return false;
+    }
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
+  });
+}
+
+const listingTitleSchema = z
+  .string()
+  .trim()
+  .min(5)
+  .max(120)
+  .refine((value) => safeListingText(value, false), "Title contains unsupported characters");
+const listingSummarySchema = z
+  .string()
+  .trim()
+  .max(240)
+  .refine((value) => safeListingText(value, false), "Summary contains unsupported characters");
+const listingBodySchema = z
+  .string()
+  .trim()
+  .min(20)
+  .max(10_000)
+  .refine((value) => safeListingText(value, true), "Body contains unsupported characters");
+const listingRegionCodeSchema = z
+  .string()
+  .min(2)
+  .max(80)
+  .regex(/^[A-Za-z0-9._:-]+$/);
+const listingAttributesSchema = z
+  .record(z.string(), z.json())
+  .refine((value) => Object.keys(value).length <= 100, "Attributes exceed the field limit");
+const listingMediaIdsSchema = z.array(z.uuid()).max(20);
+const listingContactModeSchema = z.enum(["IN_APP", "PHONE_REVEAL", "EMAIL_REVEAL"]);
+const listingLocationPrecisionSchema = z.enum(["CITY", "NEIGHBORHOOD", "APPROXIMATE", "EXACT"]);
+const createListingLocationSchema = z
+  .object({
+    precision: listingLocationPrecisionSchema.default("CITY"),
+    point: geoPointSchema.optional(),
+  })
+  .strict();
+const updateListingLocationSchema = z
+  .object({
+    precision: listingLocationPrecisionSchema.optional(),
+    point: geoPointSchema.nullable().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Location patch must not be empty");
+
 export const createListingSchema: z.ZodType<CreateListingInput> = z
   .object({
     type: listingTypeSchema,
     locale: localeSchema.default("zh-Hans"),
     categoryId: z.uuid(),
-    regionCode: z.string().min(2).max(80),
-    title: z.string().trim().min(5).max(120),
-    summary: z.string().trim().max(240).optional(),
-    body: z.string().trim().min(20).max(10_000),
+    organizationId: z.uuid().optional(),
+    regionCode: listingRegionCodeSchema,
+    title: listingTitleSchema,
+    summary: listingSummarySchema.optional(),
+    body: listingBodySchema,
     price: moneySchema.optional(),
-    location: z
-      .object({
-        precision: z.enum(["CITY", "NEIGHBORHOOD", "APPROXIMATE", "EXACT"]).default("CITY"),
-        point: geoPointSchema.optional(),
-      })
-      .strict()
-      .optional(),
-    attributes: z.record(z.string(), z.unknown()).default({}),
-    mediaIds: z.array(z.uuid()).max(20).default([]),
-    contactMode: z.enum(["IN_APP", "PHONE_REVEAL", "EMAIL_REVEAL"]).default("IN_APP"),
+    location: createListingLocationSchema.optional(),
+    attributes: listingAttributesSchema.default({}),
+    mediaIds: listingMediaIdsSchema.default([]),
+    contactMode: listingContactModeSchema.default("IN_APP"),
   })
   .strict();
+
+export const updateListingSchema: z.ZodType<UpdateListingInput> = z
+  .object({
+    locale: localeSchema.optional(),
+    categoryId: z.uuid().optional(),
+    regionCode: listingRegionCodeSchema.optional(),
+    title: listingTitleSchema.optional(),
+    summary: listingSummarySchema.nullable().optional(),
+    body: listingBodySchema.optional(),
+    price: moneySchema.nullable().optional(),
+    location: updateListingLocationSchema.optional(),
+    attributes: listingAttributesSchema.optional(),
+    mediaIds: listingMediaIdsSchema.optional(),
+    contactMode: listingContactModeSchema.optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Listing patch must not be empty");
 
 export const listingSearchSchema: z.ZodType<ListingSearchInput> = z
   .object({

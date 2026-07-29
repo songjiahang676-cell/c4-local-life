@@ -72,6 +72,10 @@ publisher/故障测试必须通过。
 - 并发编辑返回 409 而非静默覆盖。
 - 详情不泄露精确地址/联系方式/风险字段。
 
+`LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
+Audit/Outbox 和安全详情投影。自动保存/浏览器恢复与 READY 媒体绑定属于 `LIST-004`；提交、审核、
+发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
+
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
 决定 bucket/key；普通媒体路径拒绝 SVG/HTML 和验证文档；原始对象在 READY 前没有公共 URL。

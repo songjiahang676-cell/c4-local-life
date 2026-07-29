@@ -24,6 +24,9 @@
       "listing": [
         "src/repositories/listing.repository.ts"
       ],
+      "listing-draft": [
+        "src/repositories/listing-draft.repository.ts"
+      ],
       "outbox": [
         "src/repositories/outbox-event.repository.ts"
       ],
@@ -66,6 +69,11 @@
       "types": "./src/repositories/listing.repository.ts",
       "require": "./dist/src/repositories/listing.repository.js",
       "default": "./dist/src/repositories/listing.repository.js"
+    },
+    "./listing-draft": {
+      "types": "./src/repositories/listing-draft.repository.ts",
+      "require": "./dist/src/repositories/listing-draft.repository.js",
+      "default": "./dist/src/repositories/listing-draft.repository.js"
     },
     "./outbox": {
       "types": "./src/repositories/outbox-event.repository.ts",

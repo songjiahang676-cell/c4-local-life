@@ -179,6 +179,18 @@ recovery code and append minimized audit events.
   and retain additive credential/session metadata. Do not decrypt/export secrets or drop recovery
   evidence during incident response. See the migration-local `ROLLBACK.md`.
 
+## `20260729010000_listing_draft_idempotency`
+
+Adds nullable, paired `create_idempotency_key` and lowercase SHA-256 `create_request_hash` evidence
+to Listing. Existing rows remain compatible with both values null; LIST-003-created drafts always
+write both. PostgreSQL enforces the pair/shape and one key per creating owner, while an actor-scoped
+advisory transaction lock serializes concurrent exact retries.
+
+- Roll forward: apply before enabling database-backed `POST /listings`; verify exact retry,
+  changed-payload conflict and same-key concurrency, including one audit and Outbox record.
+- Rollback: disable the LIST-003 routes and retain the additive evidence. Physical removal loses
+  retry provenance and requires stopped writers plus backup; see the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

@@ -52,6 +52,7 @@ try {
     "20260728223000_password_recovery",
     "20260728234500_outbox_dispatcher_constraints",
     "20260729003000_media_processing_lifecycle",
+    "20260729010000_listing_draft_idempotency",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -402,6 +403,39 @@ try {
     throw new Error("Media lifecycle, safe variant, or processing-index controls are missing");
   }
 
+  const listingDraftStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'listings'
+            AND constraint_name = 'listings_create_idempotency_evidence_check'
+            AND constraint_type = 'CHECK'
+       ) AS pair_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'listings_owner_id_create_idempotency_key_key'
+       ) AS owner_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'listings'
+            AND column_name IN ('create_idempotency_key', 'create_request_hash')
+            AND is_nullable = 'YES'
+       ) AS nullable_evidence_columns`,
+  );
+  if (
+    !listingDraftStorage.rows[0]?.pair_check ||
+    !listingDraftStorage.rows[0]?.owner_idempotency ||
+    listingDraftStorage.rows[0]?.nullable_evidence_columns !== 2
+  ) {
+    throw new Error("Listing draft idempotency evidence controls are missing");
+  }
+
   await client.query("BEGIN");
   await client.query(
     `INSERT INTO users (id, email, updated_at)
@@ -460,6 +494,49 @@ try {
   ) {
     throw new Error("Generated geography point does not match listing coordinates");
   }
+
+  await expectSqlState(
+    "listing draft idempotency evidence pairing",
+    `UPDATE listings
+        SET create_idempotency_key = 'baseline-listing-pair'
+      WHERE id = '00000000-0000-4000-8000-000000000004'`,
+    "23514",
+  );
+  await expectSqlState(
+    "listing draft idempotency key bound",
+    `UPDATE listings
+        SET create_idempotency_key = 'invalid key with spaces',
+            create_request_hash = repeat('a', 64)
+      WHERE id = '00000000-0000-4000-8000-000000000004'`,
+    "23514",
+  );
+  await client.query(
+    `UPDATE listings
+        SET create_idempotency_key = 'baseline-listing-create-0001',
+            create_request_hash = repeat('a', 64)
+      WHERE id = '00000000-0000-4000-8000-000000000004'`,
+  );
+  await expectSqlState(
+    "listing draft owner idempotency uniqueness",
+    `INSERT INTO listings (
+       id, type, owner_id, category_id, region_id, title, slug, body,
+       create_idempotency_key, create_request_hash, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000025',
+       'RENTAL',
+       '00000000-0000-4000-8000-000000000001',
+       '00000000-0000-4000-8000-000000000003',
+       '00000000-0000-4000-8000-000000000002',
+       'Duplicate owner idempotency evidence',
+       'duplicate-owner-idempotency-evidence',
+       'Fictional data expected to fail its owner-scoped uniqueness constraint.',
+       'baseline-listing-create-0001',
+       repeat('b', 64),
+       now()
+     )`,
+    "23505",
+  );
 
   await expectSqlState(
     "review rating check",
@@ -845,7 +922,8 @@ try {
       passwordStorage: true,
       outboxStorage: true,
       mediaProcessingStorage: true,
-      negativeCases: 19,
+      listingDraftStorage: true,
+      negativeCases: 22,
     }),
   );
 } finally {

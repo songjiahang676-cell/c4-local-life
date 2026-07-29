@@ -22,6 +22,12 @@ import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 import { MemoryMfaStore } from "./support/memory-mfa.store";
 import {
+  MemoryListingStore,
+  memoryListingCategoryId,
+  memoryListingRegionCode,
+  memoryListingRegionId,
+} from "./support/memory-listing.store";
+import {
   CapturingPasswordNotificationGateway,
   MemoryPasswordStore,
 } from "./support/memory-password.store";
@@ -124,6 +130,21 @@ describe("canonical OpenAPI contract", () => {
           sortOrder: 0,
           aliases: [{ locale: "en-US", value: "USA" }],
         },
+        {
+          id: memoryListingRegionId,
+          parentId: null,
+          code: memoryListingRegionCode,
+          type: "CITY",
+          slug: "synthetic-irvine",
+          nameZhHans: "测试尔湾",
+          nameEn: "Synthetic Irvine",
+          timezone: "America/Los_Angeles",
+          latitude: 33.6846,
+          longitude: -117.8265,
+          isActive: true,
+          sortOrder: 1,
+          aliases: [],
+        },
       ],
       [
         {
@@ -138,6 +159,40 @@ describe("canonical OpenAPI contract", () => {
           isActive: true,
           sortOrder: 0,
           aliases: [{ locale: "zh-Hans", value: "找师傅" }],
+        },
+        {
+          id: memoryListingCategoryId,
+          parentId: null,
+          vertical: "RENTAL",
+          slug: "synthetic-rentals",
+          nameZhHans: "测试租房",
+          nameEn: "Synthetic Rentals",
+          iconKey: "rental",
+          formSchemaVersion: 1,
+          isActive: true,
+          sortOrder: 1,
+          aliases: [],
+        },
+      ],
+      [
+        {
+          id: "70000000-0000-4000-8000-000000000001",
+          categoryId: memoryListingCategoryId,
+          version: 1,
+          revision: 1,
+          definition: {
+            categoryId: memoryListingCategoryId,
+            version: 1,
+            fields: [],
+          },
+          contentHash: "0".repeat(64),
+          basedOnVersion: null,
+          createdById: null,
+          updatedById: null,
+          publishedById: null,
+          createdAt: organizationTimestamp,
+          updatedAt: organizationTimestamp,
+          publishedAt: organizationTimestamp,
         },
       ],
     );
@@ -164,6 +219,7 @@ describe("canonical OpenAPI contract", () => {
       otpChallengeStore,
       otpDeliveryGateway: otpDelivery,
       organizationStore,
+      listingStore: new MemoryListingStore(),
       mediaStore: new MemoryMediaStore(),
       mediaObjectStorage: new CapturingMediaObjectStorage(),
       taxonomyStore,
@@ -196,7 +252,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(44);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(89);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(98);
     expect(operationIds).toHaveLength(53);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -264,6 +320,68 @@ describe("canonical OpenAPI contract", () => {
 
     expect(operation?.responses["401"]).toBeDefined();
     expect(operation?.responses["403"]).toBeDefined();
+  });
+
+  it("validates implemented listing draft create, owner-read, and update responses", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "contract-listing-create-0001",
+      },
+      payload: {
+        type: "RENTAL",
+        locale: "en-US",
+        categoryId: memoryListingCategoryId,
+        regionCode: memoryListingRegionCode,
+        title: "Synthetic contract rental",
+        body: "A fictional Listing used to validate the canonical contract response.",
+        price: { amount: "2500.00", currency: "USD", unit: "MONTHLY" },
+        attributes: {},
+        mediaIds: [],
+        contactMode: "IN_APP",
+      },
+    });
+    const listingId = created.json<{ data: { id: string } }>().data.id;
+    const read = await server.inject({
+      method: "GET",
+      url: `/v1/listings/${listingId}`,
+      headers: { cookie },
+    });
+    const updated = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listingId}`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"listing-v1"',
+      },
+      payload: { title: "Updated synthetic contract rental" },
+    });
+    const createSchema =
+      contract.paths["/listings"]?.post?.responses["201"]?.content?.["application/json"]?.schema;
+    const readSchema =
+      contract.paths["/listings/{listingId}"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    const updateSchema =
+      contract.paths["/listings/{listingId}"]?.patch?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+
+    expect(created.statusCode).toBe(201);
+    expect(read.statusCode).toBe(200);
+    expect(updated.statusCode).toBe(200);
+    expect(ajv.validate(createSchema ?? false, created.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(readSchema ?? false, read.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    expect(ajv.validate(updateSchema ?? false, updated.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
   });
 
   it("validates the implemented current-session projection against the contract", async () => {

@@ -6,14 +6,14 @@
 
 - Gate：G2 Listings / Moderation
 - 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
-- 进度：3/16 个 G2 任务、32/101 个总任务完成
+- 进度：4/16 个 G2 任务、33/101 个总任务完成
 - 风险：`ORG-002` 是 G1/P1 但显式依赖 G2 `NOTIF-001`，按依赖顺序延后；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产发布期限、审核策略和原因码仍需运营/法律确认，当前领域只接受调用方提供的 1–365 天显式策略值
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status       | Notes                                                         |
-| -------- | -------------------- | ---------- | ----------------- | ------------ | ------------------------------------------------------------- |
-| LIST-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | hosted green | public/owner/moderator 查询授权、显式投影和动态字段可见性过滤 |
+| Task     | Owner                | Started    | Target            | Status      | Notes                                                             |
+| -------- | -------------------- | ---------- | ----------------- | ----------- | ----------------------------------------------------------------- |
+| LIST-003 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | 草稿幂等创建、owner/org 读取、强 ETag 条件更新及原子 Audit/Outbox |
 
 ## Gate Evidence
 
@@ -88,12 +88,18 @@
 | LIST-002 browser/runtime        | Chromium desktop/mobile            | observability runtime and 6/6 E2E passed                                  | 2026-07-28 |
 | LIST-002 architecture           | `scripts/check-architecture.sh`    | 101 tasks、47 models、44 paths、89 schemas passed                         | 2026-07-28 |
 | LIST-002 protected checks       | PR #18 / run `30409724740`         | real services、Linux build/E2E and four non-root images passed            | 2026-07-28 |
+| LIST-002 final checks           | PR #18 / run `30410107716`         | final head quality + four non-root images passed                          | 2026-07-28 |
+| LIST-002 protected merge        | PR #18 / merge `a8db956`           | protected merge completed                                                 | 2026-07-28 |
+| LIST-003 database lifecycle     | fresh 15-migration empty database  | baseline 22 negatives；upgrade preserved sentinel；64 DB tests passed     | 2026-07-29 |
+| LIST-003 local quality          | `pnpm ci:quality`                  | 61 files / 226 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
+| LIST-003 browser/runtime        | Chromium desktop/mobile            | observability runtime and 6/6 E2E passed                                  | 2026-07-29 |
+| LIST-003 architecture           | `scripts/check-architecture.sh`    | 101 tasks、47 models、44 paths、98 schemas passed                         | 2026-07-29 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`；LIST-002 已由受保护 PR #18 / final run `30410107716` 合并为 `a8db956`。
 - `ORG-002` 保留原 G1/P1 标签，但它显式依赖 `NOTIF-001`；`MEDIA-003` 属于 G4 受限验证文件。两者不提前实现，也不阻塞按 `IMPLEMENTATION_SEQUENCE.md` 进入 LIST-001。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。

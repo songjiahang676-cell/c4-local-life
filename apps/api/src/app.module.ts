@@ -14,13 +14,13 @@ import type { PasswordNotificationGateway } from "./modules/auth/password-notifi
 import type { PasswordStore } from "./modules/auth/password.store";
 import { HealthModule } from "./modules/health/health.module";
 import { ListingsModule } from "./modules/listings/listings.module";
+import type { ListingStore } from "./modules/listings/listing.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import { MediaModule } from "./modules/media/media.module";
 import type { MediaStore } from "./modules/media/media.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
-import { TaxonomyModule } from "./modules/taxonomy/taxonomy.module";
 
 @Module({})
 export class AppModule {
@@ -36,6 +36,7 @@ export class AppModule {
     mfaStore?: MfaStore,
     passwordStore?: PasswordStore,
     passwordNotificationGateway?: PasswordNotificationGateway,
+    listingStore?: ListingStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -51,10 +52,9 @@ export class AppModule {
         ),
         AdminModule.register(environment, mfaStore),
         HealthModule,
-        ListingsModule,
+        ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
         OrganizationsModule.register(environment, organizationStore),
-        TaxonomyModule.register(environment, taxonomyStore),
       ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },

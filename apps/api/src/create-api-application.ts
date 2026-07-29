@@ -26,6 +26,7 @@ import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import type { PasswordNotificationGateway } from "./modules/auth/password-notification.gateway";
 import type { PasswordStore } from "./modules/auth/password.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
+import type { ListingStore } from "./modules/listings/listing.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import type { MediaStore } from "./modules/media/media.store";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
@@ -59,6 +60,7 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   mfaStore?: MfaStore;
   passwordStore?: PasswordStore;
   passwordNotificationGateway?: PasswordNotificationGateway;
+  listingStore?: ListingStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -136,6 +138,7 @@ export async function createApiApplication(
       options.mfaStore,
       options.passwordStore,
       options.passwordNotificationGateway,
+      options.listingStore,
     ),
     adapter,
     {

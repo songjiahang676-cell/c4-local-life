@@ -687,14 +687,19 @@ paths:
       responses:
         "201":
           description: Draft listing created
+          headers:
+            ETag:
+              description: Strong Listing version ETag.
+              schema: { type: string, pattern: '^"listing-v[1-9]\d{0,9}"$' }
+            Location:
+              description: Canonical API path for the created draft.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Listing"
+                $ref: "#/components/schemas/ListingOwnerResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -710,22 +715,26 @@ paths:
   /listings/{listingId}:
     get:
       tags: [Listings]
-      security: []
+      security:
+        - {}
+        - sessionCookie: []
       summary: Get a visible listing
       operationId: getListing
       parameters:
         - $ref: "#/components/parameters/ListingId"
       responses:
         "200":
-          description: Listing detail
+          description: Public detail, or the safe owner view for an authorized draft reader
+          headers:
+            ETag:
+              description: Strong Listing version ETag.
+              schema: { type: string, pattern: '^"listing-v[1-9]\d{0,9}"$' }
+            Cache-Control:
+              schema: { type: string, enum: [no-store, "public, max-age=60"] }
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Listing"
+                $ref: "#/components/schemas/ListingResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
@@ -734,11 +743,7 @@ paths:
       operationId: updateListing
       parameters:
         - $ref: "#/components/parameters/ListingId"
-        - name: If-Match
-          in: header
-          required: true
-          description: Optimistic concurrency version, for example W/"12"
-          schema: { type: string }
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -748,16 +753,28 @@ paths:
       responses:
         "200":
           description: Updated listing
+          headers:
+            ETag:
+              description: Strong Listing version ETag.
+              schema: { type: string, pattern: '^"listing-v[1-9]\d{0,9}"$' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    $ref: "#/components/schemas/Listing"
+                $ref: "#/components/schemas/ListingOwnerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
     delete:
       tags: [Listings]
       summary: Soft-delete an owned listing
@@ -2140,21 +2157,236 @@ components:
         sortOrder: { type: integer, minimum: 0 }
     Money:
       type: object
-      required: [amount, currency]
+      required: [amount, currency, unit]
+      additionalProperties: false
       properties:
-        amount: { type: string, pattern: '^\\d+(\\.\\d{1,2})?$' }
+        amount:
+          {
+            type: [string, "null"],
+            pattern: '^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$',
+            description: Null only for FREE or NEGOTIABLE; positive decimal string otherwise.,
+          }
         currency: { type: string, const: USD }
         unit:
           {
-            type: [string, "null"],
-            enum: [FIXED, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY, SQFT, NEGOTIABLE, FREE, null],
+            type: string,
+            enum: [FIXED, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY, SQFT, NEGOTIABLE, FREE],
           }
     GeoPoint:
       type: object
       required: [latitude, longitude]
+      additionalProperties: false
       properties:
         latitude: { type: number, minimum: -90, maximum: 90 }
         longitude: { type: number, minimum: -180, maximum: 180 }
+    ListingRegionView:
+      type: object
+      required: [id, type, code, slug, nameZhHans, nameEn, timezone]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/RegionType"
+        code: { type: string }
+        slug: { type: string }
+        nameZhHans: { type: string }
+        nameEn: { type: string }
+        timezone: { type: string }
+    ListingCategoryView:
+      type: object
+      required: [id, vertical, slug, nameZhHans, nameEn]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        vertical:
+          oneOf:
+            - $ref: "#/components/schemas/ListingType"
+            - type: "null"
+        slug: { type: string }
+        nameZhHans: { type: string }
+        nameEn: { type: string }
+    ListingOwnerSummaryView:
+      type: object
+      required: [id, displayName, avatarUrl]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        avatarUrl: { type: [string, "null"], format: uri }
+    ListingOrganizationSummaryView:
+      type: object
+      required: [id, displayName, slug, verificationStatus]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        slug: { type: string }
+        verificationStatus:
+          { type: string, enum: [UNVERIFIED, PENDING, VERIFIED, REJECTED, EXPIRED] }
+    ListingLocationView:
+      type: object
+      required: [precision]
+      additionalProperties: false
+      properties:
+        precision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT] }
+        point:
+          $ref: "#/components/schemas/GeoPoint"
+    PublicListingView:
+      type: object
+      required:
+        [
+          id,
+          type,
+          status,
+          locale,
+          title,
+          slug,
+          summary,
+          body,
+          price,
+          region,
+          category,
+          owner,
+          organization,
+          location,
+          attributes,
+          featured,
+          featuredUntil,
+          publishedAt,
+          expiresAt,
+          createdAt,
+          updatedAt,
+          version,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        status: { type: string, const: PUBLISHED }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, maxLength: 120 }
+        slug: { type: string }
+        summary: { type: [string, "null"], maxLength: 240 }
+        body: { type: string, maxLength: 10000 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/ListingRegionView"
+        category:
+          $ref: "#/components/schemas/ListingCategoryView"
+        owner:
+          $ref: "#/components/schemas/ListingOwnerSummaryView"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/ListingOrganizationSummaryView"
+            - type: "null"
+        location:
+          $ref: "#/components/schemas/ListingLocationView"
+        attributes:
+          type: object
+          additionalProperties: true
+        featured: { type: boolean }
+        featuredUntil: { type: [string, "null"], format: date-time }
+        publishedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    ListingOwnerView:
+      type: object
+      required:
+        [
+          id,
+          type,
+          ownerId,
+          organizationId,
+          formSchemaVersion,
+          status,
+          moderationStatus,
+          locale,
+          title,
+          slug,
+          summary,
+          body,
+          price,
+          region,
+          category,
+          owner,
+          organization,
+          location,
+          contactMode,
+          attributes,
+          isFeatured,
+          featuredUntil,
+          publishedAt,
+          expiresAt,
+          createdAt,
+          updatedAt,
+          version,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        ownerId: { type: string, format: uuid }
+        organizationId: { type: [string, "null"], format: uuid }
+        formSchemaVersion: { type: integer, minimum: 1 }
+        status:
+          $ref: "#/components/schemas/ContentStatus"
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, maxLength: 120 }
+        slug: { type: string }
+        summary: { type: [string, "null"], maxLength: 240 }
+        body: { type: string, maxLength: 10000 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/ListingRegionView"
+        category:
+          $ref: "#/components/schemas/ListingCategoryView"
+        owner:
+          $ref: "#/components/schemas/ListingOwnerSummaryView"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/ListingOrganizationSummaryView"
+            - type: "null"
+        location:
+          $ref: "#/components/schemas/ListingLocationView"
+        contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
+        attributes:
+          type: object
+          additionalProperties: true
+        isFeatured: { type: boolean }
+        featuredUntil: { type: [string, "null"], format: date-time }
+        publishedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    ListingResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          oneOf:
+            - $ref: "#/components/schemas/PublicListingView"
+            - $ref: "#/components/schemas/ListingOwnerView"
+    ListingOwnerResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/ListingOwnerView"
     Listing:
       type: object
       required:
@@ -2197,6 +2429,7 @@ components:
           $ref: "#/components/schemas/Category"
         location:
           type: object
+          additionalProperties: false
           properties:
             precision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT] }
             point:
@@ -2238,6 +2471,7 @@ components:
           $ref: "#/components/schemas/ListingType"
         locale: { type: string, enum: [zh-Hans, en-US], default: zh-Hans }
         categoryId: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
         regionCode: { type: string, minLength: 2, maxLength: 80 }
         title: { type: string, minLength: 5, maxLength: 120 }
         summary: { type: string, maxLength: 240 }
@@ -2263,9 +2497,12 @@ components:
         contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL], default: IN_APP }
     UpdateListingRequest:
       type: object
+      minProperties: 1
+      additionalProperties: false
       properties:
+        locale: { type: string, enum: [zh-Hans, en-US] }
         categoryId: { type: string, format: uuid }
-        regionCode: { type: string }
+        regionCode: { type: string, minLength: 2, maxLength: 80 }
         title: { type: string, minLength: 5, maxLength: 120 }
         summary: { type: [string, "null"], maxLength: 240 }
         body: { type: string, minLength: 20, maxLength: 10000 }
@@ -2275,7 +2512,13 @@ components:
             - type: "null"
         location:
           type: object
-          additionalProperties: true
+          additionalProperties: false
+          properties:
+            precision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT] }
+            point:
+              oneOf:
+                - $ref: "#/components/schemas/GeoPoint"
+                - type: "null"
         attributes:
           type: object
           additionalProperties: true

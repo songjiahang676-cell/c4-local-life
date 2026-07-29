@@ -1241,15 +1241,135 @@ export interface components {
             readonly sortOrder: number;
         };
         readonly Money: {
-            readonly amount: string;
+            /** @description Null only for FREE or NEGOTIABLE; positive decimal string otherwise. */
+            readonly amount: string | null;
             /** @constant */
             readonly currency: "USD";
-            /** @enum {string|null} */
-            readonly unit?: "FIXED" | "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "SQFT" | "NEGOTIABLE" | "FREE" | null;
+            /** @enum {string} */
+            readonly unit: "FIXED" | "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "SQFT" | "NEGOTIABLE" | "FREE";
         };
         readonly GeoPoint: {
             readonly latitude: number;
             readonly longitude: number;
+        };
+        readonly ListingRegionView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["RegionType"];
+            readonly code: string;
+            readonly slug: string;
+            readonly nameZhHans: string;
+            readonly nameEn: string;
+            readonly timezone: string;
+        };
+        readonly ListingCategoryView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly vertical: components["schemas"]["ListingType"] | null;
+            readonly slug: string;
+            readonly nameZhHans: string;
+            readonly nameEn: string;
+        };
+        readonly ListingOwnerSummaryView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly displayName: string;
+            /** Format: uri */
+            readonly avatarUrl: string | null;
+        };
+        readonly ListingOrganizationSummaryView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly displayName: string;
+            readonly slug: string;
+            /** @enum {string} */
+            readonly verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED" | "EXPIRED";
+        };
+        readonly ListingLocationView: {
+            /** @enum {string} */
+            readonly precision: "CITY" | "NEIGHBORHOOD" | "APPROXIMATE" | "EXACT";
+            readonly point?: components["schemas"]["GeoPoint"];
+        };
+        readonly PublicListingView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["ListingType"];
+            /** @constant */
+            readonly status: "PUBLISHED";
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly slug: string;
+            readonly summary: string | null;
+            readonly body: string;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly region: components["schemas"]["ListingRegionView"];
+            readonly category: components["schemas"]["ListingCategoryView"];
+            readonly owner: components["schemas"]["ListingOwnerSummaryView"];
+            readonly organization: components["schemas"]["ListingOrganizationSummaryView"] | null;
+            readonly location: components["schemas"]["ListingLocationView"];
+            readonly attributes: {
+                readonly [key: string]: unknown;
+            };
+            readonly featured: boolean;
+            /** Format: date-time */
+            readonly featuredUntil: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string;
+            /** Format: date-time */
+            readonly expiresAt: string;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
+        readonly ListingOwnerView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly type: components["schemas"]["ListingType"];
+            /** Format: uuid */
+            readonly ownerId: string;
+            /** Format: uuid */
+            readonly organizationId: string | null;
+            readonly formSchemaVersion: number;
+            readonly status: components["schemas"]["ContentStatus"];
+            readonly moderationStatus: components["schemas"]["ModerationStatus"];
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly slug: string;
+            readonly summary: string | null;
+            readonly body: string;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly region: components["schemas"]["ListingRegionView"];
+            readonly category: components["schemas"]["ListingCategoryView"];
+            readonly owner: components["schemas"]["ListingOwnerSummaryView"];
+            readonly organization: components["schemas"]["ListingOrganizationSummaryView"] | null;
+            readonly location: components["schemas"]["ListingLocationView"];
+            /** @enum {string} */
+            readonly contactMode: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
+            readonly attributes: {
+                readonly [key: string]: unknown;
+            };
+            readonly isFeatured: boolean;
+            /** Format: date-time */
+            readonly featuredUntil: string | null;
+            /** Format: date-time */
+            readonly publishedAt: string | null;
+            /** Format: date-time */
+            readonly expiresAt: string | null;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
+        readonly ListingResponse: {
+            readonly data: components["schemas"]["PublicListingView"] | components["schemas"]["ListingOwnerView"];
+        };
+        readonly ListingOwnerResponse: {
+            readonly data: components["schemas"]["ListingOwnerView"];
         };
         readonly Listing: {
             /** Format: uuid */
@@ -1305,6 +1425,8 @@ export interface components {
             readonly locale: "zh-Hans" | "en-US";
             /** Format: uuid */
             readonly categoryId: string;
+            /** Format: uuid */
+            readonly organizationId?: string;
             readonly regionCode: string;
             readonly title: string;
             readonly summary?: string;
@@ -1331,6 +1453,8 @@ export interface components {
             readonly contactMode: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
         };
         readonly UpdateListingRequest: {
+            /** @enum {string} */
+            readonly locale?: "zh-Hans" | "en-US";
             /** Format: uuid */
             readonly categoryId?: string;
             readonly regionCode?: string;
@@ -1339,7 +1463,9 @@ export interface components {
             readonly body?: string;
             readonly price?: components["schemas"]["Money"] | null;
             readonly location?: {
-                readonly [key: string]: unknown;
+                /** @enum {string} */
+                readonly precision?: "CITY" | "NEIGHBORHOOD" | "APPROXIMATE" | "EXACT";
+                readonly point?: components["schemas"]["GeoPoint"] | null;
             };
             readonly attributes?: {
                 readonly [key: string]: unknown;
@@ -2425,12 +2551,15 @@ export interface operations {
             /** @description Draft listing created */
             readonly 201: {
                 headers: {
+                    /** @description Strong Listing version ETag. */
+                    readonly ETag?: string;
+                    /** @description Canonical API path for the created draft. */
+                    readonly Location?: string;
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": {
-                        readonly data: components["schemas"]["Listing"];
-                    };
+                    readonly "application/json": components["schemas"]["ListingOwnerResponse"];
                 };
             };
             readonly 400: components["responses"]["BadRequest"];
@@ -2452,15 +2581,16 @@ export interface operations {
         };
         readonly requestBody?: never;
         readonly responses: {
-            /** @description Listing detail */
+            /** @description Public detail, or the safe owner view for an authorized draft reader */
             readonly 200: {
                 headers: {
+                    /** @description Strong Listing version ETag. */
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store" | "public, max-age=60";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": {
-                        readonly data: components["schemas"]["Listing"];
-                    };
+                    readonly "application/json": components["schemas"]["ListingResponse"];
                 };
             };
             readonly 404: components["responses"]["NotFound"];
@@ -2490,8 +2620,8 @@ export interface operations {
         readonly parameters: {
             readonly query?: never;
             readonly header: {
-                /** @description Optimistic concurrency version, for example W/"12" */
-                readonly "If-Match": string;
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
             };
             readonly path: {
                 readonly listingId: components["parameters"]["ListingId"];
@@ -2507,15 +2637,21 @@ export interface operations {
             /** @description Updated listing */
             readonly 200: {
                 headers: {
+                    /** @description Strong Listing version ETag. */
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": {
-                        readonly data: components["schemas"]["Listing"];
-                    };
+                    readonly "application/json": components["schemas"]["ListingOwnerResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
             readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
         };
     };
     readonly submitListing: {

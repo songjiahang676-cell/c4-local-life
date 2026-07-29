@@ -3,6 +3,7 @@ import {
   accountSelfServicePermissions,
   activeUserPolicyActions,
   adminPolicyActions,
+  listingObjectPolicyActions,
   organizationPolicyActions,
   ownerOrOrganizationPolicy,
   PolicyService,
@@ -19,6 +20,22 @@ export function createPolicyService(): PolicyService {
     policies.register(action, requireActorPermissionPolicy);
   }
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
+  policies.register(activeUserPolicyActions.listingDraftUpdate, requireActiveActorPermissionPolicy);
+  policies.register(
+    listingObjectPolicyActions.draftRead,
+    ownerOrOrganizationPolicy({
+      allowOwner: true,
+      allowLimitedAccount: true,
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR", "BILLING", "ANALYST"],
+    }),
+  );
+  policies.register(
+    listingObjectPolicyActions.draftWrite,
+    ownerOrOrganizationPolicy({
+      allowOwner: true,
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR"],
+    }),
+  );
   policies.register(
     activeUserPolicyActions.mediaUploadComplete,
     requireActiveActorPermissionPolicy,

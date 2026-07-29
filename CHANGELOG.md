@@ -42,6 +42,7 @@
 - Added owner-verified media completion and a lifecycle-versioned processing Worker with bounded S3 reads, exact hash/magic-byte verification, real ClamAV streaming, Sharp decode/orientation/metadata stripping, three deterministic encrypted WebP variants, transactional READY/REJECTED Outbox events, and clean-signature hosted integration enforcement.
 - Added a pure five-type Listing domain model with discriminated detail invariants, integer-minor-unit price rules, separate content/moderation states, optimistic-versioned transitions, bounded publication expiry, and exhaustive illegal-transition tests.
 - Added PostgreSQL-backed public, owner and scoped-moderator Listing projections with query-bound object authorization, exact historical form-schema visibility filtering, fail-closed malformed JSON handling, and PII leakage integration tests.
+- Added database-backed Listing draft create/owner-read/conditional-update APIs with actor-scoped exact idempotency, current organization-role authorization, strong ETags, exact historical attribute validation, and atomic minimized Audit/Outbox evidence.
 
 ## 0.1.0 — Architecture handoff package
 

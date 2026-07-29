@@ -216,6 +216,23 @@ try {
             AND indexname = 'media_assets_processing_status_updated_at_idx'
        ) AS processing_index`,
   );
+  const listingDraftStorage = await upgrade.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'listings'
+            AND constraint_name = 'listings_create_idempotency_evidence_check'
+            AND constraint_type = 'CHECK'
+       ) AS evidence_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'listings_owner_id_create_idempotency_key_key'
+       ) AS owner_idempotency`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -244,7 +261,9 @@ try {
     !outboxStorage.rows[0].pending_claim_index ||
     mediaProcessingStorage.rows[0].variants !== "media_variants" ||
     !mediaProcessingStorage.rows[0].lifecycle_state_check ||
-    !mediaProcessingStorage.rows[0].processing_index
+    !mediaProcessingStorage.rows[0].processing_index ||
+    !listingDraftStorage.rows[0].evidence_check ||
+    !listingDraftStorage.rows[0].owner_idempotency
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -268,6 +287,7 @@ try {
       passwordStorage: true,
       outboxStorage: true,
       mediaProcessingStorage: true,
+      listingDraftStorage: true,
     }),
   );
 } finally {
