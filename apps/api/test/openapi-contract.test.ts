@@ -40,6 +40,7 @@ type ResponseObject = {
 };
 type OperationObject = {
   operationId?: string;
+  parameters?: { in?: string; name?: string; required?: boolean }[];
   responses: Record<string, ResponseObject>;
 };
 type PathItem = Partial<Record<"get" | "post" | "put" | "patch" | "delete", OperationObject>>;
