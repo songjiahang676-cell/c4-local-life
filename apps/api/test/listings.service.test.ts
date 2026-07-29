@@ -7,6 +7,7 @@ import {
 } from "../src/common/authorization/policy";
 import { createPolicyService } from "../src/common/authorization/authorization.module";
 import {
+  ListingCursorError,
   ListingIdempotencyConflictError,
   ListingsService,
 } from "../src/modules/listings/listings.service";
@@ -428,5 +429,96 @@ describe("ListingsService", () => {
         }),
       ]);
     }
+  });
+
+  it("lists account buckets with bound cursors and applies a capped action per strong version", async () => {
+    const { service, store } = createService();
+    const firstDraft = await service.create(
+      ownerContext(),
+      "create-account-listing-0001",
+      createInput("Account center draft alpha"),
+    );
+    const secondDraft = await service.create(
+      ownerContext(),
+      "create-account-listing-0002",
+      createInput("Account center draft beta"),
+    );
+    const firstPage = await service.listMine(
+      ownerContext("GET"),
+      { bucket: "DRAFT", limit: 1 },
+      new Date("2026-07-29T15:00:00.000Z"),
+    );
+
+    expect(firstPage.data).toHaveLength(1);
+    expect(firstPage.counts).toEqual({
+      draft: 2,
+      pending: 0,
+      published: 0,
+      archived: 0,
+    });
+    expect(firstPage.page).toMatchObject({ hasMore: true });
+    expect(firstPage.data[0]?.availableActions).toEqual(["EDIT", "SUBMIT", "DELETE"]);
+    await expect(
+      service.listMine(ownerContext("GET"), {
+        bucket: "DRAFT",
+        limit: 1,
+        cursor: `${firstPage.page.nextCursor ?? ""}x`,
+      }),
+    ).rejects.toBeInstanceOf(ListingCursorError);
+
+    await service.submit(
+      ownerContext(),
+      firstDraft.data.id,
+      firstDraft.data.version,
+      "submit-account-listing-0001",
+    );
+    const published = await service.listMine(ownerContext("GET"), {
+      bucket: "PUBLISHED",
+      limit: 20,
+    });
+    expect(published.data).toEqual([
+      expect.objectContaining({
+        id: firstDraft.data.id,
+        bucket: "PUBLISHED",
+        availableActions: ["ARCHIVE", "VIEW_REVISIONS"],
+      }),
+    ]);
+
+    const batch = await service.batchManage(ownerContext(), {
+      action: "ARCHIVE",
+      items: [
+        { listingId: firstDraft.data.id, version: 3 },
+        { listingId: secondDraft.data.id, version: 1 },
+      ],
+    });
+    expect(batch).toMatchObject({
+      appliedCount: 1,
+      data: [
+        {
+          listingId: firstDraft.data.id,
+          outcome: "APPLIED",
+          currentVersion: 4,
+          currentBucket: "ARCHIVED",
+        },
+        {
+          listingId: secondDraft.data.id,
+          outcome: "STATE_CONFLICT",
+          currentVersion: null,
+          currentBucket: null,
+        },
+      ],
+    });
+
+    const deleted = await service.batchManage(ownerContext(), {
+      action: "DELETE",
+      items: [{ listingId: secondDraft.data.id, version: 1 }],
+    });
+    const exactRetry = await service.batchManage(ownerContext(), {
+      action: "DELETE",
+      items: [{ listingId: secondDraft.data.id, version: 1 }],
+    });
+    expect(deleted.appliedCount).toBe(1);
+    expect(exactRetry.appliedCount).toBe(1);
+    expect(store.auditActions.filter((action) => action === "listing.deleted")).toHaveLength(1);
   });
 });

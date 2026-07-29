@@ -366,3 +366,18 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
   仍返回公开 owner view；major edit 返回新的 SUBMITTED/PENDING_REVIEW 或 ESCALATED 状态。
 - 这些都是 `/v1` 向后兼容增量：草稿 PATCH 的既有客户端无需幂等键，新增 collection/schema 与
   nullable owner 字段不改变公共响应。OpenAPI 与生成 TypeScript 是唯一 REST 契约事实源。
+
+## 8.20 私有 Listing 管理契约
+
+- `GET /me/listings` 要求当前 Session，接受 `bucket=DRAFT|PENDING|PUBLISHED|ARCHIVED`、可选
+  Listing type/organization、1–50 limit 和不透明 cursor。响应只包含最小管理摘要、server-derived
+  `availableActions`、四 bucket 计数、分页信息和生成时间，并强制 `no-store`。
+- cursor 使用独立 domain 签名并绑定 actor、bucket、type、organization、limit 与稳定
+  `(createdAt,id)` 边界；篡改、跨账号或跨筛选重放返回通用 400。
+- `POST /me/listings/actions` 仅接受 ARCHIVE/DELETE，以及 1–20 个唯一
+  `{listingId,version}`。响应顺序与请求一致，每项为 APPLIED、NOT_FOUND、VERSION_CONFLICT 或
+  STATE_CONFLICT；一个对象失败不会授权另一个对象，也不会回滚已经独立成功的对象。
+- 批量写要求 ACTIVE actor 和可信同源 Cookie mutation；每项继续使用既有强版本、对象 Policy、
+  行锁、Audit/Outbox 与目标状态幂等语义。只读组织角色和跨 owner 对象统一映射 NOT_FOUND。
+- 两个端点、生成 TypeScript、Zod 边界、API Controller、Web BFF allowlist 与契约测试同步更新；
+  OpenAPI 仍是唯一 REST 事实源。

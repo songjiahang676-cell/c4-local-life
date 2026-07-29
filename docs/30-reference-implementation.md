@@ -132,6 +132,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 snapshot/Audit/Outbox。人工审核仍由 `ModerationService` 发出领域命令，Repository 独立校验 revision
 保存的原 publication window，Controller 和 Web BFF 都不导入 Prisma。
 
+`LIST-009` 沿用同一边界：`AccountListingsController` 只验证严格 query/body、应用 Policy 和设置
+no-store；`ListingsService` 持有账号绑定 cursor、bucket 映射、最小 DTO 与逐项批量编排；
+`ListingRepository` 使用 canonical Listing/membership/taxonomy/revision 和现有索引完成投影。
+批量动作重新调用既有 archive/delete use case，不从 Controller 直接访问 Prisma，也不新增跨对象
+事务。Web 的账号页面只通过同源 BFF 和生成契约类型通信，设备草稿恢复不能覆盖明确加载的服务器草稿。
+
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
 `NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。

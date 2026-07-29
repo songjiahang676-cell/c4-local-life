@@ -29,7 +29,11 @@ type ListingFixture = {
   organizationMemberId: string;
   outsiderId: string;
   ownerId: string;
+  personalDraftListingId: string;
   publishedListingId: string;
+  submittedListingId: string;
+  archivedListingId: string;
+  suspendedListingId: string;
   regionId: string;
   regionSlug: string;
   moderatorId: string;
@@ -73,7 +77,11 @@ async function createFixture(transaction: Prisma.TransactionClient): Promise<Lis
     organizationMemberId: randomUUID(),
     outsiderId: randomUUID(),
     ownerId: randomUUID(),
+    personalDraftListingId: randomUUID(),
     publishedListingId: randomUUID(),
+    submittedListingId: randomUUID(),
+    archivedListingId: randomUUID(),
+    suspendedListingId: randomUUID(),
     regionId: randomUUID(),
     regionSlug: `synthetic-region-${randomUUID()}`,
     moderatorId: randomUUID(),
@@ -200,6 +208,43 @@ async function createFixture(transaction: Prisma.TransactionClient): Promise<Lis
         moderationStatus: ModerationStatus.NOT_REVIEWED,
         publishedAt: null,
         expiresAt: null,
+      },
+      {
+        ...sharedListing,
+        id: fixture.personalDraftListingId,
+        organizationId: null,
+        title: "Personal draft synthetic rental",
+        slug: `personal-draft-${fixture.personalDraftListingId}`,
+        status: ContentStatus.DRAFT,
+        moderationStatus: ModerationStatus.NOT_REVIEWED,
+        publishedAt: null,
+        expiresAt: null,
+      },
+      {
+        ...sharedListing,
+        id: fixture.submittedListingId,
+        title: "Submitted synthetic rental",
+        slug: `submitted-${fixture.submittedListingId}`,
+        status: ContentStatus.SUBMITTED,
+        moderationStatus: ModerationStatus.PENDING_REVIEW,
+        publishedAt: null,
+        expiresAt: null,
+      },
+      {
+        ...sharedListing,
+        id: fixture.archivedListingId,
+        title: "Archived synthetic rental",
+        slug: `archived-${fixture.archivedListingId}`,
+        status: ContentStatus.ARCHIVED,
+        moderationStatus: ModerationStatus.APPROVED,
+      },
+      {
+        ...sharedListing,
+        id: fixture.suspendedListingId,
+        title: "Suspended synthetic rental",
+        slug: `suspended-${fixture.suspendedListingId}`,
+        status: ContentStatus.SUSPENDED,
+        moderationStatus: ModerationStatus.REJECTED,
       },
       {
         ...sharedListing,
@@ -394,6 +439,93 @@ integration("ListingRepository safe PostgreSQL projections", () => {
       expect(filtered.items.map((item) => item.id)).not.toContain(fixture.draftListingId);
       expect(filtered.items.map((item) => item.id)).not.toContain(fixture.unreviewedListingId);
       expect(filtered.items.map((item) => item.id)).not.toContain(fixture.expiredListingId);
+    });
+  });
+
+  it("groups the private account projection with stable pagination and membership isolation", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const repository = new ListingRepository(transaction);
+
+      const first = await repository.listForOwner({
+        actorUserId: fixture.ownerId,
+        bucket: "DRAFT",
+        limit: 1,
+        now,
+      });
+      expect(first.items).toHaveLength(1);
+      expect(first.nextCursor).not.toBeNull();
+      expect(first.counts).toEqual({
+        draft: 2,
+        pending: 1,
+        published: 3,
+        archived: 3,
+      });
+      const second = await repository.listForOwner({
+        actorUserId: fixture.ownerId,
+        bucket: "DRAFT",
+        cursor: first.nextCursor ?? undefined,
+        limit: 1,
+        now,
+      });
+      expect(second.items).toHaveLength(1);
+      expect(new Set([...first.items, ...second.items].map((item) => item.id))).toEqual(
+        new Set([fixture.draftListingId, fixture.personalDraftListingId]),
+      );
+      expect(JSON.stringify([...first.items, ...second.items])).not.toMatch(
+        /ownerPrivate|moderatorNote|injectedUnknown|latitude|longitude|contactMode|body/i,
+      );
+
+      const analyst = await repository.listForOwner({
+        actorUserId: fixture.organizationMemberId,
+        bucket: "DRAFT",
+        limit: 20,
+        now,
+      });
+      expect(analyst.items.map((item) => item.id)).toEqual([fixture.draftListingId]);
+      expect(analyst.counts.draft).toBe(1);
+      expect(analyst.items.map((item) => item.id)).not.toContain(fixture.personalDraftListingId);
+
+      const filteredOrganization = await repository.listForOwner({
+        actorUserId: fixture.ownerId,
+        bucket: "DRAFT",
+        organizationId: fixture.organizationId,
+        limit: 20,
+        now,
+      });
+      expect(filteredOrganization.items.map((item) => item.id)).toEqual([fixture.draftListingId]);
+      expect(filteredOrganization.counts.draft).toBe(1);
+
+      const archived = await repository.listForOwner({
+        actorUserId: fixture.ownerId,
+        bucket: "ARCHIVED",
+        limit: 20,
+        now,
+      });
+      expect(new Set(archived.items.map((item) => item.id))).toEqual(
+        new Set([fixture.archivedListingId, fixture.expiredListingId, fixture.suspendedListingId]),
+      );
+      const published = await repository.listForOwner({
+        actorUserId: fixture.ownerId,
+        bucket: "PUBLISHED",
+        limit: 20,
+        now,
+      });
+      expect(published.items.map((item) => item.id)).not.toContain(fixture.expiredListingId);
+
+      const outsider = await repository.listForOwner({
+        actorUserId: fixture.outsiderId,
+        bucket: "DRAFT",
+        limit: 20,
+        now,
+      });
+      expect(outsider.items).toEqual([]);
+      expect(outsider.counts).toEqual({
+        draft: 0,
+        pending: 0,
+        published: 0,
+        archived: 0,
+      });
     });
   });
 

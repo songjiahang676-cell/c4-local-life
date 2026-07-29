@@ -3,6 +3,7 @@ import type { ApiEnvironment } from "@socal/config";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import { TaxonomyModule } from "../taxonomy/taxonomy.module";
 import type { TaxonomyStore } from "../taxonomy/taxonomy.store";
+import { AccountListingsController } from "./account-listings.controller";
 import { DatabaseListingStore } from "./database-listing.store";
 import { LISTING_STORE, type ListingStore } from "./listing.store";
 import { ListingsController } from "./listings.controller";
@@ -21,7 +22,7 @@ export class ListingsModule {
     return {
       module: ListingsModule,
       imports: [TaxonomyModule.register(environment, taxonomyStore)],
-      controllers: [ListingsController],
+      controllers: [ListingsController, AccountListingsController],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...storeProviders,

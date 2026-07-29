@@ -1,10 +1,13 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
 import type {
+  BatchListingActionRequest,
+  BatchListingActionResponse,
   CreateListingInput,
   Category,
   ListingCollection,
+  ListMyListingsQuery,
   ListListingsQuery,
   ListingSubmissionResponse,
   ListingRevisionCollection,
@@ -14,6 +17,8 @@ import type {
   ListingOwnerResponse,
   ListingOwnerView,
   ListingResponse,
+  MyListingCollection,
+  MyListingSummaryView,
   Money,
   PublicListingSummaryView,
   PublicListingView,
@@ -25,6 +30,7 @@ import {
   activeUserPolicyActions,
   listingObjectPolicyActions,
   PolicyService,
+  selfServicePolicyActions,
   type PolicyRequestContext,
 } from "../../common/authorization/policy";
 import { CategoryFormSchemaNotFoundError, TaxonomyService } from "../taxonomy/taxonomy.service";
@@ -49,7 +55,10 @@ import {
   type ListingSubmissionProjection,
   type ListingSubmissionTransitionEvidence,
   type ListingStore,
+  type OwnerListingBucket,
+  type OwnerListingCursor,
   type OwnerListingProjection,
+  type OwnerListingSummaryProjection,
   type PublicListingCursor,
   type PublicListingProjection,
 } from "./listing.store";
@@ -125,6 +134,24 @@ type PublicListingCursorPayload = {
   id: string;
 };
 
+type NormalizedOwnerListingQuery = {
+  bucket: OwnerListingBucket;
+  type: ListingType | null;
+  organizationId: string | null;
+  limit: number;
+};
+
+type OwnerListingCursorPayload = {
+  version: 1;
+  actorUserId: string;
+  bucket: OwnerListingBucket;
+  type: ListingType | null;
+  organizationId: string | null;
+  limit: number;
+  createdAt: string;
+  id: string;
+};
+
 type ListingRevisionCursorPayload = {
   version: 1;
   listingId: string;
@@ -165,6 +192,13 @@ function cursorSignature(secret: string, encoded: string): string {
 function revisionCursorSignature(secret: string, encoded: string): string {
   return createHmac("sha256", secret)
     .update("socal-listing-revision-cursor-v1\0", "utf8")
+    .update(encoded, "utf8")
+    .digest("base64url");
+}
+
+function ownerListingCursorSignature(secret: string, encoded: string): string {
+  return createHmac("sha256", secret)
+    .update("socal-owner-listing-page-cursor-v1\0", "utf8")
     .update(encoded, "utf8")
     .digest("base64url");
 }
@@ -597,6 +631,56 @@ function toRevisionView(
   };
 }
 
+function myListingActions(
+  listing: OwnerListingSummaryProjection,
+): MyListingSummaryView["availableActions"] {
+  const actions: Array<MyListingSummaryView["availableActions"][number]> =
+    listing.bucket === "DRAFT"
+      ? ["EDIT", "SUBMIT", "DELETE"]
+      : listing.bucket === "PENDING"
+        ? ["DELETE"]
+        : listing.bucket === "PUBLISHED"
+          ? ["ARCHIVE"]
+          : listing.status === "SUSPENDED"
+            ? []
+            : ["DELETE"];
+  if (listing.latestRevision) actions.push("VIEW_REVISIONS");
+  return actions;
+}
+
+function toMyListingSummary(listing: OwnerListingSummaryProjection): MyListingSummaryView {
+  return {
+    id: listing.id,
+    type: listing.type,
+    bucket: listing.bucket,
+    status: listing.status,
+    moderationStatus: listing.moderationStatus,
+    locale: listing.locale as "zh-Hans" | "en-US",
+    title: listing.title,
+    summary: listing.summary,
+    price: toMoney(listing.price),
+    region: listing.region,
+    category: listing.category,
+    organization: listing.organization,
+    isFeatured: listing.isFeatured,
+    publishedAt: listing.publishedAt?.toISOString() ?? null,
+    expiresAt: listing.expiresAt?.toISOString() ?? null,
+    latestRevision: listing.latestRevision
+      ? {
+          revisionNumber: listing.latestRevision.revisionNumber,
+          classification: listing.latestRevision.classification,
+          reasonCodes: listing.latestRevision.reasonCodes,
+          reviewState: listing.latestRevision.reviewState,
+          createdAt: listing.latestRevision.createdAt.toISOString(),
+        }
+      : null,
+    availableActions: myListingActions(listing),
+    createdAt: listing.createdAt.toISOString(),
+    updatedAt: listing.updatedAt.toISOString(),
+    version: listing.version,
+  };
+}
+
 function cloneAttributes(
   attributes: OwnerListingProjection["attributes"] | CreateListingInput["attributes"],
 ): Record<string, ListingDraftJsonValue> {
@@ -861,6 +945,47 @@ export class ListingsService {
           ? this.#encodePublicCursor(normalized, result.nextCursor)
           : null,
       },
+      generatedAt: now.toISOString(),
+    };
+  }
+
+  async listMine(
+    context: PolicyRequestContext,
+    query: ListMyListingsQuery,
+    now = new Date(),
+  ): Promise<MyListingCollection> {
+    await this.policies.require({
+      action: selfServicePolicyActions.listingsRead,
+      context,
+    });
+    const actorUserId = authenticatedUserId(context);
+    const normalized: NormalizedOwnerListingQuery = {
+      bucket: query.bucket ?? "DRAFT",
+      type: query.type ?? null,
+      organizationId: query.organizationId ?? null,
+      limit: query.limit ?? 20,
+    };
+    const cursor = query.cursor
+      ? this.#decodeOwnerListingCursor(query.cursor, actorUserId, normalized)
+      : undefined;
+    const result = await this.store.listForOwner({
+      actorUserId,
+      bucket: normalized.bucket,
+      ...(normalized.type ? { type: normalized.type } : {}),
+      ...(normalized.organizationId ? { organizationId: normalized.organizationId } : {}),
+      ...(cursor ? { cursor } : {}),
+      limit: normalized.limit,
+      now,
+    });
+    return {
+      data: result.items.map(toMyListingSummary),
+      page: {
+        hasMore: result.nextCursor !== null,
+        nextCursor: result.nextCursor
+          ? this.#encodeOwnerListingCursor(actorUserId, normalized, result.nextCursor)
+          : null,
+      },
+      counts: result.counts,
       generatedAt: now.toISOString(),
     };
   }
@@ -1281,6 +1406,73 @@ export class ListingsService {
     await this.#ownerLifecycleTransition(context, listingId, expectedVersion, "DELETE");
   }
 
+  async batchManage(
+    context: PolicyRequestContext,
+    input: BatchListingActionRequest,
+    now = new Date(),
+  ): Promise<BatchListingActionResponse> {
+    await this.policies.require({
+      action: activeUserPolicyActions.listingBatchManage,
+      context,
+    });
+    const results: BatchListingActionResponse["data"][number][] = [];
+    for (const item of input.items) {
+      try {
+        if (input.action === "ARCHIVE") {
+          const response = await this.archive(context, item.listingId, item.version);
+          results.push({
+            listingId: item.listingId,
+            outcome: "APPLIED",
+            currentVersion: response.data.version,
+            currentBucket: "ARCHIVED",
+          });
+        } else {
+          await this.delete(context, item.listingId, item.version);
+          results.push({
+            listingId: item.listingId,
+            outcome: "APPLIED",
+            currentVersion: null,
+            currentBucket: null,
+          });
+        }
+      } catch (error) {
+        if (error instanceof ListingNotFoundError || error instanceof ForbiddenException) {
+          results.push({
+            listingId: item.listingId,
+            outcome: "NOT_FOUND",
+            currentVersion: null,
+            currentBucket: null,
+          });
+          continue;
+        }
+        if (error instanceof ListingVersionConflictError) {
+          results.push({
+            listingId: item.listingId,
+            outcome: "VERSION_CONFLICT",
+            currentVersion: error.currentVersion ?? null,
+            currentBucket: null,
+          });
+          continue;
+        }
+        if (error instanceof ListingStateConflictError) {
+          results.push({
+            listingId: item.listingId,
+            outcome: "STATE_CONFLICT",
+            currentVersion: null,
+            currentBucket: null,
+          });
+          continue;
+        }
+        throw error;
+      }
+    }
+    return {
+      data: results,
+      appliedCount: results.filter((result) => result.outcome === "APPLIED").length,
+      generatedAt: now.toISOString(),
+    };
+  }
+
   async submit(
     context: PolicyRequestContext,
     listingId: string,
@@ -1602,6 +1794,25 @@ export class ListingsService {
     return `${encoded}.${cursorSignature(this.#cursorSecret, encoded)}`;
   }
 
+  #encodeOwnerListingCursor(
+    actorUserId: string,
+    query: NormalizedOwnerListingQuery,
+    cursor: OwnerListingCursor,
+  ): string {
+    const payload: OwnerListingCursorPayload = {
+      version: 1,
+      actorUserId,
+      bucket: query.bucket,
+      type: query.type,
+      organizationId: query.organizationId,
+      limit: query.limit,
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id,
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+    return `${encoded}.${ownerListingCursorSignature(this.#cursorSecret, encoded)}`;
+  }
+
   #encodeRevisionCursor(listingId: string, cursor: ListingRevisionCursor): string {
     const payload: ListingRevisionCursorPayload = {
       version: 1,
@@ -1633,6 +1844,47 @@ export class ListingsService {
     if (
       candidate.version !== 1 ||
       candidate.listingId !== listingId ||
+      typeof candidate.createdAt !== "string" ||
+      typeof candidate.id !== "string" ||
+      !uuidPattern.test(candidate.id)
+    ) {
+      throw new ListingCursorError();
+    }
+    const createdAt = new Date(candidate.createdAt);
+    if (!Number.isFinite(createdAt.getTime()) || createdAt.toISOString() !== candidate.createdAt) {
+      throw new ListingCursorError();
+    }
+    return { createdAt, id: candidate.id };
+  }
+
+  #decodeOwnerListingCursor(
+    value: string,
+    actorUserId: string,
+    query: NormalizedOwnerListingQuery,
+  ): OwnerListingCursor {
+    const [encoded, signature, extra] = value.split(".");
+    if (!encoded || !signature || extra || encoded.length > 1_024) {
+      throw new ListingCursorError();
+    }
+    const expected = ownerListingCursorSignature(this.#cursorSecret, encoded);
+    if (!signaturesMatch(expected, signature)) throw new ListingCursorError();
+    let payload: unknown;
+    try {
+      payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    } catch {
+      throw new ListingCursorError();
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new ListingCursorError();
+    }
+    const candidate = payload as Partial<OwnerListingCursorPayload>;
+    if (
+      candidate.version !== 1 ||
+      candidate.actorUserId !== actorUserId ||
+      candidate.bucket !== query.bucket ||
+      candidate.type !== query.type ||
+      candidate.organizationId !== query.organizationId ||
+      candidate.limit !== query.limit ||
       typeof candidate.createdAt !== "string" ||
       typeof candidate.id !== "string" ||
       !uuidPattern.test(candidate.id)

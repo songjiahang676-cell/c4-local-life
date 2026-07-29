@@ -19,11 +19,17 @@ export type ListingOwnerResponse = components["schemas"]["ListingOwnerResponse"]
 export type ListingSubmissionResponse = components["schemas"]["ListingSubmissionResponse"];
 export type ListingRevisionView = components["schemas"]["ListingRevisionView"];
 export type ListingRevisionCollection = components["schemas"]["ListingRevisionCollection"];
+export type OwnerListingBucket = components["schemas"]["OwnerListingBucket"];
+export type MyListingSummaryView = components["schemas"]["MyListingSummaryView"];
+export type MyListingCollection = components["schemas"]["MyListingCollection"];
+export type BatchListingActionRequest = components["schemas"]["BatchListingActionRequest"];
+export type BatchListingActionResponse = components["schemas"]["BatchListingActionResponse"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ListListingRevisionsQuery = NonNullable<
   operations["listListingRevisions"]["parameters"]["query"]
 >;
+export type ListMyListingsQuery = NonNullable<operations["listMyListings"]["parameters"]["query"]>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];
 export type Session = components["schemas"]["Session"];
 export type SessionResponse = components["schemas"]["SessionResponse"];
@@ -382,6 +388,44 @@ export const listListingRevisionsQuerySchema: z.ZodType<ListListingRevisionsQuer
   .object({
     cursor: z.string().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export const ownerListingBucketSchema: z.ZodType<OwnerListingBucket> = z.enum([
+  "DRAFT",
+  "PENDING",
+  "PUBLISHED",
+  "ARCHIVED",
+]);
+
+export const listMyListingsQuerySchema: z.ZodType<ListMyListingsQuery> = z
+  .object({
+    bucket: ownerListingBucketSchema.default("DRAFT"),
+    type: listingTypeSchema.optional(),
+    organizationId: z.uuid().optional(),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export const batchListingActionSchema: z.ZodType<BatchListingActionRequest> = z
+  .object({
+    action: z.enum(["ARCHIVE", "DELETE"]),
+    items: z
+      .array(
+        z
+          .object({
+            listingId: z.uuid(),
+            version: z.number().int().min(1).max(2_147_483_647),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(20)
+      .refine(
+        (items) => new Set(items.map((item) => item.listingId)).size === items.length,
+        "Listing IDs must be unique",
+      ),
   })
   .strict();
 

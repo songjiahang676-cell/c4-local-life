@@ -40,6 +40,7 @@ const responseHeaderBlocklist = new Set([
 const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
   GET: [
     /^auth\/session$/,
+    /^me\/listings$/,
     /^notifications$/,
     /^regions$/,
     /^categories$/,
@@ -53,6 +54,7 @@ const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
     /^auth\/mfa\/enrollment\/verify$/,
     /^auth\/mfa\/verify$/,
     /^listings$/,
+    /^me\/listings\/actions$/,
     /^media\/uploads$/,
     new RegExp(`^media/${uuid}/complete$`),
     new RegExp(`^listings/${uuid}/submit$`),

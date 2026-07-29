@@ -25,6 +25,7 @@ export function createPolicyService(): PolicyService {
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.listingDraftUpdate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.listingArchive, requireActiveActorPermissionPolicy);
+  policies.register(activeUserPolicyActions.listingBatchManage, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.listingDelete, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.listingSubmit, requireActiveActorPermissionPolicy);
   policies.register(

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  batchListingActionSchema,
   contentStatusSchema,
   createListingSchema,
+  listMyListingsQuerySchema,
   listListingsQuerySchema,
   listingSearchSchema,
   moneySchema,
@@ -110,5 +112,66 @@ describe("listing contracts", () => {
       expect(listListingsQuerySchema.parse({ type })).toMatchObject({ type, limit: 20 });
     }
     expect(listListingsQuerySchema.safeParse({ type: "BUSINESS" }).success).toBe(false);
+  });
+
+  it("bounds private management filters, cursors, and ordered batch mutations", () => {
+    const listingId = "11111111-1111-4111-8111-111111111111";
+    const organizationId = "22222222-2222-4222-8222-222222222222";
+
+    expect(
+      listMyListingsQuerySchema.parse({
+        bucket: "PUBLISHED",
+        type: "SERVICE",
+        organizationId,
+        limit: "50",
+      }),
+    ).toMatchObject({
+      bucket: "PUBLISHED",
+      type: "SERVICE",
+      organizationId,
+      limit: 50,
+    });
+    for (const invalidQuery of [
+      { bucket: "DELETED" },
+      { cursor: "a".repeat(513) },
+      { limit: "51" },
+      { offset: "0" },
+    ]) {
+      expect(listMyListingsQuerySchema.safeParse(invalidQuery).success).toBe(false);
+    }
+
+    expect(
+      batchListingActionSchema.parse({
+        action: "ARCHIVE",
+        items: [{ listingId, version: 1 }],
+      }),
+    ).toEqual({
+      action: "ARCHIVE",
+      items: [{ listingId, version: 1 }],
+    });
+    expect(
+      batchListingActionSchema.safeParse({
+        action: "DELETE",
+        items: [
+          { listingId, version: 1 },
+          { listingId, version: 2 },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      batchListingActionSchema.safeParse({
+        action: "ARCHIVE",
+        items: Array.from({ length: 21 }, (_, index) => ({
+          listingId: `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+          version: 1,
+        })),
+      }).success,
+    ).toBe(false);
+    expect(
+      batchListingActionSchema.safeParse({
+        action: "ARCHIVE",
+        items: [{ listingId, version: 1, ownerId: organizationId }],
+      }).success,
+    ).toBe(false);
   });
 });

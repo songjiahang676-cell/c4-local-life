@@ -188,6 +188,67 @@ export type PublicListingListResult = {
   nextCursor: PublicListingCursor | null;
 };
 
+export const ownerListingBuckets = ["DRAFT", "PENDING", "PUBLISHED", "ARCHIVED"] as const;
+export type OwnerListingBucket = (typeof ownerListingBuckets)[number];
+
+export type OwnerListingSummaryProjection = {
+  id: string;
+  type: ListingType;
+  ownerId: string;
+  organizationId: string | null;
+  bucket: OwnerListingBucket;
+  status: ContentStatus;
+  moderationStatus: ModerationStatus;
+  locale: string;
+  title: string;
+  summary: string | null;
+  price: ListingPriceProjection | null;
+  region: ListingRegionProjection;
+  category: ListingCategoryProjection;
+  organization: ListingOrganizationSummaryProjection | null;
+  isFeatured: boolean;
+  publishedAt: Date | null;
+  expiresAt: Date | null;
+  latestRevision: {
+    revisionNumber: number;
+    classification: ListingRevisionProjection["classification"];
+    reasonCodes: ListingRevisionProjection["reasonCodes"];
+    reviewState: ListingRevisionProjection["reviewState"];
+    createdAt: Date;
+  } | null;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+};
+
+export type OwnerListingCursor = {
+  createdAt: Date;
+  id: string;
+};
+
+export type OwnerListingCounts = {
+  draft: number;
+  pending: number;
+  published: number;
+  archived: number;
+};
+
+export type OwnerListingListInput = {
+  actorUserId: string;
+  bucket: OwnerListingBucket;
+  type?: ListingType;
+  organizationId?: string;
+  cursor?: OwnerListingCursor;
+  limit: number;
+  now: Date;
+};
+
+export type OwnerListingListResult = {
+  items: OwnerListingSummaryProjection[];
+  nextCursor: OwnerListingCursor | null;
+  counts: OwnerListingCounts;
+};
+
 export type ScopedListingReadInput = {
   actorUserId: string;
   listingId: string;
@@ -337,6 +398,35 @@ const ownerListingSelect = {
   },
 } satisfies Prisma.ListingSelect;
 
+const ownerListingSummarySelect = {
+  id: true,
+  type: true,
+  ownerId: true,
+  organizationId: true,
+  status: true,
+  moderationStatus: true,
+  locale: true,
+  title: true,
+  summary: true,
+  priceAmount: true,
+  currency: true,
+  priceUnit: true,
+  isFeatured: true,
+  publishedAt: true,
+  expiresAt: true,
+  createdAt: true,
+  updatedAt: true,
+  version: true,
+  region: { select: regionSelect },
+  category: { select: categorySelect },
+  organization: { select: organizationSummarySelect },
+  revisions: {
+    orderBy: [{ revisionNumber: "desc" }],
+    take: 1,
+    select: listingRevisionSelect,
+  },
+} satisfies Prisma.ListingSelect;
+
 const moderatorListingSelect = {
   ...publicListingSelect,
   ownerId: true,
@@ -360,6 +450,9 @@ const moderatorListingSelect = {
 } satisfies Prisma.ListingSelect;
 
 type SelectedPublicListing = Prisma.ListingGetPayload<{ select: typeof publicListingSelect }>;
+type SelectedOwnerListingSummary = Prisma.ListingGetPayload<{
+  select: typeof ownerListingSummarySelect;
+}>;
 type ListingClient = PrismaClient | Prisma.TransactionClient;
 type AttributeVisibility = "PUBLIC" | "OWNER_ONLY" | "MODERATOR_ONLY";
 
@@ -403,6 +496,131 @@ function mapOrganization(
   organization: SelectedPublicListing["organization"],
 ): ListingOrganizationSummaryProjection | null {
   return organization ? { ...organization } : null;
+}
+
+function ownerListingBucket(
+  status: ContentStatus,
+  expiresAt: Date | null,
+  now: Date,
+): OwnerListingBucket {
+  if (status === ContentStatus.DRAFT) return "DRAFT";
+  if (status === ContentStatus.SUBMITTED) return "PENDING";
+  if (status === ContentStatus.PUBLISHED && expiresAt && expiresAt > now) return "PUBLISHED";
+  if (
+    status === ContentStatus.PUBLISHED ||
+    status === ContentStatus.ARCHIVED ||
+    status === ContentStatus.EXPIRED ||
+    status === ContentStatus.SUSPENDED
+  ) {
+    return "ARCHIVED";
+  }
+  throw new Error("Deleted Listing cannot be projected into an owner management bucket");
+}
+
+function ownerListingBucketWhere(bucket: OwnerListingBucket, now: Date): Prisma.ListingWhereInput {
+  if (bucket === "DRAFT") return { status: ContentStatus.DRAFT };
+  if (bucket === "PENDING") return { status: ContentStatus.SUBMITTED };
+  if (bucket === "PUBLISHED") {
+    return {
+      status: ContentStatus.PUBLISHED,
+      expiresAt: { gt: now },
+    };
+  }
+  return {
+    OR: [
+      {
+        status: {
+          in: [ContentStatus.ARCHIVED, ContentStatus.EXPIRED, ContentStatus.SUSPENDED],
+        },
+      },
+      {
+        status: ContentStatus.PUBLISHED,
+        expiresAt: { lte: now },
+      },
+    ],
+  };
+}
+
+function ownerListingAccessWhere(
+  actorUserId: string,
+  organizationId?: string,
+): Prisma.ListingWhereInput {
+  return {
+    deletedAt: null,
+    ...(organizationId ? { organizationId } : {}),
+    OR: [
+      {
+        ownerId: actorUserId,
+        organizationId: null,
+        owner: {
+          is: {
+            status: { in: [...publicActorStatuses] },
+            deletedAt: null,
+          },
+        },
+      },
+      {
+        organization: {
+          is: {
+            status: { in: [...publicActorStatuses] },
+            deletedAt: null,
+            memberships: {
+              some: {
+                userId: actorUserId,
+                user: {
+                  is: {
+                    status: { in: [...publicActorStatuses] },
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
+}
+
+function mapOwnerListingSummary(
+  row: SelectedOwnerListingSummary,
+  now: Date,
+): OwnerListingSummaryProjection {
+  const latest = row.revisions[0];
+  let latestRevision: OwnerListingSummaryProjection["latestRevision"] = null;
+  if (latest) {
+    const revision = mapListingRevision(latest);
+    latestRevision = {
+      revisionNumber: revision.revisionNumber,
+      classification: revision.classification,
+      reasonCodes: revision.reasonCodes,
+      reviewState: revision.reviewState,
+      createdAt: revision.createdAt,
+    };
+  }
+  return {
+    id: row.id,
+    type: row.type,
+    ownerId: row.ownerId,
+    organizationId: row.organizationId,
+    bucket: ownerListingBucket(row.status, row.expiresAt, now),
+    status: row.status,
+    moderationStatus: row.moderationStatus,
+    locale: row.locale,
+    title: row.title,
+    summary: row.summary,
+    price: mapPrice(row),
+    region: mapRegion(row.region),
+    category: mapCategory(row.category),
+    organization: row.organization ? { ...row.organization } : null,
+    isFeatured: row.isFeatured,
+    publishedAt: row.publishedAt,
+    expiresAt: row.expiresAt,
+    latestRevision,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    version: row.version,
+  };
 }
 
 function mapBase(row: SelectedPublicListing, attributes: Record<string, Prisma.JsonValue>) {
@@ -617,6 +835,63 @@ export class ListingRepository {
         rows.length > input.limit && last?.publishedAt
           ? { publishedAt: last.publishedAt, id: last.id }
           : null,
+    };
+  }
+
+  async listForOwner(input: OwnerListingListInput): Promise<OwnerListingListResult> {
+    const baseWhere = {
+      AND: [
+        ownerListingAccessWhere(input.actorUserId, input.organizationId),
+        ...(input.type ? [{ type: input.type } satisfies Prisma.ListingWhereInput] : []),
+      ],
+    } satisfies Prisma.ListingWhereInput;
+    const rowsPromise = this.#client.listing.findMany({
+      where: {
+        AND: [
+          baseWhere,
+          ownerListingBucketWhere(input.bucket, input.now),
+          ...(input.cursor
+            ? [
+                {
+                  OR: [
+                    { createdAt: { lt: input.cursor.createdAt } },
+                    {
+                      createdAt: input.cursor.createdAt,
+                      id: { lt: input.cursor.id },
+                    },
+                  ],
+                } satisfies Prisma.ListingWhereInput,
+              ]
+            : []),
+        ],
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+      select: ownerListingSummarySelect,
+    });
+    const count = (bucket: OwnerListingBucket): Promise<number> =>
+      this.#client.listing.count({
+        where: { AND: [baseWhere, ownerListingBucketWhere(bucket, input.now)] },
+      });
+    const [rows, draft, pending, published, archived] = await Promise.all([
+      rowsPromise,
+      count("DRAFT"),
+      count("PENDING"),
+      count("PUBLISHED"),
+      count("ARCHIVED"),
+    ]);
+    const pageRows = rows.slice(0, input.limit);
+    const last = pageRows.at(-1);
+    return {
+      items: pageRows.map((row) => mapOwnerListingSummary(row, input.now)),
+      nextCursor:
+        rows.length > input.limit && last
+          ? {
+              createdAt: last.createdAt,
+              id: last.id,
+            }
+          : null,
+      counts: { draft, pending, published, archived },
     };
   }
 

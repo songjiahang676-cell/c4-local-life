@@ -467,9 +467,11 @@ function fieldControl(
 }
 
 export function RentalDraftForm({
+  initialListingId,
   locale,
   listingType = "RENTAL",
 }: {
+  initialListingId?: string;
   locale: SupportedLocale;
   listingType?: DraftListingType;
 }) {
@@ -663,8 +665,14 @@ export function RentalDraftForm({
       fetch("/v1/auth/session", { credentials: "same-origin", cache: "no-store" }),
       fetch(`/v1/categories?vertical=${listingType}`, { cache: "no-store" }),
       fetch("/v1/regions?type=CITY", { cache: "no-store" }),
+      initialListingId
+        ? fetch(`/v1/listings/${initialListingId}`, {
+            credentials: "same-origin",
+            cache: "no-store",
+          })
+        : Promise.resolve(null),
     ])
-      .then(async ([sessionResponse, categoryResponse, regionResponse]) => {
+      .then(async ([sessionResponse, categoryResponse, regionResponse, listingResponse]) => {
         if (cancelled) return;
         if (categoryResponse.ok) {
           const body = (await categoryResponse.json()) as { data: Category[] };
@@ -690,6 +698,27 @@ export function RentalDraftForm({
         const currentUserId = session.data.user.id;
         setUserId(currentUserId);
         setAuthState("authenticated");
+        idempotencyKeyRef.current = `listing-draft:${crypto.randomUUID()}`;
+        if (initialListingId) {
+          if (!listingResponse?.ok) {
+            setAuthState("error");
+            setHydrated(true);
+            return;
+          }
+          const existing = (await listingResponse.json()) as ListingOwnerResponse;
+          if (existing.data.type !== listingType || existing.data.status !== "DRAFT") {
+            setAuthState("error");
+            setHydrated(true);
+            return;
+          }
+          listingIdRef.current = existing.data.id;
+          etagRef.current = listingResponse.headers.get("etag");
+          setValues(valuesFromOwnerListing(existing.data));
+          setRestored(true);
+          setSaveState("saved");
+          setHydrated(true);
+          return;
+        }
         let stored: string | null = null;
         try {
           stored = localStorage.getItem(rentalDraftStorageKey(currentUserId, locale, listingType));
@@ -697,8 +726,7 @@ export function RentalDraftForm({
           // Continue without device recovery when browser storage is unavailable.
         }
         const recovered = parseStoredRentalDraft(stored, currentUserId, locale, listingType);
-        idempotencyKeyRef.current =
-          recovered?.idempotencyKey ?? `listing-draft:${crypto.randomUUID()}`;
+        idempotencyKeyRef.current = recovered?.idempotencyKey ?? idempotencyKeyRef.current;
         if (recovered) {
           listingIdRef.current = recovered.listingId;
           etagRef.current = recovered.etag;
@@ -717,7 +745,7 @@ export function RentalDraftForm({
     return () => {
       cancelled = true;
     };
-  }, [listingType, locale]);
+  }, [initialListingId, listingType, locale]);
 
   useEffect(() => {
     if (!values.categoryId) {

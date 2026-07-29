@@ -327,3 +327,16 @@ PENDING/ACCEPTED/REVOKED/EXPIRED 单向状态证据；部分唯一索引禁止�
 `organization_owner_transfers`，包含 from/to、精确幂等摘要、结果角色与发生时间。两个 deferred
 constraint trigger 在事务结束时检查组织至少保留一名 Owner，使先提升后降级的转移可原子提交，同时
 拒绝直接删除或降级最后一名 Owner。
+
+### LIST-009 用户中心查询投影
+
+用户中心不新增业务表或派生事实源。Repository 从 canonical `listings`、当前组织 membership、
+taxonomy 与最近不可变 revision 生成最小摘要，并复用 `(owner_id,status,created_at)` 和
+`(organization_id,status,created_at)` 索引。DRAFT 映射草稿，SUBMITTED 映射审核中；仍标记为
+PUBLISHED 但 `expires_at <= now()` 的行在查询时直接映射已归档，避免依赖异步过期 Worker 的时序。
+ARCHIVED/EXPIRED/SUSPENDED 也归入已归档，DELETED 永不返回。
+
+分页使用 `(created_at DESC,id DESC)`，签名 cursor 绑定 actor、bucket、type、organization、limit
+和边界。计数和列表共享相同 actor/组织可见谓词；组织读取角色可以查看管理摘要，所有写操作仍由对象
+级生命周期 Policy 与 Repository 版本条件独立复核。批量端点只是最多 20 次有界应用层编排，不创建
+跨 Listing 大事务，也不改变既有 Audit/Outbox 与软删除幂等模型。

@@ -313,6 +313,85 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/Conflict"
+  /me/listings:
+    get:
+      tags: [Listings]
+      summary: List listings managed by the current account
+      description: |
+        Returns a no-store account-center projection for personal Listings and Listings belonging
+        to organizations where the current user is an active member. Management buckets are stable:
+        DRAFT maps to editable drafts, PENDING to submitted review, PUBLISHED to public content, and
+        ARCHIVED to archived, expired, or suspended content. The signed cursor is bound to the
+        current actor, bucket, type, organization filter, and page size.
+      operationId: listMyListings
+      parameters:
+        - name: bucket
+          in: query
+          schema:
+            $ref: "#/components/schemas/OwnerListingBucket"
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ListingType"
+        - name: organizationId
+          in: query
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Cursor-paginated private Listing management projection
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            Pragma:
+              schema: { type: string, const: no-cache }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyListingCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /me/listings/actions:
+    post:
+      tags: [Listings]
+      summary: Apply a bounded action to managed listings
+      description: |
+        Applies ARCHIVE or DELETE to at most 20 unique Listings. Each item carries its own strong
+        Listing version so one stale or foreign item cannot authorize another. Processing is
+        intentionally non-atomic and returns one generic result per item; successful target-state
+        retries do not append duplicate lifecycle evidence.
+      operationId: batchManageMyListings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchListingActionRequest"
+      responses:
+        "200":
+          description: Ordered per-item results
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            Pragma:
+              schema: { type: string, const: no-cache }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchListingActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /me/sessions:
     get:
       tags: [Auth]
@@ -3557,6 +3636,173 @@ components:
             $ref: "#/components/schemas/ListingRevisionView"
         page:
           $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
+    OwnerListingBucket:
+      type: string
+      enum: [DRAFT, PENDING, PUBLISHED, ARCHIVED]
+      default: DRAFT
+    MyListingLatestRevision:
+      type: object
+      required: [revisionNumber, classification, reasonCodes, reviewState, createdAt]
+      additionalProperties: false
+      properties:
+        revisionNumber: { type: integer, minimum: 1 }
+        classification:
+          type: string
+          enum: [SUBMISSION, MINOR_EDIT, MAJOR_EDIT]
+        reasonCodes:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ListingRevisionReasonCode"
+        reviewState:
+          type: string
+          enum: [NOT_REQUIRED, PENDING, ESCALATED, APPROVED, CHANGES_REQUESTED, REJECTED]
+        createdAt: { type: string, format: date-time }
+    MyListingSummaryView:
+      type: object
+      required:
+        [
+          id,
+          type,
+          bucket,
+          status,
+          moderationStatus,
+          locale,
+          title,
+          summary,
+          price,
+          region,
+          category,
+          organization,
+          isFeatured,
+          publishedAt,
+          expiresAt,
+          latestRevision,
+          availableActions,
+          createdAt,
+          updatedAt,
+          version,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        bucket:
+          $ref: "#/components/schemas/OwnerListingBucket"
+        status:
+          $ref: "#/components/schemas/ContentStatus"
+        moderationStatus:
+          $ref: "#/components/schemas/ModerationStatus"
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        summary: { type: [string, "null"], maxLength: 240 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/ListingRegionView"
+        category:
+          $ref: "#/components/schemas/ListingCategoryView"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/ListingOrganizationSummaryView"
+            - type: "null"
+        isFeatured: { type: boolean }
+        publishedAt: { type: [string, "null"], format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        latestRevision:
+          oneOf:
+            - $ref: "#/components/schemas/MyListingLatestRevision"
+            - type: "null"
+        availableActions:
+          type: array
+          maxItems: 5
+          uniqueItems: true
+          items:
+            type: string
+            enum: [EDIT, SUBMIT, ARCHIVE, DELETE, VIEW_REVISIONS]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    MyListingCounts:
+      type: object
+      required: [draft, pending, published, archived]
+      additionalProperties: false
+      properties:
+        draft: { type: integer, minimum: 0 }
+        pending: { type: integer, minimum: 0 }
+        published: { type: integer, minimum: 0 }
+        archived: { type: integer, minimum: 0 }
+    MyListingCollection:
+      type: object
+      required: [data, page, counts, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/MyListingSummaryView"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        counts:
+          $ref: "#/components/schemas/MyListingCounts"
+        generatedAt: { type: string, format: date-time }
+    BatchListingActionItem:
+      type: object
+      required: [listingId, version]
+      additionalProperties: false
+      properties:
+        listingId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1, maximum: 2147483647 }
+    BatchListingActionRequest:
+      type: object
+      required: [action, items]
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+          enum: [ARCHIVE, DELETE]
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/BatchListingActionItem"
+    BatchListingActionResult:
+      type: object
+      required: [listingId, outcome, currentVersion, currentBucket]
+      additionalProperties: false
+      properties:
+        listingId: { type: string, format: uuid }
+        outcome:
+          type: string
+          enum: [APPLIED, NOT_FOUND, VERSION_CONFLICT, STATE_CONFLICT]
+        currentVersion:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 2147483647
+        currentBucket:
+          oneOf:
+            - $ref: "#/components/schemas/OwnerListingBucket"
+            - type: "null"
+    BatchListingActionResponse:
+      type: object
+      required: [data, appliedCount, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/BatchListingActionResult"
+        appliedCount: { type: integer, minimum: 0, maximum: 20 }
         generatedAt: { type: string, format: date-time }
     PublicListingSummaryView:
       type: object

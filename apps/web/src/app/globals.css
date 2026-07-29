@@ -2415,3 +2415,373 @@ input:focus-visible {
     flex: 1;
   }
 }
+
+.accountListingsPage {
+  width: min(100% - 32px, 1080px);
+  padding-block: 24px 64px;
+}
+
+.accountListingsPage > nav,
+.accountListingsPageHeader,
+.accountListingsPageHeader > div:last-child,
+.accountListingsToolbar,
+.accountListingsBatch,
+.accountListingHeading,
+.accountListingHeading > div,
+.accountListingActions {
+  display: flex;
+  align-items: center;
+}
+
+.accountListingsPage > nav {
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.accountListingsPageHeader {
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 28px;
+}
+
+.accountListingsPageHeader p,
+.accountListingsPageHeader h1,
+.accountListingsPageHeader span,
+.accountListingItem h2,
+.accountListingItem > p {
+  margin: 0;
+}
+
+.accountListingsPageHeader p {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.accountListingsPageHeader h1 {
+  margin-block: 5px 7px;
+  font-size: clamp(28px, 5vw, 42px);
+}
+
+.accountListingsPageHeader span {
+  color: var(--muted);
+}
+
+.accountListingsPageHeader > div:last-child {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.accountListingsPrimary {
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 10px 18px;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.accountListings {
+  display: grid;
+  gap: 16px;
+}
+
+.accountListingsToolbar {
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+}
+
+.accountListingsToolbar > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.accountListingsToolbar button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.accountListingsToolbar button[aria-pressed="true"] {
+  color: #0b4eab;
+  background: var(--blue-soft);
+  border-color: #9fc2f4;
+}
+
+.accountListingsToolbar button strong {
+  min-width: 24px;
+  padding: 2px 7px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.accountListingsToolbar > label {
+  min-width: 180px;
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.accountListingsToolbar select {
+  min-height: 44px;
+  padding: 8px 34px 8px 11px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #ccd5e2;
+  border-radius: 8px;
+}
+
+.accountListingsBatch {
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 13px 16px;
+  background: #f8fbff;
+}
+
+.accountListingsBatch label,
+.accountListingHeading label {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accountListingsBatch input,
+.accountListingHeading input {
+  width: 19px;
+  height: 19px;
+}
+
+.accountListingsBatch > span {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.accountListingsBatch button,
+.accountListingsLoadMore,
+.accountListingsError button {
+  min-height: 42px;
+  padding: 8px 16px;
+  color: var(--blue);
+  background: #fff;
+  border: 1px solid #b7cae5;
+  border-radius: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.accountListingsBatch button.isDanger {
+  color: #a51d16;
+  border-color: #e7aaa6;
+}
+
+.accountListingsBatch button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.accountListingsStatus,
+.accountListingsEmpty,
+.accountListingsGate,
+.accountListingsError,
+.accountListingsNotice {
+  padding: 20px;
+}
+
+.accountListingsGate h2 {
+  margin-top: 0;
+}
+
+.accountListingsError {
+  color: #8f1d16;
+  background: #fff1f0;
+  border: 1px solid #f3c2be;
+  border-radius: 10px;
+}
+
+.accountListingsNotice {
+  color: #086143;
+  background: #eaf8f2;
+  border: 1px solid #bce8d5;
+  border-radius: 10px;
+}
+
+.accountListingsList {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.accountListingItem {
+  padding: clamp(17px, 3vw, 24px);
+}
+
+.accountListingHeading {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.accountListingHeading > div {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.accountListingHeading > div > span {
+  padding: 4px 9px;
+  color: #506176;
+  background: #eef2f7;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.accountListingHeading > div > .accountListingType {
+  color: #0b4eab;
+  background: var(--blue-soft);
+}
+
+.accountListingHeading label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.accountListingItem h2 {
+  margin-top: 14px;
+  font-size: clamp(19px, 3vw, 24px);
+}
+
+.accountListingItem > p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.accountListingMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-block: 18px 0;
+}
+
+.accountListingMeta > div {
+  display: grid;
+  gap: 3px;
+}
+
+.accountListingMeta dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.accountListingMeta dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.accountListingRevision {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 10px 12px;
+  background: #f7f9fc;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.accountListingActions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.accountListingActions a {
+  min-height: 42px;
+  display: inline-grid;
+  place-items: center;
+  padding: 8px 15px;
+  color: var(--blue);
+  border: 1px solid #b7cae5;
+  border-radius: 8px;
+  font-weight: 750;
+}
+
+.accountListingsLoadMore {
+  justify-self: center;
+}
+
+@media (max-width: 760px) {
+  .accountListingsPage {
+    width: min(100% - 20px, 1080px);
+    padding-top: 12px;
+  }
+
+  .accountListingsPageHeader,
+  .accountListingsToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .accountListingsPageHeader > div:last-child {
+    justify-content: flex-start;
+  }
+
+  .accountListingsToolbar > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .accountListingsToolbar > label {
+    min-width: 0;
+  }
+
+  .accountListingsBatch > span {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .accountListingsBatch button {
+    flex: 1;
+  }
+
+  .accountListingHeading {
+    align-items: flex-start;
+  }
+
+  .accountListingMeta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .accountListingsToolbar > div,
+  .accountListingMeta {
+    grid-template-columns: 1fr;
+  }
+
+  .accountListingHeading {
+    flex-direction: column;
+  }
+}
