@@ -117,3 +117,10 @@ reconciliation 仍属于 `EVT-002`。
 - 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
   taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
   本地 fixture 延迟宣称生产 SLO。
+
+## 15.12 首页配置缓存一致性
+
+发布与回滚在同一数据库事务追加 `homepage.layout.published`，避免已提交配置没有失效信号。消费者按
+locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读；Redis/CDN 只保存可重建
+派生状态。TTL 由严格配置限制在 0–86400 秒，故障时允许短暂读取最后一个已发布版本，不得读取草稿或
+静默拼接不同版本模块。

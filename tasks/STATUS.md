@@ -5,20 +5,21 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：按实施顺序完成 `WEB-002` 首页模块化与真实数据 API
-- 进度：5 个 G3 任务、51/101 个总任务完成
-- 风险：首页必须隔离各模块故障并在无真实数据时隐藏内容，不能用模拟数字、伪造评价或占位广告冒充生产数据；生产域名与最终品牌资产仍待负责人确认
+- 目标：完成 `TAX-003` 受保护验证后进入 `WEB-002` 首页模块化与真实数据 API
+- 进度：6 个 G3 任务、52/101 个总任务完成
+- 风险：`WEB-002` 必须逐模块使用 canonical 公开投影、隔离依赖错误并隐藏无真实数据模块；不能从布局 seed、测试 fixture 或未知 source 伪造首页内容
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target   | Status      | Notes                      |
-| ------- | -------------------- | ---------- | -------- | ----------- | -------------------------- |
-| WEB-002 | @songjiahang676-cell | 2026-07-29 | homepage | in progress | real-data modular homepage |
+| Task    | Owner                | Started    | Target          | Status                       | Notes             |
+| ------- | -------------------- | ---------- | --------------- | ---------------------------- | ----------------- |
+| TAX-003 | @songjiahang676-cell | 2026-07-29 | homepage config | protected validation pending | unlocks `WEB-002` |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| TAX-003 local quality           | `pnpm ci:quality` + runtime/E2E       | passed：450 tests、8 builds、22 E2E、API runtime                           | 2026-07-29 |
 | Static architecture check       | `scripts/check-architecture.sh`       | passed：101 tasks、31 paths、52 schemas、36 models                         | 2026-07-25 |
 | Hosted quality gate             | GitHub Actions run `30186103447`      | passed：locked install、51 tests、7 builds、E2E                            | 2026-07-25 |
 | Four image build/runtime health | GitHub Actions job `89751350551`      | passed：4 images、`node` user、4 readiness endpoints                       | 2026-07-25 |

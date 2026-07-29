@@ -107,3 +107,12 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 - 模块级 `cacheTag`：homepage config、region、listing type、ads。
 - Hero 图片优化且不压过文本 LCP。
 - 非首屏模块延迟 hydration；避免每个小卡片成为 client component。
+
+## 26.7 TAX-003 可发布布局契约
+
+首页布局现在按 locale 与可选 region code 版本化。一个定义最多 32 个稳定 key slot，类型限定为
+Hero、热门搜索、城市、Listing feed、商家、师傅、广告、行情、资源产品和门户链接；每类 source 只
+包含其执行所需的有界枚举、ID、content/asset/placement/collection key 和 limit/TTL。配置不含实时
+业务数据、任意 HTML、外部 URL、查询表达式或私有字段。草稿可 preview；publish 切换 canonical
+版本；rollback 复制历史配置为新版本并发送原子失效事件。`WEB-002` 负责从各领域公开投影装配数据，
+模块失败需隔离为真实空态/错误态，不能从 layout seed 伪造 500 条内容或生产指标。

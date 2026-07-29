@@ -429,3 +429,10 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
 - 词典维护没有开放匿名/公共 mutation；内部 `SearchDictionaryService` 验证定义、生成 content hash，
   再经 Store/Repository 保存、双人发布或追加式回滚。未来 Admin UI 必须复用该应用服务与 Policy，
   Controller 不得直接调用 Prisma。
+
+## 8.25 TAX-003 首页布局内部契约
+
+`HomepageLayoutService` 是应用层边界，负责严格验证、规范化和内容 hash；Store/Repository 负责
+scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共 HTTP endpoint，因而 OpenAPI 不变；
+`WEB-002` 必须复用该服务生成 `GET /v1/homepage` 的公开投影，不得让 Controller 直接访问 Prisma。
+发布事件是最小化 cache-invalidation 信号，不携带 layout 正文，消费者须从 PostgreSQL 重读指定版本。

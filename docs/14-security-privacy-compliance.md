@@ -449,3 +449,13 @@ Idempotency-Key 或请求哈希。
   已下架和未知对象的内部原因不进入页面。依赖/契约异常只显示通用可重试状态。
 - 降级扩大：只有固定垂类、无 q/price/geo/cursor 且为默认/最新排序的首屏可降级 PostgreSQL；搜索和
   canonical cursor 不互换，降级页不暴露后续 cursor，避免筛选语义或快照边界被静默改变。
+
+## 14.30 TAX-003 配置滥用控制
+
+- 所有 layout 与 slot 对象均严格拒绝未知字段；十类 source 使用判别联合白名单，不接受 HTML、脚本、
+  URL、SQL、对象 key 或联系方式。
+- 启用广告必须声明 sponsored disclosure；商业和师傅模块只能指定 verified-only。
+- revision、expected current version 和 scope 行锁阻止丢失更新；发布历史由数据库强制不可变，回滚
+  只能追加。
+- Outbox 只发送版本定位信息和内容 hash；日志、指标和事件不得包含配置正文或 PII。未来写入口必须
+  叠加 Admin MFA、近期认证、Policy、审计和速率限制。

@@ -50,6 +50,7 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 - [x] `SEARCH-003` 双语/地理/筛选/排序、PIT cursor 和推广标识。
 - [x] `SEARCH-004` 双人词典、同义词、建议、热门隐私阈值、bot/PII 筛查与保留。
 - [x] `WEB-001` 双语 SSR 列表/筛选/详情、公开投影边界、状态/推广标签和错误空态。
+- [x] `TAX-003` 严格首页布局白名单、版本草稿/预览/发布/追加回滚和原子缓存失效事件。
 - [ ] 首页真实数据与模块隔离。
 - [ ] canonical/hreflang/sitemap/schema/a11y/performance。
 

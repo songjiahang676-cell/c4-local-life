@@ -230,3 +230,10 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 事实表、迁移、服务或消息范式。简单首屏降级仍调用 API 的 PostgreSQL 公共 projection，不直接访问
 数据库。E2E fixture 是 Playwright 独立进程且只提供虚构数据，不会进入应用 runtime 或生产镜像。因此
 该实现保持模块化单体和既有 REST/事实源边界，不需要 ADR。
+
+## 30.12 TAX-003 首页布局实现边界
+
+共享 Contracts 与独立 JSON Schema 描述严格可序列化 layout；Database 包保存状态、不可变版本、种子和
+事务 Outbox；API 的 `HomepageLayoutService` 通过 Store 端口调用 Repository。当前模块没有 Controller，
+不会提前改变 68-path 公共 REST 契约，也不会让 Web/Admin 导入 Prisma。`WEB-002` 只需装配该应用服务
+与各领域公共读模型；未来 Admin 编辑器同样必须通过授权 use case，不能绕过版本与审计边界。

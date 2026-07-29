@@ -30,7 +30,7 @@ ORG-001,G1,ORG,P0,组织与成员角色/Policy,AUTH-003;API-004,Owner/Admin/Edit
 ORG-002,G1,ORG,P1,成员邀请、接受、撤销、Owner 转移,ORG-001;NOTIF-001,邀请短效；至少一 Owner；转移 step-up,docs/05-roles-and-permissions.md,done
 TAX-001,G1,TAX,P0,地区/分类读取、种子与别名,DATA-003,中英名称、层级、slug、别名查询可用,docs/23-content-taxonomy.md,done
 TAX-002,G1,TAX,P0,动态表单 schema 版本与发布,TAX-001,draft/preview/publish/rollback；旧草稿可验证,schemas/listing-form.schema.json;docs/23-content-taxonomy.md,done
-TAX-003,G3,TAX,P1,首页布局配置版本,TAX-002,schema 白名单、preview/publish/rollback、缓存失效,schemas/homepage-layout.schema.json;docs/26-homepage-component-map.md,todo
+TAX-003,G3,TAX,P1,首页布局配置版本,TAX-002,schema 白名单、preview/publish/rollback、缓存失效,schemas/homepage-layout.schema.json;docs/26-homepage-component-map.md,done
 MEDIA-001,G1,MEDIA,P0,上传 intent 与 quarantine,AUTH-001;DATA-001,短效 presign、配额、MIME/size/hash、私有原件,docs/08-api-and-integrations.md,done
 MEDIA-002,G1,MEDIA,P0,媒体扫描/重编码/变体生命周期,MEDIA-001;EVT-001,UPLOADING→SCANNING→READY/REJECTED；去 EXIF,docs/14-security-privacy-compliance.md,done
 MEDIA-003,G4,MEDIA,P0,受限验证文件存储,MEDIA-001;TRUST-001,独立桶/key/权限/保留；公开仅结论,docs/14-security-privacy-compliance.md,todo

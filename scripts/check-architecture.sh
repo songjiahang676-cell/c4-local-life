@@ -70,6 +70,11 @@ if validator_for:
     for path, doc in json_docs.items():
         if path.parent == root / 'schemas' and isinstance(doc, dict) and '$schema' in doc:
             validator_for(doc).check_schema(doc)
+    homepage_schema_path = root / 'schemas/homepage-layout.schema.json'
+    homepage_seed_path = root / 'seed/homepage.zh-Hans.json'
+    homepage_schema = json_docs[homepage_schema_path]
+    homepage_seed = json_docs[homepage_seed_path]
+    validator_for(homepage_schema)(homepage_schema).validate(homepage_seed)
 
 # YAML: parse all files and reject duplicate mapping keys when PyYAML is available.
 yaml_docs: dict[Path, object] = {}

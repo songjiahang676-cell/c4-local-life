@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added strict, versioned homepage layout configuration with per-module source allowlists,
+  optimistic drafts, immutable publication history, append-only rollback, canonical bilingual
+  seeds, and transactional cache-invalidation Outbox events.
 - Added bilingual SSR pages for all five public Listing verticals and site-wide search, with strict
   anonymous runtime response validation, category/city/price/sort filters, stable detail routes,
   visible status/sponsored/verification labels, honest empty/error states, safe canonical-list

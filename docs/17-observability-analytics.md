@@ -148,3 +148,10 @@ dictionary/sample/suggestions/trending/retention，和固定 outcome：
 success/empty/recorded/duplicate/rejected_bot/rejected_sensitive/unavailable。不得添加 query、query hash、
 source hash、IP、User-Agent、region、locale、dictionary version、count 或资源 ID 标签。HTTP RED
 继续覆盖两个公开端点；热门内容、来源数和测试样本数不得作为生产 Dashboard 数据。
+
+## 17.15 TAX-003 首页配置信号
+
+发布/回滚沿用 Outbox 通用 dispatch、retry、oldest-age 和 terminal-failure 指标，event type 固定为
+`homepage.layout.published`。允许的诊断字段只有 operation、locale 类别、版本和固定 outcome；配置
+正文、content key、region code、actor ID 和内容 hash 不进入指标标签。`WEB-002` 接入消费者时再增加
+固定 outcome 的 cache invalidation 指标，TAX-003 不虚构尚未存在的消费端可用性。

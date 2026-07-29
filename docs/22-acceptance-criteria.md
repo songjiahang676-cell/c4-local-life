@@ -307,3 +307,14 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   复杂筛选显示通用恢复状态。搜索/筛选/cursor 页面 `noindex,follow`。
 - 单元/组件/生产 Chromium 桌面和移动覆盖 SSR HTML、双语、label/skip/focus/44px/reflow、列表/详情、
   空态/错误、推广/状态和无横向溢出；完整质量与受保护门禁有真实证据后才可标记 done。
+
+## 22.18 TAX-003 首页布局配置验收
+
+- 十类模块 source 有严格白名单，未知字段、任意 HTML、重复 slot key、未披露广告和越界 TTL/limit
+  被契约与应用层拒绝；中英文 seed 只含结构。
+- locale/region scope 可创建草稿、乐观更新、发布和从历史版本追加回滚；并发旧 revision/version
+  失败且不会覆盖新配置。
+- 发布版本在 PostgreSQL 中不可 UPDATE/DELETE；发布/回滚与最小化 cache-invalidation Outbox 事件
+  原子提交，事件不携带正文或 PII。
+- JSON Schema、Zod、Prisma、migration/回滚说明、单元与 PostgreSQL 负例、种子、全仓质量和受保护
+  CI 有真实证据后才可标记完成。公共首页聚合 API 和模块数据隔离仍属于 `WEB-002`。

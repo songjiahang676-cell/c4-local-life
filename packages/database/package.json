@@ -30,6 +30,9 @@
       "search-discovery": [
         "src/repositories/search-discovery.repository.ts"
       ],
+      "homepage-layout": [
+        "src/repositories/homepage-layout.repository.ts"
+      ],
       "listing-draft": [
         "src/repositories/listing-draft.repository.ts"
       ],
@@ -100,6 +103,11 @@
       "types": "./src/repositories/search-discovery.repository.ts",
       "require": "./dist/src/repositories/search-discovery.repository.js",
       "default": "./dist/src/repositories/search-discovery.repository.js"
+    },
+    "./homepage-layout": {
+      "types": "./src/repositories/homepage-layout.repository.ts",
+      "require": "./dist/src/repositories/homepage-layout.repository.js",
+      "default": "./dist/src/repositories/homepage-layout.repository.js"
     },
     "./listing-draft": {
       "types": "./src/repositories/listing-draft.repository.ts",

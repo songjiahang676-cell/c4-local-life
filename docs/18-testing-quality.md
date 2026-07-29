@@ -360,3 +360,13 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   只在 E2E 进程存在，不进入应用、seed 或生产数据路径。
 - 全仓格式、类型、lint、单元/集成、八应用构建、API 运行时、架构和四镜像保护门禁继续执行。本任务
   不修改 OpenAPI、Prisma 或 migration；真实 OpenSearch 查询回归继续由既有 SEARCH 测试承担。
+
+## 18.32 TAX-003 首页布局验证增量
+
+- Contracts/JSON Schema 拒绝未知模块、未知 source 字段、任意 HTML 和未披露广告，并验证 slot key 唯一；
+  架构检查器还会用 Draft 2020-12 schema 验证实际首页 seed，防止两份契约静默漂移。
+- Service 单元测试覆盖新 scope 草稿、乐观冲突、发布、历史回滚、规范化 hash 和无正文 Outbox 契约。
+- PostgreSQL 集成测试覆盖原子发布/回滚、当前版本切换、事件唯一性和直接 UPDATE/DELETE 已发布版本
+  的数据库负例；种子测试覆盖中英文结构且不含真实/伪造业务内容。
+- Prisma validate/generate、迁移安全、全仓质量、API runtime、架构检查和受保护 CI 均须真实通过；本地
+  缺少 PostgreSQL 时明确记录 skip，不能把 skip 当作通过。
