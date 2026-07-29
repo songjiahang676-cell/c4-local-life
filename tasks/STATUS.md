@@ -19,6 +19,7 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| WEB-002 protected checks        | PR #39 / run `30500065008`            | 106 files / 467 real-service tests；Linux 22/22 E2E；four images passed    | 2026-07-29 |
 | WEB-002 local quality           | `pnpm ci:quality` + runtime/E2E       | 381 tests、8 builds、API runtime、Chromium 22/22 passed                    | 2026-07-29 |
 | WEB-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |
 | TAX-003 final main quality      | run `30497890894` / `29a7d06`         | merged main quality + four non-root images passed                          | 2026-07-29 |
@@ -244,7 +245,8 @@
   由 PR #36 / evidence-head run `30491148630` 合并为 `30be880`，final main run
   `30491653244` 全绿；`WEB-001` 已由 PR #37 / evidence-head run `30494632057` 受保护合并为
   `6532c81`，final main run `30495144658` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-002`。
-  `WEB-002` 的本地完整质量、API runtime 与 22/22 production Chromium 已通过，正在取得受保护 CI 证据；
+  `WEB-002` 的本地完整质量、API runtime 与 22/22 production Chromium 已通过；PR #39 run
+  `30500065008` 的 467 个真实服务测试、Linux E2E 与四镜像检查全绿，正在执行证据 head 复验；
   合并后按强制序列进入 `SEO-001`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
