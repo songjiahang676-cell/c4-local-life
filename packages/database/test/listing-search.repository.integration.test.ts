@@ -34,9 +34,9 @@ integration("ListingSearchRepository with PostgreSQL", () => {
     const regionId = randomUUID();
     const listingId = randomUUID();
     const now = new Date("2026-07-29T18:00:00.000Z");
-    const repository = new ListingSearchRepository(database.client);
-    try {
-      await database.client.user.create({
+    await database.withRollback(async (transaction) => {
+      const repository = new ListingSearchRepository(transaction);
+      await transaction.user.create({
         data: {
           id: ownerId,
           email: `${ownerId}@example.invalid`,
@@ -48,7 +48,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
           },
         },
       });
-      await database.client.region.create({
+      await transaction.region.create({
         data: {
           id: parentRegionId,
           type: RegionType.COUNTY,
@@ -58,7 +58,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
           nameEn: "Synthetic County",
         },
       });
-      await database.client.region.create({
+      await transaction.region.create({
         data: {
           id: regionId,
           parentId: parentRegionId,
@@ -78,7 +78,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
           },
         },
       });
-      await database.client.category.create({
+      await transaction.category.create({
         data: {
           id: parentCategoryId,
           slug: `search-parent-${parentCategoryId}`,
@@ -86,7 +86,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
           nameEn: "Synthetic Parent",
         },
       });
-      await database.client.category.create({
+      await transaction.category.create({
         data: {
           id: categoryId,
           parentId: parentCategoryId,
@@ -118,7 +118,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
           },
         },
       });
-      await database.client.listing.create({
+      await transaction.listing.create({
         data: {
           id: listingId,
           type: ListingType.RENTAL,
@@ -176,7 +176,7 @@ integration("ListingSearchRepository with PostgreSQL", () => {
       expect(JSON.stringify(publicRecord)).not.toContain("33.6846");
       expect(JSON.stringify(publicRecord)).not.toContain("-117.8265");
 
-      await database.client.listing.update({
+      await transaction.listing.update({
         where: { id: listingId },
         data: { status: ContentStatus.ARCHIVED, version: 5 },
       });
@@ -187,16 +187,6 @@ integration("ListingSearchRepository with PostgreSQL", () => {
       });
       const states = await repository.listStates({ limit: 1_000, now });
       expect(states.items).toContainEqual({ id: listingId, version: 5, shouldIndex: false });
-    } finally {
-      await database.client.listing.deleteMany({ where: { id: listingId } });
-      await database.client.categoryFormSchemaVersion.deleteMany({ where: { categoryId } });
-      await database.client.category.deleteMany({
-        where: { id: { in: [categoryId, parentCategoryId] } },
-      });
-      await database.client.region.deleteMany({
-        where: { id: { in: [regionId, parentRegionId] } },
-      });
-      await database.client.user.deleteMany({ where: { id: ownerId } });
-    }
+    });
   });
 });

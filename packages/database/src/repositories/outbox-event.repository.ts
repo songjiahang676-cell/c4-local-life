@@ -136,7 +136,7 @@ export class OutboxEventRepository {
         ? Prisma.sql`CASE WHEN "event_type" IN (${Prisma.join(
             input.priorityEventTypes,
           )}) THEN 0 ELSE 1 END`
-        : Prisma.sql`0`;
+        : Prisma.sql`CASE WHEN FALSE THEN 0 ELSE 1 END`;
     const rows = await this.#client.$queryRaw<ClaimedOutboxEventRow[]>(Prisma.sql`
       WITH candidates AS (
         SELECT "id"
