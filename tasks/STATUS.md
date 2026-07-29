@@ -9,15 +9,15 @@
 - 进度：15/16 个 G2 任务、45/101 个总任务完成
 - 风险：`LIST-009` 已由 PR #30 受保护合并且最终 main 门禁通过；`MOD-003` 的文本/图片/联系方式
   重复候选、版本化阈值、dry-run、不可变人工反馈和误杀指标已通过完整本地质量、真实 PostgreSQL、
-  运行时和生产 Chromium，正在执行受保护托管门禁；Windows 本机无 Redis/ClamAV/Docker，真实服务
-  集成与四镜像 smoke 将由 GitHub Linux 门禁执行；生产阈值校准、HMAC 密钥轮换/保留清理、Beta
-  量级查询计划和数据库加密配置仍需运营/法律/基础设施确认
+  运行时和生产 Chromium；PR #31 首轮受保护 Linux 真实服务、16/16 E2E 与四镜像门禁已通过，正在
+  固化 evidence-head；生产阈值校准、HMAC 密钥轮换/保留清理、Beta 量级查询计划和数据库加密配置
+  仍需运营/法律/基础设施确认
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target  | Status           | Notes                                                              |
-| ------- | -------------------- | ---------- | ------- | ---------------- | ------------------------------------------------------------------ |
-| MOD-003 | @songjiahang676-cell | 2026-07-29 | pending | protected checks | 文本/图片/联系方式候选、阈值版本、dry-run、不可变人工反馈/误杀指标 |
+| Task    | Owner                | Started    | Target  | Status               | Notes                                                              |
+| ------- | -------------------- | ---------- | ------- | -------------------- | ------------------------------------------------------------------ |
+| MOD-003 | @songjiahang676-cell | 2026-07-29 | pending | evidence-head checks | 文本/图片/联系方式候选、阈值版本、dry-run、不可变人工反馈/误杀指标 |
 
 ## Gate Evidence
 
@@ -185,6 +185,7 @@
 | MOD-003 local quality           | `pnpm ci:quality`                     | 84 files；373 passed / 2 skips；9 checks；8 builds passed                  | 2026-07-29 |
 | MOD-003 runtime/browser         | API runtime + Chromium desktop/mobile | 67 paths / 153 schemas；16/16 production E2E passed                        | 2026-07-29 |
 | MOD-003 architecture            | `scripts/check-architecture.sh`       | 101 tasks；57 models；67 paths；153 schemas；36 JSON files passed          | 2026-07-29 |
+| MOD-003 protected checks        | PR #31 / run `30468335925`            | 375 real-service tests；Linux 16/16 E2E and four non-root images passed    | 2026-07-29 |
 
 ## Decisions / Blocks
 
