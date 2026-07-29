@@ -157,6 +157,7 @@
 | MOD-002 local quality           | `pnpm ci:quality`                     | 79 files / 352 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-29 |
 | MOD-002 runtime/browser         | API runtime + Chromium desktop/mobile | 64 paths / 137 schemas；14/14 production E2E passed                        | 2026-07-29 |
 | MOD-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks；54 models；64 paths；137 schemas；36 JSON files passed          | 2026-07-29 |
+| MOD-002 protected checks        | PR #28 / run `30451684923`            | 354 real-service tests；Linux 14/14 E2E and four non-root images passed    | 2026-07-29 |
 
 ## Decisions / Blocks
 
