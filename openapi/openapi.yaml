@@ -515,6 +515,191 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /organizations/{organizationId}/invitations:
+    post:
+      tags: [Organizations]
+      summary: Invite an existing active user to a managed organization
+      description: Creates one short-lived non-Owner invitation with actor-scoped exact idempotency and emits a durable in-app notification event.
+      operationId: createOrganizationInvitation
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationInvitationRequest"
+      responses:
+        "201":
+          description: Invitation created or exact retry returned
+          headers:
+            Location:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /organizations/{organizationId}/invitations/{invitationId}:
+    delete:
+      tags: [Organizations]
+      summary: Revoke a pending organization invitation
+      description: OWNER or ADMIN may idempotently revoke a still-pending invitation without revealing cross-organization identifiers.
+      operationId: revokeOrganizationInvitation
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/OrganizationInvitationId"
+      responses:
+        "204":
+          description: Invitation revoked or already revoked
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /organization-invitations/{invitationId}/accept:
+    put:
+      tags: [Organizations]
+      summary: Accept the current user's organization invitation
+      description: Atomically accepts one unexpired owned invitation and creates the membership; exact repeats return the accepted invitation.
+      operationId: acceptOrganizationInvitation
+      parameters:
+        - $ref: "#/components/parameters/OrganizationInvitationId"
+      responses:
+        "200":
+          description: Invitation accepted or exact accepted state returned
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationInvitationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "410":
+          $ref: "#/components/responses/Gone"
+  /organizations/{organizationId}/members/{memberUserId}:
+    patch:
+      tags: [Organizations]
+      summary: Change a non-Owner organization member role
+      description: OWNER or ADMIN may change only non-Owner roles. Owner changes must use the recent-MFA transfer endpoint.
+      operationId: changeOrganizationMemberRole
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/OrganizationMemberUserId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeOrganizationMemberRoleRequest"
+      responses:
+        "200":
+          description: Member role updated
+          headers:
+            ETag:
+              description: Strong membership version ETag.
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationMemberResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Organizations]
+      summary: Remove a non-Owner organization member
+      description: OWNER or ADMIN may remove a non-Owner member. Self-removal and Owner removal fail closed.
+      operationId: removeOrganizationMember
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/OrganizationMemberUserId"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Non-Owner member removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /organizations/{organizationId}/owner-transfer:
+    post:
+      tags: [Organizations]
+      summary: Transfer Owner responsibility to another current member
+      description: Requires a current OWNER, a recent MFA step-up, and an Idempotency-Key. The target is promoted before the actor is demoted so the organization always retains an Owner.
+      operationId: transferOrganizationOwnership
+      parameters:
+        - $ref: "#/components/parameters/OrganizationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferOrganizationOwnershipRequest"
+      responses:
+        "200":
+          description: Ownership transferred or exact transfer retry returned
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationOwnerTransferResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /regions:
     get:
       tags: [Taxonomy]
@@ -1395,6 +1580,90 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /auth/mfa/enrollment:
+    post:
+      tags: [Auth]
+      summary: Begin TOTP enrollment for the current active user
+      description: Creates a self-owned pending enrollment without requiring a platform staff role.
+      operationId: beginMfaEnrollment
+      responses:
+        "201":
+          description: Pending TOTP enrollment created
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaEnrollmentResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /auth/mfa/enrollment/verify:
+    post:
+      tags: [Auth]
+      summary: Verify and activate the current user's pending TOTP enrollment
+      operationId: verifyMfaEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMfaEnrollmentVerifyRequest"
+      responses:
+        "200":
+          description: MFA credential activated and the session elevated
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaActivationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Establish a recent MFA-bound session for the current user
+      operationId: verifyMfa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMfaVerifyRequest"
+      responses:
+        "200":
+          description: MFA verified and recent-auth window established
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMfaVerificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /admin/mfa/enrollment:
     post:
       tags: [Admin]
@@ -1640,6 +1909,16 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    OrganizationInvitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    OrganizationMemberUserId:
+      name: memberUserId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Cursor:
       name: cursor
       in: query
@@ -1702,6 +1981,12 @@ components:
             $ref: "#/components/schemas/ProblemDetails"
     Conflict:
       description: State or optimistic concurrency conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Gone:
+      description: Resource existed but is no longer actionable
       content:
         application/problem+json:
           schema:
@@ -2094,7 +2379,7 @@ components:
       required: [type, id]
       additionalProperties: false
       properties:
-        type: { type: string, enum: [LISTING] }
+        type: { type: string, enum: [LISTING, ORGANIZATION_INVITATION] }
         id: { type: string, format: uuid }
     InAppNotification:
       type: object
@@ -2222,7 +2507,7 @@ components:
           $ref: "#/components/schemas/Organization"
     OrganizationMember:
       type: object
-      required: [userId, displayName, avatarUrl, role, joinedAt]
+      required: [userId, displayName, avatarUrl, role, joinedAt, updatedAt, version]
       additionalProperties: false
       properties:
         userId: { type: string, format: uuid }
@@ -2231,6 +2516,15 @@ components:
         role:
           $ref: "#/components/schemas/MembershipRole"
         joinedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    OrganizationMemberResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/OrganizationMember"
     OrganizationMemberCollection:
       type: object
       required: [data, pageInfo]
@@ -2242,6 +2536,90 @@ components:
             $ref: "#/components/schemas/OrganizationMember"
         pageInfo:
           $ref: "#/components/schemas/CursorPage"
+    NonOwnerMembershipRole:
+      type: string
+      enum: [ADMIN, EDITOR, BILLING, ANALYST]
+    OrganizationInvitationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REVOKED, EXPIRED]
+    CreateOrganizationInvitationRequest:
+      type: object
+      required: [inviteeUserId, role]
+      additionalProperties: false
+      properties:
+        inviteeUserId: { type: string, format: uuid }
+        role:
+          $ref: "#/components/schemas/NonOwnerMembershipRole"
+    OrganizationInvitation:
+      type: object
+      required:
+        [
+          id,
+          organizationId,
+          organizationDisplayName,
+          inviteeUserId,
+          role,
+          status,
+          expiresAt,
+          acceptedAt,
+          revokedAt,
+          createdAt,
+          updatedAt,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        organizationDisplayName: { type: string, minLength: 1, maxLength: 120 }
+        inviteeUserId: { type: string, format: uuid }
+        role:
+          $ref: "#/components/schemas/NonOwnerMembershipRole"
+        status:
+          $ref: "#/components/schemas/OrganizationInvitationStatus"
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OrganizationInvitationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/OrganizationInvitation"
+    ChangeOrganizationMemberRoleRequest:
+      type: object
+      required: [role]
+      additionalProperties: false
+      properties:
+        role:
+          $ref: "#/components/schemas/NonOwnerMembershipRole"
+    TransferOrganizationOwnershipRequest:
+      type: object
+      required: [targetUserId]
+      additionalProperties: false
+      properties:
+        targetUserId: { type: string, format: uuid }
+    OrganizationOwnerTransfer:
+      type: object
+      required: [id, organizationId, fromUserId, toUserId, fromRoleAfter, toRoleAfter, occurredAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        fromUserId: { type: string, format: uuid }
+        toUserId: { type: string, format: uuid }
+        fromRoleAfter: { type: string, const: ADMIN }
+        toRoleAfter: { type: string, const: OWNER }
+        occurredAt: { type: string, format: date-time }
+    OrganizationOwnerTransferResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/OrganizationOwnerTransfer"
     RegionType:
       type: string
       enum: [COUNTRY, STATE, COUNTY, CITY, NEIGHBORHOOD, ZIP_CODE, REGION_GROUP]

@@ -67,8 +67,21 @@ export type OrganizationResponse = components["schemas"]["OrganizationResponse"]
 export type OrganizationType = components["schemas"]["OrganizationType"];
 export type MembershipRole = components["schemas"]["MembershipRole"];
 export type OrganizationMember = components["schemas"]["OrganizationMember"];
+export type OrganizationMemberResponse = components["schemas"]["OrganizationMemberResponse"];
 export type OrganizationMemberCollection = components["schemas"]["OrganizationMemberCollection"];
 export type CreateOrganizationRequest = components["schemas"]["CreateOrganizationRequest"];
+export type CreateOrganizationInvitationRequest =
+  components["schemas"]["CreateOrganizationInvitationRequest"];
+export type OrganizationInvitation = components["schemas"]["OrganizationInvitation"];
+export type OrganizationInvitationResponse =
+  components["schemas"]["OrganizationInvitationResponse"];
+export type ChangeOrganizationMemberRoleRequest =
+  components["schemas"]["ChangeOrganizationMemberRoleRequest"];
+export type TransferOrganizationOwnershipRequest =
+  components["schemas"]["TransferOrganizationOwnershipRequest"];
+export type OrganizationOwnerTransfer = components["schemas"]["OrganizationOwnerTransfer"];
+export type OrganizationOwnerTransferResponse =
+  components["schemas"]["OrganizationOwnerTransferResponse"];
 export type ListOrganizationMembersQuery = NonNullable<
   operations["listOrganizationMembers"]["parameters"]["query"]
 >;
@@ -622,6 +635,28 @@ export const listOrganizationMembersQuerySchema: z.ZodType<ListOrganizationMembe
     limit: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();
+
+const nonOwnerMembershipRoleSchema = z.enum(["ADMIN", "EDITOR", "BILLING", "ANALYST"]);
+
+export const createOrganizationInvitationSchema: z.ZodType<CreateOrganizationInvitationRequest> = z
+  .object({
+    inviteeUserId: z.uuid(),
+    role: nonOwnerMembershipRoleSchema,
+  })
+  .strict();
+
+export const changeOrganizationMemberRoleSchema: z.ZodType<ChangeOrganizationMemberRoleRequest> = z
+  .object({
+    role: nonOwnerMembershipRoleSchema,
+  })
+  .strict();
+
+export const transferOrganizationOwnershipSchema: z.ZodType<TransferOrganizationOwnershipRequest> =
+  z
+    .object({
+      targetUserId: z.uuid(),
+    })
+    .strict();
 
 const taxonomyQueryTextSchema = z
   .string()

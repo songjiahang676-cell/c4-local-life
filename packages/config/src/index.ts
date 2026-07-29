@@ -96,6 +96,7 @@ const apiEnvironmentSchema = commonServerSchema
     ADMIN_SESSION_ABSOLUTE_TTL_SECONDS: positiveInteger(28_800, 86_400),
     ADMIN_SESSION_IDLE_TTL_SECONDS: positiveInteger(1_800, 14_400),
     ADMIN_STEP_UP_TTL_SECONDS: positiveInteger(600, 3_600),
+    ORGANIZATION_INVITATION_TTL_SECONDS: positiveInteger(259_200, 604_800),
     PASSWORD_PEPPER: secretSchema(32),
     PASSWORD_LOGIN_MAX_FAILURES: positiveInteger(5, 20),
     PASSWORD_LOGIN_LOCK_SECONDS: positiveInteger(300, 3_600),

@@ -37,6 +37,9 @@ const userIds: Record<MembershipRole, string> = {
 };
 const outsiderUserId = "10000000-0000-4000-8000-000000000006";
 const limitedUserId = "10000000-0000-4000-8000-000000000007";
+const inviteeUserId = "10000000-0000-4000-8000-000000000008";
+const revokedInviteeUserId = "10000000-0000-4000-8000-000000000009";
+const idempotencyInviteeUserId = "10000000-0000-4000-8000-000000000010";
 
 describe("organization HTTP boundary", () => {
   let app: NestFastifyApplication;
@@ -53,6 +56,8 @@ describe("organization HTTP boundary", () => {
       avatarUrl: null,
       role,
       joinedAt: new Date(joinedAt.getTime() + index * 1_000),
+      updatedAt: new Date(joinedAt.getTime() + index * 1_000),
+      version: 1,
     }));
 
     for (const role of roles) {
@@ -86,6 +91,12 @@ describe("organization HTTP boundary", () => {
     }
     authStore.registerSubject(buildActiveSubject({ id: outsiderUserId }));
     authStore.registerSubject(buildActiveSubject({ id: limitedUserId, status: "LIMITED" }));
+    authStore.registerSubject(buildActiveSubject({ id: inviteeUserId }));
+    authStore.registerSubject(buildActiveSubject({ id: revokedInviteeUserId }));
+    authStore.registerSubject(buildActiveSubject({ id: idempotencyInviteeUserId }));
+    organizationStore.registerUser(inviteeUserId);
+    organizationStore.registerUser(revokedInviteeUserId);
+    organizationStore.registerUser(idempotencyInviteeUserId);
     authStore.registerOrganization(limitedUserId, {
       id: organizationId,
       type: "MERCHANT",
@@ -125,9 +136,21 @@ describe("organization HTTP boundary", () => {
     server = app.getHttpAdapter().getInstance();
     await server.ready();
     const sessions = app.get(AuthSessionService);
-    for (const userId of [...Object.values(userIds), outsiderUserId, limitedUserId]) {
+    for (const userId of [
+      ...Object.values(userIds),
+      outsiderUserId,
+      limitedUserId,
+      inviteeUserId,
+      revokedInviteeUserId,
+      idempotencyInviteeUserId,
+    ]) {
       const issued = await sessions.issueSession(userId, {});
-      cookies.set(userId, `${environment.SESSION_COOKIE_NAME}=${issued.token}`);
+      const session =
+        userId === userIds.OWNER
+          ? await sessions.elevateWithMfa(issued.token, {}, new Date())
+          : issued;
+      if (!session) throw new Error("Failed to prepare organization test session");
+      cookies.set(userId, `${environment.SESSION_COOKIE_NAME}=${session.token}`);
     }
   });
 
@@ -299,5 +322,233 @@ describe("organization HTTP boundary", () => {
     expect(cursor).toBeTruthy();
     expect(replayedByAdmin.statusCode).toBe(400);
     expect(replayedByAdmin.json()).toMatchObject({ detail: "Member cursor is invalid" });
+  });
+
+  it("creates a short-lived invitation with exact idempotency and hides unauthorized targets", async () => {
+    const headers = {
+      cookie: cookies.get(userIds.OWNER),
+      origin: environment.PUBLIC_WEB_URL,
+      "idempotency-key": "organization-invite-0001",
+    };
+    const payload = { inviteeUserId: idempotencyInviteeUserId, role: "EDITOR" };
+    const created = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers,
+      payload,
+    });
+    const retried = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers,
+      payload,
+    });
+    const changedRetry = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers,
+      payload: { ...payload, role: "ANALYST" },
+    });
+    const editorDenied = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers: {
+        cookie: cookies.get(userIds.EDITOR),
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "organization-invite-0002",
+      },
+      payload: { inviteeUserId: revokedInviteeUserId, role: "ANALYST" },
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(retried.statusCode).toBe(201);
+    expect(retried.json()).toEqual(created.json());
+    expect(changedRetry.statusCode).toBe(409);
+    expect(editorDenied.statusCode).toBe(403);
+    expect(created.headers.location).toContain(created.json<{ data: { id: string } }>().data.id);
+    expect(created.json()).toMatchObject({
+      data: {
+        organizationId,
+        inviteeUserId: idempotencyInviteeUserId,
+        role: "EDITOR",
+        status: "PENDING",
+        acceptedAt: null,
+        revokedAt: null,
+      },
+    });
+  });
+
+  it("binds acceptance to the invitee and supports versioned role change and safe removal", async () => {
+    const invitation = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers: {
+        cookie: cookies.get(userIds.OWNER),
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "organization-invite-accept-0001",
+      },
+      payload: { inviteeUserId, role: "EDITOR" },
+    });
+    const invitationId = invitation.json<{ data: { id: string } }>().data.id;
+    const wrongActor = await server.inject({
+      method: "PUT",
+      url: `/v1/organization-invitations/${invitationId}/accept`,
+      headers: {
+        cookie: cookies.get(outsiderUserId),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const accepted = await server.inject({
+      method: "PUT",
+      url: `/v1/organization-invitations/${invitationId}/accept`,
+      headers: {
+        cookie: cookies.get(inviteeUserId),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const acceptedRetry = await server.inject({
+      method: "PUT",
+      url: `/v1/organization-invitations/${invitationId}/accept`,
+      headers: {
+        cookie: cookies.get(inviteeUserId),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const changed = await server.inject({
+      method: "PATCH",
+      url: `/v1/organizations/${organizationId}/members/${inviteeUserId}`,
+      headers: {
+        cookie: cookies.get(userIds.OWNER),
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"organization-member-1"',
+      },
+      payload: { role: "ANALYST" },
+    });
+    const stale = await server.inject({
+      method: "PATCH",
+      url: `/v1/organizations/${organizationId}/members/${inviteeUserId}`,
+      headers: {
+        cookie: cookies.get(userIds.OWNER),
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"organization-member-1"',
+      },
+      payload: { role: "BILLING" },
+    });
+    const staleRemoval = await server.inject({
+      method: "DELETE",
+      url: `/v1/organizations/${organizationId}/members/${inviteeUserId}`,
+      headers: {
+        cookie: cookies.get(userIds.OWNER),
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"organization-member-1"',
+      },
+    });
+    const removed = await server.inject({
+      method: "DELETE",
+      url: `/v1/organizations/${organizationId}/members/${inviteeUserId}`,
+      headers: {
+        cookie: cookies.get(userIds.OWNER),
+        origin: environment.PUBLIC_WEB_URL,
+        "if-match": '"organization-member-2"',
+      },
+    });
+
+    expect(wrongActor.statusCode).toBe(404);
+    expect(accepted.statusCode).toBe(200);
+    expect(acceptedRetry.json()).toEqual(accepted.json());
+    expect(accepted.json()).toMatchObject({ data: { status: "ACCEPTED" } });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.headers.etag).toBe('"organization-member-2"');
+    expect(changed.json()).toMatchObject({ data: { role: "ANALYST", version: 2 } });
+    expect(stale.statusCode).toBe(409);
+    expect(staleRemoval.statusCode).toBe(409);
+    expect(removed.statusCode).toBe(204);
+  });
+
+  it("revokes only a managed pending invitation and fails closed after revocation", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/invitations`,
+      headers: {
+        cookie: cookies.get(userIds.ADMIN),
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "organization-invite-revoke-0001",
+      },
+      payload: { inviteeUserId: revokedInviteeUserId, role: "BILLING" },
+    });
+    const invitationId = created.json<{ data: { id: string } }>().data.id;
+    const revoked = await server.inject({
+      method: "DELETE",
+      url: `/v1/organizations/${organizationId}/invitations/${invitationId}`,
+      headers: {
+        cookie: cookies.get(userIds.ADMIN),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const revokedRetry = await server.inject({
+      method: "DELETE",
+      url: `/v1/organizations/${organizationId}/invitations/${invitationId}`,
+      headers: {
+        cookie: cookies.get(userIds.ADMIN),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const acceptRevoked = await server.inject({
+      method: "PUT",
+      url: `/v1/organization-invitations/${invitationId}/accept`,
+      headers: {
+        cookie: cookies.get(revokedInviteeUserId),
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(revoked.statusCode).toBe(204);
+    expect(revokedRetry.statusCode).toBe(204);
+    expect(acceptRevoked.statusCode).toBe(404);
+  });
+
+  it("requires recent MFA and preserves one Owner during an idempotent transfer", async () => {
+    const headers = {
+      cookie: cookies.get(userIds.OWNER),
+      origin: environment.PUBLIC_WEB_URL,
+      "idempotency-key": "organization-owner-transfer-0001",
+    };
+    const transferred = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/owner-transfer`,
+      headers,
+      payload: { targetUserId: userIds.ADMIN },
+    });
+    const retried = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/owner-transfer`,
+      headers,
+      payload: { targetUserId: userIds.ADMIN },
+    });
+    const primarySessionDenied = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${organizationId}/owner-transfer`,
+      headers: {
+        cookie: cookies.get(userIds.ADMIN),
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "organization-owner-transfer-0002",
+      },
+      payload: { targetUserId: userIds.EDITOR },
+    });
+
+    expect(transferred.statusCode).toBe(200);
+    expect(retried.statusCode).toBe(200);
+    expect(retried.json()).toEqual(transferred.json());
+    expect(transferred.json()).toMatchObject({
+      data: {
+        organizationId,
+        fromUserId: userIds.OWNER,
+        toUserId: userIds.ADMIN,
+        fromRoleAfter: "ADMIN",
+        toRoleAfter: "OWNER",
+      },
+    });
+    expect(primarySessionDenied.statusCode).toBe(403);
   });
 });

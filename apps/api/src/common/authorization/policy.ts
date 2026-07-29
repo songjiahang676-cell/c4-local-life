@@ -20,7 +20,9 @@ export const activeUserPolicyActions = {
   listingSubmit: "listing:submit",
   mediaUploadComplete: "media:upload:complete",
   mediaUploadCreate: "media:upload:create",
+  mfaManage: "account:mfa:manage",
   organizationCreate: "organization:create",
+  organizationInvitationAccept: "organization:invitation:accept",
 } as const;
 
 export const listingObjectPolicyActions = {
@@ -45,6 +47,7 @@ export const organizationPolicyActions = {
   listingsWrite: "organization:listings:write",
   membersRead: "organization:members:read",
   membersManage: "organization:members:manage",
+  ownerTransfer: "organization:owner:transfer",
   billingManage: "organization:billing:manage",
   analyticsRead: "organization:analytics:read",
 } as const;
@@ -68,7 +71,9 @@ export const activeUserPermissions = [
   activeUserPolicyActions.listingSubmit,
   activeUserPolicyActions.mediaUploadComplete,
   activeUserPolicyActions.mediaUploadCreate,
+  activeUserPolicyActions.mfaManage,
   activeUserPolicyActions.organizationCreate,
+  activeUserPolicyActions.organizationInvitationAccept,
 ] as const;
 
 export type PolicyAction = string;
@@ -253,6 +258,23 @@ export function ownerOrOrganizationPolicy(options: ObjectAccessPolicyOptions): P
     }
     return denyPolicy("OBJECT_ACCESS_DENIED");
   };
+}
+
+export function organizationOwnerTransferPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const { actor } = input.context;
+  if (actor.kind === "guest") return denyPolicy("AUTHENTICATION_REQUIRED");
+  if (actor.accountStatus !== "ACTIVE") return denyPolicy("ACCOUNT_RESTRICTED");
+  const resource = input.resource;
+  if (!resource || resource.deleted !== false || !resource.organizationId) {
+    return denyPolicy("RESOURCE_UNAVAILABLE");
+  }
+  const ownsOrganization = actor.organizations.some(
+    (membership) =>
+      membership.organizationId === resource.organizationId && membership.role === "OWNER",
+  );
+  return ownsOrganization && actor.authenticationStrength === "MFA" && actor.recentMfa
+    ? allowPolicy()
+    : denyPolicy("OBJECT_ACCESS_DENIED");
 }
 
 @Injectable()

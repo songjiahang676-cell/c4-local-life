@@ -35,6 +35,7 @@ const text = {
     loadMore: "加载更多",
     loadingMore: "正在加载…",
     listing: "信息",
+    organizationInvitation: "组织邀请",
   },
   "en-US": {
     loadingAccount: "Checking your account…",
@@ -58,6 +59,7 @@ const text = {
     loadMore: "Load more",
     loadingMore: "Loading…",
     listing: "Listing",
+    organizationInvitation: "Organization invitation",
   },
 } as const;
 
@@ -80,7 +82,7 @@ function isNotification(value: unknown): value is InAppNotification {
     (value.locale === "zh-Hans" || value.locale === "en-US") &&
     typeof value.title === "string" &&
     typeof value.body === "string" &&
-    value.resource.type === "LISTING" &&
+    (value.resource.type === "LISTING" || value.resource.type === "ORGANIZATION_INVITATION") &&
     typeof value.resource.id === "string" &&
     (value.status === "UNREAD" || value.status === "READ") &&
     isIsoInstant(value.createdAt) &&
@@ -336,7 +338,10 @@ export function NotificationCenter({ locale }: { locale: NotificationLocale }) {
               <p>{notification.body}</p>
               <div className="notificationItemFooter">
                 <span>
-                  {copy.listing} · {notification.resource.id.slice(0, 8)}
+                  {notification.resource.type === "LISTING"
+                    ? copy.listing
+                    : copy.organizationInvitation}{" "}
+                  · {notification.resource.id.slice(0, 8)}
                 </span>
                 {notification.status === "UNREAD" ? (
                   <button

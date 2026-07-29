@@ -280,6 +280,21 @@ published template version.
   history. Do not drop notification provenance during an incident; exceptional stopped-writer
   physical recovery is documented in the migration-local `ROLLBACK.md`.
 
+## `20260730020000_organization_membership_lifecycle`
+
+Adds short-lived, hash/idempotency-bound organization invitations, durable Owner-transfer receipts,
+membership versions and deferred database enforcement that every committed organization retains at
+least one `OWNER`. Invitation roles deliberately exclude `OWNER`; ownership moves only through the
+recent-MFA transfer transaction. Two immutable bilingual in-app invitation templates reuse the
+existing Outbox/notification pipeline.
+
+- Roll forward: apply before enabling invitation/member mutations; verify concurrent duplicate
+  invitation handling, expiry/accept/revoke, role/version conflicts, direct sole-Owner negative
+  writes, exact Owner-transfer retry, Audit/Outbox evidence and notification deduplication.
+- Rollback: disable the new writers and Worker event while retaining invitations, transfers,
+  AuditLog, Outbox and notification evidence. Exceptional stopped-writer physical recovery is
+  documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

@@ -284,7 +284,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 49 个 path、113 个 schema、58 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 57 个 path、123 个 schema、67 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -322,3 +322,19 @@ riskTier 和 cursor 均严格校验。cursor 使用 HMAC 并绑定 actor、队�
 `POST /admin/moderation/cases/{caseId}/actions` 要求 `If-Match`、`Idempotency-Key`、recent MFA 和
 APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试返回相同投影；同 key 不同请求、
 陈旧版本或并发处置返回 409。401/403/404 均使用通用 Problem Details，不暴露角色、案件或 PII。
+
+## 8.17 ORG-002 成员生命周期契约
+
+- `POST /organizations/{organizationId}/invitations` 要求 OWNER/ADMIN、严格非 Owner 角色和
+  `Idempotency-Key`；成功返回 201、Location 和短效邀请投影。
+- `PUT /organization-invitations/{invitationId}/accept` 只允许邀请绑定用户接受；过期返回 410，未知、
+  撤销或非本人统一 404。`DELETE /organizations/{organizationId}/invitations/{invitationId}` 由
+  OWNER/ADMIN 幂等撤销仍处于 PENDING 的邀请。
+- `PATCH /organizations/{organizationId}/members/{memberUserId}` 要求强 membership ETag；仅允许
+  ADMIN/EDITOR/BILLING/ANALYST，陈旧版本返回 409。同路径 DELETE 不能删除 self 或 Owner。
+- `POST /organizations/{organizationId}/owner-transfer` 要求 `Idempotency-Key`、当前 OWNER 和近期
+  MFA；响应是不可变 from/to/结果角色/时间凭据。所有写接口均 no-store、同源校验、Repository 再授权，
+  且不接受邮箱、手机号、Owner role 或客户端声明的组织角色。
+
+`/auth/mfa/enrollment`、`/auth/mfa/enrollment/verify` 和 `/auth/mfa/verify` 是普通 ACTIVE 用户的
+自有 TOTP step-up 别名；不会授予平台角色，仍复用一次性恢复码、重放保护、限频和 Session rotation。

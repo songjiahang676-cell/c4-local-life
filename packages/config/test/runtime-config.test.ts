@@ -42,6 +42,7 @@ describe("runtime configuration", () => {
     expect(environment.ADMIN_SESSION_ABSOLUTE_TTL_SECONDS).toBe(28_800);
     expect(environment.ADMIN_SESSION_IDLE_TTL_SECONDS).toBe(1_800);
     expect(environment.ADMIN_STEP_UP_TTL_SECONDS).toBe(600);
+    expect(environment.ORGANIZATION_INVITATION_TTL_SECONDS).toBe(259_200);
     expect(environment.S3_QUARANTINE_BUCKET).toBe("socal-media-quarantine-local");
     expect(environment.MEDIA_UPLOAD_URL_TTL_SECONDS).toBe(300);
     expect(environment.MEDIA_UPLOAD_MAX_ACTIVE).toBe(20);

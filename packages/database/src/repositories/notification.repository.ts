@@ -37,6 +37,18 @@ export type ListingNotificationEventInput = {
   riskTier?: "LOW" | "MEDIUM" | "HIGH";
 };
 
+export const organizationInvitationNotificationEventTypes = [
+  "organization.invitation.created",
+] as const;
+
+export type OrganizationInvitationNotificationEventInput = {
+  eventId: string;
+  eventType: (typeof organizationInvitationNotificationEventTypes)[number];
+  invitationId: string;
+  aggregateVersion: number;
+  occurredAt: Date;
+};
+
 export type ConsumeListingNotificationResult =
   | { kind: "created"; notification: InAppNotificationRecord }
   | { kind: "existing"; notification: InAppNotificationRecord }
@@ -74,7 +86,7 @@ export type InAppNotificationRecord = {
   locale: NotificationLocale;
   title: string;
   body: string;
-  resourceType: "LISTING";
+  resourceType: "LISTING" | "ORGANIZATION_INVITATION";
   resourceId: string;
   status: "UNREAD" | "READ";
   createdAt: Date;
@@ -83,7 +95,7 @@ export type InAppNotificationRecord = {
 
 export class NotificationEventValidationError extends Error {
   constructor() {
-    super("Listing notification event is invalid");
+    super("Notification event is invalid");
     this.name = "NotificationEventValidationError";
   }
 }
@@ -168,7 +180,7 @@ function templateKey(input: ListingNotificationEventInput): string | null {
 function toRecord(row: SelectedNotification): InAppNotificationRecord {
   if (
     (row.locale !== "zh-Hans" && row.locale !== "en-US") ||
-    row.resourceType !== "LISTING" ||
+    (row.resourceType !== "LISTING" && row.resourceType !== "ORGANIZATION_INVITATION") ||
     !row.resourceId ||
     (row.status !== NotificationStatus.SENT && row.status !== NotificationStatus.READ)
   ) {
@@ -182,12 +194,26 @@ function toRecord(row: SelectedNotification): InAppNotificationRecord {
     locale: row.locale,
     title: row.title,
     body: row.body,
-    resourceType: "LISTING",
+    resourceType: row.resourceType,
     resourceId: row.resourceId,
     status: row.status === NotificationStatus.READ ? "READ" : "UNREAD",
     createdAt: row.createdAt,
     readAt: row.readAt,
   };
+}
+
+function assertOrganizationInvitationNotificationInput(
+  input: OrganizationInvitationNotificationEventInput,
+): void {
+  if (
+    !uuidPattern.test(input.eventId) ||
+    !uuidPattern.test(input.invitationId) ||
+    !organizationInvitationNotificationEventTypes.includes(input.eventType) ||
+    input.aggregateVersion !== 1 ||
+    !Number.isFinite(input.occurredAt.getTime())
+  ) {
+    throw new NotificationEventValidationError();
+  }
 }
 
 function assertListingNotificationInput(input: ListingNotificationEventInput): void {
@@ -323,6 +349,105 @@ export class NotificationRepository {
     });
   }
 
+  consumeOrganizationInvitationEvent(
+    input: OrganizationInvitationNotificationEventInput,
+  ): Promise<ConsumeListingNotificationResult> {
+    assertOrganizationInvitationNotificationInput(input);
+    return this.#inTransaction(async (transaction) => {
+      await transaction.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${input.eventId}, 7411))`,
+      );
+      const invitation = await transaction.organizationInvitation.findUnique({
+        where: { id: input.invitationId },
+        select: {
+          id: true,
+          status: true,
+          expiresAt: true,
+          invitee: {
+            select: {
+              id: true,
+              status: true,
+              deletedAt: true,
+              profile: { select: { preferredLocale: true } },
+            },
+          },
+        },
+      });
+      if (!invitation) throw new NotificationEventValidationError();
+
+      const existing = await transaction.notification.findFirst({
+        where: {
+          sourceEventId: input.eventId,
+          userId: invitation.invitee.id,
+          channel: NotificationChannel.IN_APP,
+        },
+        select: notificationSelect,
+      });
+      if (existing) return { kind: "existing", notification: toRecord(existing) };
+      if (invitation.status !== "PENDING" || invitation.expiresAt <= input.occurredAt) {
+        return { kind: "ignored" };
+      }
+      if (
+        (invitation.invitee.status !== UserStatus.ACTIVE &&
+          invitation.invitee.status !== UserStatus.LIMITED) ||
+        invitation.invitee.deletedAt ||
+        !invitation.invitee.profile
+      ) {
+        return { kind: "recipient_unavailable" };
+      }
+
+      const locale = normalizedLocale(invitation.invitee.profile.preferredLocale);
+      const template = await transaction.notificationTemplate.findFirst({
+        where: {
+          key: input.eventType,
+          channel: NotificationChannel.IN_APP,
+          locale,
+          publishedAt: { not: null },
+        },
+        orderBy: [{ version: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          key: true,
+          version: true,
+          title: true,
+          body: true,
+          variableSchema: true,
+        },
+      });
+      if (!template || !templateVariableSchema.safeParse(template.variableSchema).success) {
+        throw new NotificationTemplateUnavailableError();
+      }
+      const variables = {
+        resourceId: invitation.id,
+        aggregateVersion: input.aggregateVersion,
+      } satisfies Prisma.InputJsonObject;
+      const notification = await transaction.notification.create({
+        data: {
+          userId: invitation.invitee.id,
+          channel: NotificationChannel.IN_APP,
+          templateId: template.id,
+          templateKey: template.key,
+          templateVersion: template.version,
+          locale,
+          title: template.title,
+          body: template.body,
+          payload: variables,
+          resourceType: "ORGANIZATION_INVITATION",
+          resourceId: invitation.id,
+          sourceEventId: input.eventId,
+          aggregateVersion: input.aggregateVersion,
+          status: NotificationStatus.SENT,
+          scheduledAt: input.occurredAt,
+          sentAt: input.occurredAt,
+          createdAt: input.occurredAt,
+          updatedAt: input.occurredAt,
+        },
+        select: notificationSelect,
+      });
+      return { kind: "created", notification: toRecord(notification) };
+    });
+  }
+
   async listInApp(input: ListInAppNotificationsInput): Promise<ListInAppNotificationsResult> {
     if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 50) {
       throw new TypeError("Notification page limit must be between 1 and 50");
@@ -331,7 +456,7 @@ export class NotificationRepository {
       userId: input.userId,
       channel: NotificationChannel.IN_APP,
       templateId: { not: null },
-      resourceType: "LISTING",
+      resourceType: { in: ["LISTING", "ORGANIZATION_INVITATION"] },
       resourceId: { not: null },
       status: input.unreadOnly
         ? NotificationStatus.SENT
@@ -359,7 +484,7 @@ export class NotificationRepository {
         userId: input.userId,
         channel: NotificationChannel.IN_APP,
         templateId: { not: null },
-        resourceType: "LISTING",
+        resourceType: { in: ["LISTING", "ORGANIZATION_INVITATION"] },
         resourceId: { not: null },
         status: NotificationStatus.SENT,
       },
@@ -385,7 +510,7 @@ export class NotificationRepository {
           userId: input.userId,
           channel: NotificationChannel.IN_APP,
           templateId: { not: null },
-          resourceType: "LISTING",
+          resourceType: { in: ["LISTING", "ORGANIZATION_INVITATION"] },
           resourceId: { not: null },
           status: NotificationStatus.SENT,
           readAt: null,
@@ -402,7 +527,7 @@ export class NotificationRepository {
           userId: input.userId,
           channel: NotificationChannel.IN_APP,
           templateId: { not: null },
-          resourceType: "LISTING",
+          resourceType: { in: ["LISTING", "ORGANIZATION_INVITATION"] },
           resourceId: { not: null },
           status: NotificationStatus.READ,
         },

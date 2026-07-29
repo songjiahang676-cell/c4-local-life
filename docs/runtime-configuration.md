@@ -67,6 +67,7 @@
 | `ADMIN_SESSION_ABSOLUTE_TTL_SECONDS`           | 否   | 否   | MFA 后台会话绝对期限，默认 8 小时             |
 | `ADMIN_SESSION_IDLE_TTL_SECONDS`               | 否   | 否   | MFA 后台会话闲置期限，默认 30 分钟            |
 | `ADMIN_STEP_UP_TTL_SECONDS`                    | 否   | 否   | 敏感动作近期认证窗口，默认 10 分钟            |
+| `ORGANIZATION_INVITATION_TTL_SECONDS`          | 否   | 否   | 组织邀请有效期，默认 72 小时、最长 7 天       |
 | `PASSWORD_PEPPER`                              | 是   | 是   | 密码预哈希、限流键与恢复 token 的独立主秘密   |
 | `PASSWORD_LOGIN_MAX_FAILURES`                  | 否   | 否   | 密码连续失败锁定阈值，默认 5                  |
 | `PASSWORD_LOGIN_LOCK_SECONDS`                  | 否   | 否   | 密码失败锁定期，默认 5 分钟                   |

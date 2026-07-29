@@ -66,6 +66,8 @@ const environment = parseApiEnvironment({
   CSRF_SECRET: "contract-csrf-secret-with-more-than-32-bytes",
 });
 const contractUserId = "20000000-0000-4000-8000-000000000001";
+const contractInviteeId = "20000000-0000-4000-8000-000000000002";
+const contractAdminId = "20000000-0000-4000-8000-000000000003";
 const contractOrganizationId = "40000000-0000-4000-8000-000000000001";
 const contractNotificationId = "30000000-0000-4000-8000-000000000001";
 
@@ -82,6 +84,8 @@ describe("canonical OpenAPI contract", () => {
   beforeAll(async () => {
     const authSessionStore = new MemoryAuthSessionStore();
     authSessionStore.registerSubject(buildActiveSubject({ id: contractUserId }));
+    authSessionStore.registerSubject(buildActiveSubject({ id: contractInviteeId }));
+    authSessionStore.registerSubject(buildActiveSubject({ id: contractAdminId }));
     authSessionStore.registerPlatformRole(contractUserId, "READ_ONLY_AUDITOR");
     authSessionStore.registerPlatformRole(contractUserId, "MODERATOR");
     authSessionStore.registerOrganization(contractUserId, {
@@ -90,6 +94,13 @@ describe("canonical OpenAPI contract", () => {
       displayName: "Contract Organization",
       slug: "contract-organization",
       role: "OWNER",
+    });
+    authSessionStore.registerOrganization(contractAdminId, {
+      id: contractOrganizationId,
+      type: "MERCHANT",
+      displayName: "Contract Organization",
+      slug: "contract-organization",
+      role: "ADMIN",
     });
     const organizationStore = new MemoryOrganizationStore();
     const notificationStore = new MemoryNotificationStore();
@@ -115,9 +126,21 @@ describe("canonical OpenAPI contract", () => {
           avatarUrl: null,
           role: "OWNER",
           joinedAt: organizationTimestamp,
+          updatedAt: organizationTimestamp,
+          version: 1,
+        },
+        {
+          userId: contractAdminId,
+          displayName: "Contract Admin",
+          avatarUrl: null,
+          role: "ADMIN",
+          joinedAt: new Date(organizationTimestamp.getTime() + 1_000),
+          updatedAt: new Date(organizationTimestamp.getTime() + 1_000),
+          version: 1,
         },
       ],
     );
+    organizationStore.registerUser(contractInviteeId);
     notificationStore.register({
       id: contractNotificationId,
       userId: contractUserId,
@@ -272,9 +295,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(49);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(113);
-    expect(operationIds).toHaveLength(58);
+    expect(Object.keys(contract.paths)).toHaveLength(57);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(123);
+    expect(operationIds).toHaveLength(67);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -311,8 +334,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(49);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(49);
+    expect(Object.keys(servedJson.paths)).toHaveLength(57);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(57);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -674,6 +697,104 @@ describe("canonical OpenAPI contract", () => {
     expect(ajv.validate(createSchema ?? false, created.json())).toBe(true);
     expect(ajv.validate(organizationSchema ?? false, organization.json())).toBe(true);
     expect(ajv.validate(membersSchema ?? false, members.json())).toBe(true);
+  });
+
+  it("validates organization invitation, member mutation, and Owner transfer projections", async () => {
+    const owner = await sessions.issueSession(contractUserId, {});
+    const ownerMfa = await sessions.elevateWithMfa(owner.token, {});
+    if (!ownerMfa) throw new Error("Contract Owner MFA fixture is unavailable");
+    const invitee = await sessions.issueSession(contractInviteeId, {});
+    const ownerHeaders = {
+      cookie: `${environment.SESSION_COOKIE_NAME}=${ownerMfa.token}`,
+      origin: environment.PUBLIC_WEB_URL,
+    };
+    const created = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${contractOrganizationId}/invitations`,
+      headers: {
+        ...ownerHeaders,
+        "idempotency-key": "contract-organization-invite-0001",
+      },
+      payload: { inviteeUserId: contractInviteeId, role: "EDITOR" },
+    });
+    const invitationId = created.json<{ data: { id: string } }>().data.id;
+    const accepted = await server.inject({
+      method: "PUT",
+      url: `/v1/organization-invitations/${invitationId}/accept`,
+      headers: {
+        cookie: `${environment.SESSION_COOKIE_NAME}=${invitee.token}`,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+    const changed = await server.inject({
+      method: "PATCH",
+      url: `/v1/organizations/${contractOrganizationId}/members/${contractInviteeId}`,
+      headers: {
+        ...ownerHeaders,
+        "if-match": '"organization-member-1"',
+      },
+      payload: { role: "ANALYST" },
+    });
+    const removed = await server.inject({
+      method: "DELETE",
+      url: `/v1/organizations/${contractOrganizationId}/members/${contractInviteeId}`,
+      headers: {
+        ...ownerHeaders,
+        "if-match": '"organization-member-2"',
+      },
+    });
+    const transferred = await server.inject({
+      method: "POST",
+      url: `/v1/organizations/${contractOrganizationId}/owner-transfer`,
+      headers: {
+        ...ownerHeaders,
+        "idempotency-key": "contract-owner-transfer-0001",
+      },
+      payload: { targetUserId: contractAdminId },
+    });
+    const invitationSchema =
+      contract.paths["/organizations/{organizationId}/invitations"]?.post?.responses["201"]
+        ?.content?.["application/json"]?.schema;
+    const acceptedSchema =
+      contract.paths["/organization-invitations/{invitationId}/accept"]?.put?.responses["200"]
+        ?.content?.["application/json"]?.schema;
+    const memberSchema =
+      contract.paths["/organizations/{organizationId}/members/{memberUserId}"]?.patch?.responses[
+        "200"
+      ]?.content?.["application/json"]?.schema;
+    const removalParameters =
+      contract.paths["/organizations/{organizationId}/members/{memberUserId}"]?.delete
+        ?.parameters ?? [];
+    const transferSchema =
+      contract.paths["/organizations/{organizationId}/owner-transfer"]?.post?.responses["200"]
+        ?.content?.["application/json"]?.schema;
+
+    expect(created.statusCode).toBe(201);
+    expect(accepted.statusCode).toBe(200);
+    expect(changed.statusCode).toBe(200);
+    expect(removed.statusCode).toBe(204);
+    expect(transferred.statusCode).toBe(200);
+    expect(removalParameters).toContainEqual(
+      expect.objectContaining({
+        in: "header",
+        name: "If-Match",
+        required: true,
+      }),
+    );
+    expect(
+      ajv.validate(invitationSchema ?? false, created.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
+    expect(ajv.validate(acceptedSchema ?? false, accepted.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(memberSchema ?? false, changed.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(
+      ajv.validate(transferSchema ?? false, transferred.json()),
+      ajv.errorsText(ajv.errors),
+    ).toBe(true);
   });
 
   it("validates the implemented private upload-intent projection against the contract", async () => {

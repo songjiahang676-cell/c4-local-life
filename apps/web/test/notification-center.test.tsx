@@ -104,6 +104,20 @@ describe("notification center", () => {
     expect(
       parseNotificationCollection({
         ...collection,
+        data: [
+          {
+            ...notification,
+            resource: {
+              ...notification.resource,
+              type: "ORGANIZATION_INVITATION",
+            },
+          },
+        ],
+      }),
+    ).not.toBeNull();
+    expect(
+      parseNotificationCollection({
+        ...collection,
         data: [{ ...notification, body: { unsafe: true } }],
       }),
     ).toBeNull();

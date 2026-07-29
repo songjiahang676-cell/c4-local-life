@@ -10,6 +10,7 @@ import {
 import {
   NotificationRepository,
   type ListingNotificationEventInput,
+  type OrganizationInvitationNotificationEventInput,
 } from "../src/repositories/notification.repository";
 import {
   createIntegrationDatabase,
@@ -294,6 +295,87 @@ integration("NotificationRepository with PostgreSQL", () => {
           where: { id: "4f000000-0000-4000-8000-000000000004" },
         }),
       ).rejects.toThrow(/immutable/i);
+    });
+  });
+
+  it("projects one owned organization invitation without exposing contact data", async () => {
+    await database.withRollback(async (transaction) => {
+      const ownerUserId = randomUUID();
+      const inviteeUserId = randomUUID();
+      const organizationId = randomUUID();
+      const invitationId = randomUUID();
+      for (const [userId, displayName, preferredLocale] of [
+        [ownerUserId, "Invitation Owner", "en-US"],
+        [inviteeUserId, "Invitation Recipient", "zh-Hans"],
+      ] as const) {
+        await transaction.user.create({
+          data: {
+            id: userId,
+            email: `${userId}@example.invalid`,
+            profile: { create: { displayName, preferredLocale } },
+          },
+        });
+      }
+      await transaction.organization.create({
+        data: {
+          id: organizationId,
+          type: "MERCHANT",
+          displayName: "Private Invitation Organization",
+          slug: `notification-organization-${organizationId}`,
+          memberships: {
+            create: { userId: ownerUserId, role: "OWNER" },
+          },
+        },
+      });
+      await transaction.organizationInvitation.create({
+        data: {
+          id: invitationId,
+          organizationId,
+          inviteeUserId,
+          invitedById: ownerUserId,
+          role: "EDITOR",
+          idempotencyKey: "notification-invite-0001",
+          requestHash: "a".repeat(64),
+          expiresAt: new Date("2026-08-02T02:00:00.000Z"),
+          createdAt: new Date("2026-07-30T02:00:00.000Z"),
+          updatedAt: new Date("2026-07-30T02:00:00.000Z"),
+        },
+      });
+      const repository = new NotificationRepository(transaction);
+      const input: OrganizationInvitationNotificationEventInput = {
+        eventId: randomUUID(),
+        eventType: "organization.invitation.created",
+        invitationId,
+        aggregateVersion: 1,
+        occurredAt: new Date("2026-07-30T02:00:00.000Z"),
+      };
+
+      const created = await repository.consumeOrganizationInvitationEvent(input);
+      const retried = await repository.consumeOrganizationInvitationEvent(input);
+      const listed = await repository.listInApp({
+        userId: inviteeUserId,
+        unreadOnly: false,
+        limit: 10,
+      });
+
+      expect(created).toMatchObject({
+        kind: "created",
+        notification: {
+          userId: inviteeUserId,
+          templateKey: "organization.invitation.created",
+          locale: "zh-Hans",
+          resourceType: "ORGANIZATION_INVITATION",
+          resourceId: invitationId,
+        },
+      });
+      expect(retried).toMatchObject({
+        kind: "existing",
+        notification: { id: created.kind === "created" ? created.notification.id : "" },
+      });
+      expect(listed.items).toHaveLength(1);
+      expect(listed.unreadCount).toBe(1);
+      expect(JSON.stringify(listed)).not.toContain("@example.invalid");
+      expect(JSON.stringify(listed)).not.toContain("Private Invitation Organization");
     });
   });
 });

@@ -113,10 +113,19 @@ grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Reposit
 | `organization:listings:write` | ✓     | ✓     | ✓      | —       | —       |
 | `organization:members:read`   | ✓     | ✓     | —      | —       | —       |
 | `organization:members:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:owner:transfer` | ✓¹    | —     | —      | —       | —       |
 | `organization:billing:manage` | ✓     | —     | —      | ✓       | —       |
 | `organization:analytics:read` | ✓     | ✓     | —      | ✓       | ✓       |
 
 `profile:edit` 只代表公开档案内容，不能修改 legal identity、状态或验证结论；这些字段必须走
-`profile:manage` 或后续专用审核动作。当前 API 只开放创建、成员范围详情以及 OWNER/ADMIN 的成员只读列表，
-没有提前实现 ORG-002 的邀请、移除、角色变更或 Owner 转移。每次对象授权使用 Repository 返回的当前
-membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。
+`profile:manage` 或后续专用审核动作。每次对象授权使用 Repository 返回的当前 membership 覆盖请求
+开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。
+
+`ORG-002` 已把 `members:manage` 落到短效邀请、撤销、非 Owner 角色变更和移除。邀请只接受现有 ACTIVE
+用户 UUID，不通过请求或事件传播邮箱/手机号；同组织同受邀人最多一个 PENDING 邀请，接受操作绑定
+invitee user，跨用户和跨组织标识统一 404。Owner 角色不能通过通用成员接口赋予、修改或删除。
+
+¹ `organization:owner:transfer` 还要求当前 OWNER 的 MFA 强度 Session 和 recent-MFA 窗口。转移事务先
+提升目标成员再降级原 Owner，数据库延迟约束在组织创建、成员角色更新和删除的事务提交点保证始终至少
+一名 Owner；精确幂等重试返回原转移凭据。普通 ACTIVE 用户可通过 `/auth/mfa/*` 建立自有 TOTP
+step-up，MFA secret、恢复码和 Session token 不进入组织事件或审计 metadata。

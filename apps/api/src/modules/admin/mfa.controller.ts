@@ -26,7 +26,7 @@ import {
 } from "@socal/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
-import { adminPolicyActions } from "../../common/authorization/policy";
+import { activeUserPolicyActions } from "../../common/authorization/policy";
 import {
   RequestContextAccessor,
   type SessionIdentityContext,
@@ -44,7 +44,7 @@ import {
   type MfaVerificationContext,
 } from "./mfa.service";
 
-@Controller("admin/mfa")
+@Controller(["admin/mfa", "auth/mfa"])
 export class MfaController {
   constructor(
     @Inject(API_ENVIRONMENT) private readonly environment: ApiEnvironment,
@@ -54,7 +54,7 @@ export class MfaController {
 
   @Post("enrollment")
   @HttpCode(201)
-  @RequirePolicy(adminPolicyActions.consoleAccess)
+  @RequirePolicy(activeUserPolicyActions.mfaManage)
   @Header("Cache-Control", "no-store")
   async beginEnrollment(@Req() request: FastifyRequest): Promise<AdminMfaEnrollmentResponse> {
     try {
@@ -66,7 +66,7 @@ export class MfaController {
 
   @Post("enrollment/verify")
   @HttpCode(200)
-  @RequirePolicy(adminPolicyActions.consoleAccess)
+  @RequirePolicy(activeUserPolicyActions.mfaManage)
   @Header("Cache-Control", "no-store")
   async activateEnrollment(
     @Body(new SchemaValidationPipe(adminMfaEnrollmentVerifyRequestSchema))
@@ -91,7 +91,7 @@ export class MfaController {
 
   @Post("verify")
   @HttpCode(200)
-  @RequirePolicy(adminPolicyActions.consoleAccess)
+  @RequirePolicy(activeUserPolicyActions.mfaManage)
   @Header("Cache-Control", "no-store")
   async verify(
     @Body(new SchemaValidationPipe(adminMfaVerifyRequestSchema)) input: AdminMfaVerifyRequest,

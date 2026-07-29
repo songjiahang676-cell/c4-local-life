@@ -5,6 +5,7 @@ import {
   adminPolicyActions,
   listingObjectPolicyActions,
   organizationPolicyActions,
+  organizationOwnerTransferPolicy,
   ownerOrOrganizationPolicy,
   PolicyService,
   requireActiveActorPermissionPolicy,
@@ -60,7 +61,12 @@ export function createPolicyService(): PolicyService {
     requireActiveActorPermissionPolicy,
   );
   policies.register(activeUserPolicyActions.mediaUploadCreate, requireActiveActorPermissionPolicy);
+  policies.register(activeUserPolicyActions.mfaManage, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
+  policies.register(
+    activeUserPolicyActions.organizationInvitationAccept,
+    requireActiveActorPermissionPolicy,
+  );
   policies.register(adminPolicyActions.consoleAccess, requireActiveActorPermissionPolicy);
   policies.register(adminPolicyActions.privilegedAccess, requireMfaActorPermissionPolicy);
   policies.register(adminPolicyActions.sensitiveAccess, requireRecentMfaActorPermissionPolicy);
@@ -102,6 +108,7 @@ export function createPolicyService(): PolicyService {
       organizationRoles: ["OWNER", "ADMIN"],
     }),
   );
+  policies.register(organizationPolicyActions.ownerTransfer, organizationOwnerTransferPolicy);
   policies.register(
     organizationPolicyActions.billingManage,
     ownerOrOrganizationPolicy({

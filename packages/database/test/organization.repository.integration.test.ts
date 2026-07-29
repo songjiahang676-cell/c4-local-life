@@ -187,4 +187,216 @@ integration("OrganizationRepository with PostgreSQL", () => {
       expect(JSON.stringify([firstPage, secondPage])).not.toContain("@example.invalid");
     });
   });
+
+  it("persists invitation evidence, exact retries, membership versions, and atomic Owner transfer", async () => {
+    await database.withRollback(async (transaction) => {
+      const ownerUserId = randomUUID();
+      const inviteeUserId = randomUUID();
+      const secondMemberUserId = randomUUID();
+      const expiredInviteeUserId = randomUUID();
+      await createSubject(transaction, ownerUserId, "Lifecycle Owner");
+      await createSubject(transaction, inviteeUserId, "Invited Editor");
+      await createSubject(transaction, secondMemberUserId, "Transfer Target");
+      await createSubject(transaction, expiredInviteeUserId, "Expired Invitee");
+      const repository = new OrganizationRepository(transaction);
+      const createdOrganization = await repository.createOwned({
+        ownerUserId,
+        type: "MERCHANT",
+        displayName: "Lifecycle Organization",
+        slug: `lifecycle-org-${randomUUID()}`,
+      });
+      if (createdOrganization.kind !== "created" && createdOrganization.kind !== "existing") {
+        throw new Error("Organization fixture was not created");
+      }
+      const organizationId = createdOrganization.organization.id;
+      await transaction.organizationMembership.create({
+        data: {
+          organizationId,
+          userId: secondMemberUserId,
+          role: "EDITOR",
+        },
+      });
+      const now = new Date("2026-07-30T02:00:00.000Z");
+      const invitationInput = {
+        actorUserId: ownerUserId,
+        organizationId,
+        inviteeUserId,
+        role: "EDITOR" as const,
+        idempotencyKey: "repository-invite-0001",
+        requestHash: "a".repeat(64),
+        requestId: randomUUID(),
+        now,
+        expiresAt: new Date(now.getTime() + 72 * 60 * 60 * 1_000),
+      };
+      const expiredInvitation = await repository.createInvitation({
+        ...invitationInput,
+        inviteeUserId: expiredInviteeUserId,
+        idempotencyKey: "repository-invite-expired-0001",
+        requestHash: "d".repeat(64),
+        now: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1_000),
+        expiresAt: new Date(now.getTime() - 24 * 60 * 60 * 1_000),
+      });
+
+      const invited = await repository.createInvitation(invitationInput);
+      const invitedRetry = await repository.createInvitation(invitationInput);
+      const changedRetry = await repository.createInvitation({
+        ...invitationInput,
+        requestHash: "b".repeat(64),
+      });
+      if (invited.kind !== "created") throw new Error("Invitation fixture was not created");
+      const wrongActor = await repository.acceptInvitation({
+        actorUserId: secondMemberUserId,
+        invitationId: invited.invitation.id,
+        requestId: randomUUID(),
+        now,
+      });
+      const accepted = await repository.acceptInvitation({
+        actorUserId: inviteeUserId,
+        invitationId: invited.invitation.id,
+        requestId: randomUUID(),
+        now,
+      });
+      const acceptedRetry = await repository.acceptInvitation({
+        actorUserId: inviteeUserId,
+        invitationId: invited.invitation.id,
+        requestId: randomUUID(),
+        now,
+      });
+      const expiredAccepted =
+        expiredInvitation.kind === "created"
+          ? await repository.acceptInvitation({
+              actorUserId: expiredInviteeUserId,
+              invitationId: expiredInvitation.invitation.id,
+              requestId: randomUUID(),
+              now,
+            })
+          : null;
+      const roleChanged = await repository.changeMemberRole({
+        actorUserId: ownerUserId,
+        organizationId,
+        targetUserId: inviteeUserId,
+        role: "ANALYST",
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        now,
+      });
+      const staleRoleChange = await repository.changeMemberRole({
+        actorUserId: ownerUserId,
+        organizationId,
+        targetUserId: inviteeUserId,
+        role: "BILLING",
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        now,
+      });
+      const staleRemoval = await repository.removeMember({
+        actorUserId: ownerUserId,
+        organizationId,
+        targetUserId: inviteeUserId,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        now,
+      });
+      const removed = await repository.removeMember({
+        actorUserId: ownerUserId,
+        organizationId,
+        targetUserId: inviteeUserId,
+        expectedVersion: 2,
+        requestId: randomUUID(),
+        now,
+      });
+      const transferInput = {
+        actorUserId: ownerUserId,
+        organizationId,
+        targetUserId: secondMemberUserId,
+        idempotencyKey: "repository-owner-transfer-0001",
+        requestHash: "c".repeat(64),
+        requestId: randomUUID(),
+        now,
+      };
+      const transferred = await repository.transferOwnership(transferInput);
+      const transferRetry = await repository.transferOwnership(transferInput);
+      const owners = await transaction.organizationMembership.count({
+        where: { organizationId, role: "OWNER" },
+      });
+      const evidence = await transaction.outboxEvent.findMany({
+        where: { aggregateId: { in: [organizationId, invited.invitation.id] } },
+        select: { eventType: true, payload: true },
+      });
+
+      expect(invitedRetry).toMatchObject({
+        kind: "existing",
+        invitation: { id: invited.invitation.id },
+      });
+      expect(changedRetry).toEqual({ kind: "idempotency_conflict" });
+      expect(wrongActor).toEqual({ kind: "not_found" });
+      expect(accepted).toMatchObject({ kind: "accepted", invitation: { status: "ACCEPTED" } });
+      expect(acceptedRetry).toMatchObject({
+        kind: "existing",
+        invitation: { status: "ACCEPTED" },
+      });
+      expect(expiredAccepted).toEqual({ kind: "expired" });
+      expect(roleChanged).toMatchObject({
+        kind: "updated",
+        member: { role: "ANALYST", version: 2 },
+      });
+      expect(staleRoleChange).toEqual({ kind: "conflict" });
+      expect(staleRemoval).toEqual({ kind: "conflict" });
+      expect(removed).toEqual({ kind: "removed" });
+      expect(transferred).toMatchObject({
+        kind: "transferred",
+        transfer: {
+          fromUserId: ownerUserId,
+          toUserId: secondMemberUserId,
+          fromRoleAfter: "ADMIN",
+          toRoleAfter: "OWNER",
+        },
+      });
+      expect(transferRetry).toMatchObject({
+        kind: "existing",
+        transfer: { id: transferred.kind === "transferred" ? transferred.transfer.id : "" },
+      });
+      expect(owners).toBe(1);
+      expect(evidence.map((event) => event.eventType)).toEqual(
+        expect.arrayContaining([
+          "organization.invitation.created",
+          "organization.invitation.accepted",
+          "organization.member.role.changed",
+          "organization.membership.removed",
+          "organization.owner.transferred",
+        ]),
+      );
+      expect(JSON.stringify(evidence)).not.toContain("@example.invalid");
+    });
+  });
+
+  it("enforces the deferred invariant that every organization retains an Owner", async () => {
+    const ownerUserId = randomUUID();
+    const organizationId = randomUUID();
+    await expect(
+      database.client.$transaction(async (transaction) => {
+        await createSubject(transaction, ownerUserId, "Constraint Owner");
+        await transaction.organization.create({
+          data: {
+            id: organizationId,
+            type: "MERCHANT",
+            displayName: "Constraint Organization",
+            slug: `constraint-org-${randomUUID()}`,
+            memberships: {
+              create: {
+                userId: ownerUserId,
+                role: "OWNER",
+              },
+            },
+          },
+        });
+        await transaction.organizationMembership.delete({
+          where: {
+            organizationId_userId: { organizationId, userId: ownerUserId },
+          },
+        });
+      }),
+    ).rejects.toThrow();
+    expect(await database.client.organization.count({ where: { id: organizationId } })).toBe(0);
+  });
 });

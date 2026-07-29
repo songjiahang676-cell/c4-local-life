@@ -3,7 +3,10 @@ import type { ApiEnvironment } from "@socal/config";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import { DatabaseOrganizationStore } from "./database-organization.store";
 import { ORGANIZATION_STORE, type OrganizationStore } from "./organization.store";
-import { OrganizationsController } from "./organizations.controller";
+import {
+  OrganizationInvitationsController,
+  OrganizationsController,
+} from "./organizations.controller";
 import { OrganizationsService } from "./organizations.service";
 
 @Module({})
@@ -17,7 +20,7 @@ export class OrganizationsModule {
         ];
     return {
       module: OrganizationsModule,
-      controllers: [OrganizationsController],
+      controllers: [OrganizationsController, OrganizationInvitationsController],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...storeProviders,
