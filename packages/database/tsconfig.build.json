@@ -15,6 +15,7 @@
     "src/repositories/otp-challenge.repository.ts",
     "src/repositories/organization.repository.ts",
     "src/repositories/listing.repository.ts",
+    "src/repositories/listing-search.repository.ts",
     "src/repositories/listing-draft.repository.ts",
     "src/repositories/listing-submission.repository.ts",
     "src/repositories/listing-revision.repository.ts",
