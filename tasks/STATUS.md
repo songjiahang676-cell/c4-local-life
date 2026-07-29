@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status           | Notes                                                             |
-| -------- | -------------------- | ---------- | ----------------- | ---------------- | ----------------------------------------------------------------- |
-| LIST-005 | @songjiahang676-cell | 2026-07-29 | protected task PR | local validation | Rental 公开游标列表、Owner 归档/软删除、Worker 批量过期与原子审计 |
+| Task     | Owner                | Started    | Target            | Status          | Notes                                                             |
+| -------- | -------------------- | ---------- | ----------------- | --------------- | ----------------------------------------------------------------- |
+| LIST-005 | @songjiahang676-cell | 2026-07-29 | protected task PR | protected green | Rental 公开游标列表、Owner 归档/软删除、Worker 批量过期与原子审计 |
 
 ## Gate Evidence
 
@@ -122,6 +122,7 @@
 | LIST-005 local quality          | `pnpm ci:quality`                     | 72 files / 271 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | LIST-005 runtime/browser        | API runtime + Chromium desktop/mobile | canonical contract and 8/8 production E2E passed                          | 2026-07-29 |
 | LIST-005 architecture           | `scripts/check-architecture.sh`       | 101 tasks、50 models、47 paths、109 schemas passed                        | 2026-07-29 |
+| LIST-005 protected checks       | PR #23 / run `30430161567`            | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
 
 ## Decisions / Blocks
 
