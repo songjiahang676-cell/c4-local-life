@@ -45,6 +45,9 @@ if (
 if (!String(job.services.opensearch.options).includes("_cluster/health")) {
   throw new Error("CI OpenSearch service must be health checked before integration tests");
 }
+if (job.services.opensearch.env?.DISABLE_SECURITY_PLUGIN !== "true") {
+  throw new Error("CI OpenSearch service must explicitly disable the demo security installer");
+}
 
 if (workflow.permissions?.contents !== "read") {
   throw new Error("CI workflow must keep default contents permission read-only");
