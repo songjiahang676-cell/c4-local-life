@@ -2,7 +2,7 @@ export const ROUTES = {
   home: "/",
   news: "/news",
   jobs: "/jobs",
-  jobPost: "/jobs/post",
+  jobPost: "/post/job/new",
   resumes: "/resumes",
   housingRent: "/housing/rent",
   rentalPost: "/post/rental/new",

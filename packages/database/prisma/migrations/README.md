@@ -36,6 +36,9 @@
 19. `20260729230000_listing_public_lifecycle` adds the partial Rental due-expiry polling index.
 20. `20260730010000_notification_in_app_baseline` adds immutable bilingual template versions and
     source-event-idempotent in-app notification snapshots.
+21. `20260730020000_organization_membership_lifecycle` adds invitation, membership-version and
+    ownership-transfer invariants.
+22. `20260730030000_job_vertical_baseline` adds Job wage constraints and the Job expiry index.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -294,6 +297,19 @@ existing Outbox/notification pipeline.
 - Rollback: disable the new writers and Worker event while retaining invitations, transfers,
   AuditLog, Outbox and notification evidence. Exceptional stopped-writer physical recovery is
   documented in the migration-local `ROLLBACK.md`.
+
+## `20260730030000_job_vertical_baseline`
+
+Adds coherent positive Job wage ranges with supported periods, rejects nonblank optional Job text
+when present, and adds a partial `(expires_at, id)` index for visible-state Job expiry candidates.
+The API additionally requires the complete employer, employment, wage, and employment-policy
+fields before creating or updating a Job draft.
+
+- Roll forward: apply before enabling Job posting; verify invalid wage ranges and unsupported units
+  fail, valid Job details persist atomically, public Job pages exclude private policy fields, and
+  duplicate expiry polls emit one Audit/Outbox transition.
+- Rollback: disable Job posting/listing and retain the additive constraints/index. Exceptional
+  pre-production physical recovery is documented in the migration-local `ROLLBACK.md`.
 
 ## Roll-forward and recovery
 

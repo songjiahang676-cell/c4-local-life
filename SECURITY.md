@@ -24,8 +24,9 @@
   恶意文件扫描、图像解码重编码/去 EXIF，并通过独立无 Cookie 域名分发。完成端点以服务端 HEAD 闭合
   intent，Worker 对实际字节复算 hash、经真实 ClamAV INSTREAM 和 Sharp 像素上限处理，只写入三个
   确定性加密 WebP；原始/派生桶保持私有，重复或乱序事件不能越过 lifecycleVersion。
-- Rental 发布只经 method/path allowlist 同源 BFF；本地恢复按 server-derived userId + locale 隔离。
-  媒体状态未知/跨 owner/删除统一 404，只有数据库确认 READY 的 LISTING_MEDIA 图片可在事务中绑定。
+- Rental/Job 发布只经 method/path allowlist 同源 BFF；本地恢复按 server-derived userId + locale
+  - vertical 隔离。
+    媒体状态未知/跨 owner/删除统一 404，只有数据库确认 READY 的 LISTING_MEDIA 图片可在事务中绑定。
 - 异步事件采用数据库同事务 Outbox 和至少一次投递；`eventId` 是消费者幂等键，队列 envelope 有大小
   上限和版本。日志/指标不记录事件 payload、原始提供商错误或 PII，失败只保留有界错误码。
 - Listing 状态通知只从 canonical Listing owner/locale 投影，严格验证事件且以 eventId 锁和复合唯一键
@@ -58,9 +59,17 @@ Repository 在每次读取及写事务内重新检查 Session 与授权，撤销
 
 ## 公共 Listing 生命周期边界
 
-Rental 公开列表/详情只读取批准且当前有效的 PostgreSQL 行，并在查询层同时过滤删除、期限、
+Rental/Job 公开列表/详情只读取批准且当前有效的 PostgreSQL 行，并在查询层同时过滤删除、期限、
 taxonomy、owner 与组织状态。列表 HMAC cursor 与筛选条件绑定，拒绝篡改和跨筛选重放；列表摘要
 不返回正文、精确坐标、联系方式、媒体绑定或审核字段。归档/删除要求 ACTIVE actor、对象级
 owner/组织写角色和强 ETag，Repository 在行锁后复核授权与版本；软删除重试不会重复 Audit/
-Outbox。过期 Worker 只处理到期 `PUBLISHED` Rental，使用 `SKIP LOCKED` 与状态/version predicate
+Outbox。过期 Worker 只处理到期 `PUBLISHED` Rental/Job，使用 `SKIP LOCKED` 与状态/version predicate
 避免并发重复，系统审计和事件不包含正文、attributes 或 PII。
+
+## 招聘信息边界
+
+Job 草稿必须同时保存一致的雇主、用工形式和薪资明细；应用服务和 Repository 双层拒绝缺失 Job
+明细或向其他垂类挂接 Job 明细。最低/最高薪资必须非负、同周期且下限不高于上限。就业政策确认属于
+`OWNER_ONLY` 动态字段，不进入公开投影。规则 v2 对就业政策风险只保存规则代码、版本、严重度和字段
+名并进入人工审核，不在命中表、审计、事件、日志或响应中复制疑似歧视性原文；政策来源及帮助文本
+链接 California Civil Rights Department 和 Labor Commissioner 官方页面。

@@ -1808,15 +1808,21 @@ PUBLISHED
 ## 11.11 MOD-001 已实现的提交风险基线
 
 `POST /listings/{listingId}/submit` 要求 ACTIVE actor、当前 owner 或组织
-OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集固定为
-`listing-submission` v1；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式
-以及平台外付款诱导。低风险按提交时绑定的历史表单发布策略自动发布；中风险创建普通审核案件；
+OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集当前为
+`listing-submission` v2；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式、
+平台外付款诱导，以及 Job 中保守匹配的疑似歧视性招聘措辞。低风险按提交时绑定的历史表单发布
+策略自动发布；中风险创建普通审核案件；
 高风险进入优先队列并标记 `ESCALATED`。
 
 一次事务同时写 Listing 状态/版本、不可变 `ModerationEvaluation`、仅含规则代码/版本/证据字段名
 的 `ModerationRuleHit`、可选 `ModerationCase`、最小 Audit 和逐状态 Outbox。命中原文、阈值、
 手机号、邮箱和风险输入不进入公开响应或日志；输入仅保存 canonical SHA-256。后续调整规则必须
 增加规则集/规则版本，不能改写历史证据。
+
+Job 规则只保存 `EMPLOYMENT_POLICY_RISK`、规则版本、严重度和 title/summary/body 字段名，不保存
+命中词或正文片段，也不自动拒绝/处罚；它仅将内容送人工复核。薪资完整性在草稿写入时先由
+versioned schema 与 Job 应用规则校验，再由 `job_details_wage_range_coherent` 防止旁路写入不一致
+范围。
 
 ## 11.12 ADMIN-002 已实现的人工审核闭环
 
@@ -2322,7 +2328,7 @@ Idempotency-Key 或请求哈希。
   通用 400，不回显 payload。
 - 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
   ETag；外部用户得到通用 404，受限账号 403。
-- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental/Job 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
 ## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
@@ -2337,6 +2343,19 @@ Idempotency-Key 或请求哈希。
   普通用户的 `/auth/mfa/*` 只管理自身 credential 并原子旋转 Session，不赋予组织或平台角色。
 - Worker 重复/毒事件：邀请通知只接受版本 1 的最小 Outbox envelope，使用 eventId advisory lock 与
   唯一通知键；无效 schema/template 进入永久失败，瞬时数据库失败保留队列重试。
+
+## 14.18 LIST-006 招聘安全与就业政策
+
+- Job 创建/更新要求完整、正数且同周期的薪资上下限；服务层校验 `min <= max`，数据库 check
+  防止 repository 旁路产生不一致范围。
+- 发布者必须明确确认职位条件、薪资真实且无歧视性要求。确认值仅供 owner/审核证据使用，
+  `OWNER_ONLY` 投影规则阻止其进入公开 API。
+- v2 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
+  以减少错误处罚和敏感内容扩散。
+- `visaSupport` 明确标为发布者声明，不视为平台核验或移民法律意见；表单不收集申请人的国籍、
+  年龄、证件或其他非必要 PII。
+- Web 提交复用 BFF 精确 allowlist、强 ETag 和 actor-scoped 幂等键；Job 草稿、媒体和恢复数据仍
+  按账号隔离，公开投影省略联系方式、精确坐标和 owner-only 字段。
 
 ---
 
@@ -3244,14 +3263,16 @@ publisher/故障测试必须通过。
 `LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
 Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
-Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；其余
-四个垂直类型仍须复用并验收同一闭环，不能因 Rental 通过而标记整个 22.4 完成。
+Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
+`LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
+Transfer/Secondhand/Service 三个垂直仍须复用并验收，不能因 Rental/Job 通过而标记整个 22.4 完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
 规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
-`LIST-005`/`ADMIN-002` 验收；其余垂直类型与搜索派生状态仍待后续切片。
+`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用并增加 v2 就业政策人工审核规则；其余
+三个垂直类型与搜索派生状态仍待后续切片。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
@@ -3265,6 +3286,13 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 归档与 DELETE 重试不重复写，状态、版本、最小 Audit 和 Outbox 在同一事务提交。Worker 通过有界批次和
 `FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
 读立即移除，搜索侧最终移除仍由后续索引消费者处理。
+
+`LIST-006` 已验收 Job 完整垂直切片：版本化动态表单覆盖雇主、岗位类型、经验、办公方式、排班、
+语言、福利、签证支持声明、薪资范围与 OWNER_ONLY 就业政策确认；`job_details` 与 Listing 在同一
+事务 create/upsert，应用/数据库双层拒绝非正数、倒置或不支持周期的薪资。公共集合、签名 cursor、
+详情、归档/删除和 Worker 过期复用现有状态链并接受 `type=JOB`，公开 schema 投影剔除政策确认。
+中英 noindex Job 发布页复用 900ms 自动保存、账号/locale/vertical 隔离恢复、READY 图片和 ETag，
+并通过精确 BFF allowlist 以幂等键提交审核；桌面/移动 E2E 覆盖填写、保存、提交和无横向溢出。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
@@ -3364,6 +3392,18 @@ allowedRegionTypes, promotionEligibility
 餐饮、仓库物流、办公室行政、销售客服、司机运输、美容美甲、建筑装修、教育培训、医疗护理、家政照护、技术/专业、其他。
 
 关键字段：岗位、雇主、employment type、薪资 min/max/unit、地点、经验、语言、排班、远程、签证支持声明、福利。政策禁止歧视性条件和误导工资。
+
+`LIST-006` 已把这组字段落为 Job v1 动态表单：通用 `title` 表示岗位，通用 `price`
+表示最低薪资，`wageMax` 表示同周期最高薪资；允许 HOURLY/DAILY/WEEKLY/MONTHLY/YEARLY，
+且应用层和 PostgreSQL 都要求 `0 < min <= max`。`employerName`、`employmentType`、
+`experienceLevel`、`remoteType`、`schedule` 必填，语言、签证支持声明和福利可选。
+`employmentPolicyAcknowledged` 必须明确为 true，但属于 OWNER_ONLY，不进入公开详情或列表。
+
+平台统一要求所有 Job 提供薪资范围，这是内容完整性规则，不代表平台判断某发布者的法律适用性。
+加州官方材料说明就业反歧视义务覆盖招聘广告，且特定雇主的职位发布须包含 pay scale：
+[California Civil Rights Department — Employment](https://calcivilrights.ca.gov/employment/)、
+[California Labor Commissioner — Equal Pay Act FAQ](https://www.dir.ca.gov/dlse/California_Equal_Pay_Act.htm)。
+规则仅把疑似歧视或误导内容送人工审核，不自动作出违法结论；正式政策和阈值仍须法律/运营批准。
 
 ### 租房
 
@@ -3778,13 +3818,17 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 | `/[locale]/account/notifications`    | 通知          |
 | `/[locale]/account/orders`           | 订单          |
 | `/[locale]/account/wallet`           | 积分/信用     |
-| `/[locale]/account/organizations`    | 组织与成员    |
-| `/[locale]/account/profile`          | 资料          |
-| `/[locale]/account/verification`     | 验证          |
-| `/[locale]/account/security`         | 会话/MFA      |
-| `/[locale]/account/privacy`          | 数据请求/删除 |
-| `/[locale]/auth/login`               | 登录          |
-| `/[locale]/auth/verify`              | OTP 验证      |
+
+当前已实现的规范创建路由为 `/[locale]/post/rental/new` 与
+`/[locale]/post/job/new`；首页招聘入口指向后者。两者均为 noindex 私有草稿页，复用账号隔离恢复、
+动态 schema、READY 媒体绑定和强并发控制。Job 页另外提供幂等提交审核动作。
+| `/[locale]/account/organizations` | 组织与成员 |
+| `/[locale]/account/profile` | 资料 |
+| `/[locale]/account/verification` | 验证 |
+| `/[locale]/account/security` | 会话/MFA |
+| `/[locale]/account/privacy` | 数据请求/删除 |
+| `/[locale]/auth/login` | 登录 |
+| `/[locale]/auth/verify` | OTP 验证 |
 
 ## 27.3 Admin
 

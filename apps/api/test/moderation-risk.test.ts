@@ -24,7 +24,7 @@ describe("listing submission risk rules v1", () => {
   it("auto-approves an established account with a complete risk-based policy", () => {
     expect(evaluateListingSubmissionRisk(baseline())).toEqual({
       ruleSetKey: "listing-submission",
-      ruleSetVersion: 1,
+      ruleSetVersion: 2,
       riskTier: "LOW",
       hits: [],
       defaultLifetimeDays: 30,
@@ -56,7 +56,7 @@ describe("listing submission risk rules v1", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 1,
+      ruleSetVersion: 2,
       riskTier: "HIGH",
       hits: [
         {
@@ -67,5 +67,27 @@ describe("listing submission risk rules v1", () => {
         },
       ],
     });
+  });
+
+  it("routes suspected discriminatory Job wording to human review without retaining raw text", () => {
+    const result = evaluateListingSubmissionRisk({
+      ...baseline(),
+      listingType: "JOB",
+      body: "Synthetic policy test: women only.",
+    });
+
+    expect(result).toMatchObject({
+      ruleSetVersion: 2,
+      riskTier: "MEDIUM",
+      hits: [
+        {
+          ruleCode: "EMPLOYMENT_POLICY_RISK",
+          ruleVersion: 1,
+          severity: "MEDIUM",
+          evidenceKey: "body",
+        },
+      ],
+    });
+    expect(JSON.stringify(result.hits)).not.toContain("women only");
   });
 });

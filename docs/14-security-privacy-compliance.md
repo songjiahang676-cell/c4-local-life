@@ -266,7 +266,7 @@ Idempotency-Key 或请求哈希。
   通用 400，不回显 payload。
 - 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
   ETag；外部用户得到通用 404，受限账号 403。
-- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental/Job 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
 ## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
@@ -281,3 +281,16 @@ Idempotency-Key 或请求哈希。
   普通用户的 `/auth/mfa/*` 只管理自身 credential 并原子旋转 Session，不赋予组织或平台角色。
 - Worker 重复/毒事件：邀请通知只接受版本 1 的最小 Outbox envelope，使用 eventId advisory lock 与
   唯一通知键；无效 schema/template 进入永久失败，瞬时数据库失败保留队列重试。
+
+## 14.18 LIST-006 招聘安全与就业政策
+
+- Job 创建/更新要求完整、正数且同周期的薪资上下限；服务层校验 `min <= max`，数据库 check
+  防止 repository 旁路产生不一致范围。
+- 发布者必须明确确认职位条件、薪资真实且无歧视性要求。确认值仅供 owner/审核证据使用，
+  `OWNER_ONLY` 投影规则阻止其进入公开 API。
+- v2 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
+  以减少错误处罚和敏感内容扩散。
+- `visaSupport` 明确标为发布者声明，不视为平台核验或移民法律意见；表单不收集申请人的国籍、
+  年龄、证件或其他非必要 PII。
+- Web 提交复用 BFF 精确 allowlist、强 ETag 和 actor-scoped 幂等键；Job 草稿、媒体和恢复数据仍
+  按账号隔离，公开投影省略联系方式、精确坐标和 owner-only 字段。

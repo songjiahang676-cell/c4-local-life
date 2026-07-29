@@ -25,6 +25,7 @@ import type {
 import { MemoryTaxonomyStore } from "./memory-taxonomy.store";
 
 export const memoryListingCategoryId = "11111111-1111-4111-8111-111111111111";
+export const memoryJobCategoryId = "11111111-1111-4111-8111-111111111112";
 export const memoryListingRegionId = "22222222-2222-4222-8222-222222222222";
 export const memoryListingRegionCode = "US-CA-ORANGE-IRVINE";
 
@@ -34,6 +35,13 @@ const category = {
   slug: "synthetic-rentals",
   nameZhHans: "测试租房",
   nameEn: "Synthetic Rentals",
+};
+const jobCategory = {
+  id: memoryJobCategoryId,
+  vertical: "JOB" as const,
+  slug: "synthetic-jobs",
+  nameZhHans: "测试招聘",
+  nameEn: "Synthetic Jobs",
 };
 const region = {
   id: memoryListingRegionId,
@@ -69,6 +77,15 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
         sortOrder: 0,
         aliases: [],
       },
+      {
+        ...jobCategory,
+        parentId: null,
+        iconKey: "job",
+        formSchemaVersion: 1,
+        isActive: true,
+        sortOrder: 1,
+        aliases: [],
+      },
     ],
     [
       {
@@ -94,6 +111,106 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
         updatedAt: timestamp,
         publishedAt: timestamp,
       },
+      {
+        id: "33333333-3333-4333-8333-333333333334",
+        categoryId: memoryJobCategoryId,
+        version: 1,
+        revision: 1,
+        definition: {
+          categoryId: memoryJobCategoryId,
+          version: 1,
+          fields: [
+            {
+              key: "employerName",
+              type: "TEXT",
+              label: { "zh-Hans": "雇主", "en-US": "Employer" },
+              required: true,
+              filterable: false,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 10,
+              validation: { minLength: 2, maxLength: 160 },
+            },
+            {
+              key: "employmentType",
+              type: "SELECT",
+              label: { "zh-Hans": "雇佣类型", "en-US": "Employment type" },
+              required: true,
+              filterable: true,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 20,
+              options: [{ value: "full-time", label: { "zh-Hans": "全职", "en-US": "Full time" } }],
+            },
+            {
+              key: "experienceLevel",
+              type: "SELECT",
+              label: { "zh-Hans": "经验", "en-US": "Experience" },
+              required: true,
+              filterable: true,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 30,
+              options: [{ value: "entry", label: { "zh-Hans": "入门", "en-US": "Entry" } }],
+            },
+            {
+              key: "remoteType",
+              type: "SELECT",
+              label: { "zh-Hans": "办公方式", "en-US": "Work arrangement" },
+              required: true,
+              filterable: true,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 40,
+              options: [{ value: "onsite", label: { "zh-Hans": "现场", "en-US": "On-site" } }],
+            },
+            {
+              key: "wageMax",
+              type: "MONEY",
+              label: { "zh-Hans": "最高薪资", "en-US": "Maximum wage" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 50,
+              validation: { min: 0.01, max: 99999999.99 },
+            },
+            {
+              key: "schedule",
+              type: "TEXT",
+              label: { "zh-Hans": "工作时间", "en-US": "Schedule" },
+              required: true,
+              filterable: false,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 60,
+              validation: { minLength: 2, maxLength: 160 },
+            },
+            {
+              key: "employmentPolicyAcknowledged",
+              type: "BOOLEAN",
+              label: { "zh-Hans": "就业政策", "en-US": "Employment policy" },
+              required: true,
+              filterable: false,
+              searchable: false,
+              visibility: "OWNER_ONLY",
+              sortOrder: 100,
+            },
+          ],
+          publicationPolicy: {
+            defaultLifetimeDays: 30,
+            manualReviewRequired: false,
+          },
+        },
+        contentHash: "1".repeat(64),
+        basedOnVersion: null,
+        createdById: null,
+        updatedById: null,
+        publishedById: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        publishedAt: timestamp,
+      },
     ],
   );
 }
@@ -103,6 +220,7 @@ function cloneOwner(row: OwnerListingProjection): OwnerListingProjection {
 }
 
 function rowFromCreate(input: CreateListingDraftInput): OwnerListingProjection {
+  const selectedCategory = input.type === "JOB" ? jobCategory : category;
   return {
     id: input.id,
     type: input.type,
@@ -125,7 +243,7 @@ function rowFromCreate(input: CreateListingDraftInput): OwnerListingProjection {
             unit: input.priceUnit,
           },
     region,
-    category,
+    category: selectedCategory,
     owner: {
       id: input.actorUserId,
       displayName: "Synthetic Listing Owner",
@@ -170,7 +288,10 @@ function applyFields(
 ): OwnerListingProjection {
   return {
     ...row,
-    category: { ...category, id: fields.categoryId },
+    category: {
+      ...(row.type === "JOB" ? jobCategory : category),
+      id: fields.categoryId,
+    },
     formSchemaVersion: fields.formSchemaVersion,
     region: { ...region, id: fields.regionId },
     locale: fields.locale,
@@ -238,13 +359,14 @@ export class MemoryListingStore implements ListingStore {
   resolveReferences(
     input: ResolveListingDraftReferencesInput,
   ): Promise<ListingDraftReferences | null> {
+    const selectedCategory = input.type === "JOB" ? jobCategory : category;
     return Promise.resolve(
-      input.type === category.vertical &&
-        input.categoryId === category.id &&
+      input.type === selectedCategory.vertical &&
+        input.categoryId === selectedCategory.id &&
         input.regionCode === region.code &&
         (input.formSchemaVersion === undefined || input.formSchemaVersion === 1)
         ? {
-            categoryId: category.id,
+            categoryId: selectedCategory.id,
             formSchemaVersion: 1,
             regionId: region.id,
           }

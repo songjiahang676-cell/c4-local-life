@@ -218,6 +218,290 @@ test("completes the bilingual rental form and recovers its account-scoped autosa
   );
 });
 
+test("completes the bilingual Job wage and employment-policy path through submission", async ({
+  page,
+}) => {
+  const userId = "10000000-0000-4000-8000-000000000072";
+  const categoryId = "20000000-0000-4000-8000-000000000072";
+  const listingId = "30000000-0000-4000-8000-000000000072";
+  let createdInput: Record<string, unknown> | null = null;
+  let submitted = false;
+
+  await page.route("**/v1/auth/session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          user: { id: userId, displayName: "Synthetic Job Owner", avatarUrl: null },
+          expiresAt: "2026-07-30T01:00:00.000Z",
+          permissions: ["listing:create", "listing:submit"],
+          platformRoles: [],
+          organizations: [],
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/categories?vertical=JOB", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            id: categoryId,
+            parentId: "20000000-0000-4000-8000-000000000070",
+            vertical: "JOB",
+            slug: "restaurant",
+            name: { "zh-Hans": "餐饮服务", "en-US": "Restaurant & Food Service" },
+            iconKey: null,
+            formSchemaVersion: 1,
+            children: [],
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/v1/regions?type=CITY", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            id: "40000000-0000-4000-8000-000000000072",
+            parentId: "40000000-0000-4000-8000-000000000070",
+            code: "US-CA-IRVINE",
+            type: "CITY",
+            slug: "irvine",
+            name: { "zh-Hans": "尔湾", "en-US": "Irvine" },
+            timezone: "America/Los_Angeles",
+            centroid: null,
+            children: [],
+          },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/v1/categories/${categoryId}/form-schema`, async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        categoryId,
+        version: 1,
+        fields: [
+          {
+            key: "employerName",
+            type: "TEXT",
+            label: { "zh-Hans": "雇主或公司名称", "en-US": "Employer or company" },
+            required: true,
+            filterable: false,
+            searchable: true,
+            visibility: "PUBLIC",
+            sortOrder: 10,
+            validation: { minLength: 2, maxLength: 160 },
+          },
+          {
+            key: "employmentType",
+            type: "SELECT",
+            label: { "zh-Hans": "雇佣类型", "en-US": "Employment type" },
+            required: true,
+            filterable: true,
+            searchable: true,
+            visibility: "PUBLIC",
+            sortOrder: 20,
+            options: [{ value: "full-time", label: { "zh-Hans": "全职", "en-US": "Full time" } }],
+          },
+          {
+            key: "experienceLevel",
+            type: "SELECT",
+            label: { "zh-Hans": "经验要求", "en-US": "Experience level" },
+            required: true,
+            filterable: true,
+            searchable: true,
+            visibility: "PUBLIC",
+            sortOrder: 30,
+            options: [
+              {
+                value: "entry",
+                label: { "zh-Hans": "入门/无需经验", "en-US": "Entry / no experience" },
+              },
+            ],
+          },
+          {
+            key: "remoteType",
+            type: "SELECT",
+            label: { "zh-Hans": "办公方式", "en-US": "Work arrangement" },
+            required: true,
+            filterable: true,
+            searchable: true,
+            visibility: "PUBLIC",
+            sortOrder: 40,
+            options: [{ value: "onsite", label: { "zh-Hans": "现场", "en-US": "On-site" } }],
+          },
+          {
+            key: "wageMax",
+            type: "MONEY",
+            label: { "zh-Hans": "最高薪资（美元）", "en-US": "Maximum wage (USD)" },
+            required: true,
+            filterable: true,
+            searchable: false,
+            visibility: "PUBLIC",
+            sortOrder: 50,
+            validation: { min: 0.01, max: 99999999.99 },
+          },
+          {
+            key: "schedule",
+            type: "TEXT",
+            label: { "zh-Hans": "工作时间", "en-US": "Schedule" },
+            required: true,
+            filterable: false,
+            searchable: true,
+            visibility: "PUBLIC",
+            sortOrder: 60,
+            validation: { minLength: 2, maxLength: 160 },
+          },
+          {
+            key: "employmentPolicyAcknowledged",
+            type: "BOOLEAN",
+            label: {
+              "zh-Hans": "我确认职位条件和薪资信息真实，不含歧视性要求",
+              "en-US":
+                "I confirm the job terms and wage information are truthful and contain no discriminatory requirements",
+            },
+            required: true,
+            filterable: false,
+            searchable: false,
+            visibility: "OWNER_ONLY",
+            sortOrder: 100,
+          },
+        ],
+        publicationPolicy: {
+          defaultLifetimeDays: 30,
+          manualReviewRequired: false,
+          phoneVerificationRequired: false,
+          maxMedia: 20,
+          allowExactAddress: false,
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/listings", async (route) => {
+    createdInput = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      headers: { etag: '"listing-v1"', "content-type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          id: listingId,
+          type: "JOB",
+          ownerId: userId,
+          organizationId: null,
+          formSchemaVersion: 1,
+          status: "DRAFT",
+          moderationStatus: "NOT_REVIEWED",
+          locale: createdInput.locale,
+          title: createdInput.title,
+          slug: "e2e-synthetic-job",
+          summary: createdInput.summary ?? null,
+          body: createdInput.body,
+          price: createdInput.price,
+          region: {
+            id: "40000000-0000-4000-8000-000000000072",
+            type: "CITY",
+            code: "US-CA-IRVINE",
+            slug: "irvine",
+            nameZhHans: "尔湾",
+            nameEn: "Irvine",
+            timezone: "America/Los_Angeles",
+          },
+          category: {
+            id: categoryId,
+            vertical: "JOB",
+            slug: "restaurant",
+            nameZhHans: "餐饮服务",
+            nameEn: "Restaurant & Food Service",
+          },
+          owner: { id: userId, displayName: "Synthetic Job Owner", avatarUrl: null },
+          organization: null,
+          location: { precision: "CITY" },
+          contactMode: "IN_APP",
+          attributes: createdInput.attributes,
+          mediaIds: [],
+          isFeatured: false,
+          featuredUntil: null,
+          publishedAt: null,
+          expiresAt: null,
+          createdAt: "2026-07-29T01:00:00.000Z",
+          updatedAt: "2026-07-29T01:00:00.000Z",
+          version: 1,
+        },
+      }),
+    });
+  });
+  await page.route(`**/v1/listings/${listingId}/submit`, async (route) => {
+    submitted = true;
+    await route.fulfill({
+      status: 202,
+      headers: { etag: '"listing-v3"', "content-type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          resourceId: listingId,
+          previousStatus: "DRAFT",
+          currentStatus: "PUBLISHED",
+          previousModerationStatus: "NOT_REVIEWED",
+          currentModerationStatus: "AUTO_APPROVED",
+          riskTier: "LOW",
+          ruleSetVersion: 2,
+          caseId: null,
+          occurredAt: "2026-07-29T01:01:00.000Z",
+          version: 3,
+        },
+      }),
+    });
+  });
+
+  const response = await page.goto("/zh-Hans/post/job/new");
+  expect(response?.ok()).toBe(true);
+  await expect(page.getByRole("heading", { level: 1, name: "发布招聘信息" })).toBeVisible();
+  await page.getByLabel("招聘类别").selectOption(categoryId);
+  await page.getByLabel("城市").selectOption("US-CA-IRVINE");
+  await page.getByLabel("岗位名称").fill("尔湾餐厅厨房职位测试");
+  await page
+    .getByLabel("岗位说明与任职要求")
+    .fill("这是仅供端到端验证使用的虚构招聘信息，不代表真实职位或招聘承诺。");
+  await page.getByLabel("最低薪资").fill("24.00");
+  await page.getByLabel(/雇主或公司名称/).fill("虚构测试雇主");
+  await page.getByLabel(/雇佣类型/).selectOption("full-time");
+  await page.getByLabel(/经验要求/).selectOption("entry");
+  await page.getByLabel(/办公方式/).selectOption("onsite");
+  await page.getByLabel(/最高薪资/).fill("31.50");
+  await page.getByLabel(/工作时间/).fill("周一至周五测试班次");
+  await page.getByLabel(/我确认职位条件和薪资信息真实/).check();
+  await page.getByRole("button", { name: "立即保存" }).click();
+  await expect(page.getByText("已保存到服务器")).toBeVisible();
+  expect(createdInput).toMatchObject({
+    type: "JOB",
+    price: { amount: "24.00", currency: "USD", unit: "HOURLY" },
+    attributes: {
+      employerName: "虚构测试雇主",
+      employmentType: "full-time",
+      experienceLevel: "entry",
+      remoteType: "onsite",
+      wageMax: "31.50",
+      employmentPolicyAcknowledged: true,
+    },
+  });
+
+  await page.getByRole("button", { name: "提交审核" }).click();
+  await expect(page.getByText(/已提交；平台会按风险规则/)).toBeVisible();
+  expect(submitted).toBe(true);
+  await expect(page.getByRole("link", { name: "Switch to English" })).toHaveAttribute(
+    "href",
+    "/en-US/post/job/new",
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("renders and updates the private bilingual notification center", async ({ page }) => {
   const userId = "10000000-0000-4000-8000-000000000081";
   const notificationId = "20000000-0000-4000-8000-000000000081";

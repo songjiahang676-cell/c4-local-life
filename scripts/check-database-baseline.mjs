@@ -58,6 +58,8 @@ try {
     "20260729150000_admin_moderation_workbench",
     "20260729230000_listing_public_lifecycle",
     "20260730010000_notification_in_app_baseline",
+    "20260730020000_organization_membership_lifecycle",
+    "20260730030000_job_vertical_baseline",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -123,11 +125,35 @@ try {
           'listings_geo_point_gist',
           'listings_title_trgm',
           'listings_published_partial',
-          'listings_rental_expiry_due_idx'
+          'listings_rental_expiry_due_idx',
+          'listings_job_expiry_due_idx'
         )`,
   );
-  if (customIndexes.rowCount !== 4) {
+  if (customIndexes.rowCount !== 5) {
     throw new Error("One or more custom listing indexes are missing");
+  }
+
+  const jobVerticalStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'job_details'
+            AND constraint_name = 'job_details_wage_range_coherent'
+            AND constraint_type = 'CHECK'
+       ) AS wage_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'job_details'
+            AND constraint_name = 'job_details_text_fields_nonblank'
+            AND constraint_type = 'CHECK'
+       ) AS text_check`,
+  );
+  if (!jobVerticalStorage.rows[0]?.wage_check || !jobVerticalStorage.rows[0]?.text_check) {
+    throw new Error("Job vertical storage constraints are missing");
   }
 
   const sessionLifecycleColumns = await client.query(
@@ -696,6 +722,50 @@ try {
        -117.8265,
        now()
      )`,
+  );
+  await client.query(
+    `INSERT INTO categories (id, vertical, slug, name_zh_hans, name_en)
+     VALUES (
+       '00000000-0000-4000-8000-000000000040',
+       'JOB',
+       'test-job',
+       '测试招聘',
+       'Test Job'
+     )`,
+  );
+  await client.query(
+    `INSERT INTO listings (
+       id, type, owner_id, category_id, region_id, title, slug, body,
+       price_amount, price_unit, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000041',
+       'JOB',
+       '00000000-0000-4000-8000-000000000001',
+       '00000000-0000-4000-8000-000000000040',
+       '00000000-0000-4000-8000-000000000002',
+       'Baseline synthetic Job',
+       'baseline-synthetic-job',
+       'Fictional Job data used only inside a rolled-back migration check.',
+       40.00,
+       'HOURLY',
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "Job wage range coherence",
+    `INSERT INTO job_details (
+       listing_id, employer_name, employment_type, wage_min, wage_max, wage_unit
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000041',
+       'Synthetic Employer',
+       'full-time',
+       40.00,
+       20.00,
+       'HOURLY'
+     )`,
+    "23514",
   );
 
   const generatedPoint = await client.query(
@@ -1325,7 +1395,7 @@ try {
       moderationWorkbenchStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
-      negativeCases: 33,
+      negativeCases: savepointSequence,
     }),
   );
 } finally {

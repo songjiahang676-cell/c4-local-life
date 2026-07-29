@@ -101,7 +101,7 @@ export type ListingReadResult = {
 };
 
 type NormalizedPublicListingQuery = {
-  type: "RENTAL";
+  type: "RENTAL" | "JOB";
   categoryId: string | null;
   regionCode: string | null;
   limit: number;
@@ -109,7 +109,7 @@ type NormalizedPublicListingQuery = {
 
 type PublicListingCursorPayload = {
   version: 1;
-  type: "RENTAL";
+  type: "RENTAL" | "JOB";
   categoryId: string | null;
   regionCode: string | null;
   publishedAt: string;
@@ -141,7 +141,7 @@ function requestHash(value: unknown): string {
 
 function cursorSignature(secret: string, encoded: string): string {
   return createHmac("sha256", secret)
-    .update("socal-public-rental-page-cursor-v1\0", "utf8")
+    .update("socal-public-listing-page-cursor-v2\0", "utf8")
     .update(encoded, "utf8")
     .digest("base64url");
 }
@@ -192,12 +192,92 @@ function emptyDetail(type: ListingType): ListingDetail {
   return { kind: type } as ListingDetail;
 }
 
-function assertDomainDraft(id: string, type: ListingType, price: Money | null, now: Date): void {
+type ValidatedJobDetail = NonNullable<ListingDraftWriteFields["jobDetail"]>;
+
+const jobWageUnits = ["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const;
+
+function optionalAttributeString(
+  attributes: Record<string, ListingDraftJsonValue>,
+  key: string,
+): string | null {
+  const value = attributes[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function validatedJobDetail(
+  type: ListingType,
+  price: Money | null,
+  attributes: Record<string, ListingDraftJsonValue>,
+): ValidatedJobDetail | null {
+  if (type !== "JOB") return null;
+  const errors: Record<string, string[]> = {};
+  const employerName = optionalAttributeString(attributes, "employerName");
+  const employmentType = optionalAttributeString(attributes, "employmentType");
+  const wageMax = optionalAttributeString(attributes, "wageMax");
+  const wageUnit = price?.unit;
+  if (!employerName) errors.employerName = ["is required"];
+  if (!employmentType) errors.employmentType = ["is required"];
+  if (
+    !price?.amount ||
+    !wageUnit ||
+    !jobWageUnits.includes(wageUnit as (typeof jobWageUnits)[number])
+  ) {
+    errors.price = ["must include a non-negative Job wage and supported wage unit"];
+  }
+  if (!wageMax || !/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/.test(wageMax)) {
+    errors.wageMax = ["must be a valid wage amount"];
+  }
+  if (attributes.employmentPolicyAcknowledged !== true) {
+    errors.employmentPolicyAcknowledged = ["must be acknowledged"];
+  }
+  if (
+    Object.keys(errors).length > 0 ||
+    !employerName ||
+    !employmentType ||
+    !price?.amount ||
+    !wageMax ||
+    !wageUnit
+  ) {
+    throw new ListingValidationError(errors);
+  }
+  if (toMinorAmount(price.amount) > toMinorAmount(wageMax)) {
+    throw new ListingValidationError({
+      wageMax: ["must be greater than or equal to wage minimum"],
+    });
+  }
+  const visaSupport = attributes.visaSupport;
+  return {
+    employerName,
+    employmentType,
+    wageMin: normalizedAmount(price) ?? price.amount,
+    wageMax: normalizedAmount({ ...price, amount: wageMax }) ?? wageMax,
+    wageUnit,
+    experienceLevel: optionalAttributeString(attributes, "experienceLevel"),
+    remoteType: optionalAttributeString(attributes, "remoteType"),
+    visaSupport: typeof visaSupport === "boolean" ? visaSupport : null,
+  };
+}
+
+function assertDomainDraft(
+  id: string,
+  type: ListingType,
+  price: Money | null,
+  jobDetail: ValidatedJobDetail | null,
+  now: Date,
+): void {
   try {
     createDraftListing({
       id,
       type,
-      detail: emptyDetail(type),
+      detail:
+        type === "JOB" && jobDetail
+          ? {
+              kind: "JOB",
+              wageMinMinor: toMinorAmount(jobDetail.wageMin),
+              wageMaxMinor: toMinorAmount(jobDetail.wageMax),
+              wageUnit: jobDetail.wageUnit as "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
+            }
+          : emptyDetail(type),
       price: toDomainPrice(price),
       createdAt: now,
     });
@@ -263,13 +343,13 @@ function toPublicView(listing: PublicListingProjection): PublicListingView {
 }
 
 function toPublicSummary(listing: PublicListingProjection): PublicListingSummaryView {
-  if (listing.type !== "RENTAL") {
-    throw new Error("Public Listing collection currently supports Rental only");
+  if (listing.type !== "RENTAL" && listing.type !== "JOB") {
+    throw new Error("Public Listing collection does not support this vertical");
   }
   const { body: _body, createdAt: _createdAt, ...summary } = toPublicView(listing);
   void _body;
   void _createdAt;
-  return { ...summary, type: "RENTAL" };
+  return { ...summary, type: listing.type };
 }
 
 function toOwnerView(listing: OwnerListingProjection): ListingOwnerView {
@@ -310,6 +390,7 @@ function buildWriteFields(input: {
   patch: CreateListingInput | UpdateListingInput;
   references: { categoryId: string; formSchemaVersion: number; regionId: string };
   attributes: Record<string, ListingDraftJsonValue>;
+  jobDetail: ValidatedJobDetail | null;
   slug: string;
 }): ListingDraftWriteFields {
   const current = input.current;
@@ -357,6 +438,7 @@ function buildWriteFields(input: {
       "mediaIds" in patch && patch.mediaIds !== undefined
         ? patch.mediaIds
         : (current?.mediaIds ?? []),
+    jobDetail: input.jobDetail,
   };
 }
 
@@ -394,7 +476,7 @@ export class ListingsService {
     } as const;
     const cursor = query.cursor ? this.#decodePublicCursor(query.cursor, normalized) : undefined;
     const result = await this.store.listPublic({
-      type: "RENTAL",
+      type: normalized.type,
       ...(normalized.categoryId ? { categoryId: normalized.categoryId } : {}),
       ...(normalized.regionCode ? { regionCode: normalized.regionCode } : {}),
       ...(cursor ? { cursor } : {}),
@@ -446,11 +528,14 @@ export class ListingsService {
     );
 
     const id = randomUUID();
-    assertDomainDraft(id, input.type, input.price ?? null, now);
+    const attributes = cloneAttributes(input.attributes);
+    const jobDetail = validatedJobDetail(input.type, input.price ?? null, attributes);
+    assertDomainDraft(id, input.type, input.price ?? null, jobDetail, now);
     const fields = buildWriteFields({
       patch: input,
       references,
-      attributes: cloneAttributes(input.attributes),
+      attributes,
+      jobDetail,
       slug: `${input.type.toLowerCase()}-${id}`,
     });
     const result = await this.store.createDraft({
@@ -558,12 +643,14 @@ export class ListingsService {
 
     const currentMoney = toMoney(current.price);
     const nextMoney = input.price === undefined ? currentMoney : input.price;
-    assertDomainDraft(current.id, current.type, nextMoney, now);
+    const jobDetail = validatedJobDetail(current.type, nextMoney, attributes);
+    assertDomainDraft(current.id, current.type, nextMoney, jobDetail, now);
     const fields = buildWriteFields({
       current,
       patch: input,
       references,
       attributes,
+      jobDetail,
       slug: current.slug,
     });
     const result = await this.store.updateDraft({
@@ -668,6 +755,7 @@ export class ListingsService {
     if (!parsedForm.success) throw new ListingValidationError();
     const occurredAt = new Date();
     const risk = evaluateListingSubmissionRisk({
+      listingType: candidate.type,
       title: candidate.title,
       summary: candidate.summary,
       body: candidate.body,
@@ -744,6 +832,7 @@ export class ListingsService {
     }
     const inputHash = requestHash({
       listingId: candidate.id,
+      listingType: candidate.type,
       listingVersion: candidate.version,
       title: candidate.title,
       summary: candidate.summary,

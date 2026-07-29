@@ -410,12 +410,27 @@ try {
        ) AS workbench_columns`,
   );
   const listingPublicLifecycleStorage = await upgrade.query(
-    `SELECT EXISTS (
-       SELECT 1
-         FROM pg_indexes
-        WHERE schemaname = 'public'
-          AND indexname = 'listings_rental_expiry_due_idx'
-     ) AS expiry_index`,
+    `SELECT
+       (
+         SELECT count(*)::integer
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname IN (
+              'listings_rental_expiry_due_idx',
+              'listings_job_expiry_due_idx'
+            )
+       ) AS expiry_indexes,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'job_details'
+            AND constraint_name IN (
+              'job_details_wage_range_coherent',
+              'job_details_text_fields_nonblank'
+            )
+            AND constraint_type = 'CHECK'
+       ) AS job_checks`,
   );
   const notificationStorage = await upgrade.query(
     `SELECT
@@ -509,7 +524,8 @@ try {
     !moderationWorkbenchStorage.rows[0].action_idempotency ||
     moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
     moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
-    !listingPublicLifecycleStorage.rows[0].expiry_index ||
+    listingPublicLifecycleStorage.rows[0].expiry_indexes !== 2 ||
+    listingPublicLifecycleStorage.rows[0].job_checks !== 2 ||
     notificationStorage.rows[0].templates !== "notification_templates" ||
     !notificationStorage.rows[0].source_event_idempotency ||
     !notificationStorage.rows[0].immutable_trigger ||

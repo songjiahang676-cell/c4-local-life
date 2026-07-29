@@ -59,6 +59,16 @@ export type ListingDraftWriteFields = {
   longitude: string | null;
   locationPrecision: string;
   mediaIds: readonly string[];
+  jobDetail: {
+    employerName: string;
+    employmentType: string;
+    wageMin: string;
+    wageMax: string;
+    wageUnit: PriceUnit;
+    experienceLevel: string | null;
+    remoteType: string | null;
+    visaSupport: boolean | null;
+  } | null;
 };
 
 export type CreateListingDraftInput = ListingDraftWriteFields & {
@@ -350,6 +360,29 @@ function listingData(
   };
 }
 
+async function applyJobDetail(
+  transaction: Prisma.TransactionClient,
+  listingId: string,
+  detail: ListingDraftWriteFields["jobDetail"],
+): Promise<void> {
+  if (!detail) {
+    await transaction.jobDetail.deleteMany({ where: { listingId } });
+    return;
+  }
+  await transaction.jobDetail.upsert({
+    where: { listingId },
+    create: { listingId, ...detail },
+    update: detail,
+  });
+}
+
+function jobDetailMatchesListingType(
+  type: ListingType,
+  detail: ListingDraftWriteFields["jobDetail"],
+): boolean {
+  return type === "JOB" ? detail !== null : detail === null;
+}
+
 async function appendDraftEvidence(
   transaction: Prisma.TransactionClient,
   input: {
@@ -511,7 +544,10 @@ export class ListingDraftRepository {
         return listing ? { kind: "exact_retry", listing } : { kind: "idempotency_conflict" };
       }
 
-      if (!(await referencesRemainValid(transaction, input.type, input))) {
+      if (
+        !jobDetailMatchesListingType(input.type, input.jobDetail) ||
+        !(await referencesRemainValid(transaction, input.type, input))
+      ) {
         return { kind: "invalid_reference" };
       }
       if (
@@ -539,6 +575,7 @@ export class ListingDraftRepository {
         },
         select: { id: true },
       });
+      await applyJobDetail(transaction, input.id, input.jobDetail);
       await applyMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.id,
@@ -594,7 +631,10 @@ export class ListingDraftRepository {
       if (input.occurredAt < current.updatedAt) {
         return { kind: "time_conflict", currentVersion: current.version };
       }
-      if (!(await referencesRemainValid(transaction, current.type, input))) {
+      if (
+        !jobDetailMatchesListingType(current.type, input.jobDetail) ||
+        !(await referencesRemainValid(transaction, current.type, input))
+      ) {
         return { kind: "invalid_reference" };
       }
       if (
@@ -623,6 +663,7 @@ export class ListingDraftRepository {
       if (updated.count !== 1) {
         return { kind: "version_conflict", currentVersion: current.version };
       }
+      await applyJobDetail(transaction, input.listingId, input.jobDetail);
       await applyMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.listingId,

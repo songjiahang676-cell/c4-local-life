@@ -769,6 +769,7 @@ model Listing {
   @@index([geoPoint], map: "listings_geo_point_gist", type: Gist)
   @@index([type, regionId, publishedAt(sort: Desc)], map: "listings_published_partial", where: raw("((status = 'PUBLISHED'::\"ContentStatus\") AND (deleted_at IS NULL))"))
   @@index([expiresAt, id], map: "listings_rental_expiry_due_idx", where: raw("((type = 'RENTAL'::\"ListingType\") AND (status = 'PUBLISHED'::\"ContentStatus\") AND (moderation_status = ANY (ARRAY['AUTO_APPROVED'::\"ModerationStatus\", 'APPROVED'::\"ModerationStatus\"])) AND (deleted_at IS NULL))"))
+  @@index([expiresAt, id], map: "listings_job_expiry_due_idx", where: raw("((type = 'JOB'::\"ListingType\") AND (status = 'PUBLISHED'::\"ContentStatus\") AND (moderation_status = ANY (ARRAY['AUTO_APPROVED'::\"ModerationStatus\", 'APPROVED'::\"ModerationStatus\"])) AND (deleted_at IS NULL))"))
   @@index([title(ops: raw("gin_trgm_ops"))], map: "listings_title_trgm", type: Gin)
   @@map("listings")
 }

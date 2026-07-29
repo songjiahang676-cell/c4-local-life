@@ -48,13 +48,17 @@
 | `/[locale]/account/notifications`    | 通知          |
 | `/[locale]/account/orders`           | 订单          |
 | `/[locale]/account/wallet`           | 积分/信用     |
-| `/[locale]/account/organizations`    | 组织与成员    |
-| `/[locale]/account/profile`          | 资料          |
-| `/[locale]/account/verification`     | 验证          |
-| `/[locale]/account/security`         | 会话/MFA      |
-| `/[locale]/account/privacy`          | 数据请求/删除 |
-| `/[locale]/auth/login`               | 登录          |
-| `/[locale]/auth/verify`              | OTP 验证      |
+
+当前已实现的规范创建路由为 `/[locale]/post/rental/new` 与
+`/[locale]/post/job/new`；首页招聘入口指向后者。两者均为 noindex 私有草稿页，复用账号隔离恢复、
+动态 schema、READY 媒体绑定和强并发控制。Job 页另外提供幂等提交审核动作。
+| `/[locale]/account/organizations` | 组织与成员 |
+| `/[locale]/account/profile` | 资料 |
+| `/[locale]/account/verification` | 验证 |
+| `/[locale]/account/security` | 会话/MFA |
+| `/[locale]/account/privacy` | 数据请求/删除 |
+| `/[locale]/auth/login` | 登录 |
+| `/[locale]/auth/verify` | OTP 验证 |
 
 ## 27.3 Admin
 

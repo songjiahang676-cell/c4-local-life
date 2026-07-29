@@ -75,14 +75,16 @@ publisher/故障测试必须通过。
 `LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
 Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
-Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；其余
-四个垂直类型仍须复用并验收同一闭环，不能因 Rental 通过而标记整个 22.4 完成。
+Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
+`LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
+Transfer/Secondhand/Service 三个垂直仍须复用并验收，不能因 Rental/Job 通过而标记整个 22.4 完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
 规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
-`LIST-005`/`ADMIN-002` 验收；其余垂直类型与搜索派生状态仍待后续切片。
+`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用并增加 v2 就业政策人工审核规则；其余
+三个垂直类型与搜索派生状态仍待后续切片。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
@@ -96,6 +98,13 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 归档与 DELETE 重试不重复写，状态、版本、最小 Audit 和 Outbox 在同一事务提交。Worker 通过有界批次和
 `FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
 读立即移除，搜索侧最终移除仍由后续索引消费者处理。
+
+`LIST-006` 已验收 Job 完整垂直切片：版本化动态表单覆盖雇主、岗位类型、经验、办公方式、排班、
+语言、福利、签证支持声明、薪资范围与 OWNER_ONLY 就业政策确认；`job_details` 与 Listing 在同一
+事务 create/upsert，应用/数据库双层拒绝非正数、倒置或不支持周期的薪资。公共集合、签名 cursor、
+详情、归档/删除和 Worker 过期复用现有状态链并接受 `type=JOB`，公开 schema 投影剔除政策确认。
+中英 noindex Job 发布页复用 900ms 自动保存、账号/locale/vertical 隔离恢复、READY 图片和 ETag，
+并通过精确 BFF allowlist 以幂等键提交审核；桌面/移动 E2E 覆盖填写、保存、提交和无横向溢出。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
