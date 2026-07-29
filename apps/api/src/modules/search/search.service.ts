@@ -12,6 +12,11 @@ import {
   searchCriteriaFingerprint,
 } from "./search-cursor";
 import {
+  SearchDiscoveryService,
+  type ResolvedSearchQuery,
+  type SearchRequestContext,
+} from "./search-discovery.service";
+import {
   SEARCH_STORE,
   SearchSnapshotExpiredError,
   type SearchStore,
@@ -27,11 +32,16 @@ export class SearchService {
     @Inject(API_ENVIRONMENT) private readonly environment: ApiEnvironment,
     @Inject(SEARCH_STORE) private readonly store: SearchStore,
     @Optional() @Inject(API_METRICS) private readonly metrics?: MetricsRegistry,
+    @Optional() private readonly discovery?: SearchDiscoveryService,
   ) {
     this.#cursorCodec = new SearchCursorCodec(environment.SESSION_SECRET.reveal());
   }
 
-  async search(query: ListingSearchInput, now = new Date()): Promise<SearchResponse> {
+  async search(
+    query: ListingSearchInput,
+    now = new Date(),
+    context?: SearchRequestContext,
+  ): Promise<SearchResponse> {
     const criteria = searchCriteria(query);
     const fingerprint = searchCriteriaFingerprint(criteria);
     const sort = criteria.sort ?? "RELEVANCE";
@@ -40,12 +50,20 @@ export class SearchService {
     try {
       let snapshotAt: string;
       let searchAfter: readonly (string | number | null)[] | undefined;
+      let resolved: ResolvedSearchQuery;
       if (query.cursor) {
         const cursor = this.#cursorCodec.decode(query.cursor, fingerprint, now);
         snapshotId = cursor.snapshotId;
         snapshotAt = cursor.snapshotAt;
         searchAfter = cursor.searchAfter;
+        resolved = await this.#resolveQuery(
+          criteria.q,
+          context,
+          criteria.regionCode,
+          cursor.dictionaryVersion,
+        );
       } else {
+        resolved = await this.#resolveQuery(criteria.q, context, criteria.regionCode);
         snapshotAt = now.toISOString();
         snapshotId = await this.store.openSnapshot(this.environment.SEARCH_PIT_KEEP_ALIVE_SECONDS);
       }
@@ -54,6 +72,7 @@ export class SearchService {
         snapshotId,
         snapshotAt,
         criteria,
+        queryTerms: resolved.queryTerms,
         ...(searchAfter ? { searchAfter } : {}),
         keepAliveSeconds: this.environment.SEARCH_PIT_KEEP_ALIVE_SECONDS,
         timeoutMilliseconds: this.environment.SEARCH_QUERY_TIMEOUT_MS,
@@ -71,6 +90,7 @@ export class SearchService {
           snapshotId,
           snapshotAt,
           searchAfter: lastHit.sort,
+          dictionaryVersion: resolved.dictionaryVersion,
           expiresAt:
             Math.floor(now.getTime() / 1_000) + this.environment.SEARCH_PIT_KEEP_ALIVE_SECONDS,
         });
@@ -84,11 +104,20 @@ export class SearchService {
         sort,
         geo,
       });
+      await this.discovery?.captureSuccessfulQuery({
+        query: criteria.q,
+        regionCode: criteria.regionCode,
+        resultCount: visibleHits.length,
+        cursor: query.cursor,
+        context,
+        dictionary: resolved.dictionary,
+        now,
+      });
       return {
         data: visibleHits.map((hit) => hit.result),
         page: { nextCursor, hasMore },
         facets: result.facets,
-        correctedQuery: null,
+        correctedQuery: resolved.correctedQuery,
         tookMs: result.tookMilliseconds,
         generatedAt: now.toISOString(),
       };
@@ -117,5 +146,27 @@ export class SearchService {
     } catch {
       // PITs have a short bounded TTL; cleanup failure must not replace the search outcome.
     }
+  }
+
+  #resolveQuery(
+    query: string | undefined,
+    context: SearchRequestContext | undefined,
+    regionCode?: string,
+    dictionaryVersion?: number,
+  ): Promise<ResolvedSearchQuery> {
+    if (this.discovery) {
+      return this.discovery.resolveSearchQuery({
+        query,
+        locale: context?.locale ?? "zh-Hans",
+        ...(regionCode ? { regionCode } : {}),
+        ...(dictionaryVersion === undefined ? {} : { dictionaryVersion }),
+      });
+    }
+    return Promise.resolve({
+      dictionaryVersion: 0,
+      queryTerms: query ? [query] : [],
+      correctedQuery: null,
+      dictionary: null,
+    });
   }
 }

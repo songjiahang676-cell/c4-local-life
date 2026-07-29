@@ -3,8 +3,16 @@ import type { ApiEnvironment } from "@socal/config";
 import type { MetricsRegistry } from "@socal/observability";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import { API_METRICS } from "../../common/api-metrics.token";
+import { DatabaseSearchDiscoveryStore } from "./database-search-discovery.store";
 import { OpenSearchSearchStore } from "./opensearch-search.store";
 import { SearchController } from "./search.controller";
+import { SearchDictionaryService } from "./search-dictionary.service";
+import { SearchDiscoveryService } from "./search-discovery.service";
+import {
+  NoopSearchDiscoveryStore,
+  SEARCH_DISCOVERY_STORE,
+  type SearchDiscoveryStore,
+} from "./search-discovery.store";
 import { SearchService } from "./search.service";
 import { SEARCH_STORE, type SearchStore } from "./search.store";
 
@@ -14,6 +22,7 @@ export class SearchModule {
     environment: ApiEnvironment,
     store?: SearchStore,
     metrics?: MetricsRegistry,
+    discoveryStore?: SearchDiscoveryStore,
   ): DynamicModule {
     const storeProvider: Provider = store
       ? { provide: SEARCH_STORE, useValue: store }
@@ -21,6 +30,11 @@ export class SearchModule {
           provide: SEARCH_STORE,
           useFactory: () => new OpenSearchSearchStore(environment),
         };
+    const discoveryProvider: Provider = discoveryStore
+      ? { provide: SEARCH_DISCOVERY_STORE, useValue: discoveryStore }
+      : store
+        ? { provide: SEARCH_DISCOVERY_STORE, useClass: NoopSearchDiscoveryStore }
+        : { provide: SEARCH_DISCOVERY_STORE, useClass: DatabaseSearchDiscoveryStore };
     return {
       module: SearchModule,
       controllers: [SearchController],
@@ -28,6 +42,9 @@ export class SearchModule {
         { provide: API_ENVIRONMENT, useValue: environment },
         ...(metrics ? [{ provide: API_METRICS, useValue: metrics }] : []),
         storeProvider,
+        discoveryProvider,
+        SearchDiscoveryService,
+        SearchDictionaryService,
         SearchService,
       ],
     };

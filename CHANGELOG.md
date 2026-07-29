@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added reviewed immutable versioned search dictionaries, cursor-stable bounded synonym expansion,
+  strict suggestion/trending APIs, five-source privacy thresholds, bot/PII filtering, IP-derived
+  HMAC source deduplication, bounded 30–90 day retention, and count-free low-cardinality telemetry.
 - Added the public Listing search API with strict bilingual input normalization, fixed public
   projections and facets, bounded geo/price filters, stable point-in-time `search_after`
   pagination, query-bound HMAC cursors, explicit expired/timeout/unavailable Problem Details,

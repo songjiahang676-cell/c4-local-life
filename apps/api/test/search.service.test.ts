@@ -2,11 +2,13 @@ import { parseApiEnvironment } from "@socal/config";
 import { MetricsRegistry } from "@socal/observability";
 import { describe, expect, it } from "vitest";
 import { SearchService } from "../src/modules/search/search.service";
+import { SearchDiscoveryService } from "../src/modules/search/search-discovery.service";
 import {
   SearchCursorExpiredError,
   SearchCursorInvalidError,
 } from "../src/modules/search/search-cursor";
 import { type SearchStoreHit, SearchTimeoutError } from "../src/modules/search/search.store";
+import { MemorySearchDiscoveryStore } from "./support/memory-search-discovery.store";
 import {
   MemorySearchStore,
   searchStoreResult,
@@ -99,13 +101,19 @@ describe("SearchService", () => {
     const now = new Date("2026-07-29T12:00:00.000Z");
     const first = await service.search({ q: "rental", limit: 1 }, now);
     const cursor = first.page.nextCursor ?? "";
+    const [encoded = "", signature = ""] = cursor.split(".");
+    const tamperedCursor = `${encoded}.${signature.startsWith("x") ? "y" : "x"}${signature.slice(1)}`;
 
     await expect(
       service.search({ q: "different", limit: 1, cursor }, new Date(now.getTime() + 1_000)),
     ).rejects.toBeInstanceOf(SearchCursorInvalidError);
     await expect(
       service.search(
-        { q: "rental", limit: 1, cursor: `${cursor.slice(0, -1)}x` },
+        {
+          q: "rental",
+          limit: 1,
+          cursor: tamperedCursor,
+        },
         new Date(now.getTime() + 1_000),
       ),
     ).rejects.toBeInstanceOf(SearchCursorInvalidError);
@@ -113,6 +121,74 @@ describe("SearchService", () => {
       service.search({ q: "rental", limit: 1, cursor }, new Date(now.getTime() + 121_000)),
     ).rejects.toBeInstanceOf(SearchCursorExpiredError);
     expect(store.searched).toHaveLength(1);
+  });
+
+  it("pins the reviewed dictionary version and expansion across cursor pages", async () => {
+    const store = new MemorySearchStore();
+    const discoveryStore = new MemorySearchDiscoveryStore();
+    const baseDictionary = {
+      schemaVersion: 1 as const,
+      synonymGroups: [
+        {
+          key: "apartment-rental",
+          locale: "en-US" as const,
+          canonical: "apartment",
+          alternatives: ["apt"],
+          regionCodes: [],
+        },
+      ],
+      blockedTerms: [],
+    };
+    discoveryStore.currentVersion = 1;
+    discoveryStore.dictionaries.set(1, {
+      version: 1,
+      revision: 1,
+      definition: baseDictionary,
+      contentHash: "1".repeat(64),
+      basedOnVersion: null,
+      createdById: "75000000-0000-4000-8000-000000000001",
+      updatedById: "75000000-0000-4000-8000-000000000001",
+      publishedById: "75000000-0000-4000-8000-000000000002",
+      createdAt: new Date("2026-07-29T10:00:00.000Z"),
+      updatedAt: new Date("2026-07-29T11:00:00.000Z"),
+      publishedAt: new Date("2026-07-29T11:00:00.000Z"),
+    });
+    store.results.push(searchStoreResult([hit(1), hit(2)]), searchStoreResult([hit(2)]));
+    const discovery = new SearchDiscoveryService(environment, discoveryStore);
+    const service = new SearchService(environment, store, undefined, discovery);
+    const context = {
+      ip: "203.0.113.10",
+      userAgent: "Synthetic Browser/1.0",
+      locale: "en-US" as const,
+    };
+    const first = await service.search(
+      { q: "apt", limit: 1 },
+      new Date("2026-07-29T12:00:00.000Z"),
+      context,
+    );
+
+    discoveryStore.currentVersion = 2;
+    discoveryStore.dictionaries.set(2, {
+      ...discoveryStore.dictionaries.get(1)!,
+      version: 2,
+      definition: {
+        ...baseDictionary,
+        synonymGroups: [
+          {
+            ...baseDictionary.synonymGroups[0]!,
+            canonical: "condominium",
+          },
+        ],
+      },
+    });
+    await service.search(
+      { q: "apt", limit: 1, cursor: first.page.nextCursor ?? undefined },
+      new Date("2026-07-29T12:00:30.000Z"),
+      context,
+    );
+
+    expect(store.searched[0]?.queryTerms).toEqual(["apt", "apartment"]);
+    expect(store.searched[1]?.queryTerms).toEqual(["apt", "apartment"]);
   });
 
   it("closes the PIT and records a bounded timeout outcome when OpenSearch times out", async () => {

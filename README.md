@@ -275,7 +275,10 @@ reconciliation 扫描 Listing 版本并修复缺失、落后或应删除的文�
 的 p95 freshness。`SEARCH-003` 已实现 `GET /v1/search`：只读 v1 公共投影，固定公开字段与 facets，
 使用短效 PIT、HMAC 查询绑定 cursor 和 `search_after` 保持分页稳定，并支持类型、分类、地区、价格、
 半径及距离排序。查询文本、cursor、坐标和对象 ID 不进入指标；OpenSearch 超时、PIT 过期或不可用
-分别返回 504、410、503，详情与发布链路不依赖搜索。同义词/建议和原子重建仍由后续 SEARCH 任务负责。
+分别返回 504、410、503，详情与发布链路不依赖搜索。`SEARCH-004` 已加入双人审核、不可变和可追加回滚
+的版本词典，cursor v2 固定词典版本；`GET /v1/search/suggestions` 与 `/v1/search/trending` 只消费
+active taxonomy 或至少五个独立 HMAC 来源的非 bot、非敏感、有效结果查询，热门响应不暴露 count。
+查询样本默认 30 天且数据库硬上限 90 天。原子索引重建仍由后续 `SEARCH-005` 负责。
 
 ## 七、规划容量与服务目标
 

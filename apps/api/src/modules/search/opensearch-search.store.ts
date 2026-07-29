@@ -403,10 +403,25 @@ function textQuery(query: string): JsonObject {
 }
 
 function searchQuery(input: SearchStoreInput): JsonObject {
+  const queryTerms = input.queryTerms ?? (input.criteria.q ? [input.criteria.q] : []);
+  if (queryTerms.length > 8 || queryTerms.some((term) => term.length < 1 || term.length > 120)) {
+    throw new SearchUnavailableError();
+  }
   const baseQuery = {
     bool: {
       filter: searchFilters(input),
-      ...(input.criteria.q ? { must: [textQuery(input.criteria.q)] } : {}),
+      ...(queryTerms.length > 0
+        ? {
+            must: [
+              {
+                bool: {
+                  minimum_should_match: 1,
+                  should: queryTerms.map(textQuery),
+                },
+              },
+            ],
+          }
+        : {}),
     },
   };
   if (input.criteria.sort !== "RELEVANCE") return baseQuery;

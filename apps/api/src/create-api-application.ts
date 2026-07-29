@@ -31,6 +31,7 @@ import type { ListingStore } from "./modules/listings/listing.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import type { MediaStore } from "./modules/media/media.store";
 import type { NotificationStore } from "./modules/notifications/notification.store";
+import type { SearchDiscoveryStore } from "./modules/search/search-discovery.store";
 import type { SearchStore } from "./modules/search/search.store";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
 import type { TrustSafetyStore } from "./modules/trust-safety/trust-safety.store";
@@ -69,6 +70,7 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   notificationStore?: NotificationStore;
   trustSafetyStore?: TrustSafetyStore;
   searchStore?: SearchStore;
+  searchDiscoveryStore?: SearchDiscoveryStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -151,6 +153,7 @@ export async function createApiApplication(
       options.notificationStore,
       options.trustSafetyStore,
       options.searchStore,
+      options.searchDiscoveryStore,
       observability.metrics,
     ),
     adapter,

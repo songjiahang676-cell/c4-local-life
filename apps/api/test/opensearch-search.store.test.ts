@@ -116,6 +116,29 @@ describe("OpenSearch public search adapter", () => {
     expect(serialized).not.toContain('"script"');
   });
 
+  it("ORs at most eight reviewed synonym terms without weakening each term match", () => {
+    const request = buildOpenSearchRequest(
+      input({
+        criteria: { ...input().criteria, q: "apt" },
+        queryTerms: ["apt", "apartment", "rental unit"],
+      }),
+    );
+    const serialized = JSON.stringify(request);
+
+    expect(serialized).toContain('"query":"apt"');
+    expect(serialized).toContain('"query":"apartment"');
+    expect(serialized).toContain('"query":"rental unit"');
+    expect(serialized).toContain('"minimum_should_match":1');
+    expect(serialized).toContain('"operator":"and"');
+    expect(() =>
+      buildOpenSearchRequest(
+        input({
+          queryTerms: Array.from({ length: 9 }, (_, index) => `term-${index}`),
+        }),
+      ),
+    ).toThrow(SearchUnavailableError);
+  });
+
   it("maps only contract-safe fields and converts minor units and geo points", () => {
     const result = parseSearchListingResult(indexedSource(), 3.25);
     expect(result).toMatchObject({

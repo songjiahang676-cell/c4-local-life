@@ -357,3 +357,15 @@ evaluation/candidate 只有一行；数据库 check 约束有界分值、Hamming
 候选查询固定为同一 Listing type、过去 365 天、排除自身与 DELETED，使用 pg_trgm 标题/正文相似度、
 联系方式指纹精确匹配和图片 Hamming 距离，最多返回 10 条。`(type,created_at DESC)`、指纹反向索引及
 候选审核索引支持有界访问；OpenSearch 不参与审核写事务，也不是重复证据事实源。
+
+## 6.9 SEARCH-004 词典与查询样本
+
+`search_dictionary_states` 是 singleton 当前版本指针，`search_dictionary_versions` 保存 JSON 定义、
+content hash、revision、创建/编辑/发布 actor 和追加回滚来源。每个 version 唯一、每个 dictionary
+最多一个未发布草稿；发布行由 trigger 禁止更新/删除，当前指针和发布在 Serializable 事务内一起推进。
+定义由 API 应用服务的共享 Zod 契约验证，Repository 只负责并发和持久化。
+
+`search_query_samples` 保存经过应用层 bot/PII 筛查的内部 query、locale/可选 region、query hash、
+独立 HMAC source hash、UTC window date 和到期时间。`(query_hash,source_hash,window_date)` 防止同源
+每日重复贡献；查询按 locale/region/time、query/time 和 expiresAt 有界索引。数据库约束 hash、locale、
+region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COUNT(DISTINCT source_hash) >= 5`。

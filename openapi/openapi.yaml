@@ -961,29 +961,90 @@ paths:
       tags: [Search]
       security: []
       summary: Get search suggestions
+      description: >
+        Returns operational dictionary, active taxonomy, and privacy-thresholded
+        query suggestions. Omit q to receive safe category and region defaults.
       operationId: getSearchSuggestions
       parameters:
         - name: q
           in: query
-          required: true
           schema: { type: string, minLength: 1, maxLength: 50 }
         - name: regionCode
           in: query
-          schema: { type: string }
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+            pattern: "^[A-Za-z0-9._:-]+$"
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [zh-Hans, en-US]
+            default: zh-Hans
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
       responses:
         "200":
-          description: Query, category, city, and entity suggestions
+          description: Safe query, category, and region suggestions
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "private, no-store" }
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    maxItems: 10
-                    items:
-                      $ref: "#/components/schemas/SearchSuggestion"
+                $ref: "#/components/schemas/SearchSuggestionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /search/trending:
+    get:
+      tags: [Search]
+      security: []
+      summary: Get privacy-safe trending searches
+      description: >
+        Returns only bot-filtered, result-bearing searches that satisfy the
+        minimum anonymity threshold. Raw query counts are never exposed.
+      operationId: getTrendingSearches
+      parameters:
+        - name: regionCode
+          in: query
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+            pattern: "^[A-Za-z0-9._:-]+$"
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [zh-Hans, en-US]
+            default: zh-Hans
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [DAY_1, DAY_7, DAY_30]
+            default: DAY_7
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
+      responses:
+        "200":
+          description: Privacy-thresholded trending searches
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "public, max-age=300" }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchTrendingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /listings:
     get:
       tags: [Listings]
@@ -4056,14 +4117,44 @@ components:
         generatedAt: { type: string, format: date-time }
     SearchSuggestion:
       type: object
-      required: [type, label, value]
+      required: [type, label, value, locale]
+      additionalProperties: false
       properties:
-        type: { type: string, enum: [QUERY, CATEGORY, REGION, BUSINESS, PROVIDER] }
-        label: { type: string }
-        value: { type: string }
-        metadata:
-          type: object
-          additionalProperties: true
+        type: { type: string, enum: [QUERY, CATEGORY, REGION] }
+        label: { type: string, minLength: 1, maxLength: 120 }
+        value: { type: string, minLength: 1, maxLength: 120 }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+    SearchSuggestionResponse:
+      type: object
+      required: [data, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/SearchSuggestion"
+        generatedAt: { type: string, format: date-time }
+    SearchTrendingItem:
+      type: object
+      required: [query, rank, locale]
+      additionalProperties: false
+      properties:
+        query: { type: string, minLength: 1, maxLength: 120 }
+        rank: { type: integer, minimum: 1, maximum: 10 }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+    SearchTrendingResponse:
+      type: object
+      required: [data, window, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/SearchTrendingItem"
+        window: { type: string, enum: [DAY_1, DAY_7, DAY_30] }
+        generatedAt: { type: string, format: date-time }
     CursorPage:
       type: object
       required: [hasMore]

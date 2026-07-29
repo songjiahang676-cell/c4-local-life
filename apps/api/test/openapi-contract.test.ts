@@ -313,9 +313,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(67);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(160);
-    expect(operationIds).toHaveLength(77);
+    expect(Object.keys(contract.paths)).toHaveLength(68);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(163);
+    expect(operationIds).toHaveLength(78);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -352,8 +352,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(67);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(67);
+    expect(Object.keys(servedJson.paths)).toHaveLength(68);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(68);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -389,6 +389,33 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(200);
     expect(ajv.validate(schema ?? false, response.json())).toBe(true);
     expect(JSON.stringify(response.json())).not.toContain("moderationStatus");
+  });
+
+  it("validates count-free suggestion and trending responses against strict contracts", async () => {
+    const [suggestions, trending] = await Promise.all([
+      server.inject({
+        method: "GET",
+        url: "/v1/search/suggestions?locale=en-US&limit=10",
+      }),
+      server.inject({
+        method: "GET",
+        url: "/v1/search/trending?locale=en-US&window=DAY_7&limit=10",
+      }),
+    ]);
+    const suggestionSchema =
+      contract.paths["/search/suggestions"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    const trendingSchema =
+      contract.paths["/search/trending"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+
+    expect(suggestions.statusCode).toBe(200);
+    expect(trending.statusCode).toBe(200);
+    expect(suggestions.headers["cache-control"]).toBe("private, no-store");
+    expect(trending.headers["cache-control"]).toBe("public, max-age=300");
+    expect(ajv.validate(suggestionSchema ?? false, suggestions.json())).toBe(true);
+    expect(ajv.validate(trendingSchema ?? false, trending.json())).toBe(true);
+    expect(JSON.stringify(trending.json())).not.toContain("count");
   });
 
   it("declares authentication failures for protected listing creation", () => {

@@ -421,3 +421,16 @@ Idempotency-Key 或请求哈希。
   筛选值、坐标、金额或资源 ID。公开结果仍强制 PUBLISHED、未过期，索引漂移返回 503 而不宽松公开。
 - 依赖故障：PIT 过期、查询超时、OpenSearch 不可用分别映射 410/504/503 且 no-store；搜索 adapter
   不在应用启动或 Listing 写入链做远程探测，详情、发布和 PostgreSQL canonical 状态保持可用。
+
+## 14.28 SEARCH-004 查询发现威胁和缓解
+
+- 低频 PII 枚举：样本写前拒绝 email、电话、URL、长数字、英中地址、联系方式句柄、控制/双向字符及
+  运营阻止词；建议/热门读取再次筛查，并硬性要求至少五个不同 HMAC 来源。响应不返回 count。
+- bot/操纵：缺失或命中 crawler/headless/脚本特征的 User-Agent 不采样；来源摘要只由可信代理解析后的
+  IP 和独立 HMAC key 生成，因此轮换 User-Agent 不能增加来源数；同 query/source/UTC day 唯一。
+- 词典投毒/漂移：定义有严格大小、locale、region、重复和字符约束；最后编辑者不能自行发布；发布行
+  由 PostgreSQL trigger 保护不可变，回滚追加新版本。cursor v2 绑定词典版本，不跨页切换规则。
+- 数据泄漏/保留：数据库内部保存已筛查 query 文本以生成建议，但不保存原 IP/User-Agent；默认 30 天
+  过期且数据库上限 90 天。日志和指标从不记录 query/hash/source/region/version 等动态值。
+- 依赖降级：首次普通搜索在发现库不可用时可用无同义词的 version 0 继续；已绑定非零词典的 cursor
+  若无法加载历史版本则 503，避免静默改变语义。建议/热门依赖失败明确 503，不回退展示低频原文。
