@@ -101,3 +101,18 @@
   `admin:console:privileged` 或 `admin:sensitive:access`。
 - enrollment、TOTP 验证和恢复码消费写最小审计事件。审计与 HTTP 日志不得包含 secret、明文
   recovery code、token、联系方式或 IP 原文。当前不提供自助禁用/重置以避免降级绕过。
+
+## 28.10 ADMIN-002 Listing 审核工作台
+
+- `/admin/moderation/listings` 只有 API 返回 moderation navigation 时才挂载真实工作台。Admin BFF
+  只增加 queue GET、UUID detail GET 和 UUID action POST；路径穿越、方法混淆及其他 Admin 资源 404。
+- 队列固定使用 PostgreSQL canonical Case，按 priority、createdAt、UUID 排序；高风险 15 分钟、
+  中风险 4 小时的计划 SLA 与数据时间可见。列表 limit 最大 50，cursor 对 actor 和全部筛选签名。
+- 详情来自提交时不可变快照；动态联系方式/地址和精确坐标已移除。界面展示首提 ADDED diff、
+  非 LOW 规则证据、媒体状态和发布者聚合，不加载 email/phone、原图 key、内部 hash 或假指标。
+- 读取要求当前 MODERATOR/SENIOR_MODERATOR + MFA；动作另要求 recent MFA。批准、要求修改、拒绝、
+  升级与稳定原因码绑定，并携带强 `If-Match` 和 actor-scoped `Idempotency-Key`。
+- 写事务同时更新 Listing/Case version，追加 immutable ModerationAction、最小 Audit 和 Outbox。
+  客户端 409 后重新加载当前案件，不静默覆盖另一审核员的决定。
+- 中文/英文与移动布局共用语义结构；队列可用 J/K/方向键切换，R 刷新，Alt+A 聚焦动作，状态/错误
+  使用 live region，focus 保持可见。

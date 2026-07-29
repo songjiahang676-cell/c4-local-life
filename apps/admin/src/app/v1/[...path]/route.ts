@@ -27,22 +27,37 @@ const responseHeaderBlocklist = new Set([
   "connection",
   "content-encoding",
   "content-length",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
   "set-cookie",
+  "te",
+  "trailer",
   "transfer-encoding",
+  "upgrade",
 ]);
 
-const allowedApiPaths = new Set([
-  "auth/session",
-  "auth/otp/request",
-  "auth/otp/verify",
-  "admin/session",
-  "admin/mfa/enrollment",
-  "admin/mfa/enrollment/verify",
-  "admin/mfa/verify",
-]);
+const exactApiMethods: Readonly<Record<string, readonly string[]>> = {
+  "auth/session": ["DELETE"],
+  "auth/otp/request": ["POST"],
+  "auth/otp/verify": ["POST"],
+  "admin/session": ["GET"],
+  "admin/mfa/enrollment": ["POST"],
+  "admin/mfa/enrollment/verify": ["POST"],
+  "admin/mfa/verify": ["POST"],
+  "admin/moderation/cases": ["GET"],
+};
 
-function isAllowedPath(path: string): boolean {
-  return allowedApiPaths.has(path);
+const moderationCasePath =
+  /^admin\/moderation\/cases\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const moderationActionPath =
+  /^admin\/moderation\/cases\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/actions$/i;
+
+export function isAllowedAdminApiPath(method: string, path: string): boolean {
+  const exactMethods = exactApiMethods[path];
+  if (exactMethods?.includes(method)) return true;
+  if (method === "GET" && moderationCasePath.test(path)) return true;
+  return method === "POST" && moderationActionPath.test(path);
 }
 
 function apiBaseUrl(): URL | null {
@@ -56,7 +71,7 @@ function apiBaseUrl(): URL | null {
 
 async function proxyApi(request: NextRequest, context: ProxyContext): Promise<NextResponse> {
   const path = (await context.params).path.join("/");
-  if (!isAllowedPath(path)) {
+  if (!isAllowedAdminApiPath(request.method, path)) {
     return NextResponse.json(
       { title: "Not Found", status: 404, detail: "The requested resource was not found." },
       { status: 404, headers: { "cache-control": "no-store" } },

@@ -244,3 +244,16 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 版本、严重度和字段名；公开响应仅返回 LOW/MEDIUM/HIGH 与规则集版本。数据库将 evaluation/hit
 设为不可变，避免审核历史被覆盖；Audit/Outbox payload 不包含正文、attributes、联系信息、
 Idempotency-Key 或请求哈希。
+
+## 14.15 人工审核威胁与缓解
+
+- 越权/授权陈旧：Controller Policy 要求 MFA moderator；Repository 每次读写重新查询 ACTIVE user、
+  未撤销 Session 与当前未过期平台角色，UI 导航不作为权限。
+- 并发覆盖/重复动作：强 Case ETag、Listing/Case 行锁、版本 predicate、actor/key advisory lock、
+  唯一索引和 request hash 将精确重试与不同请求冲突分开。
+- PII 扩散：提交快照按历史表单 schema 删除 PHONE/EMAIL/contact/address 类动态字段，不存 latitude/
+  longitude；API 只返回快照、稳定 evidence key 与聚合计数，内部备注不进入响应/Audit/Outbox。
+- 审核证据篡改：snapshot/action 更新与删除由数据库触发器拒绝，快照对 Case 使用 RESTRICT；历史
+  evaluation/hits 仍保持不可变。
+- CSRF/代理扩大：写动作要求可信 Admin Origin；Admin 同源 BFF 使用精确 method/path 和 UUID
+  allowlist，未知/方法混淆路径失败关闭。

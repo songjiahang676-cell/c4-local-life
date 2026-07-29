@@ -40,3 +40,11 @@ Listing 提交要求 ACTIVE actor、对象级 owner/组织写权限、强 ETag �
 规则代码、版本、严重度和证据字段名写入不可变审核证据；匹配到的邮箱、电话、付款词或正文
 不会复制到命中记录、公开响应或日志。中高风险案件不能绕过后端授权，低风险自动通过仍保留
 版本化 evaluation、Audit 和 Outbox。
+
+## 人工审核边界
+
+审核队列和详情只允许当前 ACTIVE、MFA-bound 且仍具有 MODERATOR/SENIOR_MODERATOR 授权的会话；
+Repository 在每次读取及写事务内重新检查 Session 与授权，撤销/到期在下一请求生效。处置动作另要求
+十分钟内的 recent MFA、强 Case ETag、标准 action/reason 组合和 actor-scoped 幂等键。提交快照在
+创建时删除动态联系/地址字段且不保存精确坐标；数据库触发器阻止快照与动作 UPDATE/DELETE。内部备注
+不进入 HTTP 响应、Audit metadata、Outbox payload 或结构化日志。

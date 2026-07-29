@@ -55,6 +55,7 @@ try {
     "20260729010000_listing_draft_idempotency",
     "20260729020000_listing_media_binding",
     "20260729130000_listing_submission_moderation",
+    "20260729150000_admin_moderation_workbench",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -89,7 +90,8 @@ try {
             to_regclass('public.password_auth_attempts') AS password_auth_attempts,
             to_regclass('public.password_recovery_requests') AS password_recovery_requests,
             to_regclass('public.moderation_evaluations') AS moderation_evaluations,
-            to_regclass('public.moderation_rule_hits') AS moderation_rule_hits`,
+            to_regclass('public.moderation_rule_hits') AS moderation_rule_hits,
+            to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -515,6 +517,50 @@ try {
     throw new Error("Listing submission evidence or immutability controls are missing");
   }
 
+  const moderationWorkbenchStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'moderation_cases'
+            AND column_name = 'version'
+            AND is_nullable = 'NO'
+       ) AS case_version,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'moderation_actions_actor_id_idempotency_key_key'
+       ) AS action_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'moderation_actions'
+            AND constraint_name = 'moderation_actions_idempotency_check'
+       ) AS action_evidence_check,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname IN (
+            'moderation_case_snapshots_immutable',
+            'moderation_actions_immutable'
+          )
+            AND NOT tgisinternal
+       ) AS immutable_triggers`,
+  );
+  if (
+    !moderationWorkbenchStorage.rows[0]?.case_version ||
+    !moderationWorkbenchStorage.rows[0]?.action_idempotency ||
+    !moderationWorkbenchStorage.rows[0]?.action_evidence_check ||
+    moderationWorkbenchStorage.rows[0]?.immutable_triggers !== 2
+  ) {
+    throw new Error(
+      "Moderation workbench version, idempotency, or immutability controls are missing",
+    );
+  }
+
   await client.query("BEGIN");
   await client.query(
     `INSERT INTO users (id, email, updated_at)
@@ -681,6 +727,99 @@ try {
     "moderation rule-hit immutability",
     `DELETE FROM moderation_rule_hits
       WHERE id = '00000000-0000-4000-8000-000000000033'`,
+    "P0001",
+  );
+  await client.query(
+    `INSERT INTO moderation_evaluations (
+       id, listing_id, actor_user_id, listing_version, rule_set_key, rule_set_version,
+       risk_tier, input_hash, idempotency_key, request_hash,
+       result_content_status, result_moderation_status, result_listing_version, occurred_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000034',
+       '00000000-0000-4000-8000-000000000004',
+       '00000000-0000-4000-8000-000000000001',
+       2, 'listing-submission', 1, 'HIGH', repeat('a', 64),
+       'baseline-listing-submit-0003', repeat('b', 64),
+       'SUBMITTED', 'ESCALATED', 3, now()
+     )`,
+  );
+  await client.query(
+    `INSERT INTO moderation_cases (
+       id, evaluation_id, target_type, target_id, queue, priority, status, version, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000035',
+       '00000000-0000-4000-8000-000000000034',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'listing-submission',
+       80,
+       'OPEN',
+       1,
+       now()
+     )`,
+  );
+  await client.query(
+    `INSERT INTO moderation_case_snapshots (
+       id, case_id, listing_version, snapshot, snapshot_hash, captured_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000036',
+       '00000000-0000-4000-8000-000000000035',
+       3,
+       '{"sensitiveFieldsRedacted":true}'::jsonb,
+       repeat('c', 64),
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "moderation case positive version",
+    `UPDATE moderation_cases
+        SET version = 0
+      WHERE id = '00000000-0000-4000-8000-000000000035'`,
+    "23514",
+  );
+  await expectSqlState(
+    "moderation action idempotency evidence pairing",
+    `INSERT INTO moderation_actions (
+       id, case_id, actor_id, action, reason_code, idempotency_key
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000037',
+       '00000000-0000-4000-8000-000000000035',
+       '00000000-0000-4000-8000-000000000001',
+       'APPROVE',
+       'CONTENT_POLICY_COMPLIANT',
+       'baseline-moderation-action-invalid'
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "moderation snapshot immutability",
+    `UPDATE moderation_case_snapshots
+        SET snapshot_hash = repeat('d', 64)
+      WHERE id = '00000000-0000-4000-8000-000000000036'`,
+    "P0001",
+  );
+  await client.query(
+    `INSERT INTO moderation_actions (
+       id, case_id, actor_id, action, reason_code, idempotency_key, request_hash
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000038',
+       '00000000-0000-4000-8000-000000000035',
+       '00000000-0000-4000-8000-000000000001',
+       'APPROVE',
+       'CONTENT_POLICY_COMPLIANT',
+       'baseline-moderation-action-valid',
+       repeat('e', 64)
+     )`,
+  );
+  await expectSqlState(
+    "moderation action immutability",
+    `DELETE FROM moderation_actions
+      WHERE id = '00000000-0000-4000-8000-000000000038'`,
     "P0001",
   );
 
@@ -1078,7 +1217,8 @@ try {
       listingDraftStorage: true,
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
-      negativeCases: 27,
+      moderationWorkbenchStorage: true,
+      negativeCases: 31,
     }),
   );
 } finally {

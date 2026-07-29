@@ -7,6 +7,7 @@ import type {
 } from "@socal/contracts";
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ModerationWorkspace } from "./moderation-workspace";
 
 type Locale = "zh-Hans" | "en-US";
 type SessionState =
@@ -603,6 +604,8 @@ export function AdminConsole({ activePath }: { activePath: string }) {
   }
 
   const activeNavigation = session.navigation.find((item) => item.href === activePath);
+  const moderationActive =
+    activeNavigation?.key === "moderation" && activePath === "/admin/moderation/listings";
   return (
     <div className="adminShell">
       <aside>
@@ -634,7 +637,13 @@ export function AdminConsole({ activePath }: { activePath: string }) {
             <p className="eyebrow">
               {activeNavigation ? text.nav[activeNavigation.key] : text.admin}
             </p>
-            <h1>{activeNavigation ? text.placeholder : text.overview}</h1>
+            <h1>
+              {moderationActive
+                ? text.nav.moderation
+                : activeNavigation
+                  ? text.placeholder
+                  : text.overview}
+            </h1>
           </div>
           <div className="operator">
             {languageControl}
@@ -670,21 +679,25 @@ export function AdminConsole({ activePath }: { activePath: string }) {
             </form>
           ) : null}
         </section>
-        <div className="adminGrid">
-          <section className="panel">
-            <h2>{activeNavigation ? text.placeholder : text.overview}</h2>
-            <p>{activeNavigation ? text.placeholderBody : text.overviewBody}</p>
-            {!activeNavigation && session.navigation.length === 0 ? <p>{text.empty}</p> : null}
-          </section>
-          <section className="panel">
-            <h2>{text.roles}</h2>
-            <ul className="roleList">
-              {session.roles.map((role) => (
-                <li key={role}>{role.replaceAll("_", " ")}</li>
-              ))}
-            </ul>
-          </section>
-        </div>
+        {moderationActive ? (
+          <ModerationWorkspace locale={locale} canAct={session.security.sensitiveActionsAllowed} />
+        ) : (
+          <div className="adminGrid">
+            <section className="panel">
+              <h2>{activeNavigation ? text.placeholder : text.overview}</h2>
+              <p>{activeNavigation ? text.placeholderBody : text.overviewBody}</p>
+              {!activeNavigation && session.navigation.length === 0 ? <p>{text.empty}</p> : null}
+            </section>
+            <section className="panel">
+              <h2>{text.roles}</h2>
+              <ul className="roleList">
+                {session.roles.map((role) => (
+                  <li key={role}>{role.replaceAll("_", " ")}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );

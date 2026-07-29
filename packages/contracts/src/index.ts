@@ -30,6 +30,14 @@ export type AdminMfaEnrollmentVerifyRequest =
 export type AdminMfaVerifyRequest = components["schemas"]["AdminMfaVerifyRequest"];
 export type AdminMfaActivationResponse = components["schemas"]["AdminMfaActivationResponse"];
 export type AdminMfaVerificationResponse = components["schemas"]["AdminMfaVerificationResponse"];
+export type ModerationCase = components["schemas"]["ModerationCase"];
+export type ModerationCaseCollection = components["schemas"]["ModerationCaseCollection"];
+export type ModerationCaseDetailResponse = components["schemas"]["ModerationCaseDetailResponse"];
+export type ModerationActionRequest = components["schemas"]["ModerationActionRequest"];
+export type ModerationActionResponse = components["schemas"]["ModerationActionResponse"];
+export type ListModerationCasesQuery = NonNullable<
+  operations["listModerationCases"]["parameters"]["query"]
+>;
 export type OtpRequest = components["schemas"]["OtpRequest"];
 export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
 export type OtpAcceptedResponse = components["schemas"]["OtpAcceptedResponse"];
@@ -432,6 +440,66 @@ export const adminMfaVerifyRequestSchema: z.ZodType<AdminMfaVerifyRequest> = z
       .pipe(z.string().regex(/^(?:\d{6}|[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3})$/)),
   })
   .strict();
+
+export const listModerationCasesQuerySchema: z.ZodType<ListModerationCasesQuery> = z
+  .object({
+    queue: z.literal("listing-submission").default("listing-submission"),
+    status: z.enum(["OPEN", "ASSIGNED", "RESOLVED", "APPEALED", "CLOSED"]).default("OPEN"),
+    riskTier: z.enum(["MEDIUM", "HIGH"]).optional(),
+    minPriority: z.coerce.number().int().min(0).max(100).optional(),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+const moderationReasonByAction = {
+  APPROVE: ["CONTENT_POLICY_COMPLIANT"],
+  REQUEST_CHANGES: ["NEEDS_CLARIFICATION"],
+  REJECT: ["PROHIBITED_CONTENT", "EXTERNAL_PAYMENT_RISK"],
+  ESCALATE: ["ESCALATE_SENIOR_REVIEW"],
+} as const;
+
+function safeModerationNote(value: string): boolean {
+  return !Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const allowedWhitespace = codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d;
+    return (
+      (codePoint <= 0x1f && !allowedWhitespace) ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      isBidirectionalControl(codePoint)
+    );
+  });
+}
+
+export const moderationActionRequestSchema: z.ZodType<ModerationActionRequest> = z
+  .object({
+    action: z.enum(["APPROVE", "REQUEST_CHANGES", "REJECT", "ESCALATE"]),
+    reasonCode: z.enum([
+      "CONTENT_POLICY_COMPLIANT",
+      "NEEDS_CLARIFICATION",
+      "PROHIBITED_CONTENT",
+      "EXTERNAL_PAYMENT_RISK",
+      "ESCALATE_SENIOR_REVIEW",
+    ]),
+    note: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .refine(safeModerationNote, "Note contains unsupported characters")
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const allowed = moderationReasonByAction[value.action] as readonly string[];
+    if (!allowed.includes(value.reasonCode)) {
+      context.addIssue({
+        code: "custom",
+        path: ["reasonCode"],
+        message: "Reason code is not allowed for this moderation action",
+      });
+    }
+  });
 
 function isBidirectionalControl(codePoint: number): boolean {
   return (

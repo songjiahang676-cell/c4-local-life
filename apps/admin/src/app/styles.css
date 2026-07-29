@@ -360,6 +360,250 @@ button:disabled {
   padding: 7px 10px;
 }
 
+.moderationWorkspace {
+  display: grid;
+  gap: 14px;
+}
+
+.workspaceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.workspaceHeader h2,
+.workspaceHeader p,
+.caseQueue h3,
+.caseDetail h3 {
+  margin-top: 0;
+}
+
+.workspaceHeader p,
+.keyboardHelp,
+.freshness,
+.caseDetail > footer {
+  color: #637188;
+}
+
+.keyboardHelp,
+.freshness {
+  margin: 0;
+  font-size: 13px;
+}
+
+.moderationLayout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.caseQueue,
+.caseDetail > section,
+.caseDetail > .evidenceGrid > section,
+.caseDetail > footer {
+  border: 1px solid #dce5f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 22px rgba(31, 53, 83, 0.05);
+}
+
+.caseQueue {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px;
+}
+
+.caseQueue ol,
+.caseDetail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.caseQueue ol {
+  display: grid;
+  gap: 8px;
+}
+
+.caseQueue button {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  border: 1px solid #d5dfeb;
+  background: #fff;
+  color: #243853;
+  text-align: left;
+}
+
+.caseQueue button.selected {
+  border-color: #155fbd;
+  background: #eaf3ff;
+  box-shadow: inset 4px 0 #155fbd;
+}
+
+.caseQueue button span {
+  color: #65758c;
+  font-size: 12px;
+}
+
+.caseDetail {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.caseDetail > section,
+.caseDetail > footer,
+.caseDetail > .evidenceGrid > section {
+  padding: 20px;
+}
+
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sectionHeading > span {
+  color: #8a4b16;
+  background: #fff1d9;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 5px 9px;
+}
+
+.snapshotGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.snapshotGrid > div,
+.evidenceGrid dl > div {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 11px;
+}
+
+.snapshotGrid .wide {
+  grid-column: 1 / -1;
+}
+
+.snapshotGrid dt,
+.evidenceGrid dt {
+  color: #67768b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.snapshotGrid dd,
+.evidenceGrid dd {
+  margin: 5px 0 0;
+}
+
+.contentBody {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.snapshotGrid pre,
+.diffList pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diffList {
+  display: grid;
+  gap: 7px;
+}
+
+.diffList li {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.25fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border-top: 1px solid #e8edf3;
+  padding-top: 9px;
+}
+
+.diffList li > span {
+  border-radius: 999px;
+  background: #e7f5ed;
+  color: #247447;
+  font-size: 11px;
+  font-weight: 750;
+  padding: 4px 7px;
+}
+
+.evidenceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.evidenceGrid ul,
+.evidenceGrid dl {
+  display: grid;
+  gap: 8px;
+}
+
+.evidenceGrid li {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid #e8edf3;
+  padding-top: 8px;
+}
+
+.evidenceGrid li span {
+  color: #65758c;
+  font-size: 12px;
+}
+
+.actionPanel form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actionPanel label {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+}
+
+.actionPanel label:has(textarea) {
+  grid-column: 1 / -1;
+}
+
+.actionPanel select,
+.actionPanel textarea {
+  width: 100%;
+  border: 1px solid #b8c5d6;
+  border-radius: 9px;
+  background: #fff;
+  color: #18253b;
+  padding: 10px 12px;
+}
+
+.actionPanel textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.actionPanel button {
+  justify-self: start;
+}
+
 @media (max-width: 860px) {
   .adminShell {
     grid-template-columns: 1fr;
@@ -398,6 +642,39 @@ button:disabled {
   }
 
   .recoveryCodes {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspaceHeader button {
+    align-self: start;
+  }
+
+  .moderationLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .caseQueue {
+    position: static;
+    max-height: 360px;
+  }
+
+  .snapshotGrid,
+  .evidenceGrid,
+  .actionPanel form {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshotGrid .wide,
+  .actionPanel label:has(textarea) {
+    grid-column: auto;
+  }
+
+  .diffList li {
     grid-template-columns: 1fr;
   }
 }

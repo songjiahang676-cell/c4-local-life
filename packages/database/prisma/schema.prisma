@@ -1006,6 +1006,7 @@ model ModerationCase {
   assignedToId   String?              @map("assigned_to_id") @db.Uuid
   decisionCode   String?              @map("decision_code") @db.VarChar(80)
   resolutionNote String?              @map("resolution_note") @db.VarChar(2000)
+  version        Int                  @default(1)
   createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   resolvedAt     DateTime?            @map("resolved_at") @db.Timestamptz(6)
@@ -1013,10 +1014,24 @@ model ModerationCase {
   evaluation     ModerationEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
   assignedTo     User?                @relation("CaseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   actions        ModerationAction[]
+  snapshot       ModerationCaseSnapshot?
 
   @@index([queue, status, priority(sort: Desc), createdAt])
   @@index([targetType, targetId])
   @@map("moderation_cases")
+}
+
+model ModerationCaseSnapshot {
+  id             String         @id @default(uuid()) @db.Uuid
+  caseId         String         @unique @map("case_id") @db.Uuid
+  listingVersion Int            @map("listing_version")
+  snapshot       Json
+  snapshotHash   String         @map("snapshot_hash") @db.Char(64)
+  capturedAt     DateTime       @map("captured_at") @db.Timestamptz(6)
+  moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([capturedAt(sort: Desc)])
+  @@map("moderation_case_snapshots")
 }
 
 model ModerationEvaluation {
@@ -1069,11 +1084,14 @@ model ModerationAction {
   action         String         @db.VarChar(80)
   reasonCode     String?        @map("reason_code") @db.VarChar(80)
   note           String?        @db.VarChar(2000)
+  idempotencyKey String?        @map("idempotency_key") @db.VarChar(128)
+  requestHash    String?        @map("request_hash") @db.Char(64)
   metadata       Json?
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   actor          User           @relation("ActionActor", fields: [actorId], references: [id], onDelete: Restrict)
 
+  @@unique([actorId, idempotencyKey])
   @@index([caseId, createdAt])
   @@map("moderation_actions")
 }

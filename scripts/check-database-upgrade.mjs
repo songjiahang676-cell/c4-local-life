@@ -56,6 +56,7 @@ if (
 const priorMigrations = migrationNames.slice(0, compatibilityIndex + 1);
 const upgradeMigrations = migrationNames.slice(compatibilityIndex + 1);
 const sentinelId = "00000000-0000-4000-8000-000000000404";
+const moderationSentinelCaseId = "00000000-0000-4000-8000-000000000409";
 const admin = new Client({ connectionString: adminUrl.toString() });
 let upgrade;
 
@@ -78,6 +79,108 @@ try {
   for (const migration of upgradeMigrations) {
     const sql = await readFile(resolve(migrationsRoot, migration, "migration.sql"), "utf8");
     await upgrade.query(sql);
+    if (migration === "20260729130000_listing_submission_moderation") {
+      await upgrade.query(`
+        INSERT INTO "users" ("id", "email", "updated_at")
+        VALUES (
+          '00000000-0000-4000-8000-000000000405',
+          'upgrade-moderation-sentinel@example.invalid',
+          now()
+        );
+        INSERT INTO "categories" ("id", "vertical", "slug", "name_zh_hans", "name_en")
+        VALUES (
+          '00000000-0000-4000-8000-000000000406',
+          'RENTAL',
+          'upgrade-moderation-rentals',
+          '升级审核出租',
+          'Upgrade moderation rentals'
+        );
+        INSERT INTO "category_form_schema_versions" (
+          "id", "category_id", "version", "revision", "definition", "content_hash",
+          "created_at", "updated_at", "published_at"
+        )
+        VALUES (
+          '00000000-0000-4000-8000-000000000410',
+          '00000000-0000-4000-8000-000000000406',
+          1,
+          1,
+          '{"categoryId":"00000000-0000-4000-8000-000000000406","version":1,"fields":[],"publicationPolicy":{"defaultLifetimeDays":30}}'::jsonb,
+          repeat('a', 64),
+          now(),
+          now(),
+          now()
+        );
+        INSERT INTO "listings" (
+          "id", "type", "owner_id", "category_id", "form_schema_version", "region_id",
+          "status", "moderation_status", "locale", "title", "slug", "summary", "body",
+          "price_amount", "currency", "price_unit", "contact_mode", "attributes",
+          "latitude", "longitude", "location_precision", "version", "updated_at"
+        )
+        VALUES (
+          '00000000-0000-4000-8000-000000000407',
+          'RENTAL',
+          '00000000-0000-4000-8000-000000000405',
+          '00000000-0000-4000-8000-000000000406',
+          1,
+          '00000000-0000-4000-8000-000000000404',
+          'SUBMITTED',
+          'ESCALATED',
+          'en-US',
+          'Upgrade moderation sentinel',
+          'upgrade-moderation-sentinel',
+          'Synthetic upgrade summary',
+          'Synthetic upgrade body',
+          2500.00,
+          'USD',
+          'MONTHLY',
+          'PHONE_REVEAL',
+          '{"phone":"+15555550100","bedrooms":2}'::jsonb,
+          34.052235,
+          -118.243683,
+          'EXACT',
+          3,
+          now()
+        );
+        INSERT INTO "rental_details" ("listing_id", "bedrooms", "bathrooms")
+        VALUES ('00000000-0000-4000-8000-000000000407', 2.0, 1.0);
+        INSERT INTO "moderation_evaluations" (
+          "id", "listing_id", "actor_user_id", "listing_version", "rule_set_key",
+          "rule_set_version", "risk_tier", "input_hash", "idempotency_key", "request_hash",
+          "result_content_status", "result_moderation_status", "result_listing_version",
+          "occurred_at"
+        )
+        VALUES (
+          '00000000-0000-4000-8000-000000000408',
+          '00000000-0000-4000-8000-000000000407',
+          '00000000-0000-4000-8000-000000000405',
+          1,
+          'listing-submission',
+          1,
+          'HIGH',
+          repeat('b', 64),
+          'upgrade-moderation-submission',
+          repeat('c', 64),
+          'SUBMITTED',
+          'ESCALATED',
+          3,
+          now()
+        );
+        INSERT INTO "moderation_cases" (
+          "id", "evaluation_id", "target_type", "target_id", "queue", "priority", "status",
+          "updated_at"
+        )
+        VALUES (
+          '${moderationSentinelCaseId}',
+          '00000000-0000-4000-8000-000000000408',
+          'LISTING',
+          '00000000-0000-4000-8000-000000000407',
+          'listing-submission',
+          80,
+          'OPEN',
+          now()
+        );
+      `);
+    }
   }
 
   const sentinel = await upgrade.query(`SELECT "code" FROM "regions" WHERE "id" = $1::uuid`, [
@@ -274,6 +377,44 @@ try {
             AND NOT tgisinternal
        ) AS immutable_triggers`,
   );
+  const moderationWorkbenchStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.moderation_case_snapshots') AS snapshots,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'moderation_actions_actor_id_idempotency_key_key'
+       ) AS action_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname IN (
+            'moderation_case_snapshots_immutable',
+            'moderation_actions_immutable'
+          )
+            AND NOT tgisinternal
+       ) AS immutable_triggers,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND (
+              (table_name = 'moderation_cases' AND column_name = 'version' AND is_nullable = 'NO')
+              OR (
+                table_name = 'moderation_actions'
+                AND column_name IN ('idempotency_key', 'request_hash')
+                AND is_nullable = 'YES'
+              )
+            )
+       ) AS workbench_columns`,
+  );
+  const moderationSentinelSnapshot = await upgrade.query(
+    `SELECT "listing_version", "snapshot"
+       FROM "moderation_case_snapshots"
+      WHERE "case_id" = $1::uuid`,
+    [moderationSentinelCaseId],
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -311,7 +452,17 @@ try {
     listingSubmissionStorage.rows[0].evaluations !== "moderation_evaluations" ||
     listingSubmissionStorage.rows[0].rule_hits !== "moderation_rule_hits" ||
     !listingSubmissionStorage.rows[0].actor_idempotency ||
-    listingSubmissionStorage.rows[0].immutable_triggers !== 2
+    listingSubmissionStorage.rows[0].immutable_triggers !== 2 ||
+    moderationWorkbenchStorage.rows[0].snapshots !== "moderation_case_snapshots" ||
+    !moderationWorkbenchStorage.rows[0].action_idempotency ||
+    moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
+    moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
+    moderationSentinelSnapshot.rowCount !== 1 ||
+    moderationSentinelSnapshot.rows[0].listing_version !== 3 ||
+    moderationSentinelSnapshot.rows[0].snapshot.sensitiveFieldsRedacted !== true ||
+    Object.keys(moderationSentinelSnapshot.rows[0].snapshot.attributes).length !== 0 ||
+    "latitude" in moderationSentinelSnapshot.rows[0].snapshot ||
+    "longitude" in moderationSentinelSnapshot.rows[0].snapshot
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -338,6 +489,8 @@ try {
       listingDraftStorage: true,
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
+      moderationWorkbenchStorage: true,
+      moderationSnapshotBackfilledAndRedacted: true,
     }),
   );
 } finally {
