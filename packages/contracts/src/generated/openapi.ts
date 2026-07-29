@@ -1835,7 +1835,7 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             /** @enum {string} */
-            readonly type: "RENTAL" | "JOB";
+            readonly type: "RENTAL" | "JOB" | "TRANSFER" | "SECONDHAND" | "SERVICE";
             /** @constant */
             readonly status: "PUBLISHED";
             /** @enum {string} */
@@ -3316,7 +3316,7 @@ export interface operations {
     readonly listListings: {
         readonly parameters: {
             readonly query?: {
-                readonly type?: "RENTAL" | "JOB";
+                readonly type?: "RENTAL" | "JOB" | "TRANSFER" | "SECONDHAND" | "SERVICE";
                 readonly categoryId?: string;
                 readonly regionCode?: string;
                 readonly cursor?: components["parameters"]["Cursor"];
@@ -3328,7 +3328,7 @@ export interface operations {
         };
         readonly requestBody?: never;
         readonly responses: {
-            /** @description Stable cursor-paginated public Rental or Job summaries */
+            /** @description Stable cursor-paginated public listing summaries */
             readonly 200: {
                 headers: {
                     readonly "Cache-Control"?: "public, max-age=30";

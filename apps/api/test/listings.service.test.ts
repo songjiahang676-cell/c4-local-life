@@ -17,6 +17,9 @@ import {
   memoryJobCategoryId,
   memoryListingCategoryId,
   memoryListingRegionCode,
+  memorySecondhandCategoryId,
+  memoryServiceCategoryId,
+  memoryTransferCategoryId,
 } from "./support/memory-listing.store";
 
 const ownerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -97,6 +100,65 @@ function createJobInput(overrides: Partial<CreateListingInput> = {}): CreateList
   };
 }
 
+function createRemainingVerticalInput(
+  type: "TRANSFER" | "SECONDHAND" | "SERVICE",
+): CreateListingInput {
+  if (type === "TRANSFER") {
+    return {
+      type,
+      categoryId: memoryTransferCategoryId,
+      locale: "zh-Hans",
+      title: "Synthetic Irvine retail transfer",
+      body: "A deliberately fictional transfer used only for deterministic policy tests.",
+      regionCode: memoryListingRegionCode,
+      price: { amount: "125000.00", currency: "USD", unit: "FIXED" },
+      attributes: {
+        businessType: "retail",
+        monthlyRent: "2500.00",
+        leaseRemainingMonths: 24,
+        reasonForTransfer: "Synthetic owner relocation",
+        financialDisclaimerAcknowledged: true,
+      },
+      mediaIds: [],
+      contactMode: "IN_APP",
+    };
+  }
+  if (type === "SECONDHAND") {
+    return {
+      type,
+      categoryId: memorySecondhandCategoryId,
+      locale: "zh-Hans",
+      title: "Synthetic Irvine wooden table",
+      body: "A deliberately fictional secondhand item used only for deterministic policy tests.",
+      regionCode: memoryListingRegionCode,
+      price: { amount: null, currency: "USD", unit: "NEGOTIABLE" },
+      attributes: {
+        condition: "good",
+        deliveryOptions: ["pickup"],
+        marketplacePolicyAcknowledged: true,
+      },
+      mediaIds: [],
+      contactMode: "IN_APP",
+    };
+  }
+  return {
+    type,
+    categoryId: memoryServiceCategoryId,
+    locale: "zh-Hans",
+    title: "Synthetic Irvine home cleaning",
+    body: "A deliberately fictional local service used only for deterministic policy tests.",
+    regionCode: memoryListingRegionCode,
+    price: { amount: "95.00", currency: "USD", unit: "HOURLY" },
+    attributes: {
+      serviceRadiusMiles: 20,
+      availability: ["weekdays"],
+      servicePolicyAcknowledged: true,
+    },
+    mediaIds: [],
+    contactMode: "IN_APP",
+  };
+}
+
 function createService(): { service: ListingsService; store: MemoryListingStore } {
   const store = new MemoryListingStore();
   const service = new ListingsService(
@@ -161,7 +223,7 @@ describe("ListingsService", () => {
         previousModerationStatus: "NOT_REVIEWED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 2,
+        ruleSetVersion: 3,
         caseId: null,
         version: 3,
       },
@@ -253,7 +315,7 @@ describe("ListingsService", () => {
       currentStatus: "PUBLISHED",
       currentModerationStatus: "AUTO_APPROVED",
       riskTier: "LOW",
-      ruleSetVersion: 2,
+      ruleSetVersion: 3,
     });
 
     const publicPage = await service.list({ type: "JOB", limit: 20 });
@@ -264,5 +326,66 @@ describe("ListingsService", () => {
       status: "PUBLISHED",
       title: "Synthetic Irvine kitchen position",
     });
+  });
+
+  it("validates and submits Transfer, Secondhand, and Service through their policies", async () => {
+    const { service } = createService();
+    await expect(
+      service.create(ownerContext(), "create-transfer-invalid-0001", {
+        ...createRemainingVerticalInput("TRANSFER"),
+        attributes: {
+          ...createRemainingVerticalInput("TRANSFER").attributes,
+          financialDisclaimerAcknowledged: false,
+        },
+      }),
+    ).rejects.toMatchObject({
+      errors: { financialDisclaimerAcknowledged: ["must be acknowledged"] },
+    });
+
+    const transfer = await service.create(
+      ownerContext(),
+      "create-transfer-valid-0001",
+      createRemainingVerticalInput("TRANSFER"),
+    );
+    const transferSubmission = await service.submit(
+      ownerContext(),
+      transfer.data.id,
+      1,
+      "submit-transfer-valid-0001",
+    );
+    expect(transferSubmission.data).toMatchObject({
+      currentStatus: "SUBMITTED",
+      currentModerationStatus: "PENDING_REVIEW",
+      riskTier: "MEDIUM",
+      ruleSetVersion: 3,
+    });
+
+    for (const type of ["SECONDHAND", "SERVICE"] as const) {
+      const created = await service.create(
+        ownerContext(),
+        `create-${type.toLowerCase()}-valid-0001`,
+        createRemainingVerticalInput(type),
+      );
+      const submitted = await service.submit(
+        ownerContext(),
+        created.data.id,
+        1,
+        `submit-${type.toLowerCase()}-valid-0001`,
+      );
+      expect(submitted.data).toMatchObject({
+        currentStatus: "PUBLISHED",
+        currentModerationStatus: "AUTO_APPROVED",
+        riskTier: "LOW",
+        ruleSetVersion: 3,
+      });
+      const publicPage = await service.list({ type, limit: 20 });
+      expect(publicPage.data).toEqual([
+        expect.objectContaining({
+          id: created.data.id,
+          type,
+          status: "PUBLISHED",
+        }),
+      ]);
+    }
   });
 });

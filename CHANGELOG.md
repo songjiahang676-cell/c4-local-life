@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added the Transfer, Secondhand and Service verticals from bilingual/mobile schema-driven drafts
+  through coherent detail persistence, submission/moderation, safe public reads and duplicate-safe
+  expiry, including financial disclaimers, prohibited-goods routing and owner-only license data.
 - Added the Job vertical from bilingual/mobile schema-driven draft through submit/moderation,
   approved public list/detail and duplicate-safe expiry, with coherent wage persistence, explicit
   employment-policy acknowledgement, conservative policy-risk routing and PII-minimized evidence.

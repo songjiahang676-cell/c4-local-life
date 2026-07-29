@@ -104,12 +104,11 @@ describe("listing contracts", () => {
     });
   });
 
-  it("limits the public Listing collection to implemented Rental and Job verticals", () => {
+  it("accepts every implemented public Listing vertical and rejects unknown values", () => {
     expect(listListingsQuerySchema.parse({})).toMatchObject({ type: "RENTAL", limit: 20 });
-    expect(listListingsQuerySchema.parse({ type: "JOB" })).toMatchObject({
-      type: "JOB",
-      limit: 20,
-    });
-    expect(listListingsQuerySchema.safeParse({ type: "SERVICE" }).success).toBe(false);
+    for (const type of ["RENTAL", "JOB", "TRANSFER", "SECONDHAND", "SERVICE"] as const) {
+      expect(listListingsQuerySchema.parse({ type })).toMatchObject({ type, limit: 20 });
+    }
+    expect(listListingsQuerySchema.safeParse({ type: "BUSINESS" }).success).toBe(false);
   });
 });

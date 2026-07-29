@@ -124,12 +124,15 @@ try {
         AND indexname IN (
           'listings_geo_point_gist',
           'listings_title_trgm',
-          'listings_published_partial',
-          'listings_rental_expiry_due_idx',
-          'listings_job_expiry_due_idx'
-        )`,
+           'listings_published_partial',
+           'listings_rental_expiry_due_idx',
+           'listings_job_expiry_due_idx',
+           'listings_transfer_expiry_due_idx',
+           'listings_secondhand_expiry_due_idx',
+           'listings_service_expiry_due_idx'
+         )`,
   );
-  if (customIndexes.rowCount !== 5) {
+  if (customIndexes.rowCount !== 8) {
     throw new Error("One or more custom listing indexes are missing");
   }
 
@@ -154,6 +157,23 @@ try {
   );
   if (!jobVerticalStorage.rows[0]?.wage_check || !jobVerticalStorage.rows[0]?.text_check) {
     throw new Error("Job vertical storage constraints are missing");
+  }
+
+  const remainingVerticalStorage = await client.query(
+    `SELECT count(*)::integer AS detail_checks
+       FROM information_schema.table_constraints
+      WHERE constraint_schema = 'public'
+        AND constraint_type = 'CHECK'
+        AND constraint_name IN (
+          'transfer_details_core_fields_coherent',
+          'secondhand_details_core_fields_coherent',
+          'secondhand_details_optional_text_nonblank',
+          'service_details_core_fields_coherent',
+          'service_details_license_nonblank'
+        )`,
+  );
+  if (remainingVerticalStorage.rows[0]?.detail_checks !== 5) {
+    throw new Error("Transfer, Secondhand, or Service storage constraints are missing");
   }
 
   const sessionLifecycleColumns = await client.query(
@@ -764,6 +784,42 @@ try {
        40.00,
        20.00,
        'HOURLY'
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "Transfer detail coherence",
+    `INSERT INTO transfer_details (
+       listing_id, business_type, asking_price, monthly_rent,
+       lease_remaining_months, reason_for_transfer
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000041',
+       'retail',
+       -1.00,
+       1000.00,
+       12,
+       'Synthetic invalid transfer'
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "Secondhand detail coherence",
+    `INSERT INTO secondhand_details (listing_id, condition, delivery_options)
+     VALUES (
+       '00000000-0000-4000-8000-000000000041',
+       'good',
+       '{}'::jsonb
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "Service detail coherence",
+    `INSERT INTO service_details (listing_id, service_radius_miles, availability)
+     VALUES (
+       '00000000-0000-4000-8000-000000000041',
+       101,
+       '["weekdays"]'::jsonb
      )`,
     "23514",
   );
@@ -1395,6 +1451,7 @@ try {
       moderationWorkbenchStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
+      remainingVerticalStorage: true,
       negativeCases: savepointSequence,
     }),
   );

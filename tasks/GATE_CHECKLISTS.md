@@ -31,9 +31,9 @@ Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证�
 - [x] Listing 审核队列、脱敏快照/diff、规则证据、并发安全动作和键盘工作流。
 - [x] Rental 草稿/提交/审核/发布/编辑/归档/删除/过期完整。
 - [x] Job 复用并验收完整状态链。
-- [ ] Transfer/Secondhand/Service 复用并验收完整状态链。
+- [x] Transfer/Secondhand/Service 复用并验收完整状态链。
 - [ ] 审核、举报、申诉、审计和通知。
-- [ ] 移动端中英文发布 E2E。
+- [x] 五类移动端中英文发布 E2E。
 
 ## G3 Search / Web / SEO
 

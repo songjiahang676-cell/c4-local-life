@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
+  draftPriceUnits,
   emptyRentalDraft,
   parseStoredRentalDraft,
   rentalDraftStorageKey,
@@ -172,6 +173,103 @@ const jobCopy = {
     media: "Workplace images",
     mediaHelp:
       "JPG, PNG or WebP; 20 MB per image and 20 images maximum. Do not upload IDs or unnecessary personal information.",
+  },
+} as const;
+
+const verticalCopy = {
+  JOB: jobCopy,
+  TRANSFER: {
+    "zh-Hans": {
+      title: "发布生意转让",
+      intro: "转让草稿保持私有；价格、租约、经营声明完整后可提交人工审核。",
+      category: "转让类别",
+      titleLabel: "生意或资产名称",
+      summary: "转让摘要（可选）",
+      body: "经营情况与转让说明",
+      price: "转让价",
+      priceUnit: "计价方式",
+      dynamic: "经营、租约与合规声明",
+      media: "场地或资产图片",
+      mediaHelp:
+        "支持 JPG、PNG、WebP，单张不超过 20 MB，最多 20 张。请勿上传合同、证件或未脱敏的财务资料。",
+    },
+    "en-US": {
+      title: "Post a business transfer",
+      intro:
+        "The draft stays private until price, lease, business statements, and review fields are complete.",
+      category: "Transfer category",
+      titleLabel: "Business or asset name",
+      summary: "Transfer summary (optional)",
+      body: "Operations and transfer details",
+      price: "Asking price",
+      priceUnit: "Pricing",
+      dynamic: "Business, lease, and compliance statements",
+      media: "Premises or asset images",
+      mediaHelp:
+        "JPG, PNG or WebP; 20 MB per image and 20 images maximum. Do not upload contracts, IDs, or unredacted financial records.",
+    },
+  },
+  SECONDHAND: {
+    "zh-Hans": {
+      title: "发布二手物品",
+      intro: "物品草稿保持私有；成色、交付方式和禁售品声明完整后可提交审核。",
+      category: "二手类别",
+      titleLabel: "物品名称",
+      summary: "物品摘要（可选）",
+      body: "成色、使用情况与交付说明",
+      price: "价格",
+      priceUnit: "计价方式",
+      dynamic: "物品与交易政策",
+      media: "物品图片",
+      mediaHelp:
+        "支持 JPG、PNG、WebP，单张不超过 20 MB，最多 20 张。图片不得包含身份证件、支付信息或他人隐私。",
+    },
+    "en-US": {
+      title: "Post a secondhand item",
+      intro:
+        "The draft stays private until condition, delivery, and prohibited-goods declarations are complete.",
+      category: "Secondhand category",
+      titleLabel: "Item name",
+      summary: "Item summary (optional)",
+      body: "Condition, use, and delivery details",
+      price: "Price",
+      priceUnit: "Pricing",
+      dynamic: "Item and marketplace policy",
+      media: "Item images",
+      mediaHelp:
+        "JPG, PNG or WebP; 20 MB per image and 20 images maximum. Images must not expose IDs, payment data, or another person's privacy.",
+    },
+  },
+  SERVICE: {
+    "zh-Hans": {
+      title: "发布本地服务",
+      intro: "服务草稿保持私有；服务范围、可用时间和资质声明完整后可提交审核。",
+      category: "服务类别",
+      titleLabel: "服务名称",
+      summary: "服务摘要（可选）",
+      body: "服务内容、经验与范围说明",
+      price: "起步价或时薪",
+      priceUnit: "计价方式",
+      dynamic: "服务范围与资质声明",
+      media: "服务案例图片",
+      mediaHelp:
+        "支持 JPG、PNG、WebP，单张不超过 20 MB，最多 20 张。执照号请填写在核验字段，不要上传证件原图。",
+    },
+    "en-US": {
+      title: "Post a local service",
+      intro:
+        "The draft stays private until service area, availability, and credential statements are complete.",
+      category: "Service category",
+      titleLabel: "Service name",
+      summary: "Service summary (optional)",
+      body: "Services, experience, and coverage",
+      price: "Starting price or hourly rate",
+      priceUnit: "Pricing",
+      dynamic: "Coverage and credential statements",
+      media: "Service portfolio images",
+      mediaHelp:
+        "JPG, PNG or WebP; 20 MB per image and 20 images maximum. Enter license numbers in the verification field; do not upload ID images.",
+    },
   },
 } as const;
 
@@ -375,7 +473,10 @@ export function RentalDraftForm({
   locale: SupportedLocale;
   listingType?: DraftListingType;
 }) {
-  const text = listingType === "JOB" ? { ...copy[locale], ...jobCopy[locale] } : copy[locale];
+  const text =
+    listingType === "RENTAL"
+      ? copy[locale]
+      : { ...copy[locale], ...verticalCopy[listingType][locale] };
   const [authState, setAuthState] = useState<"loading" | "authenticated" | "guest" | "error">(
     "loading",
   );
@@ -902,7 +1003,7 @@ export function RentalDraftForm({
         <Link
           className="draftPrimaryButton"
           href={`/${locale}/login?returnTo=${encodeURIComponent(
-            `/${locale}/post/${listingType === "JOB" ? "job" : "rental"}/new`,
+            `/${locale}/post/${listingType.toLowerCase()}/new`,
           )}`}
         >
           {text.login}
@@ -1056,10 +1157,7 @@ export function RentalDraftForm({
             <input
               aria-describedby={errors.priceAmount ? "priceAmount-error" : undefined}
               aria-invalid={Boolean(errors.priceAmount)}
-              disabled={
-                listingType === "RENTAL" &&
-                (values.priceUnit === "FREE" || values.priceUnit === "NEGOTIABLE")
-              }
+              disabled={values.priceUnit === "FREE" || values.priceUnit === "NEGOTIABLE"}
               id="priceAmount"
               inputMode="decimal"
               onChange={(event) =>
@@ -1085,23 +1183,22 @@ export function RentalDraftForm({
               }
               value={values.priceUnit}
             >
-              {listingType === "JOB" ? (
-                <>
-                  <option value="HOURLY">{locale === "zh-Hans" ? "每小时" : "Hourly"}</option>
-                  <option value="DAILY">{locale === "zh-Hans" ? "每天" : "Daily"}</option>
-                  <option value="WEEKLY">{locale === "zh-Hans" ? "每周" : "Weekly"}</option>
-                  <option value="MONTHLY">{locale === "zh-Hans" ? "每月" : "Monthly"}</option>
-                  <option value="YEARLY">{locale === "zh-Hans" ? "每年" : "Yearly"}</option>
-                </>
-              ) : (
-                <>
-                  <option value="MONTHLY">{locale === "zh-Hans" ? "每月" : "Monthly"}</option>
-                  <option value="WEEKLY">{locale === "zh-Hans" ? "每周" : "Weekly"}</option>
-                  <option value="DAILY">{locale === "zh-Hans" ? "每天" : "Daily"}</option>
-                  <option value="NEGOTIABLE">{locale === "zh-Hans" ? "面议" : "Negotiable"}</option>
-                  <option value="FREE">{locale === "zh-Hans" ? "免费" : "Free"}</option>
-                </>
-              )}
+              {draftPriceUnits[listingType].map((unit) => (
+                <option key={unit} value={unit}>
+                  {
+                    {
+                      FIXED: locale === "zh-Hans" ? "固定价格" : "Fixed",
+                      HOURLY: locale === "zh-Hans" ? "每小时" : "Hourly",
+                      DAILY: locale === "zh-Hans" ? "每天" : "Daily",
+                      WEEKLY: locale === "zh-Hans" ? "每周" : "Weekly",
+                      MONTHLY: locale === "zh-Hans" ? "每月" : "Monthly",
+                      YEARLY: locale === "zh-Hans" ? "每年" : "Yearly",
+                      NEGOTIABLE: locale === "zh-Hans" ? "面议" : "Negotiable",
+                      FREE: locale === "zh-Hans" ? "免费" : "Free",
+                    }[unit]
+                  }
+                </option>
+              ))}
             </select>
           </label>
         </div>
@@ -1214,7 +1311,7 @@ export function RentalDraftForm({
         >
           {text.save}
         </button>
-        {listingType === "JOB" ? (
+        {listingType !== "RENTAL" ? (
           <button
             disabled={
               saveState !== "saved" ||
@@ -1231,12 +1328,12 @@ export function RentalDraftForm({
           {text.discard}
         </button>
       </div>
-      {listingType === "JOB" && submissionState === "submitted" ? (
+      {listingType !== "RENTAL" && submissionState === "submitted" ? (
         <p aria-live="polite" className="draftSaveStatus state-saved">
           {text.submittedReview}
         </p>
       ) : null}
-      {listingType === "JOB" && submissionState === "failed" ? (
+      {listingType !== "RENTAL" && submissionState === "failed" ? (
         <p role="alert">{text.submitReviewFailed}</p>
       ) : null}
     </form>

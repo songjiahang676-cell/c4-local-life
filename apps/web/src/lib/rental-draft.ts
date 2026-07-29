@@ -7,8 +7,10 @@ import type {
 } from "@socal/contracts";
 
 export type SupportedLocale = "zh-Hans" | "en-US";
-export type DraftListingType = "RENTAL" | "JOB";
+export type DraftListingType = "RENTAL" | "JOB" | "TRANSFER" | "SECONDHAND" | "SERVICE";
 export type DraftFieldErrors = Record<string, string>;
+export type DraftPriceUnit =
+  "FIXED" | "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "NEGOTIABLE" | "FREE";
 
 export type RentalDraftValues = {
   categoryId: string;
@@ -17,7 +19,7 @@ export type RentalDraftValues = {
   summary: string;
   body: string;
   priceAmount: string;
-  priceUnit: "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "NEGOTIABLE" | "FREE";
+  priceUnit: DraftPriceUnit;
   attributes: Record<string, unknown>;
   mediaIds: string[];
   contactMode: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
@@ -58,6 +60,39 @@ const messages = {
   },
 } as const;
 
+const categoryMessages: Record<SupportedLocale, Record<DraftListingType, string>> = {
+  "zh-Hans": {
+    RENTAL: "请选择房屋类型。",
+    JOB: "请选择招聘类别。",
+    TRANSFER: "请选择转让类别。",
+    SECONDHAND: "请选择二手类别。",
+    SERVICE: "请选择服务类别。",
+  },
+  "en-US": {
+    RENTAL: "Choose a housing category.",
+    JOB: "Choose a job category.",
+    TRANSFER: "Choose a business-transfer category.",
+    SECONDHAND: "Choose a secondhand category.",
+    SERVICE: "Choose a service category.",
+  },
+};
+
+export const draftPriceUnits: Record<DraftListingType, readonly DraftPriceUnit[]> = {
+  RENTAL: ["MONTHLY", "WEEKLY", "DAILY", "NEGOTIABLE", "FREE"],
+  JOB: ["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"],
+  TRANSFER: ["FIXED"],
+  SECONDHAND: ["FIXED", "NEGOTIABLE", "FREE"],
+  SERVICE: ["HOURLY", "FIXED", "NEGOTIABLE"],
+};
+
+const initialPriceUnits: Record<DraftListingType, DraftPriceUnit> = {
+  RENTAL: "MONTHLY",
+  JOB: "HOURLY",
+  TRANSFER: "FIXED",
+  SECONDHAND: "FIXED",
+  SERVICE: "HOURLY",
+};
+
 export function emptyRentalDraft(listingType: DraftListingType = "RENTAL"): RentalDraftValues {
   return {
     categoryId: "",
@@ -66,7 +101,7 @@ export function emptyRentalDraft(listingType: DraftListingType = "RENTAL"): Rent
     summary: "",
     body: "",
     priceAmount: "",
-    priceUnit: listingType === "JOB" ? "HOURLY" : "MONTHLY",
+    priceUnit: initialPriceUnits[listingType],
     attributes: {},
     mediaIds: [],
     contactMode: "IN_APP",
@@ -187,7 +222,7 @@ export function validateRentalDraft(
   const copy = messages[locale];
   const errors: DraftFieldErrors = {};
   if (!values.categoryId) {
-    errors.categoryId = listingType === "JOB" ? copy.jobCategory : copy.category;
+    errors.categoryId = categoryMessages[locale][listingType];
   }
   if (!values.regionCode) errors.regionCode = copy.region;
   if (values.title.trim().length < 5) errors.title = copy.title;
@@ -205,15 +240,18 @@ export function validateRentalDraft(
   ) {
     errors.priceAmount = copy.price;
   }
-  if (
-    listingType === "JOB" &&
-    !["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(values.priceUnit)
-  ) {
+  if (!draftPriceUnits[listingType].includes(values.priceUnit)) {
     errors.priceAmount = copy.invalid;
   }
+  const policyAcknowledgements = new Set([
+    "employmentPolicyAcknowledged",
+    "financialDisclaimerAcknowledged",
+    "marketplacePolicyAcknowledged",
+    "servicePolicyAcknowledged",
+  ]);
   for (const field of definition?.fields ?? []) {
     const value = values.attributes[field.key];
-    if (field.key === "employmentPolicyAcknowledged" && value !== true) {
+    if (policyAcknowledgements.has(field.key) && value !== true) {
       errors[`attribute.${field.key}`] = copy.required;
     } else if (field.required && isEmptyValue(value)) {
       errors[`attribute.${field.key}`] = copy.required;
@@ -274,6 +312,8 @@ export function toUpdateListingInput(
 }
 
 export function valuesFromOwnerListing(listing: ListingOwnerView): RentalDraftValues {
+  const listingType = listing.type as DraftListingType;
+  const storedUnit = listing.price?.unit;
   return {
     categoryId: listing.category.id,
     regionCode: listing.region.code,
@@ -282,14 +322,9 @@ export function valuesFromOwnerListing(listing: ListingOwnerView): RentalDraftVa
     body: listing.body,
     priceAmount: listing.price?.amount ?? "",
     priceUnit:
-      listing.price?.unit === "WEEKLY" ||
-      listing.price?.unit === "DAILY" ||
-      listing.price?.unit === "HOURLY" ||
-      listing.price?.unit === "YEARLY" ||
-      listing.price?.unit === "NEGOTIABLE" ||
-      listing.price?.unit === "FREE"
-        ? listing.price.unit
-        : "MONTHLY",
+      storedUnit && draftPriceUnits[listingType].includes(storedUnit as DraftPriceUnit)
+        ? (storedUnit as DraftPriceUnit)
+        : initialPriceUnits[listingType],
     attributes: structuredClone(listing.attributes),
     mediaIds: [...listing.mediaIds],
     contactMode: listing.contactMode,
@@ -301,7 +336,7 @@ export function rentalDraftStorageKey(
   locale: SupportedLocale,
   listingType: DraftListingType = "RENTAL",
 ): string {
-  const vertical = listingType === "JOB" ? "job" : "rental";
+  const vertical = listingType.toLowerCase();
   return `socal:${vertical}-draft:v1:${userId}:${locale}`;
 }
 
@@ -340,7 +375,7 @@ export function parseStoredRentalDraft(
       typeof values.body !== "string" ||
       values.body.length > 10_000 ||
       typeof values.priceAmount !== "string" ||
-      !["HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "NEGOTIABLE", "FREE"].includes(
+      !["FIXED", "HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "NEGOTIABLE", "FREE"].includes(
         String(values.priceUnit),
       ) ||
       !isPlainRecord(values.attributes) ||

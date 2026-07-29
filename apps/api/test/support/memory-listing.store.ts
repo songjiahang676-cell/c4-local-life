@@ -26,6 +26,9 @@ import { MemoryTaxonomyStore } from "./memory-taxonomy.store";
 
 export const memoryListingCategoryId = "11111111-1111-4111-8111-111111111111";
 export const memoryJobCategoryId = "11111111-1111-4111-8111-111111111112";
+export const memoryTransferCategoryId = "11111111-1111-4111-8111-111111111113";
+export const memorySecondhandCategoryId = "11111111-1111-4111-8111-111111111114";
+export const memoryServiceCategoryId = "11111111-1111-4111-8111-111111111115";
 export const memoryListingRegionId = "22222222-2222-4222-8222-222222222222";
 export const memoryListingRegionCode = "US-CA-ORANGE-IRVINE";
 
@@ -43,6 +46,34 @@ const jobCategory = {
   nameZhHans: "测试招聘",
   nameEn: "Synthetic Jobs",
 };
+const transferCategory = {
+  id: memoryTransferCategoryId,
+  vertical: "TRANSFER" as const,
+  slug: "synthetic-transfers",
+  nameZhHans: "测试转让",
+  nameEn: "Synthetic Transfers",
+};
+const secondhandCategory = {
+  id: memorySecondhandCategoryId,
+  vertical: "SECONDHAND" as const,
+  slug: "synthetic-secondhand",
+  nameZhHans: "测试二手",
+  nameEn: "Synthetic Secondhand",
+};
+const serviceCategory = {
+  id: memoryServiceCategoryId,
+  vertical: "SERVICE" as const,
+  slug: "synthetic-services",
+  nameZhHans: "测试服务",
+  nameEn: "Synthetic Services",
+};
+const categoriesByType = {
+  RENTAL: category,
+  JOB: jobCategory,
+  TRANSFER: transferCategory,
+  SECONDHAND: secondhandCategory,
+  SERVICE: serviceCategory,
+} as const;
 const region = {
   id: memoryListingRegionId,
   type: "CITY" as const,
@@ -84,6 +115,33 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
         formSchemaVersion: 1,
         isActive: true,
         sortOrder: 1,
+        aliases: [],
+      },
+      {
+        ...transferCategory,
+        parentId: null,
+        iconKey: "transfer",
+        formSchemaVersion: 1,
+        isActive: true,
+        sortOrder: 2,
+        aliases: [],
+      },
+      {
+        ...secondhandCategory,
+        parentId: null,
+        iconKey: "secondhand",
+        formSchemaVersion: 1,
+        isActive: true,
+        sortOrder: 3,
+        aliases: [],
+      },
+      {
+        ...serviceCategory,
+        parentId: null,
+        iconKey: "service",
+        formSchemaVersion: 1,
+        isActive: true,
+        sortOrder: 4,
         aliases: [],
       },
     ],
@@ -211,6 +269,196 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
         updatedAt: timestamp,
         publishedAt: timestamp,
       },
+      {
+        id: "33333333-3333-4333-8333-333333333335",
+        categoryId: memoryTransferCategoryId,
+        version: 1,
+        revision: 1,
+        definition: {
+          categoryId: memoryTransferCategoryId,
+          version: 1,
+          fields: [
+            {
+              key: "businessType",
+              type: "SELECT",
+              label: { "zh-Hans": "业务类型", "en-US": "Business type" },
+              required: true,
+              filterable: true,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 10,
+              options: [{ value: "retail", label: { "zh-Hans": "零售", "en-US": "Retail" } }],
+            },
+            {
+              key: "monthlyRent",
+              type: "MONEY",
+              label: { "zh-Hans": "月租", "en-US": "Monthly rent" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 20,
+              validation: { min: 0, max: 9999999999.99 },
+            },
+            {
+              key: "leaseRemainingMonths",
+              type: "NUMBER",
+              label: { "zh-Hans": "剩余租期", "en-US": "Lease months remaining" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 30,
+              validation: { min: 0, max: 1200 },
+            },
+            {
+              key: "reasonForTransfer",
+              type: "TEXTAREA",
+              label: { "zh-Hans": "转让原因", "en-US": "Reason" },
+              required: true,
+              filterable: false,
+              searchable: true,
+              visibility: "PUBLIC",
+              sortOrder: 40,
+              validation: { minLength: 5, maxLength: 300 },
+            },
+            {
+              key: "financialDisclaimerAcknowledged",
+              type: "BOOLEAN",
+              label: { "zh-Hans": "财务声明", "en-US": "Financial disclaimer" },
+              required: true,
+              filterable: false,
+              searchable: false,
+              visibility: "OWNER_ONLY",
+              sortOrder: 100,
+            },
+          ],
+          publicationPolicy: {
+            defaultLifetimeDays: 45,
+            manualReviewRequired: true,
+          },
+        },
+        contentHash: "2".repeat(64),
+        basedOnVersion: null,
+        createdById: null,
+        updatedById: null,
+        publishedById: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        publishedAt: timestamp,
+      },
+      {
+        id: "33333333-3333-4333-8333-333333333336",
+        categoryId: memorySecondhandCategoryId,
+        version: 1,
+        revision: 1,
+        definition: {
+          categoryId: memorySecondhandCategoryId,
+          version: 1,
+          fields: [
+            {
+              key: "condition",
+              type: "SELECT",
+              label: { "zh-Hans": "成色", "en-US": "Condition" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 10,
+              options: [{ value: "good", label: { "zh-Hans": "良好", "en-US": "Good" } }],
+            },
+            {
+              key: "deliveryOptions",
+              type: "MULTISELECT",
+              label: { "zh-Hans": "交付", "en-US": "Delivery" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 20,
+              options: [{ value: "pickup", label: { "zh-Hans": "自取", "en-US": "Pickup" } }],
+            },
+            {
+              key: "marketplacePolicyAcknowledged",
+              type: "BOOLEAN",
+              label: { "zh-Hans": "交易政策", "en-US": "Marketplace policy" },
+              required: true,
+              filterable: false,
+              searchable: false,
+              visibility: "OWNER_ONLY",
+              sortOrder: 100,
+            },
+          ],
+          publicationPolicy: {
+            defaultLifetimeDays: 45,
+            manualReviewRequired: false,
+          },
+        },
+        contentHash: "3".repeat(64),
+        basedOnVersion: null,
+        createdById: null,
+        updatedById: null,
+        publishedById: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        publishedAt: timestamp,
+      },
+      {
+        id: "33333333-3333-4333-8333-333333333337",
+        categoryId: memoryServiceCategoryId,
+        version: 1,
+        revision: 1,
+        definition: {
+          categoryId: memoryServiceCategoryId,
+          version: 1,
+          fields: [
+            {
+              key: "serviceRadiusMiles",
+              type: "NUMBER",
+              label: { "zh-Hans": "服务半径", "en-US": "Service radius" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 10,
+              validation: { min: 1, max: 100 },
+            },
+            {
+              key: "availability",
+              type: "MULTISELECT",
+              label: { "zh-Hans": "可用时间", "en-US": "Availability" },
+              required: true,
+              filterable: true,
+              searchable: false,
+              visibility: "PUBLIC",
+              sortOrder: 20,
+              options: [{ value: "weekdays", label: { "zh-Hans": "工作日", "en-US": "Weekdays" } }],
+            },
+            {
+              key: "servicePolicyAcknowledged",
+              type: "BOOLEAN",
+              label: { "zh-Hans": "服务政策", "en-US": "Service policy" },
+              required: true,
+              filterable: false,
+              searchable: false,
+              visibility: "OWNER_ONLY",
+              sortOrder: 100,
+            },
+          ],
+          publicationPolicy: {
+            defaultLifetimeDays: 90,
+            manualReviewRequired: false,
+          },
+        },
+        contentHash: "4".repeat(64),
+        basedOnVersion: null,
+        createdById: null,
+        updatedById: null,
+        publishedById: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        publishedAt: timestamp,
+      },
     ],
   );
 }
@@ -220,7 +468,7 @@ function cloneOwner(row: OwnerListingProjection): OwnerListingProjection {
 }
 
 function rowFromCreate(input: CreateListingDraftInput): OwnerListingProjection {
-  const selectedCategory = input.type === "JOB" ? jobCategory : category;
+  const selectedCategory = categoriesByType[input.type];
   return {
     id: input.id,
     type: input.type,
@@ -289,7 +537,7 @@ function applyFields(
   return {
     ...row,
     category: {
-      ...(row.type === "JOB" ? jobCategory : category),
+      ...categoriesByType[row.type],
       id: fields.categoryId,
     },
     formSchemaVersion: fields.formSchemaVersion,
@@ -359,7 +607,7 @@ export class MemoryListingStore implements ListingStore {
   resolveReferences(
     input: ResolveListingDraftReferencesInput,
   ): Promise<ListingDraftReferences | null> {
-    const selectedCategory = input.type === "JOB" ? jobCategory : category;
+    const selectedCategory = categoriesByType[input.type];
     return Promise.resolve(
       input.type === selectedCategory.vertical &&
         input.categoryId === selectedCategory.id &&
@@ -568,8 +816,13 @@ export class MemoryListingStore implements ListingStore {
         version: row.formSchemaVersion,
         fields: [],
         publicationPolicy: {
-          defaultLifetimeDays: 30,
-          manualReviewRequired: false,
+          defaultLifetimeDays:
+            row.type === "TRANSFER" || row.type === "SECONDHAND"
+              ? 45
+              : row.type === "SERVICE"
+                ? 90
+                : 30,
+          manualReviewRequired: row.type === "TRANSFER",
         },
       },
       actorCreatedAt: new Date("2025-01-01T00:00:00.000Z"),

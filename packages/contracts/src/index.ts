@@ -343,7 +343,7 @@ export const listingSearchSchema: z.ZodType<ListingSearchInput> = z
 
 export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
   .object({
-    type: z.enum(["RENTAL", "JOB"]).default("RENTAL"),
+    type: listingTypeSchema.default("RENTAL"),
     categoryId: z.uuid().optional(),
     regionCode: z.string().trim().min(2).max(80).optional(),
     cursor: z.string().max(512).optional(),

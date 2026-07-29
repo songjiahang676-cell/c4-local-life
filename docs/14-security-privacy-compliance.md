@@ -266,7 +266,7 @@ Idempotency-Key 或请求哈希。
   通用 400，不回显 payload。
 - 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
   ETag；外部用户得到通用 404，受限账号 403。
-- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental/Job 和当前
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved 五类 Listing 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
 ## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
@@ -288,9 +288,23 @@ Idempotency-Key 或请求哈希。
   防止 repository 旁路产生不一致范围。
 - 发布者必须明确确认职位条件、薪资真实且无歧视性要求。确认值仅供 owner/审核证据使用，
   `OWNER_ONLY` 投影规则阻止其进入公开 API。
-- v2 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
+- v3 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
   以减少错误处罚和敏感内容扩散。
 - `visaSupport` 明确标为发布者声明，不视为平台核验或移民法律意见；表单不收集申请人的国籍、
   年龄、证件或其他非必要 PII。
 - Web 提交复用 BFF 精确 allowlist、强 ETag 和 actor-scoped 幂等键；Job 草稿、媒体和恢复数据仍
   按账号隔离，公开投影省略联系方式、精确坐标和 owner-only 字段。
+
+## 14.19 LIST-007 转让、二手与服务安全边界
+
+- Transfer 创建/更新要求正数 FIXED 要价、非负租金、0–1200 的整数剩余租期和非空转让原因；
+  应用层与数据库约束双层校验。分类策略始终人工审核，发布者还必须确认财务数字未经平台验证。
+- Secondhand 只接受 FIXED/NEGOTIABLE/FREE；交付方式不得为空，发布者必须确认合法来源和禁售品政策。
+  v3 `PROHIBITED_GOODS_RISK` 对高置信疑似禁售品只保存规则代码/版本/严重度和命中字段名，
+  送高优先人工审核，不保存原文、不自动处罚。
+- Service 只接受 HOURLY/FIXED/NEGOTIABLE，服务半径限制 1–100 英里且可用时间不得为空。
+  `licenseNumber` 和政策确认是 `OWNER_ONLY`；公开 `licenseStatus`、保险和紧急服务均为发布者声明，
+  不是平台核验或专业建议。
+- 三类详情与 Listing 一对一，应用服务和 Repository 双层执行类型严格耦合，数据库约束独立保护各类
+  核心字段；跨类型明细、缺失明细、未知动态字段均失败关闭。
+  公开投影省略联系方式、精确坐标、执照号、政策确认和审核证据。

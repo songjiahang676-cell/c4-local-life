@@ -164,7 +164,7 @@ Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非
 
 PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随后受保护合并为
 `d4abece`，Gate 1 实施主线完成。Backlog 中的 `ORG-002` 是 G1/P1，但显式依赖 Gate 2
-`NOTIF-001`；该依赖及 `ORG-002` 已分别由 PR #24/#25 受保护合并，现继续 LIST-006。受限验证文件
+`NOTIF-001`；该依赖及 `ORG-002` 已分别由 PR #24/#25 受保护合并。受限验证文件
 `MEDIA-003` 属于 Gate 4，仍按 Gate 顺序延后。
 `LIST-001` 已由 PR #17 / final run `30408759770` 通过两项 required checks，并受保护合并为
 `c1709a7`。`LIST-002` 在此基础上提供真实 PostgreSQL public/owner/moderator 安全投影：公开内容在
@@ -221,11 +221,19 @@ Listing ETag 幂等归档或软删除，状态/版本/Audit/Outbox 原子提交�
 组织至少一名 Owner；Owner 转移还要求当前 Owner、MFA-bound 会话和十分钟内 recent-auth，目标晋升
 与原 Owner 降级原子提交。邀请通知只保存资源 ID/版本，正文不包含邮箱或组织私密资料。
 
-`LIST-006` 正在把已验证的 Rental 模式复用到 Job：招聘草稿使用独立中英文响应式入口，按历史表单
+`LIST-006` 已把已验证的 Rental 模式复用到 Job：招聘草稿使用独立中英文响应式入口，按历史表单
 schema 校验雇主、用工形式、经验/远程方式、薪资范围/周期及就业政策确认；应用层和 Repository 都
-拒绝 Job 缺少明细或其他垂类携带 Job 明细。提交风险规则 v2 只记录命中字段名并把疑似歧视性招聘内容
+拒绝 Job 缺少明细或其他垂类携带 Job 明细。提交风险规则 v3 只记录命中字段名并把疑似歧视性招聘内容
 送人工审核，不复制命中文本。公开列表/详情继续过滤联系方式、精确位置和 OWNER_ONLY 政策字段，到期
-Job 与 Rental 共用有界、并发安全且不重复写审计证据的 Worker。
+Job 与 Rental 共用有界、并发安全且不重复写审计证据的 Worker。PR #26 已受保护 squash 合并，
+`main` 最终 run `30443279395` 通过。
+
+`LIST-007` 已将同一闭环扩展到 Transfer、Secondhand 和 Service：三类分别持久化一致的
+`TransferDetail`、`SecondhandDetail` 和 `ServiceDetail`，并由应用层与 PostgreSQL 双层阻止类型错配、
+无效价格、越界租期/服务半径和空交付/可用时间。转让始终进入人工审核且要求财务免责声明；二手要求
+合法来源/禁售品确认，并由 v3 高置信规则把疑似禁售品送高优先人工审核；服务执照号仅 owner/审核可见，
+公开资质状态明确为发布者声明。五类公共查询、签名 cursor、归档/删除和到期 Worker 现共享一致的
+安全投影与幂等状态链；三类新增中英文 noindex 发布页复用 READY 图片、自动保存和幂等提交。
 
 ## 七、规划容量与服务目标
 

@@ -77,20 +77,23 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
 Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
 `LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
-Transfer/Secondhand/Service 三个垂直仍须复用并验收，不能因 Rental/Job 通过而标记整个 22.4 完成。
+`LIST-007` 已继续完成 Transfer/Secondhand/Service 的 schema、明细持久化、政策确认、双语移动提交、
+安全公开读取和过期。五类垂直基线均已验收；revision/重大编辑复审、账户管理和搜索派生状态仍由
+后续任务完成，因此整个 22.4 尚不能标记完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
 规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
-`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用并增加 v2 就业政策人工审核规则；其余
-三个垂直类型与搜索派生状态仍待后续切片。
+`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用，`LIST-007` 又覆盖其余三类。v3 风险规则
+继续把就业政策疑点送人工审核，并把 Secondhand 高置信疑似禁售品送高优先人工审核；搜索派生状态
+仍待 Gate 3。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
 覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
-revision diff、通知、搜索索引消费和其余垂直类型仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+revision diff、申诉/举报和搜索索引消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
 
 `LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
 安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选
@@ -105,6 +108,14 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 详情、归档/删除和 Worker 过期复用现有状态链并接受 `type=JOB`，公开 schema 投影剔除政策确认。
 中英 noindex Job 发布页复用 900ms 自动保存、账号/locale/vertical 隔离恢复、READY 图片和 ETag，
 并通过精确 BFF allowlist 以幂等键提交审核；桌面/移动 E2E 覆盖填写、保存、提交和无横向溢出。
+
+`LIST-007` 已验收其余三个垂直切片：Transfer 要求 FIXED 正数要价、租金/剩余租期/转让原因、
+OWNER_ONLY 财务免责声明并始终人工审核；Secondhand 要求成色、非空交付方式、合法来源/禁售品确认，
+只接受 FIXED/NEGOTIABLE/FREE；Service 要求 1–100 英里服务半径、非空可用时间和资质声明，
+只接受 HOURLY/FIXED/NEGOTIABLE，执照号仅 owner/审核可见。三个 detail 与 Listing 在同一事务
+upsert 且类型严格耦合，数据库约束阻止应用旁路。五类公共 list/detail、签名 cursor、归档/软删除和
+到期处理统一；v3 禁售品规则只保留字段级证据。三个中英文 noindex 发布页复用账号/locale/vertical
+隔离恢复、READY 图片、强 ETag 和幂等提交，桌面/移动 E2E 覆盖三类填写、保存与提交。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
