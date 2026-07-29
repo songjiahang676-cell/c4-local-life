@@ -24,6 +24,18 @@ allowedRegionTypes, promotionEligibility
 
 关键字段：岗位、雇主、employment type、薪资 min/max/unit、地点、经验、语言、排班、远程、签证支持声明、福利。政策禁止歧视性条件和误导工资。
 
+`LIST-006` 已把这组字段落为 Job v1 动态表单：通用 `title` 表示岗位，通用 `price`
+表示最低薪资，`wageMax` 表示同周期最高薪资；允许 HOURLY/DAILY/WEEKLY/MONTHLY/YEARLY，
+且应用层和 PostgreSQL 都要求 `0 < min <= max`。`employerName`、`employmentType`、
+`experienceLevel`、`remoteType`、`schedule` 必填，语言、签证支持声明和福利可选。
+`employmentPolicyAcknowledged` 必须明确为 true，但属于 OWNER_ONLY，不进入公开详情或列表。
+
+平台统一要求所有 Job 提供薪资范围，这是内容完整性规则，不代表平台判断某发布者的法律适用性。
+加州官方材料说明就业反歧视义务覆盖招聘广告，且特定雇主的职位发布须包含 pay scale：
+[California Civil Rights Department — Employment](https://calcivilrights.ca.gov/employment/)、
+[California Labor Commissioner — Equal Pay Act FAQ](https://www.dir.ca.gov/dlse/California_Equal_Pay_Act.htm)。
+规则仅把疑似歧视或误导内容送人工审核，不自动作出违法结论；正式政策和阈值仍须法律/运营批准。
+
 ### 租房
 
 单间/主卧、整租公寓、独立屋、ADU/后屋、合租找室友、商业/仓库（可后续独立频道）、短租（需政策确认）。

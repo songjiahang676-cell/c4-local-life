@@ -746,4 +746,26 @@ Observability: Reused bounded `socal_notification_events_total` outcomes and str
 
 Docs: Updated roles/permissions、domain/data、API/integrations、UI notification behavior、security/privacy、testing matrix、acceptance criteria、reference implementation、runtime configuration、migration recovery、Gate checklist/status、Backlog、README、SECURITY、changelog、generated architecture book and this worklog
 
-Known gaps: Email/SMS invitation delivery、organization invitation management UI and delegated custom roles remain later slices；membership invitations require an existing platform account because AUTH-006 verification/linking is not yet implemented；the final evidence-head checks and protected merge remain pending
+Known gaps: Email/SMS invitation delivery、organization invitation management UI and delegated custom roles remain later slices；membership invitations require an existing platform account because AUTH-006 verification/linking is not yet implemented；final run `30439069763` passed and PR #25 was protected-squash-merged as `0ac0b6e`
+
+## LIST-006 — Job 垂直切片
+
+Task: LIST-006 Job 垂直切片
+
+Changed: Reused the proven Listing draft/submission/moderation/public/expiry chain for Job；added a bilingual responsive `/[locale]/post/job/new` flow with vertical-isolated autosave recovery、employer/employment/experience/remote/wage/schedule/language/visa/benefit fields、explicit employment-policy acknowledgement and save/submit states；persisted coherent `JobDetail` create/update in the Listing transaction；extended public list/detail and due-expiry processing to Job；added conservative `EMPLOYMENT_POLICY_RISK` v2 human-review routing that stores field-only evidence；the application service and Repository both reject missing Job detail or Job detail attached to another vertical
+
+Contracts: OpenAPI remains 57 paths / 67 operations / 123 schemas and changes `GET /listings?type` plus public summary type from Rental-only to the strict `RENTAL|JOB` enum；generated TypeScript and Zod adapters、contract tests and the Web BFF submit allowlist were updated；Prisma remains 53 models and records the Job due-expiry partial index
+
+Migrations: 有，`20260730030000_job_vertical_baseline` additively adds coherent wage-range/nonblank Job-detail constraints and `listings_job_expiry_due_idx`；all 22 migrations deploy and report current on the disposable PostgreSQL database；baseline verifies the new constraints/index and passes 34 negative cases，while previous-baseline upgrade applies 20 later migrations and preserves its sentinel；application rollback disables Job create/public/expiry callers while retaining rows/evidence，and migration-local `ROLLBACK.md` documents recoverable index/constraint removal plus roll-forward recreation
+
+Security: Job writes require the existing ACTIVE actor、object authorization、idempotency and strong ETag boundaries；policy acknowledgement is `OWNER_ONLY` and excluded from public projection；public list/detail continue omitting body、contact、exact location、owner internals and moderation evidence；wage min/max share a validated unit and cannot invert；the v2 policy-risk rule routes to human review without auto-penalty and stores only code/version/severity/field name，not suspected discriminatory text；cursor HMAC domain moved to v2 so old Rental cursors fail closed；duplicate Job expiry is state/version guarded and does not duplicate Audit/Outbox
+
+Tests run: Root `pnpm ci:quality` passed workflow/governance/config/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、78 files / 324 tests with 0 failures and 2 explicit unavailable-service skips、8 production builds and 73.44% statements / 76.95% lines；API passed 24 files / 137 tests；real PostgreSQL passed 22 files / 80 tests including Job detail type coupling、wage persistence/update、public private-field exclusion and duplicate-safe expiry；fresh deploy/status、migration safety、baseline 34 negatives and previous-release upgrade passed；production Chromium desktop/mobile passed 12/12 including bilingual Job create/save/submit；architecture passed 101 tasks / 53 Prisma models / 57 OpenAPI paths / 123 schemas / 36 JSON files
+
+Not run: Local Redis and ClamAV integration tests were explicitly skipped because neither service is available and LIST-006 only appends PostgreSQL Outbox records；local Docker image smoke is unavailable because this host has no Docker CLI；real-service Linux quality、browser and four non-root image checks remain pending on the protected PR
+
+Observability: Existing bounded HTTP RED metrics/traces cover draft、submit and public routes；the existing Listing expiry metrics now include Job through the same fixed outcome labels；successful mutations retain minimized Audit/Outbox identifiers and versions only；no employer、wage、policy text、body、contact、cursor or idempotency evidence enters metric labels or new structured logs
+
+Docs: Updated content taxonomy、moderation workflow、security/privacy、acceptance criteria、route catalog、migration recovery、Gate checklist/status、Backlog、README、SECURITY、changelog、generated architecture book and this worklog；policy help text links official California Civil Rights Department and Labor Commissioner sources
+
+Known gaps: Transfer/Secondhand/Service verticals remain `LIST-007`；production employment-policy terms、minimum-wage display interpretation、moderation thresholds/SLA and legal review require operator approval；external application tracking and employer verification are later product slices；protected-head checks and merge remain pending

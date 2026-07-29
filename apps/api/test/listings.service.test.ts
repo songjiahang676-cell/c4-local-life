@@ -14,6 +14,7 @@ import { TaxonomyService } from "../src/modules/taxonomy/taxonomy.service";
 import {
   createMemoryListingTaxonomyStore,
   MemoryListingStore,
+  memoryJobCategoryId,
   memoryListingCategoryId,
   memoryListingRegionCode,
 } from "./support/memory-listing.store";
@@ -67,6 +68,32 @@ function createInput(title = "Irvine two-bedroom rental"): CreateListingInput {
     attributes: {},
     mediaIds: [],
     contactMode: "IN_APP" as const,
+  };
+}
+
+const validJobAttributes = {
+  employerName: "Synthetic Employer",
+  employmentType: "full-time",
+  experienceLevel: "entry",
+  remoteType: "onsite",
+  wageMax: "31.50",
+  schedule: "Weekday test schedule",
+  employmentPolicyAcknowledged: true,
+} as const;
+
+function createJobInput(overrides: Partial<CreateListingInput> = {}): CreateListingInput {
+  return {
+    type: "JOB",
+    categoryId: memoryJobCategoryId,
+    locale: "zh-Hans",
+    title: "Synthetic Irvine kitchen position",
+    body: "A deliberately fictional Job listing used only for deterministic tests.",
+    regionCode: memoryListingRegionCode,
+    price: { amount: "24.00", currency: "USD", unit: "HOURLY" },
+    attributes: { ...validJobAttributes },
+    mediaIds: [],
+    contactMode: "IN_APP",
+    ...overrides,
   };
 }
 
@@ -134,7 +161,7 @@ describe("ListingsService", () => {
         previousModerationStatus: "NOT_REVIEWED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 1,
+        ruleSetVersion: 2,
         caseId: null,
         version: 3,
       },
@@ -173,6 +200,69 @@ describe("ListingsService", () => {
         caseId: "77777777-7777-4777-8777-777777777777",
         version: 3,
       },
+    });
+  });
+
+  it("runs the complete Job draft, publication, and public-list path", async () => {
+    const { service } = createService();
+    await expect(
+      service.create(
+        ownerContext(),
+        "create-job-invalid-0001",
+        createJobInput({
+          attributes: {
+            ...validJobAttributes,
+            employmentPolicyAcknowledged: false,
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      errors: { employmentPolicyAcknowledged: ["must be acknowledged"] },
+    });
+    await expect(
+      service.create(
+        ownerContext(),
+        "create-job-invalid-0002",
+        createJobInput({
+          attributes: { ...validJobAttributes, wageMax: "20.00" },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      errors: { wageMax: ["must be greater than or equal to wage minimum"] },
+    });
+
+    const created = await service.create(ownerContext(), "create-job-valid-0001", createJobInput());
+    expect(created.data).toMatchObject({
+      type: "JOB",
+      status: "DRAFT",
+      price: { amount: "24.00", unit: "HOURLY" },
+      attributes: {
+        employerName: "Synthetic Employer",
+        wageMax: "31.50",
+        employmentPolicyAcknowledged: true,
+      },
+    });
+
+    const submitted = await service.submit(
+      ownerContext(),
+      created.data.id,
+      1,
+      "submit-job-valid-0001",
+    );
+    expect(submitted.data).toMatchObject({
+      currentStatus: "PUBLISHED",
+      currentModerationStatus: "AUTO_APPROVED",
+      riskTier: "LOW",
+      ruleSetVersion: 2,
+    });
+
+    const publicPage = await service.list({ type: "JOB", limit: 20 });
+    expect(publicPage.data).toHaveLength(1);
+    expect(publicPage.data[0]).toMatchObject({
+      id: created.data.id,
+      type: "JOB",
+      status: "PUBLISHED",
+      title: "Synthetic Irvine kitchen position",
     });
   });
 });

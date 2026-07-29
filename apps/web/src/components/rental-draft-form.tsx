@@ -20,6 +20,7 @@ import {
   toUpdateListingInput,
   validateRentalDraft,
   valuesFromOwnerListing,
+  type DraftListingType,
   type DraftFieldErrors,
   type RentalDraftValues,
   type StoredRentalDraft,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/rental-draft";
 
 type SaveState = "idle" | "local" | "saving" | "saved" | "offline" | "conflict" | "invalid";
+type SubmissionState = "idle" | "submitting" | "submitted" | "failed";
 type UploadState = {
   key: string;
   file: File;
@@ -81,6 +83,10 @@ const copy = {
     remove: "移除",
     noSchema: "动态字段暂时不可用，请稍后重试。",
     serverError: "保存失败，内容仍保留在本机。",
+    submitReview: "提交审核",
+    submittingReview: "正在提交审核…",
+    submittedReview: "已提交；平台会按风险规则发布或进入人工审核。",
+    submitReviewFailed: "提交失败，请确认草稿仍是最新版本后重试。",
   },
   "en-US": {
     title: "Post a rental",
@@ -130,6 +136,42 @@ const copy = {
     remove: "Remove",
     noSchema: "Dynamic fields are temporarily unavailable. Try again later.",
     serverError: "Save failed. Your work remains on this device.",
+    submitReview: "Submit for review",
+    submittingReview: "Submitting for review…",
+    submittedReview: "Submitted. Risk rules will publish it or route it to human review.",
+    submitReviewFailed: "Submission failed. Confirm this is the latest draft and try again.",
+  },
+} as const;
+
+const jobCopy = {
+  "zh-Hans": {
+    title: "发布招聘信息",
+    intro: "内容会先保存为私有草稿；职位、薪资与就业政策字段完整后，可提交平台审核。",
+    category: "招聘类别",
+    titleLabel: "岗位名称",
+    summary: "岗位摘要（可选）",
+    body: "岗位说明与任职要求",
+    price: "最低薪资",
+    priceUnit: "薪资周期",
+    dynamic: "职位与就业政策",
+    media: "工作环境图片",
+    mediaHelp:
+      "支持 JPG、PNG、WebP，单张不超过 20 MB，最多 20 张。不得上传证件或其他不必要的个人信息。",
+  },
+  "en-US": {
+    title: "Post a job",
+    intro:
+      "Your work stays private until the position, wage, and employment-policy fields are complete and submitted for moderation.",
+    category: "Job category",
+    titleLabel: "Position title",
+    summary: "Position summary (optional)",
+    body: "Role description and requirements",
+    price: "Minimum wage",
+    priceUnit: "Wage period",
+    dynamic: "Position and employment policy",
+    media: "Workplace images",
+    mediaHelp:
+      "JPG, PNG or WebP; 20 MB per image and 20 images maximum. Do not upload IDs or unnecessary personal information.",
   },
 } as const;
 
@@ -326,13 +368,19 @@ function fieldControl(
   );
 }
 
-export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
-  const text = copy[locale];
+export function RentalDraftForm({
+  locale,
+  listingType = "RENTAL",
+}: {
+  locale: SupportedLocale;
+  listingType?: DraftListingType;
+}) {
+  const text = listingType === "JOB" ? { ...copy[locale], ...jobCopy[locale] } : copy[locale];
   const [authState, setAuthState] = useState<"loading" | "authenticated" | "guest" | "error">(
     "loading",
   );
   const [userId, setUserId] = useState<string | null>(null);
-  const [values, setValues] = useState<RentalDraftValues>(emptyRentalDraft);
+  const [values, setValues] = useState<RentalDraftValues>(() => emptyRentalDraft(listingType));
   const [categories, setCategories] = useState<Category[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [definition, setDefinition] = useState<CategoryFormSchema | null>(null);
@@ -340,6 +388,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
   const [hydrated, setHydrated] = useState(false);
   const [restored, setRestored] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [errors, setErrors] = useState<DraftFieldErrors>({});
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [conflict, setConflict] = useState(false);
@@ -358,6 +407,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
       if (!userId || !idempotencyKeyRef.current) return;
       const stored: StoredRentalDraft = {
         version: 1,
+        listingType,
         userId,
         locale,
         idempotencyKey: idempotencyKeyRef.current,
@@ -367,12 +417,15 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
         values: snapshot,
       };
       try {
-        localStorage.setItem(rentalDraftStorageKey(userId, locale), JSON.stringify(stored));
+        localStorage.setItem(
+          rentalDraftStorageKey(userId, locale, listingType),
+          JSON.stringify(stored),
+        );
       } catch {
         // Storage can be disabled or full; server autosave remains the canonical recovery path.
       }
     },
-    [locale, userId],
+    [listingType, locale, userId],
   );
 
   const applyServerErrors = useCallback(
@@ -397,9 +450,9 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
 
   const saveSnapshot = useCallback(
     async (snapshot: RentalDraftValues): Promise<void> => {
-      if (!userId || !definition || conflict) return;
+      if (!userId || !definition || conflict || submissionState === "submitted") return;
       persistLocal(snapshot);
-      const validation = validateRentalDraft(snapshot, definition, locale);
+      const validation = validateRentalDraft(snapshot, definition, locale, listingType);
       if (Object.keys(validation).length > 0) {
         setErrors(validation);
         setSaveState("invalid");
@@ -426,7 +479,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
           body: JSON.stringify(
             listingId
               ? toUpdateListingInput(snapshot, locale)
-              : toCreateListingInput(snapshot, locale),
+              : toCreateListingInput(snapshot, locale, listingType),
           ),
         });
         if (response.status === 401) {
@@ -461,7 +514,16 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
         }
       }
     },
-    [applyServerErrors, conflict, definition, locale, persistLocal, userId],
+    [
+      applyServerErrors,
+      conflict,
+      definition,
+      listingType,
+      locale,
+      persistLocal,
+      submissionState,
+      userId,
+    ],
   );
 
   const reloadServer = useCallback(async () => {
@@ -498,7 +560,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
     let cancelled = false;
     void Promise.all([
       fetch("/v1/auth/session", { credentials: "same-origin", cache: "no-store" }),
-      fetch("/v1/categories?vertical=RENTAL", { cache: "no-store" }),
+      fetch(`/v1/categories?vertical=${listingType}`, { cache: "no-store" }),
       fetch("/v1/regions?type=CITY", { cache: "no-store" }),
     ])
       .then(async ([sessionResponse, categoryResponse, regionResponse]) => {
@@ -529,11 +591,11 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
         setAuthState("authenticated");
         let stored: string | null = null;
         try {
-          stored = localStorage.getItem(rentalDraftStorageKey(currentUserId, locale));
+          stored = localStorage.getItem(rentalDraftStorageKey(currentUserId, locale, listingType));
         } catch {
           // Continue without device recovery when browser storage is unavailable.
         }
-        const recovered = parseStoredRentalDraft(stored, currentUserId, locale);
+        const recovered = parseStoredRentalDraft(stored, currentUserId, locale, listingType);
         idempotencyKeyRef.current =
           recovered?.idempotencyKey ?? `listing-draft:${crypto.randomUUID()}`;
         if (recovered) {
@@ -554,7 +616,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [listingType, locale]);
 
   useEffect(() => {
     if (!values.categoryId) {
@@ -582,7 +644,9 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
   }, [values.categoryId]);
 
   useEffect(() => {
-    if (!hydrated || authState !== "authenticated" || !userId) return;
+    if (!hydrated || authState !== "authenticated" || !userId || submissionState === "submitted") {
+      return;
+    }
     persistLocal(values);
     const localTimer = window.setTimeout(
       () => setSaveState((current) => (current === "conflict" ? current : "local")),
@@ -594,7 +658,17 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
       window.clearTimeout(localTimer);
       if (saveTimer !== undefined) window.clearTimeout(saveTimer);
     };
-  }, [authState, conflict, definition, hydrated, persistLocal, saveSnapshot, userId, values]);
+  }, [
+    authState,
+    conflict,
+    definition,
+    hydrated,
+    persistLocal,
+    saveSnapshot,
+    submissionState,
+    userId,
+    values,
+  ]);
 
   useEffect(() => {
     const retry = () => {
@@ -745,7 +819,7 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const validation = validateRentalDraft(values, definition, locale);
+    const validation = validateRentalDraft(values, definition, locale, listingType);
     setErrors(validation);
     if (Object.keys(validation).length > 0) {
       setSaveState("invalid");
@@ -758,10 +832,47 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
     void saveSnapshot(values);
   };
 
+  const submitForModeration = async () => {
+    const listingId = listingIdRef.current;
+    const etag = etagRef.current;
+    if (!listingId || !etag || saveState !== "saved") return;
+    setSubmissionState("submitting");
+    try {
+      const response = await fetch(`/v1/listings/${listingId}/submit`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "if-match": etag,
+          "idempotency-key": `listing-submit:${listingId}`,
+        },
+      });
+      if (response.status === 409) {
+        const currentEtag = response.headers.get("etag");
+        if (currentEtag) etagRef.current = currentEtag;
+        setConflict(true);
+        setSaveState("conflict");
+        setSubmissionState("failed");
+        return;
+      }
+      if (!response.ok) throw new Error("Submission failed");
+      etagRef.current = response.headers.get("etag");
+      setSubmissionState("submitted");
+      if (userId) {
+        try {
+          localStorage.removeItem(rentalDraftStorageKey(userId, locale, listingType));
+        } catch {
+          // Submission is canonical even when local cleanup is unavailable.
+        }
+      }
+    } catch {
+      setSubmissionState("failed");
+    }
+  };
+
   const discard = () => {
     if (userId) {
       try {
-        localStorage.removeItem(rentalDraftStorageKey(userId, locale));
+        localStorage.removeItem(rentalDraftStorageKey(userId, locale, listingType));
       } catch {
         // Clearing the in-memory draft must still work when browser storage is unavailable.
       }
@@ -769,13 +880,14 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
     listingIdRef.current = null;
     etagRef.current = null;
     idempotencyKeyRef.current = `listing-draft:${crypto.randomUUID()}`;
-    setValues(emptyRentalDraft());
+    setValues(emptyRentalDraft(listingType));
     setDefinition(null);
     setUploads([]);
     setErrors({});
     setConflict(false);
     setRestored(false);
     setSaveState("idle");
+    setSubmissionState("idle");
   };
 
   if (!hydrated || authState === "loading") {
@@ -789,7 +901,9 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
         <p>{text.authBody}</p>
         <Link
           className="draftPrimaryButton"
-          href={`/${locale}/login?returnTo=${encodeURIComponent(`/${locale}/post/rental/new`)}`}
+          href={`/${locale}/login?returnTo=${encodeURIComponent(
+            `/${locale}/post/${listingType === "JOB" ? "job" : "rental"}/new`,
+          )}`}
         >
           {text.login}
         </Link>
@@ -942,7 +1056,10 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
             <input
               aria-describedby={errors.priceAmount ? "priceAmount-error" : undefined}
               aria-invalid={Boolean(errors.priceAmount)}
-              disabled={values.priceUnit === "FREE" || values.priceUnit === "NEGOTIABLE"}
+              disabled={
+                listingType === "RENTAL" &&
+                (values.priceUnit === "FREE" || values.priceUnit === "NEGOTIABLE")
+              }
               id="priceAmount"
               inputMode="decimal"
               onChange={(event) =>
@@ -968,11 +1085,23 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
               }
               value={values.priceUnit}
             >
-              <option value="MONTHLY">{locale === "zh-Hans" ? "每月" : "Monthly"}</option>
-              <option value="WEEKLY">{locale === "zh-Hans" ? "每周" : "Weekly"}</option>
-              <option value="DAILY">{locale === "zh-Hans" ? "每天" : "Daily"}</option>
-              <option value="NEGOTIABLE">{locale === "zh-Hans" ? "面议" : "Negotiable"}</option>
-              <option value="FREE">{locale === "zh-Hans" ? "免费" : "Free"}</option>
+              {listingType === "JOB" ? (
+                <>
+                  <option value="HOURLY">{locale === "zh-Hans" ? "每小时" : "Hourly"}</option>
+                  <option value="DAILY">{locale === "zh-Hans" ? "每天" : "Daily"}</option>
+                  <option value="WEEKLY">{locale === "zh-Hans" ? "每周" : "Weekly"}</option>
+                  <option value="MONTHLY">{locale === "zh-Hans" ? "每月" : "Monthly"}</option>
+                  <option value="YEARLY">{locale === "zh-Hans" ? "每年" : "Yearly"}</option>
+                </>
+              ) : (
+                <>
+                  <option value="MONTHLY">{locale === "zh-Hans" ? "每月" : "Monthly"}</option>
+                  <option value="WEEKLY">{locale === "zh-Hans" ? "每周" : "Weekly"}</option>
+                  <option value="DAILY">{locale === "zh-Hans" ? "每天" : "Daily"}</option>
+                  <option value="NEGOTIABLE">{locale === "zh-Hans" ? "面议" : "Negotiable"}</option>
+                  <option value="FREE">{locale === "zh-Hans" ? "免费" : "Free"}</option>
+                </>
+              )}
             </select>
           </label>
         </div>
@@ -1078,13 +1207,38 @@ export function RentalDraftForm({ locale }: { locale: SupportedLocale }) {
       </section>
 
       <div className="draftActions">
-        <button className="draftPrimaryButton" disabled={saveState === "saving"} type="submit">
+        <button
+          className="draftPrimaryButton"
+          disabled={saveState === "saving" || submissionState === "submitted"}
+          type="submit"
+        >
           {text.save}
         </button>
+        {listingType === "JOB" ? (
+          <button
+            disabled={
+              saveState !== "saved" ||
+              submissionState === "submitting" ||
+              submissionState === "submitted"
+            }
+            onClick={() => void submitForModeration()}
+            type="button"
+          >
+            {submissionState === "submitting" ? text.submittingReview : text.submitReview}
+          </button>
+        ) : null}
         <button onClick={discard} type="button">
           {text.discard}
         </button>
       </div>
+      {listingType === "JOB" && submissionState === "submitted" ? (
+        <p aria-live="polite" className="draftSaveStatus state-saved">
+          {text.submittedReview}
+        </p>
+      ) : null}
+      {listingType === "JOB" && submissionState === "failed" ? (
+        <p role="alert">{text.submitReviewFailed}</p>
+      ) : null}
     </form>
   );
 }

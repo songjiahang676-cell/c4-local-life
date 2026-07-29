@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added the Job vertical from bilingual/mobile schema-driven draft through submit/moderation,
+  approved public list/detail and duplicate-safe expiry, with coherent wage persistence, explicit
+  employment-policy acknowledgement, conservative policy-risk routing and PII-minimized evidence.
 - Added short-lived organization invitations, canonical recipient notifications, conditional member
   role/removal APIs, deferred database enforcement of at least one Owner, and MFA recent-auth Owner
   transfer with atomic Audit/Outbox evidence and exact retry behavior.

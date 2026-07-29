@@ -140,6 +140,7 @@ function writeFields(fixture: DraftFixture, title: string): ListingDraftWriteFie
     longitude: "-117.826500",
     locationPrecision: "APPROXIMATE",
     mediaIds: [],
+    jobDetail: null,
   };
 }
 
@@ -251,6 +252,106 @@ integration("ListingDraftRepository with PostgreSQL", () => {
       expect(JSON.stringify(created)).not.toMatch(
         /createIdempotencyKey|createRequestHash|requestHash/i,
       );
+    });
+  });
+
+  it("persists and updates coherent Job detail fields in the Listing transaction", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createDraftFixture(transaction);
+      const jobCategoryId = randomUUID();
+      await transaction.category.create({
+        data: {
+          id: jobCategoryId,
+          vertical: ListingType.JOB,
+          slug: `listing-job-category-${jobCategoryId}`,
+          nameZhHans: "测试招聘",
+          nameEn: "Synthetic Jobs",
+          formSchemaVersions: {
+            create: {
+              version: 1,
+              definition: { categoryId: jobCategoryId, version: 1, fields: [] },
+              contentHash: "e".repeat(64),
+              publishedAt: baseTime,
+            },
+          },
+        },
+      });
+      const repository = new ListingDraftRepository(transaction);
+      const input = createInput(fixture, {
+        id: randomUUID(),
+        type: ListingType.JOB,
+        categoryId: jobCategoryId,
+        priceAmount: "24.00",
+        priceUnit: PriceUnit.HOURLY,
+        jobDetail: {
+          employerName: "Synthetic Employer",
+          employmentType: "full-time",
+          wageMin: "24.00",
+          wageMax: "31.50",
+          wageUnit: PriceUnit.HOURLY,
+          experienceLevel: "entry",
+          remoteType: "onsite",
+          visaSupport: false,
+        },
+      });
+
+      await expect(
+        repository.createDraft({
+          ...input,
+          id: randomUUID(),
+          idempotencyKey: "repository-job-missing-detail-0001",
+          jobDetail: null,
+        }),
+      ).resolves.toEqual({ kind: "invalid_reference" });
+      await expect(
+        repository.createDraft({
+          ...createInput(fixture),
+          idempotencyKey: "repository-rental-job-detail-0001",
+          jobDetail: input.jobDetail,
+        }),
+      ).resolves.toEqual({ kind: "invalid_reference" });
+      await expect(repository.createDraft(input)).resolves.toMatchObject({
+        kind: "created",
+        listing: { id: input.id, type: "JOB" },
+      });
+      const createdDetail = await transaction.jobDetail.findUniqueOrThrow({
+        where: { listingId: input.id },
+      });
+      expect(createdDetail).toMatchObject({
+        employerName: "Synthetic Employer",
+        employmentType: "full-time",
+        wageUnit: "HOURLY",
+        experienceLevel: "entry",
+        remoteType: "onsite",
+        visaSupport: false,
+      });
+      expect(createdDetail.wageMin?.toString()).toBe("24");
+      expect(createdDetail.wageMax?.toString()).toBe("31.5");
+
+      await expect(
+        repository.updateDraft({
+          ...writeFields(fixture, "Updated synthetic Job"),
+          categoryId: jobCategoryId,
+          priceAmount: "25.00",
+          priceUnit: PriceUnit.HOURLY,
+          jobDetail: {
+            ...input.jobDetail!,
+            wageMin: "25.00",
+            wageMax: "33.00",
+          },
+          actorUserId: fixture.ownerId,
+          listingId: input.id,
+          expectedVersion: 1,
+          requestId: randomUUID(),
+          occurredAt: new Date(baseTime.getTime() + 1_000),
+        }),
+      ).resolves.toMatchObject({ kind: "updated", listing: { version: 2 } });
+      const updatedDetail = await transaction.jobDetail.findUniqueOrThrow({
+        where: { listingId: input.id },
+        select: { wageMin: true, wageMax: true },
+      });
+      expect(updatedDetail.wageMin?.toString()).toBe("25");
+      expect(updatedDetail.wageMax?.toString()).toBe("33");
     });
   });
 

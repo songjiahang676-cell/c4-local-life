@@ -343,7 +343,7 @@ describe("listing draft HTTP boundary", () => {
         previousModerationStatus: "NOT_REVIEWED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 1,
+        ruleSetVersion: 2,
         caseId: null,
         version: 3,
       },
@@ -438,7 +438,7 @@ describe("listing draft HTTP boundary", () => {
     expect(billingArchiveRetry.statusCode).toBe(403);
   });
 
-  it("serves only safe public Rental summaries through a filter-bound signed cursor", async () => {
+  it("serves safe public Rental and Job summaries through filter-bound signed cursors", async () => {
     const publishedIds: string[] = [];
     for (const [index, title] of ["Public rental alpha", "Public rental beta"].entries()) {
       const created = await server.inject({
@@ -505,11 +505,17 @@ describe("listing draft HTTP boundary", () => {
         firstPage.page.nextCursor ?? "",
       )}`,
     });
-    const wrongType = await server.inject({
+    const emptyJobPage = await server.inject({
       method: "GET",
       url: "/v1/listings?type=JOB",
     });
-    expect([tampered.statusCode, rebound.statusCode, wrongType.statusCode]).toEqual([
+    const unsupportedType = await server.inject({
+      method: "GET",
+      url: "/v1/listings?type=SERVICE",
+    });
+    expect(emptyJobPage.statusCode).toBe(200);
+    expect(emptyJobPage.json<ListingCollection>().data).toEqual([]);
+    expect([tampered.statusCode, rebound.statusCode, unsupportedType.statusCode]).toEqual([
       400, 400, 400,
     ]);
   });

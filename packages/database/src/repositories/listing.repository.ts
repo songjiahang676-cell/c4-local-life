@@ -169,7 +169,7 @@ export type PublicListingCursor = {
 };
 
 export type PublicListingListInput = {
-  type: "RENTAL";
+  type: "RENTAL" | "JOB";
   categoryId?: string;
   regionCode?: string;
   cursor?: PublicListingCursor;
@@ -818,7 +818,7 @@ export class ListingRepository {
           "version"
         FROM "listings"
         WHERE
-          "type" = 'RENTAL'::"ListingType"
+          "type" IN ('RENTAL'::"ListingType", 'JOB'::"ListingType")
           AND "status" = 'PUBLISHED'::"ContentStatus"
           AND "moderation_status" IN (
             'AUTO_APPROVED'::"ModerationStatus",

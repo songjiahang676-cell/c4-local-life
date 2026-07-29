@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   contentStatusSchema,
   createListingSchema,
+  listListingsQuerySchema,
   listingSearchSchema,
   moneySchema,
   updateListingSchema,
@@ -101,5 +102,14 @@ describe("listing contracts", () => {
       sort: "RELEVANCE",
       limit: 20,
     });
+  });
+
+  it("limits the public Listing collection to implemented Rental and Job verticals", () => {
+    expect(listListingsQuerySchema.parse({})).toMatchObject({ type: "RENTAL", limit: 20 });
+    expect(listListingsQuerySchema.parse({ type: "JOB" })).toMatchObject({
+      type: "JOB",
+      limit: 20,
+    });
+    expect(listListingsQuerySchema.safeParse({ type: "SERVICE" }).success).toBe(false);
   });
 });

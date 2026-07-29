@@ -17,6 +17,17 @@
       "manualReview": "risk_based",
       "formFields": [
         {
+          "key": "employerName",
+          "type": "TEXT",
+          "label": { "zh-Hans": "雇主或公司名称", "en-US": "Employer or company" },
+          "required": true,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "minLength": 2, "maxLength": 160 },
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        },
+        {
           "key": "employmentType",
           "type": "SELECT",
           "label": { "zh-Hans": "雇佣类型", "en-US": "Employment type" },
@@ -38,7 +49,81 @@
             }
           ],
           "visibility": "PUBLIC",
-          "sortOrder": 10
+          "sortOrder": 20
+        },
+        {
+          "key": "experienceLevel",
+          "type": "SELECT",
+          "label": { "zh-Hans": "经验要求", "en-US": "Experience level" },
+          "required": true,
+          "filterable": true,
+          "searchable": true,
+          "options": [
+            {
+              "value": "entry",
+              "label": { "zh-Hans": "入门/无需经验", "en-US": "Entry / no experience" }
+            },
+            {
+              "value": "mid",
+              "label": { "zh-Hans": "有相关经验", "en-US": "Experienced" }
+            },
+            {
+              "value": "senior",
+              "label": { "zh-Hans": "资深", "en-US": "Senior" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 30
+        },
+        {
+          "key": "remoteType",
+          "type": "SELECT",
+          "label": { "zh-Hans": "办公方式", "en-US": "Work arrangement" },
+          "required": true,
+          "filterable": true,
+          "searchable": true,
+          "options": [
+            {
+              "value": "onsite",
+              "label": { "zh-Hans": "现场", "en-US": "On-site" }
+            },
+            {
+              "value": "hybrid",
+              "label": { "zh-Hans": "混合办公", "en-US": "Hybrid" }
+            },
+            {
+              "value": "remote",
+              "label": { "zh-Hans": "远程", "en-US": "Remote" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 40
+        },
+        {
+          "key": "wageMax",
+          "type": "MONEY",
+          "label": { "zh-Hans": "最高薪资（美元）", "en-US": "Maximum wage (USD)" },
+          "helpText": {
+            "zh-Hans": "必须与最低薪资使用相同周期，且不得低于最低薪资。",
+            "en-US": "Use the same period as the minimum wage and do not enter a lower amount."
+          },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 0.01, "max": 99999999.99 },
+          "visibility": "PUBLIC",
+          "sortOrder": 50
+        },
+        {
+          "key": "schedule",
+          "type": "TEXT",
+          "label": { "zh-Hans": "工作时间", "en-US": "Schedule" },
+          "required": true,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "minLength": 2, "maxLength": 160 },
+          "visibility": "PUBLIC",
+          "sortOrder": 60
         },
         {
           "key": "language",
@@ -62,7 +147,48 @@
             }
           ],
           "visibility": "PUBLIC",
-          "sortOrder": 20
+          "sortOrder": 70
+        },
+        {
+          "key": "visaSupport",
+          "type": "BOOLEAN",
+          "label": {
+            "zh-Hans": "雇主声明可提供签证支持",
+            "en-US": "Employer states visa support is available"
+          },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "visibility": "PUBLIC",
+          "sortOrder": 80
+        },
+        {
+          "key": "benefits",
+          "type": "TEXTAREA",
+          "label": { "zh-Hans": "福利说明", "en-US": "Benefits" },
+          "required": false,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "maxLength": 1000 },
+          "visibility": "PUBLIC",
+          "sortOrder": 90
+        },
+        {
+          "key": "employmentPolicyAcknowledged",
+          "type": "BOOLEAN",
+          "label": {
+            "zh-Hans": "我确认职位条件和薪资信息真实，不含歧视性要求",
+            "en-US": "I confirm the job terms and wage information are truthful and contain no discriminatory requirements"
+          },
+          "helpText": {
+            "zh-Hans": "平台会把疑似歧视、误导薪资或不完整信息送交人工审核；此提示不构成法律意见。",
+            "en-US": "Suspected discrimination, misleading wages, or incomplete information goes to human review; not legal advice."
+          },
+          "required": true,
+          "filterable": false,
+          "searchable": false,
+          "visibility": "OWNER_ONLY",
+          "sortOrder": 100
         }
       ],
       "children": [

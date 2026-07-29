@@ -397,6 +397,116 @@ integration("ListingRepository safe PostgreSQL projections", () => {
     });
   });
 
+  it("projects public Job fields, hides owner policy evidence, and expires due Jobs once", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const jobCategoryId = randomUUID();
+      const visibleJobId = randomUUID();
+      const dueJobId = randomUUID();
+      await transaction.category.create({
+        data: {
+          id: jobCategoryId,
+          vertical: ListingType.JOB,
+          slug: `synthetic-jobs-${jobCategoryId}`,
+          nameZhHans: "测试招聘",
+          nameEn: "Synthetic Jobs",
+          formSchemaVersions: {
+            create: {
+              version: 1,
+              definition: {
+                categoryId: jobCategoryId,
+                version: 1,
+                fields: [
+                  { key: "employerName", visibility: "PUBLIC" },
+                  { key: "wageMax", visibility: "PUBLIC" },
+                  { key: "employmentPolicyAcknowledged", visibility: "OWNER_ONLY" },
+                ],
+              },
+              contentHash: "f".repeat(64),
+              publishedAt: new Date("2026-07-01T00:00:00.000Z"),
+            },
+          },
+        },
+      });
+      const jobBase = {
+        type: ListingType.JOB,
+        ownerId: fixture.ownerId,
+        categoryId: jobCategoryId,
+        regionId: fixture.regionId,
+        locale: "zh-Hans",
+        summary: "Fictional Job fixture.",
+        body: "This synthetic Job is used only by repository integration tests.",
+        priceAmount: "24.00",
+        currency: "USD",
+        priceUnit: "HOURLY" as const,
+        contactMode: ContactMode.IN_APP,
+        locationPrecision: "CITY",
+        attributes: {
+          employerName: "Synthetic Employer",
+          wageMax: "31.50",
+          employmentPolicyAcknowledged: true,
+        },
+        status: ContentStatus.PUBLISHED,
+        moderationStatus: ModerationStatus.APPROVED,
+        publishedAt: new Date("2026-07-20T12:00:00.000Z"),
+      } satisfies Omit<Prisma.ListingCreateManyInput, "id" | "title" | "slug" | "expiresAt">;
+      await transaction.listing.createMany({
+        data: [
+          {
+            ...jobBase,
+            id: visibleJobId,
+            title: "Visible synthetic Job",
+            slug: `visible-job-${visibleJobId}`,
+            expiresAt: new Date("2026-08-20T12:00:00.000Z"),
+          },
+          {
+            ...jobBase,
+            id: dueJobId,
+            title: "Due synthetic Job",
+            slug: `due-job-${dueJobId}`,
+            expiresAt: new Date("2026-07-29T11:59:00.000Z"),
+          },
+        ],
+      });
+      const repository = new ListingRepository(transaction);
+
+      const publicJobs = await repository.listPublic({ type: "JOB", now, limit: 20 });
+      expect(publicJobs.items).toHaveLength(1);
+      expect(publicJobs.items[0]).toMatchObject({
+        id: visibleJobId,
+        type: "JOB",
+        attributes: {
+          employerName: "Synthetic Employer",
+          wageMax: "31.50",
+        },
+      });
+      expect(publicJobs.items[0]?.attributes).not.toHaveProperty("employmentPolicyAcknowledged");
+
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 2,
+      });
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 0,
+      });
+      await expect(
+        transaction.listing.findUniqueOrThrow({
+          where: { id: dueJobId },
+          select: { status: true, version: true },
+        }),
+      ).resolves.toEqual({ status: ContentStatus.EXPIRED, version: 2 });
+      await expect(
+        transaction.auditLog.count({
+          where: { targetId: dueJobId, action: "listing.expired", actorType: "SYSTEM" },
+        }),
+      ).resolves.toBe(1);
+      await expect(
+        transaction.outboxEvent.count({
+          where: { aggregateId: dueJobId, eventType: "listing.expired" },
+        }),
+      ).resolves.toBe(1);
+    });
+  });
+
   it("scopes owner views to the direct owner or a current organization member", async () => {
     await database.withRollback(async (transaction) => {
       const fixture = await createFixture(transaction);

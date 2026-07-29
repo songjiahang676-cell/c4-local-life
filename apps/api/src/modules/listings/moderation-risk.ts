@@ -1,6 +1,6 @@
 export const listingSubmissionRuleSet = {
   key: "listing-submission",
-  version: 1,
+  version: 2,
 } as const;
 
 export const moderationRiskTiers = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -11,6 +11,7 @@ export type ModerationRuleHit = {
     | "CATEGORY_MANUAL_REVIEW"
     | "EXTERNAL_CONTACT"
     | "EXTERNAL_PAYMENT_REQUEST"
+    | "EMPLOYMENT_POLICY_RISK"
     | "NEW_ACCOUNT"
     | "PUBLICATION_POLICY_INCOMPLETE";
   ruleVersion: 1;
@@ -19,6 +20,7 @@ export type ModerationRuleHit = {
 };
 
 export type ListingSubmissionRiskInput = {
+  listingType?: "JOB" | "RENTAL" | "TRANSFER" | "SECONDHAND" | "SERVICE";
   title: string;
   summary: string | null;
   body: string;
@@ -42,6 +44,8 @@ const externalContactPattern =
   /(?:https?:\/\/|www\.|[\w.+-]+@[\w.-]+\.[a-z]{2,}|\+?1?[\s().-]*\d{3}[\s).-]*\d{3}[\s.-]*\d{4})/iu;
 const externalPaymentPattern =
   /(?:gift\s*cards?|wire\s+transfer|bitcoin|cryptocurrency|crypto\s+payment|zelle\s+(?:deposit|payment)|礼品卡|电汇|比特币|加密货币|先付(?:押金|定金)|平台外付款)/iu;
+const employmentPolicyRiskPattern =
+  /(?:women\s+only|men\s+only|female\s+only|male\s+only|young\s+(?:women|men|people)\s+only|under\s+\d{2}\s+only|仅限女性|仅限男性|只招女性|只招男性|只要年轻人|年轻漂亮)/iu;
 
 function textHit(
   input: ListingSubmissionRiskInput,
@@ -103,6 +107,16 @@ export function evaluateListingSubmissionRisk(
       ruleVersion: 1,
       severity: "HIGH",
       evidenceKey: paymentEvidence,
+    });
+  }
+  const employmentEvidence =
+    input.listingType === "JOB" ? textHit(input, employmentPolicyRiskPattern) : null;
+  if (employmentEvidence) {
+    hits.push({
+      ruleCode: "EMPLOYMENT_POLICY_RISK",
+      ruleVersion: 1,
+      severity: "MEDIUM",
+      evidenceKey: employmentEvidence,
     });
   }
   return {

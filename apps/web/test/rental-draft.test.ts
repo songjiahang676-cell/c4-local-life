@@ -97,6 +97,7 @@ describe("rental draft model", () => {
     const userId = "33333333-3333-4333-8333-333333333333";
     const stored: StoredRentalDraft = {
       version: 1,
+      listingType: "RENTAL",
       userId,
       locale: "en-US",
       idempotencyKey: "listing-draft:test-0001",
@@ -114,6 +115,68 @@ describe("rental draft model", () => {
     ).toBeNull();
     expect(parseStoredRentalDraft(serialized, userId, "zh-Hans")).toBeNull();
     expect(parseStoredRentalDraft("{not-json", userId, "en-US")).toBeNull();
+  });
+
+  it("validates Job wage periods and requires an affirmative employment policy", () => {
+    const jobDefinition: CategoryFormSchema = {
+      categoryId,
+      version: 1,
+      fields: [
+        {
+          key: "wageMax",
+          type: "MONEY",
+          label: { "zh-Hans": "最高薪资", "en-US": "Maximum wage" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 10,
+          validation: { min: 0.01, max: 99999999.99 },
+        },
+        {
+          key: "employmentPolicyAcknowledged",
+          type: "BOOLEAN",
+          label: { "zh-Hans": "就业政策", "en-US": "Employment policy" },
+          required: true,
+          filterable: false,
+          searchable: false,
+          visibility: "OWNER_ONLY",
+          sortOrder: 20,
+        },
+      ],
+    };
+    const values = {
+      ...emptyRentalDraft("JOB"),
+      categoryId,
+      regionCode: "US-CA-IRVINE",
+      title: "测试招聘岗位",
+      body: "这是用于招聘发布表单边界测试的虚构内容，不是真实生产职位信息。",
+      priceAmount: "24.00",
+      attributes: {
+        wageMax: "31.50",
+        employmentPolicyAcknowledged: false,
+      },
+    };
+
+    expect(validateRentalDraft(values, jobDefinition, "zh-Hans", "JOB")).toHaveProperty(
+      "attribute.employmentPolicyAcknowledged",
+    );
+    const valid = {
+      ...values,
+      attributes: { ...values.attributes, employmentPolicyAcknowledged: true },
+    };
+    expect(validateRentalDraft(valid, jobDefinition, "zh-Hans", "JOB")).toEqual({});
+    expect(toCreateListingInput(valid, "zh-Hans", "JOB")).toMatchObject({
+      type: "JOB",
+      price: { amount: "24.00", currency: "USD", unit: "HOURLY" },
+      attributes: {
+        wageMax: "31.50",
+        employmentPolicyAcknowledged: true,
+      },
+    });
+    expect(rentalDraftStorageKey("job-owner", "en-US", "JOB")).toBe(
+      "socal:job-draft:v1:job-owner:en-US",
+    );
   });
 
   it("restores only the owner-safe projection and READY media identifiers", () => {

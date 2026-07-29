@@ -4,7 +4,7 @@ import { isAllowedWebApiPath } from "../src/app/v1/[...path]/route";
 describe("public Web API proxy allowlist", () => {
   const id = "11111111-1111-4111-8111-111111111111";
 
-  it("allows only the account, notification, form, draft, taxonomy and media routes", () => {
+  it("allows only the account, notification, form, draft, submission, taxonomy and media routes", () => {
     expect(isAllowedWebApiPath("GET", "auth/session")).toBe(true);
     expect(isAllowedWebApiPath("GET", "notifications")).toBe(true);
     expect(isAllowedWebApiPath("PUT", `notifications/${id}/read`)).toBe(true);
@@ -12,6 +12,7 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("GET", `categories/${id}/form-schema`)).toBe(true);
     expect(isAllowedWebApiPath("POST", "listings")).toBe(true);
     expect(isAllowedWebApiPath("PATCH", `listings/${id}`)).toBe(true);
+    expect(isAllowedWebApiPath("POST", `listings/${id}/submit`)).toBe(true);
     expect(isAllowedWebApiPath("GET", `media/${id}`)).toBe(true);
     expect(isAllowedWebApiPath("POST", `media/${id}/complete`)).toBe(true);
     expect(isAllowedWebApiPath("POST", "auth/mfa/enrollment")).toBe(true);

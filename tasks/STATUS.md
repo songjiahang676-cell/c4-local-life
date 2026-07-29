@@ -6,14 +6,14 @@
 
 - Gate：G2 Listings / Moderation
 - 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
-- 进度：9/16 个 G2 任务、39/101 个总任务完成
-- 风险：`ORG-002` 已在本地完成并等待受保护 PR 验证，合并后回到 Gate 2 的 `LIST-006`；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产审核词库、阈值、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v1 保守地把命中内容送入队列而不自动处罚
+- 进度：10/16 个 G2 任务、40/101 个总任务完成
+- 风险：`LIST-006` 本地全量验证已通过并等待受保护 PR；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产招聘政策词库、最低工资展示细则、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v2 只把政策风险命中送入人工队列而不自动处罚
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target            | Status      | Notes                                                                   |
-| ------- | -------------------- | ---------- | ----------------- | ----------- | ----------------------------------------------------------------------- |
-| ORG-002 | @songjiahang676-cell | 2026-07-30 | protected task PR | local green | 短效邀请、接受/撤销、角色并发控制、至少一名 Owner 与 step-up Owner 转移 |
+| Task     | Owner                | Started    | Target            | Status      | Notes                                                      |
+| -------- | -------------------- | ---------- | ----------------- | ----------- | ---------------------------------------------------------- |
+| LIST-006 | @songjiahang676-cell | 2026-07-30 | protected task PR | local green | Job 薪资/岗位字段、政策确认、审核、公开/过期与中英移动 E2E |
 
 ## Gate Evidence
 
@@ -137,14 +137,20 @@
 | ORG-002 runtime/browser         | API runtime + Chromium desktop/mobile | canonical contract and private notification flow；10/10 E2E passed         | 2026-07-30 |
 | ORG-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks、53 models、57 paths、123 schemas、36 JSON files passed          | 2026-07-30 |
 | ORG-002 protected checks        | PR #25 / run `30438535063`            | 320 real-service tests、Linux build/E2E and four non-root images passed    | 2026-07-30 |
+| ORG-002 final checks            | PR #25 / run `30439069763`            | evidence head quality + four non-root images passed                        | 2026-07-30 |
+| ORG-002 protected merge         | PR #25 / merge `0ac0b6e`              | protected squash merge completed                                           | 2026-07-30 |
+| LIST-006 database lifecycle     | fresh 22-migration empty database     | baseline 34 negatives；upgrade sentinel；22 files / 80 DB tests passed     | 2026-07-30 |
+| LIST-006 local quality          | `pnpm ci:quality`                     | 78 files / 324 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-30 |
+| LIST-006 runtime/browser        | production Chromium desktop/mobile    | Job create/save/submit and existing journeys；12/12 E2E passed             | 2026-07-30 |
+| LIST-006 architecture           | `scripts/check-architecture.sh`       | 101 tasks、53 models、57 paths、123 schemas、36 JSON files passed          | 2026-07-30 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
 - Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`；LIST-002 已由受保护 PR #18 / final run `30410107716` 合并为 `a8db956`；LIST-003 已由受保护 PR #19 / final run `30412407859` 合并为 `c9a6db2`；LIST-004 已由受保护 PR #20 / final run `30415124557` 合并为 `fd27e19`；MOD-001 已由受保护 PR #21 / final run `30417062067` 合并为 `d9f632d`；ADMIN-002 已由受保护 PR #22 / final run `30419743207` 合并为 `cb02bda`；LIST-005 已由受保护 PR #23 / final run `30430614404` 合并为 `7a42b00`；NOTIF-001 已由受保护 PR #24 / final run `30435034353` 合并为 `19a6176`。
-- `ORG-002` 保留原 G1/P1 标签；其依赖已经满足并在本地完成，受保护合并后按
-  `IMPLEMENTATION_SEQUENCE.md` 继续 `LIST-006`。`MEDIA-003` 仍属于 G4 受限验证文件。
+- `ORG-002` 保留原 G1/P1 标签并已由 PR #25 受保护合并；现按
+  `IMPLEMENTATION_SEQUENCE.md` 执行 `LIST-006`。`MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。
