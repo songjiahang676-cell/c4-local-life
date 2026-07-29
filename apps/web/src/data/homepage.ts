@@ -65,7 +65,7 @@ export const quickPublish: IconEntry[] = [
   {
     key: "housing-post",
     label: "发布房源",
-    href: `${ROUTES.housingRent}/post`,
+    href: ROUTES.rentalPost,
     icon: House,
     theme: "red",
     description: "出租 / 出售 / 求租",

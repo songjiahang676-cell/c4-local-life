@@ -38,7 +38,7 @@ ADMIN-001,G1,ADMIN,P0,Admin shell、登录、RBAC 导航,AUTH-001;API-004,独立
 LIST-001,G2,LIST,P0,Listing 领域状态机与不变式,DATA-001;TAX-002,非法转换/type-detail/价格/过期规则单测,docs/06-domain-and-data-model.md;docs/11-content-workflows-and-moderation.md,done
 LIST-002,G2,LIST,P0,Listing repository 与安全投影,LIST-001;DATA-006,public/owner/moderator DTO 不泄漏字段；查询带授权,docs/08-api-and-integrations.md,done
 LIST-003,G2,LIST,P0,草稿创建/读取/更新/并发控制,LIST-002;API-004,Owner/org 权限；version/ETag；冲突 409,openapi/openapi.yaml,done
-LIST-004,G2,WEB,P0,Rental 动态发布表单与自动保存,LIST-003;MEDIA-002,移动/中英/错误/恢复/上传完成；E2E,docs/10-ui-ux-design-system.md,todo
+LIST-004,G2,WEB,P0,Rental 动态发布表单与自动保存,LIST-003;MEDIA-002,移动/中英/错误/恢复/上传完成；E2E,docs/10-ui-ux-design-system.md,done
 LIST-005,G2,LIST,P0,Rental 提交/发布/公开列表详情/过期,MOD-001;ADMIN-002,完整状态链；公开投影；过期任务；审计,docs/22-acceptance-criteria.md,todo
 LIST-006,G2,LIST,P0,Job 垂直切片,LIST-005,薪资/岗位字段、就业政策、完整 E2E,docs/23-content-taxonomy.md,todo
 LIST-007,G2,LIST,P0,Transfer/Secondhand/Service 垂直切片,LIST-006,三类 schema/detail/政策/列表详情 E2E,docs/23-content-taxonomy.md,todo

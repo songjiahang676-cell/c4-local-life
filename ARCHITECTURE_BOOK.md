@@ -767,8 +767,10 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影；READY asset 的显式所有权校验和绑定仍由 `LIST-004` 的表单/上传闭环完成，不能把未扫描
-对象直接公开。
+公开变体投影；`LIST-004` 在 `MediaAsset` 上增加 nullable `listingId` 和稳定 `sortOrder` 作为私有草稿
+绑定证据。Repository 先按 UUID 顺序锁定候选 asset，要求 `LISTING_MEDIA + IMAGE + READY`、当前
+actor 所有或已经绑定到同一可编辑 Listing，随后才在同一 Listing 写事务中绑定/解绑。数据库 check
+同时禁止把未扫描、非图片或非 Listing 用途的 asset 绑定，跨 Listing 复用由锁和外键失败关闭。
 
 `MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
 元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和
@@ -1234,6 +1236,10 @@ owner/当前组织成员返回 `ListingOwnerView` 和 `no-store`，未发布草�
 `If-Match`；版本竞争返回 409 和当前 ETag，不会静默覆盖。组织 `OWNER|ADMIN|EDITOR` 可更新，
 `BILLING|ANALYST` 只读；状态/价格/分类/地区/精确历史 attributes 在服务端再次验证。
 
+`LIST-004` 将 `mediaIds` 纳入 owner 投影和创建/更新契约，数组最多 20 个且必须唯一。应用层不信任
+客户端上传完成声明；Repository 在事务中锁定并复核 READY、用途、类型、owner/同 Listing 归属，
+无效、跨 owner、跨 Listing 和未扫描 ID 统一映射为字段级 422，且不会先递增 Listing version。
+
 ## 8.7 上传 API
 
 1. 客户端请求 upload intent，声明用途、mime、大小、hash。
@@ -1265,6 +1271,12 @@ WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性�
 永久内容错误进入 REJECTED，ClamAV/S3 等暂时故障抛回 BullMQ 重试；重复/乱序 event 由
 `lifecycleVersion` 关闭。只有数据库 READY 和完整三变体集可供后续 Listing 绑定，原始 quarantine
 对象及当前 processed bucket 都不直接匿名公开。
+
+`LIST-004` 新增 owner-scoped `GET /media/{mediaId}`，只返回 UUID、四态
+`UPLOADING|SCANNING|READY|REJECTED`、稳定拒绝码和更新时间，并强制 `no-store`；未知、删除和跨 owner
+标识统一 404，bucket、object key、hash、原图 URL 与 provider 错误不进入响应。Web 通过同源
+`/v1` BFF 的 method + UUID path allowlist 调用 session、taxonomy、form schema、Listing 草稿和媒体
+生命周期端点；任意 Admin、DELETE、方法混淆或 malformed 路径失败为 404，代理不开放通用 API 穿透。
 
 ## 8.8 Stripe 集成
 
@@ -1323,7 +1335,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 44 个 path、89 个 schema、53 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 45 个 path、99 个 schema、54 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1537,6 +1549,16 @@ Button、IconButton、Link、Input、Textarea、Select/Combobox、Checkbox/Radio
 - 服务端字段错误映射到具体控件，首个错误获焦并有汇总。
 - 不用颜色单独表达错误；错误文本说明如何修复。
 - 上传显示进度、扫描、失败、重试和删除；提交前检查 READY 状态。
+
+`LIST-004` 已在 `/{locale}/post/rental/new` 落地首个真实切片：页面只消费已发布的 Rental
+`CategoryFormSchema`，按白名单渲染控件；900ms 防抖队列以 `Idempotency-Key` 创建、强 ETag
+`If-Match` 更新，并在 409 时明确要求用户装载服务器版本。浏览器恢复数据按 user + locale 分区、
+限 250KB 且经过严格形状检查；离线时只保存在当前设备，恢复联网后继续服务端保存。字段错误有汇总、
+首错聚焦和 live region，中文/英文及移动宽度由 Chromium E2E 覆盖。
+
+图片上传只接受 JPEG/PNG/WebP、单图 20MiB、最多 20 张；客户端展示直传进度、SCANNING、
+REJECTED、重试和移除状态，但只有 owner-scoped 状态端点确认 `READY` 后才把 UUID 写入草稿。
+“移除”只解除草稿绑定，不把对象删除冒充已完成的数据删除工作流。
 
 ## 10.7 可访问性
 
@@ -2067,6 +2089,12 @@ Worker 对实际字节再次复算长度/SHA-256、检查 magic bytes 和执行�
 `image/webp` 类型。永久拒绝仅保存有界错误码，不保存扫描响应或原始 provider 错误；暂时依赖故障重试。
 数据库 row lock + lifecycleVersion 阻止重复/乱序队列覆盖终态，只有 READY 才能被后续业务绑定。
 
+`LIST-004` 的 Web BFF 仅允许发布表单所需的 method/path 组合，UUID 段严格校验且不代理 Admin、
+DELETE 或任意上游路径。浏览器恢复 key 同时绑定 server-derived userId 与 locale，解析时限制总大小、
+字段长度、媒体数量和枚举；切换账号不能读取上一账号草稿。媒体状态查询只对 owner 返回有界生命周期，
+跨 owner/删除/未知统一 404；数据库和事务双重要求 READY + LISTING_MEDIA + IMAGE，并以确定性行锁
+阻止跨 Listing 竞争绑定。客户端移除图片只解绑，不绕过未来媒体删除和审计工作流。
+
 ## 14.8 PII 分类
 
 | 等级              | 示例                             | 控制                       |
@@ -2526,6 +2554,12 @@ taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization memb
 并发 PATCH 只成功一个；每次成功恰有一条 Audit 和一条 Outbox，序列化负例证明其中没有业务正文或
 PII。并行集成测试只按稳定 seed ID 断言 taxonomy，避免其他隔离 fixture 造成全表计数抖动。
 
+`LIST-004` 增加 READY 媒体绑定和浏览器发布测试。Repository 集成验证 owner READY 图片的稳定排序、
+解绑、未扫描/跨 owner 拒绝且失败时 Listing 不创建、不递增版本；API/契约验证 owner 状态、统一 404、
+无存储 metadata 泄漏和唯一 `mediaIds`。Web 单测覆盖双语校验、create/update payload、user + locale
+恢复隔离和严格 BFF allowlist。Playwright 在 Desktop Chrome 与 Pixel 7 上用真实生产构建验证中文填写、
+自动保存、刷新恢复、切换英文和无横向溢出，共 8 个 E2E case。
+
 ## 18.4 授权测试
 
 为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。
@@ -2617,8 +2651,9 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 31 个 path 的唯一 OpenAPI 文档；
+- 运行时提供包含 45 个 path 的唯一 OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
+- Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
 
 首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
 
@@ -2943,8 +2978,9 @@ publisher/故障测试必须通过。
 - 详情不泄露精确地址/联系方式/风险字段。
 
 `LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
-Audit/Outbox 和安全详情投影。自动保存/浏览器恢复与 READY 媒体绑定属于 `LIST-004`；提交、审核、
-发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
+Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
+账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
+提交、审核、发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3717,8 +3753,9 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   type-detail、价格、审核/内容双状态、版本和过期不变式。`LIST-002` 已增加 PostgreSQL Repository
   及 public/owner/moderator 显式安全投影，包含对象范围、当前审核角色 scope 和精确历史动态字段
   visibility 过滤；`LIST-003` 已接入数据库草稿创建/owner 读取/条件更新、actor-scoped 幂等、
-  API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。列表仍留给 `LIST-005`，
-  READY 媒体绑定与发布 UX 留给 `LIST-004`。
+  API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
+  中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
+  轮询及事务化 READY 绑定。公开列表仍留给 `LIST-005`。
 
 ### `apps/worker`
 
@@ -3739,6 +3776,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   Repository 边界失败关闭，不直接返回 Prisma 模型。
 - Listing 草稿 Repository 对创建使用 advisory lock + owner/key 唯一证据，对更新使用行锁 +
   version predicate，并在相同事务写 Audit/Outbox。
+- Listing 媒体绑定按 UUID 加行锁，只接受 owner 或同一可编辑 Listing 已绑定的 READY 图片；
+  `media_assets_listing_binding_check`、外键和稳定 sort order 提供数据库兜底。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 

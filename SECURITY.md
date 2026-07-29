@@ -24,6 +24,8 @@
   恶意文件扫描、图像解码重编码/去 EXIF，并通过独立无 Cookie 域名分发。完成端点以服务端 HEAD 闭合
   intent，Worker 对实际字节复算 hash、经真实 ClamAV INSTREAM 和 Sharp 像素上限处理，只写入三个
   确定性加密 WebP；原始/派生桶保持私有，重复或乱序事件不能越过 lifecycleVersion。
+- Rental 发布只经 method/path allowlist 同源 BFF；本地恢复按 server-derived userId + locale 隔离。
+  媒体状态未知/跨 owner/删除统一 404，只有数据库确认 READY 的 LISTING_MEDIA 图片可在事务中绑定。
 - 异步事件采用数据库同事务 Outbox 和至少一次投递；`eventId` 是消费者幂等键，队列 envelope 有大小
   上限和版本。日志/指标不记录事件 payload、原始提供商错误或 PII，失败只保留有界错误码。
 - 支付数据由支付服务商托管；平台不保存完整卡号和 CVC。

@@ -177,7 +177,15 @@ actor-scoped `Idempotency-Key`、强 ETag/`If-Match`，Repository 以事务锁�
 `socal_list003_empty` 空库重放；baseline 22 个负例、previous-baseline upgrade、64 项真实
 PostgreSQL 测试、全仓 61 个文件/226 项测试、8 个构建、运行时检查和 Chromium 6/6 smoke 本机通过。
 本机无 Redis/ClamAV 的 2 项服务集成明确跳过；PR #19 / run `30412033239` 已用真实服务通过
-Linux quality、浏览器和四镜像非 root 检查，证据提交的最终 head checks 与受保护合并仍待完成。
+Linux quality、浏览器和四镜像非 root 检查，final run `30412407859` 通过后受保护合并为
+`c9a6db2`。
+
+`LIST-004` 已提供 `/{locale}/post/rental/new` 的中文/英文响应式发布表单，按已发布 schema 白名单
+渲染动态字段，以 900ms 防抖、actor 幂等键和强 ETag 完成服务端自动保存，并以 user + locale
+隔离、250KB 严格解析的本地快照提供离线恢复。图片仅接受 JPEG/PNG/WebP，展示上传/扫描/拒绝/重试，
+只有 owner 状态端点确认 READY 后才进入草稿。第 16 个迁移及 Repository 以 UUID 行锁、用途/类型/
+状态/owner 检查和数据库约束原子绑定媒体；Web 同源 BFF 只允许该流程所需 method/path。全量本地
+质量门禁通过 61 个文件/235 项测试、9 个 typecheck/lint、8 个构建；Chromium 桌面/移动 8/8 通过。
 
 ## 七、规划容量与服务目标
 

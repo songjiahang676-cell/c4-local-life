@@ -1762,3 +1762,406 @@ input:focus-visible {
     padding-inline: 4px;
   }
 }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.draftPage {
+  min-height: 100vh;
+  max-width: 980px;
+  padding-block: 24px 48px;
+}
+
+.draftPage > nav {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.draftPage > nav a {
+  color: var(--blue);
+}
+
+.draftPageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 0;
+}
+
+.draftPageHeader p {
+  margin: 0 0 6px;
+  color: var(--orange);
+  font-weight: 800;
+}
+
+.draftPageHeader h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 38px);
+}
+
+.draftPageHeader span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.draftPageHeader > a {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding-inline: 16px;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 9px;
+  font-weight: 700;
+}
+
+.draftLoading,
+.draftAuthGate {
+  padding: 28px;
+}
+
+.draftAuthGate h2 {
+  margin-top: 0;
+}
+
+.draftAuthGate p {
+  max-width: 640px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.rentalDraftForm {
+  display: grid;
+  gap: 16px;
+}
+
+.draftSaveStatus {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  color: #24508c;
+  background: var(--blue-soft);
+  border: 1px solid #cfe0fb;
+  border-radius: 10px;
+}
+
+.draftSaveStatus span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.draftSaveStatus.state-saved {
+  color: #0a6945;
+  background: #eaf8f2;
+  border-color: #bce8d5;
+}
+
+.draftSaveStatus.state-conflict,
+.draftSaveStatus.state-offline {
+  color: #8b4a00;
+  background: #fff6e9;
+  border-color: #f5d49e;
+}
+
+.draftConflict,
+.draftErrorSummary {
+  padding: 16px 18px;
+  border-radius: 10px;
+}
+
+.draftConflict {
+  color: #734000;
+  background: #fff6e9;
+  border: 1px solid #f5d49e;
+}
+
+.draftConflict p {
+  margin-top: 0;
+}
+
+.draftConflict button,
+.draftErrorSummary a {
+  color: #734000;
+  text-decoration: underline;
+}
+
+.draftErrorSummary {
+  color: #8f1d16;
+  background: #fff1f0;
+  border: 1px solid #f3c2be;
+}
+
+.draftErrorSummary ul {
+  margin-bottom: 0;
+}
+
+.draftSection {
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.draftSection h2 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+
+.draftSection > p {
+  margin-top: -8px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.draftSection > label,
+.draftGrid > label,
+.dynamicFieldGrid > label {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  font-weight: 700;
+}
+
+.draftSection input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.draftSection textarea,
+.draftSection select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #ccd5e2;
+  border-radius: 8px;
+}
+
+.draftSection textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.draftSection input[aria-invalid="true"],
+.draftSection textarea[aria-invalid="true"],
+.draftSection select[aria-invalid="true"] {
+  border-color: var(--color-danger-600, #d92d20);
+}
+
+.draftSection input:focus-visible,
+.draftSection textarea:focus-visible,
+.draftSection select:focus-visible {
+  outline: 3px solid rgba(18, 103, 237, 0.28);
+  outline-offset: 1px;
+  border-color: var(--blue);
+}
+
+.draftGrid,
+.dynamicFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+
+.dynamicFieldGrid .spanTwo {
+  grid-column: 1 / -1;
+}
+
+.dynamicFieldGrid label > small:not(.fieldError) {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.fieldError {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.choiceSet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choiceSet label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.choiceSet input {
+  width: 20px;
+  height: 20px;
+}
+
+.coordinateFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.draftUploadButton {
+  width: fit-content;
+  min-height: 44px;
+  display: inline-flex !important;
+  align-items: center;
+  padding: 10px 16px;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border: 1px solid #cfe0fb;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.draftUploadButton input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.draftUploadList {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.draftUploadList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 180px) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.draftUploadList strong,
+.draftUploadList span {
+  display: block;
+}
+
+.draftUploadList strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draftUploadList span,
+.draftUploadList small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.draftUploadList progress {
+  width: 100%;
+}
+
+.uploadActions {
+  display: flex !important;
+  gap: 6px;
+}
+
+.uploadActions button,
+.draftActions > button:not(.draftPrimaryButton),
+.draftConflict button {
+  min-height: 40px;
+  padding: 8px 12px;
+  color: var(--blue);
+  background: #fff;
+  border: 1px solid #cbd7e8;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.draftActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(245, 247, 251, 0.96);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.draftPrimaryButton {
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 10px 20px;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.draftPrimaryButton:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+@media (max-width: 600px) {
+  .draftPage {
+    width: min(100% - 20px, 980px);
+    padding-top: 10px;
+  }
+
+  .draftPageHeader {
+    align-items: center;
+    padding: 12px 0 18px;
+  }
+
+  .draftPageHeader span {
+    font-size: 12px;
+  }
+
+  .draftGrid,
+  .dynamicFieldGrid,
+  .coordinateFields {
+    grid-template-columns: 1fr;
+  }
+
+  .dynamicFieldGrid .spanTwo {
+    grid-column: auto;
+  }
+
+  .draftSaveStatus {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .draftUploadList li {
+    grid-template-columns: 1fr;
+  }
+
+  .draftActions {
+    margin-inline: -10px;
+  }
+
+  .draftActions button {
+    flex: 1;
+  }
+}

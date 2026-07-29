@@ -85,6 +85,16 @@ Button、IconButton、Link、Input、Textarea、Select/Combobox、Checkbox/Radio
 - 不用颜色单独表达错误；错误文本说明如何修复。
 - 上传显示进度、扫描、失败、重试和删除；提交前检查 READY 状态。
 
+`LIST-004` 已在 `/{locale}/post/rental/new` 落地首个真实切片：页面只消费已发布的 Rental
+`CategoryFormSchema`，按白名单渲染控件；900ms 防抖队列以 `Idempotency-Key` 创建、强 ETag
+`If-Match` 更新，并在 409 时明确要求用户装载服务器版本。浏览器恢复数据按 user + locale 分区、
+限 250KB 且经过严格形状检查；离线时只保存在当前设备，恢复联网后继续服务端保存。字段错误有汇总、
+首错聚焦和 live region，中文/英文及移动宽度由 Chromium E2E 覆盖。
+
+图片上传只接受 JPEG/PNG/WebP、单图 20MiB、最多 20 张；客户端展示直传进度、SCANNING、
+REJECTED、重试和移除状态，但只有 owner-scoped 状态端点确认 `READY` 后才把 UUID 写入草稿。
+“移除”只解除草稿绑定，不把对象删除冒充已完成的数据删除工作流。
+
 ## 10.7 可访问性
 
 - 全站键盘可操作，焦点顺序与视觉顺序一致。

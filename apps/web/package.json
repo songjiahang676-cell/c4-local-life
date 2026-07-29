@@ -11,6 +11,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project @socal/web --reporter=default"
   },
   "dependencies": {
+    "@socal/contracts": "workspace:*",
     "lucide-react": "1.25.0",
     "next": "catalog:",
     "react": "catalog:",

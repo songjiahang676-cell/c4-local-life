@@ -36,6 +36,7 @@ const editorId = "10000000-0000-4000-8000-000000000003";
 const billingId = "10000000-0000-4000-8000-000000000004";
 const limitedId = "10000000-0000-4000-8000-000000000005";
 const organizationId = "40000000-0000-4000-8000-000000000001";
+const readyMediaId = "50000000-0000-4000-8000-000000000002";
 
 function draftPayload(title = "Fictional Irvine rental"): CreateListingInput {
   return {
@@ -97,6 +98,7 @@ describe("listing draft HTTP boundary", () => {
       readers: [editorId, billingId],
       writers: [editorId],
     });
+    listingStore.registerReadyMedia(readyMediaId);
 
     app = await createApiApplication(environment, {
       logger: false,
@@ -261,6 +263,31 @@ describe("listing draft HTTP boundary", () => {
     expect(stale.headers.etag).toBe('"listing-v2"');
   });
 
+  it("binds only registered READY media and supports ordered removal on autosave", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-ready-media-0001"),
+      payload: {
+        ...draftPayload("Draft with scanned media"),
+        mediaIds: [readyMediaId],
+      },
+    });
+    const listing = created.json<ListingOwnerResponse>();
+
+    expect(created.statusCode).toBe(201);
+    expect(listing.data.mediaIds).toEqual([readyMediaId]);
+
+    const removed = await server.inject({
+      method: "PATCH",
+      url: `/v1/listings/${listing.data.id}`,
+      headers: { ...mutationHeaders(ownerId), "if-match": '"listing-v1"' },
+      payload: { mediaIds: [] },
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json<ListingOwnerResponse>().data.mediaIds).toEqual([]);
+  });
+
   it("allows organization Editors to write and Billing members only to read", async () => {
     const created = await server.inject({
       method: "POST",
@@ -297,7 +324,7 @@ describe("listing draft HTTP boundary", () => {
     expect(editorWrite.headers.etag).toBe('"listing-v2"');
   });
 
-  it("rejects unsafe, over-posted, unsupported-media, and restricted-account writes", async () => {
+  it("rejects unsafe, over-posted, unready-media, and restricted-account writes", async () => {
     const cases = await Promise.all([
       server.inject({
         method: "POST",

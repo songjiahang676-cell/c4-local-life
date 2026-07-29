@@ -24,8 +24,9 @@
   type-detail、价格、审核/内容双状态、版本和过期不变式。`LIST-002` 已增加 PostgreSQL Repository
   及 public/owner/moderator 显式安全投影，包含对象范围、当前审核角色 scope 和精确历史动态字段
   visibility 过滤；`LIST-003` 已接入数据库草稿创建/owner 读取/条件更新、actor-scoped 幂等、
-  API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。列表仍留给 `LIST-005`，
-  READY 媒体绑定与发布 UX 留给 `LIST-004`。
+  API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
+  中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
+  轮询及事务化 READY 绑定。公开列表仍留给 `LIST-005`。
 
 ### `apps/worker`
 
@@ -46,6 +47,8 @@
   Repository 边界失败关闭，不直接返回 Prisma 模型。
 - Listing 草稿 Repository 对创建使用 advisory lock + owner/key 唯一证据，对更新使用行锁 +
   version predicate，并在相同事务写 Audit/Outbox。
+- Listing 媒体绑定按 UUID 加行锁，只接受 owner 或同一可编辑 Listing 已绑定的 READY 图片；
+  `media_assets_listing_binding_check`、外键和稳定 sort order 提供数据库兜底。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 

@@ -121,8 +121,10 @@ PENDING/SUCCESS/FAILURE 结果，用于三维限流和安全诊断，不保存�
 `quarantine/<两位分片>/<media UUID>/original`，不包含原始文件名或用户标识。创建 intent 在 owner
 advisory transaction lock 内依次处理 exact retry、ACTIVE actor 复核、未过期活动数量和滚动 24 小时
 字节配额，再插入元数据；同一 `owner + Idempotency-Key` 的不同 payload 冲突。`ListingMedia` 仍是现有
-Listing 投影；READY asset 的显式所有权校验和绑定仍由 `LIST-004` 的表单/上传闭环完成，不能把未扫描
-对象直接公开。
+公开变体投影；`LIST-004` 在 `MediaAsset` 上增加 nullable `listingId` 和稳定 `sortOrder` 作为私有草稿
+绑定证据。Repository 先按 UUID 顺序锁定候选 asset，要求 `LISTING_MEDIA + IMAGE + READY`、当前
+actor 所有或已经绑定到同一可编辑 Listing，随后才在同一 Listing 写事务中绑定/解绑。数据库 check
+同时禁止把未扫描、非图片或非 Listing 用途的 asset 绑定，跨 Listing 复用由锁和外键失败关闭。
 
 `MEDIA-002` 把生命周期扩展为 `UPLOADING → SCANNING → READY/REJECTED`。API 只根据受信 `HeadObject`
 元数据完成 owner 范围的对象确认，并在同一事务递增 `lifecycleVersion`、写入状态和

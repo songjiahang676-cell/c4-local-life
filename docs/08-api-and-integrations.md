@@ -177,6 +177,10 @@ owner/当前组织成员返回 `ListingOwnerView` 和 `no-store`，未发布草�
 `If-Match`；版本竞争返回 409 和当前 ETag，不会静默覆盖。组织 `OWNER|ADMIN|EDITOR` 可更新，
 `BILLING|ANALYST` 只读；状态/价格/分类/地区/精确历史 attributes 在服务端再次验证。
 
+`LIST-004` 将 `mediaIds` 纳入 owner 投影和创建/更新契约，数组最多 20 个且必须唯一。应用层不信任
+客户端上传完成声明；Repository 在事务中锁定并复核 READY、用途、类型、owner/同 Listing 归属，
+无效、跨 owner、跨 Listing 和未扫描 ID 统一映射为字段级 422，且不会先递增 Listing version。
+
 ## 8.7 上传 API
 
 1. 客户端请求 upload intent，声明用途、mime、大小、hash。
@@ -208,6 +212,12 @@ WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性�
 永久内容错误进入 REJECTED，ClamAV/S3 等暂时故障抛回 BullMQ 重试；重复/乱序 event 由
 `lifecycleVersion` 关闭。只有数据库 READY 和完整三变体集可供后续 Listing 绑定，原始 quarantine
 对象及当前 processed bucket 都不直接匿名公开。
+
+`LIST-004` 新增 owner-scoped `GET /media/{mediaId}`，只返回 UUID、四态
+`UPLOADING|SCANNING|READY|REJECTED`、稳定拒绝码和更新时间，并强制 `no-store`；未知、删除和跨 owner
+标识统一 404，bucket、object key、hash、原图 URL 与 provider 错误不进入响应。Web 通过同源
+`/v1` BFF 的 method + UUID path allowlist 调用 session、taxonomy、form schema、Listing 草稿和媒体
+生命周期端点；任意 Admin、DELETE、方法混淆或 malformed 路径失败为 404，代理不开放通用 API 穿透。
 
 ## 8.8 Stripe 集成
 
@@ -266,7 +276,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 44 个 path、89 个 schema、53 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 45 个 path、99 个 schema、54 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 

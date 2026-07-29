@@ -1,6 +1,6 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
-import type { CreateUploadResponse } from "@socal/contracts";
+import type { CreateUploadResponse, MediaStatusResponse } from "@socal/contracts";
 import { createObservabilityRuntime } from "@socal/observability";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -317,6 +317,54 @@ describe("media upload HTTP boundary", () => {
       mimeType: validPayload.mimeType,
       sha256: validPayload.sha256,
     });
+  });
+
+  it("returns bounded owner-only processing state without storage metadata", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/media/uploads",
+      headers: {
+        cookie: activeCookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "media-status-http-0001",
+      },
+      payload: validPayload,
+    });
+    const { data } = created.json<CreateUploadResponse>();
+    await server.inject({
+      method: "POST",
+      url: `/v1/media/${data.mediaId}/complete`,
+      headers: { cookie: activeCookie, origin: environment.PUBLIC_WEB_URL },
+    });
+
+    const [owner, foreign, guest] = await Promise.all([
+      server.inject({
+        method: "GET",
+        url: `/v1/media/${data.mediaId}`,
+        headers: { cookie: activeCookie },
+      }),
+      server.inject({
+        method: "GET",
+        url: `/v1/media/${data.mediaId}`,
+        headers: { cookie: secondaryCookie },
+      }),
+      server.inject({ method: "GET", url: `/v1/media/${data.mediaId}` }),
+    ]);
+
+    expect(owner.statusCode).toBe(200);
+    expect(owner.headers["cache-control"]).toBe("no-store");
+    expect(owner.json<MediaStatusResponse>()).toMatchObject({
+      data: {
+        mediaId: data.mediaId,
+        status: "SCANNING",
+        rejectionCode: null,
+      },
+    });
+    expect(owner.body).not.toContain("bucket");
+    expect(owner.body).not.toContain("sha256");
+    expect(owner.body).not.toContain("objectKey");
+    expect(foreign.statusCode).toBe(404);
+    expect(guest.statusCode).toBe(401);
   });
 
   it("hides cross-owner assets and rejects mismatched or unavailable objects without queueing", async () => {

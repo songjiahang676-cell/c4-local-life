@@ -251,9 +251,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(44);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(98);
-    expect(operationIds).toHaveLength(53);
+    expect(Object.keys(contract.paths)).toHaveLength(45);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(99);
+    expect(operationIds).toHaveLength(54);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -290,8 +290,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(44);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(44);
+    expect(Object.keys(servedJson.paths)).toHaveLength(45);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(45);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -593,6 +593,19 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(201);
     expect(schema).toBeDefined();
     expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    const mediaId = response.json<{ data: { mediaId: string } }>().data.mediaId;
+    const status = await server.inject({
+      method: "GET",
+      url: `/v1/media/${mediaId}`,
+      headers: { cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}` },
+    });
+    const statusSchema =
+      contract.paths["/media/{mediaId}"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    expect(status.statusCode).toBe(200);
+    expect(ajv.validate(statusSchema ?? false, status.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
     const completion = contract.paths["/media/{mediaId}/complete"]?.post;
     expect(completion?.responses["202"]?.content?.["application/json"]?.schema).toBeDefined();
     expect(Object.keys(completion?.responses ?? {})).toEqual([

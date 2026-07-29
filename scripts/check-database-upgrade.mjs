@@ -233,6 +233,30 @@ try {
             AND indexname = 'listings_owner_id_create_idempotency_key_key'
        ) AS owner_idempotency`,
   );
+  const listingMediaBindingStorage = await upgrade.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_listing_binding_check'
+            AND constraint_type = 'CHECK'
+       ) AS binding_check,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_listing_id_sort_order_idx'
+       ) AS binding_index,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'media_assets'
+            AND column_name IN ('listing_id', 'sort_order')
+       ) AS binding_columns`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -263,7 +287,10 @@ try {
     !mediaProcessingStorage.rows[0].lifecycle_state_check ||
     !mediaProcessingStorage.rows[0].processing_index ||
     !listingDraftStorage.rows[0].evidence_check ||
-    !listingDraftStorage.rows[0].owner_idempotency
+    !listingDraftStorage.rows[0].owner_idempotency ||
+    !listingMediaBindingStorage.rows[0].binding_check ||
+    !listingMediaBindingStorage.rows[0].binding_index ||
+    listingMediaBindingStorage.rows[0].binding_columns !== 2
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -288,6 +315,7 @@ try {
       outboxStorage: true,
       mediaProcessingStorage: true,
       listingDraftStorage: true,
+      listingMediaBindingStorage: true,
     }),
   );
 } finally {

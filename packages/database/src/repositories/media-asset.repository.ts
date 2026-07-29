@@ -38,6 +38,13 @@ export type MediaUploadIntentRecord = {
   createdAt: Date;
 };
 
+export type OwnedMediaStatusRecord = {
+  id: string;
+  status: Exclude<MediaStatus, "DELETED">;
+  rejectionCode: string | null;
+  updatedAt: Date;
+};
+
 export type ReserveMediaUploadIntentInput = {
   id: string;
   ownerId: string;
@@ -342,6 +349,29 @@ export class MediaAssetRepository {
       select: mediaUploadIntentSelect,
     });
     return row ? mapIntent(row) : null;
+  }
+
+  async findOwnedStatus(id: string, ownerId: string): Promise<OwnedMediaStatusRecord | null> {
+    const row = await this.#client.mediaAsset.findFirst({
+      where: {
+        id,
+        ownerId,
+        status: { not: MediaStatus.DELETED },
+      },
+      select: {
+        id: true,
+        status: true,
+        rejectionCode: true,
+        updatedAt: true,
+      },
+    });
+    if (!row || row.status === MediaStatus.DELETED) return null;
+    return {
+      id: row.id,
+      status: row.status,
+      rejectionCode: row.rejectionCode,
+      updatedAt: row.updatedAt,
+    };
   }
 
   completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult> {

@@ -216,6 +216,7 @@ function toOwnerView(listing: OwnerListingProjection): ListingOwnerView {
       ...(point ? { point } : {}),
     },
     contactMode: listing.contactMode,
+    mediaIds: listing.mediaIds,
     isFeatured: listing.isFeatured,
     publishedAt: listing.publishedAt?.toISOString() ?? null,
     expiresAt: listing.expiresAt?.toISOString() ?? null,
@@ -276,6 +277,10 @@ function buildWriteFields(input: {
     latitude: point ? String(point.latitude) : null,
     longitude: point ? String(point.longitude) : null,
     locationPrecision: locationPatch?.precision ?? current?.location.precision ?? "CITY",
+    mediaIds:
+      "mediaIds" in patch && patch.mediaIds !== undefined
+        ? patch.mediaIds
+        : (current?.mediaIds ?? []),
   };
 }
 
@@ -323,8 +328,6 @@ export class ListingsService {
     });
     if (retry.kind === "conflict") throw new ListingIdempotencyConflictError();
     if (retry.kind === "exact_retry") return { data: toOwnerView(retry.listing) };
-    if (input.mediaIds.length > 0) throw new ListingValidationError();
-
     const references = await this.store.resolveReferences({
       type: input.type,
       categoryId: input.categoryId,
@@ -360,6 +363,11 @@ export class ListingsService {
       return { data: toOwnerView(result.listing) };
     }
     if (result.kind === "idempotency_conflict") throw new ListingIdempotencyConflictError();
+    if (result.kind === "invalid_media") {
+      throw new ListingValidationError({
+        mediaIds: ["must contain only owner-scoped READY listing images"],
+      });
+    }
     if (result.kind === "invalid_reference") throw new ListingValidationError();
     throw new ListingAccessDeniedError();
   }
@@ -431,8 +439,6 @@ export class ListingsService {
       throw new ListingVersionConflictError(current.version);
     }
     if (current.status !== "DRAFT") throw new ListingStateConflictError();
-    if (input.mediaIds?.length) throw new ListingValidationError();
-
     const categoryChanged =
       input.categoryId !== undefined && input.categoryId !== current.category.id;
     const references = await this.store.resolveReferences({
@@ -467,6 +473,11 @@ export class ListingsService {
       return { data: toOwnerView(result.listing) };
     }
     if (result.kind === "not_found") throw new ListingNotFoundError();
+    if (result.kind === "invalid_media") {
+      throw new ListingValidationError({
+        mediaIds: ["must contain only owner-scoped READY listing images"],
+      });
+    }
     if (result.kind === "invalid_reference") throw new ListingValidationError();
     if (result.kind === "state_conflict") throw new ListingStateConflictError();
     if (result.kind === "time_conflict" || result.kind === "version_conflict") {
