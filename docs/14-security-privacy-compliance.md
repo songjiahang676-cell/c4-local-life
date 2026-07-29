@@ -394,3 +394,16 @@ Idempotency-Key 或请求哈希。
   节点 URL、凭据、文档内容或查询文本。
 - 真实集成测试证明额外 `phone` 字段被 strict mapping 拒绝；后续 `SEARCH-002` 仍必须从 canonical
   PostgreSQL 重新加载授权公开投影，不能信任 Outbox payload 作为完整索引文档。
+
+## 14.26 SEARCH-002 索引消费威胁和缓解
+
+- 事件 payload 注入/旧事件覆盖：Worker 只接受固定 Listing event allowlist、UUID、ISO 时间、
+  schemaVersion 和正 aggregateVersion；文档始终从 PostgreSQL 重新加载。external version 阻止旧写/
+  删覆盖较新状态，数据库版本落后事件时重试而不信任 payload。
+- PII/精确位置扩散：Repository 只按发布时 form schema 选择 PUBLIC primitive attributes；联系方式、
+  未知/owner-only 字段、审核/风险、媒体 key 和组织法律名不进入投影。EXACT 位置替换为公开 Region
+  CITY 点，其他公开点三位小数化，结构化日志和指标不记录 Listing/event ID、标题、坐标或文档。
+- 下架延迟：提交复审、拒绝、移除、申诉维持、归档、删除和过期事件在 PostgreSQL Outbox claim 与
+  BullMQ 两段优先；索引失败可安全重试，周期 reconciliation 还会删除任何 canonical 非公开行。
+- 索引漂移/事实源反转：对账只以 PostgreSQL 状态和版本决定写删，绝不把 OpenSearch 内容写回数据库；
+  OpenSearch 版本异常领先会失败并告警，不以强制降版本掩盖损坏。

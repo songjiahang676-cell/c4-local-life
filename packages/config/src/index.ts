@@ -236,6 +236,8 @@ const workerEnvironmentSchema = commonServerSchema
     OPENSEARCH_USERNAME: z.string().optional().default(""),
     OPENSEARCH_PASSWORD: optionalSecretSchema(),
     OPENSEARCH_INDEX_PREFIX: openSearchIndexPrefixSchema,
+    SEARCH_RECONCILIATION_BATCH_SIZE: positiveInteger(100, 1_000),
+    SEARCH_RECONCILIATION_INTERVAL_MS: positiveInteger(300_000, 86_400_000),
     WORKER_CONCURRENCY: positiveInteger(5, 100),
     WORKER_HEALTH_PORT: positiveInteger(4001, 65_535),
     LISTING_EXPIRY_BATCH_SIZE: positiveInteger(50, 500),

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added canonical PostgreSQL-to-OpenSearch Listing event projection with strict envelope parsing,
+  external-version upsert/removal ordering, two-stage urgent takedown priority, periodic version
+  reconciliation, fuzzy public geo conversion, historical PUBLIC-attribute filtering, and bounded
+  freshness/reconciliation metrics.
 - Added a bilingual private account overview and shared capability-aware account shell with one
   bounded in-memory no-store Session snapshot, focus/visibility/expiry revalidation, fail-closed
   invalidation, localized minimal organization summaries, and responsive accessible navigation

@@ -84,6 +84,19 @@ describe("observability primitives", () => {
     runtime.metrics.mediaProcessing("ready");
     runtime.metrics.notificationEvent("created");
     runtime.metrics.moderationDuplicateReview("false_positive", 2);
+    runtime.metrics.searchIndex({
+      operation: "delete",
+      outcome: "applied",
+      priority: "urgent",
+      freshnessSeconds: 7,
+    });
+    runtime.metrics.searchIndex({
+      operation: "upsert",
+      outcome: "failed",
+      priority: "normal",
+      freshnessSeconds: 900,
+    });
+    runtime.metrics.searchReconciliation("deleted");
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -97,6 +110,19 @@ describe("observability primitives", () => {
     expect(metrics).toContain(
       'socal_moderation_duplicate_reviews_total{outcome="false_positive"} 2',
     );
+    expect(metrics).toContain(
+      'socal_search_index_events_total{operation="delete",outcome="applied",priority="urgent"} 1',
+    );
+    expect(metrics).toContain(
+      'socal_search_index_freshness_seconds_bucket{operation="delete",priority="urgent",le="10"} 1',
+    );
+    expect(metrics).toContain(
+      'socal_search_index_events_total{operation="upsert",outcome="failed",priority="normal"} 1',
+    );
+    expect(metrics).not.toContain(
+      'socal_search_index_freshness_seconds_count{operation="upsert",priority="normal"}',
+    );
+    expect(metrics).toContain('socal_search_reconciliation_total{outcome="deleted"} 1');
     expect(metrics).not.toContain("person@example.com");
   });
 });

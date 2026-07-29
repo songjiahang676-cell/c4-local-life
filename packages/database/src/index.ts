@@ -201,6 +201,15 @@ export {
   type OutboxEventRepositoryOptions,
 } from "./repositories/outbox-event.repository";
 export {
+  ListingSearchRepository,
+  type ListingSearchProjection,
+  type ListingSearchRecord,
+  type ListingSearchRepositoryOptions,
+  type ListingSearchState,
+  type ListingSearchStatePage,
+  type ListListingSearchStatesInput,
+} from "./repositories/listing-search.repository";
+export {
   CategoryFormSchemaRepository,
   normalizeTaxonomyAlias,
   TaxonomyRepository,

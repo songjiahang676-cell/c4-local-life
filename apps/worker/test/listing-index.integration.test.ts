@@ -7,6 +7,7 @@ import {
   type ListingSearchDocument,
 } from "../src/search/listing-index-definition";
 import { ListingIndexManager } from "../src/search/listing-index-manager";
+import { OpenSearchListingIndex } from "../src/search/listing-index";
 
 const node = process.env.OPENSEARCH_INTEGRATION_URL ?? "";
 const integration = describe.skipIf(node.length === 0);
@@ -139,5 +140,22 @@ integration("Listing index with OpenSearch", () => {
         body: { ...document, id: randomUUID(), phone: "+1-555-0100" },
       }),
     ).rejects.toMatchObject({ meta: { statusCode: 400 } });
+
+    const versionedIndex = new OpenSearchListingIndex(client, names.readAlias, names.writeAlias);
+    await expect(
+      versionedIndex.upsert({ ...document, title: "Version two", contentVersion: 2 }, 2),
+    ).resolves.toBe("applied");
+    await expect(versionedIndex.version(document.id)).resolves.toBe(2);
+    await expect(
+      versionedIndex.upsert({ ...document, title: "Stale version", contentVersion: 1 }, 1),
+    ).resolves.toBe("stale");
+    await expect(versionedIndex.remove(document.id, 1)).resolves.toBe("stale");
+    const current = await client.get<{ _source: ListingSearchDocument }>({
+      index: names.readAlias,
+      id: document.id,
+    });
+    expect(current.body._source.title).toBe("Version two");
+    await expect(versionedIndex.remove(document.id, 3)).resolves.toBe("applied");
+    await expect(versionedIndex.version(document.id)).resolves.toBeNull();
   });
 });

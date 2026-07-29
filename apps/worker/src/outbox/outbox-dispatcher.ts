@@ -27,6 +27,7 @@ export type OutboxDispatcherConfiguration = {
   retryBaseSeconds: number;
   retryMaximumSeconds: number;
   pollIntervalMilliseconds: number;
+  priorityEventTypes?: readonly string[];
 };
 
 export type OutboxDispatchSummary = {
@@ -96,6 +97,9 @@ export class OutboxDispatcher {
       now,
       batchSize: this.#configuration.batchSize,
       leaseSeconds: this.#configuration.leaseSeconds,
+      ...(this.#configuration.priorityEventTypes
+        ? { priorityEventTypes: this.#configuration.priorityEventTypes }
+        : {}),
     });
     const summary: OutboxDispatchSummary = {
       claimed: claims.length,

@@ -22,16 +22,19 @@ export class BullMqOutboxPublisher implements OutboxPublisher {
   readonly #queue: QueueProducer;
   readonly #maximumPayloadBytes: number;
   readonly #jobOptions: JobsOptions;
+  readonly #priorityEventTypes: ReadonlySet<string>;
 
   constructor(
     queue: QueueProducer,
     options: {
       maximumPayloadBytes: number;
       jobAttempts: number;
+      priorityEventTypes?: readonly string[];
     },
   ) {
     this.#queue = queue;
     this.#maximumPayloadBytes = options.maximumPayloadBytes;
+    this.#priorityEventTypes = new Set(options.priorityEventTypes ?? []);
     this.#jobOptions = {
       attempts: options.jobAttempts,
       backoff: { type: "exponential", delay: 1_000 },
@@ -58,6 +61,7 @@ export class BullMqOutboxPublisher implements OutboxPublisher {
     await this.#queue.add(event.eventType, envelope, {
       ...this.#jobOptions,
       jobId: event.id,
+      priority: this.#priorityEventTypes.has(event.eventType) ? 1 : 10,
     });
   }
 }

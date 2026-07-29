@@ -922,4 +922,26 @@ Observability: CLI emits only fixed event、outcome、index/alias names and sche
 
 Docs: Updated README、search architecture、security/privacy、testing、acceptance criteria、reference implementation、Gate checklist and task status
 
-Known gaps: SEARCH-002 owns Outbox consumption、external-version ordering、deletion priority and reconciliation；SEARCH-003 owns query/facets/cursor/geo API；SEARCH-004 owns synonyms/suggestions/trending privacy；SEARCH-005 owns rebuild and atomic alias switch；production shard/replica sizing still requires Beta capacity evidence；evidence-head、protected merge and final main evidence remain pending
+Known gaps: SEARCH-002 owns Outbox consumption、external-version ordering、deletion priority and reconciliation；SEARCH-003 owns query/facets/cursor/geo API；SEARCH-004 owns synonyms/suggestions/trending privacy；SEARCH-005 owns rebuild and atomic alias switch；production shard/replica sizing still requires Beta capacity evidence；PR #33 evidence-head run `30476886837`、protected merge `8a827bf` and final main run `30477490511` subsequently passed
+
+## SEARCH-002 — 索引 Worker、下架优先和对账
+
+Task: SEARCH-002 索引 Worker、下架优先和对账
+
+Changed: Added a canonical `ListingSearchRepository` that reloads current publishability、historical PUBLIC attributes、taxonomy paths/aliases、public publisher signals and fuzzy geo from PostgreSQL；added strict Listing envelope parsing、integer-minor-unit document construction and OpenSearch `external_gte` upsert/removal adapter；composed search and notification handlers on the same idempotent BullMQ job；added two-stage urgent takedown priority in Outbox claim and BullMQ；added bounded cursor reconciliation and Worker runtime controls
+
+Contracts: Public OpenAPI and generated REST contracts remain 67 paths / 153 schemas；the internal v1 `ListingSearchDocument` mapping is unchanged，while its producer now guarantees canonical contentVersion、PUBLIC-only primitive attributes、USD integer minor units and no exact point；Outbox claim accepts an optional validated/capped priority event allowlist
+
+Migrations: None；Prisma schema and all 26 migrations are unchanged。The repository reads existing Listing/taxonomy/form-schema/actor relations and existing UUID/status indexes；rollback removes the Worker consumer/reconciler and priority options，leaving PostgreSQL facts、Outbox history and the derived index intact；an index version ahead of canonical data requires later SEARCH-005 rebuild rather than destructive in-place lowering
+
+Security: Event payload is only a strict UUID/version/time trigger and never a document source；publishability is re-evaluated from canonical status、moderation、expiry、taxonomy and actor state；historical schema allowlists PUBLIC attributes and complex/private/unknown values are omitted；EXACT coordinates become the Region CITY point and other public coordinates are rounded to three decimals；external version prevents old writes/deletes；logs/metrics exclude IDs、titles、payloads、coordinates and provider detail
+
+Tests run: Target Database/Observability/Worker typecheck and lint passed；target tests passed 78 tests with 76 explicit local service skips；root `pnpm ci:quality` passed workflow/governance/runtime/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、67 passed / 23 skipped files with 319 passed / 76 skipped tests、8 production builds and 54.17% statements / 56.91% lines；architecture checker passed 101 tasks / 57 Prisma models / 67 OpenAPI paths / 153 schemas / 36 JSON files；the first complete quality attempt correctly found and then verified the fix for a test-only Vitest mock tuple inference error
+
+Not run: Local real PostgreSQL integration remains unavailable because the installed service rejects the repository `.env` account and the disposable-test guard forbids the non-test database；Redis、ClamAV、OpenSearch and Docker image smoke are unavailable on this Windows host。The draft protected PR must supply all real-service integration、Linux Chromium and four-image health evidence before the task is marked done
+
+Observability: Added `socal_search_index_events_total{operation,outcome,priority}`、`socal_search_index_freshness_seconds{operation,priority}` with 1/2/5/10/30/60/120/300/900-second buckets and `socal_search_reconciliation_total{outcome}`；the histogram records only successful terminal writes/deletes so failed retries do not distort the SLO，and fixed labels support urgent p95 10-second and normal p95 60-second calculation without resource cardinality；reconciliation logs only counts and cycle completion
+
+Docs: Updated README、search architecture、security/privacy、observability、testing、operations runbook、acceptance criteria、reference implementation、SECURITY、changelog、generated architecture book、Gate status and this worklog
+
+Known gaps: Protected real-service evidence and merge are pending；SEARCH-003 owns public query/facets/cursor/geo API，SEARCH-004 owns synonym/suggestion/trending privacy and SEARCH-005 owns full rebuild/atomic alias switching；reconciliation compares Listing versions and presence，while dependency display-name/taxonomy content refresh without Listing version change remains a later event/rebuild concern；production p95 claims require observed Beta traffic and are not inferred from test timing

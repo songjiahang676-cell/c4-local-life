@@ -120,3 +120,23 @@ natural_score =
 本地 Compose 与托管 CI 使用相同的 OpenSearch 2.19.5 基线。CI 对真实节点执行 analyzer、mapping、
 读写 alias、中文/英文命中、geo filter 和 strict-mapping PII 拒绝测试；单节点 replica 导致 yellow
 是预期可服务状态，生产副本数仍由基础设施模板和容量评审确定。
+
+## 9.12 SEARCH-002 索引消费、优先下架与对账
+
+`apps/worker/src/search/listing-index-handler.ts` 严格校验 Listing Outbox envelope，但事件 payload 只
+提供 Listing ID、aggregate version 和发生时间。每次消费都通过
+`ListingSearchRepository.findById` 从 PostgreSQL 重新读取当前状态、历史表单的 PUBLIC attributes、
+taxonomy path/alias 和最小公开发布者信号；不公开或不存在的 Listing 执行删除，当前有效 Listing 才
+构造 `ListingSearchDocument`。EXACT 位置只投影为 Region 的 CITY 点，APPROXIMATE/NEIGHBORHOOD
+坐标最多保留三位小数，原精确点不进入 DTO 或 OpenSearch。
+
+写入和删除均使用 Listing canonical version 与 `external_gte`。迟到事件会加载较新数据库版本，
+OpenSearch 版本冲突视为 stale 而不是覆盖；若 durable event 版本反而领先数据库则重试并告警，不能
+用 payload 补齐数据。下架类事件先在 Outbox `claimBatch` 的有界 priority allowlist 中被领取，再以
+BullMQ priority 1（普通事件为 10）入队；同一事件同时驱动搜索和通知时顺序执行，重试依赖各消费者
+幂等性。
+
+`ListingIndexReconciler` 每五分钟默认扫描 100 个 canonical Listing 状态，以稳定 UUID cursor 分页。
+公开行缺失或版本落后会重建，不公开行若仍存在则删除；完成全表后从头开始。索引版本领先 PostgreSQL
+无法安全降级，按失败处理并保留重复告警，后续由 `SEARCH-005` 新索引重建。周期和批量由
+`SEARCH_RECONCILIATION_INTERVAL_MS` / `SEARCH_RECONCILIATION_BATCH_SIZE` 有界配置控制。

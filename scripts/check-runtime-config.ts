@@ -67,6 +67,8 @@ assert.equal(workerEnvironment.S3_MEDIA_BUCKET, "socal-media-processed-local");
 assert.equal(workerEnvironment.CLAMAV_HOST, "clamav");
 assert.equal(workerEnvironment.MEDIA_PROCESS_MAX_BYTES, 20_971_520);
 assert.equal(workerEnvironment.OPENSEARCH_INDEX_PREFIX, "socal_local");
+assert.equal(workerEnvironment.SEARCH_RECONCILIATION_BATCH_SIZE, 100);
+assert.equal(workerEnvironment.SEARCH_RECONCILIATION_INTERVAL_MS, 300_000);
 
 let missingConfigurationError: RuntimeConfigError | undefined;
 try {

@@ -4,6 +4,7 @@ import IORedis from "ioredis";
 import { parseWorkerEnvironment, RuntimeConfigError, runtimeConfigSummary } from "@socal/config";
 import { MediaAssetRepository } from "@socal/database/media";
 import { ListingRepository } from "@socal/database/listing";
+import { ListingSearchRepository } from "@socal/database/listing-search";
 import {
   NotificationRepository,
   listingNotificationEventTypes,
@@ -32,6 +33,17 @@ import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
 import { SharpImageTransformer } from "./media/sharp-image-transformer";
 import { BullMqOutboxPublisher } from "./outbox/bullmq-outbox.publisher";
 import { OutboxDispatcher } from "./outbox/outbox-dispatcher";
+import {
+  ListingIndexHandler,
+  ListingSearchProjectionError,
+  PermanentListingSearchEventError,
+  listingSearchEventTypes,
+  urgentListingSearchEventTypes,
+} from "./search/listing-index-handler";
+import { ListingIndexReconciler } from "./search/listing-index-reconciler";
+import { listingIndexNames } from "./search/listing-index-definition";
+import { OpenSearchListingIndex } from "./search/listing-index";
+import { createOpenSearchClient } from "./search/opensearch-client";
 
 const runtimeState: { observability?: ObservabilityRuntime } = {};
 process.on("uncaughtException", (error: Error) => {
@@ -79,6 +91,10 @@ const listingRepository = new ListingRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
+const listingSearchRepository = new ListingSearchRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
 const notificationRepository = new NotificationRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
@@ -100,11 +116,27 @@ const mediaProcessing = new MediaProcessingHandler(
   },
 );
 const outboxQueue = new Queue(environment.OUTBOX_QUEUE_NAME, { connection });
+const openSearchClient = createOpenSearchClient({
+  node: environment.OPENSEARCH_NODE,
+  ...(environment.OPENSEARCH_USERNAME
+    ? {
+        username: environment.OPENSEARCH_USERNAME,
+        password: environment.OPENSEARCH_PASSWORD,
+      }
+    : {}),
+});
+const listingIndexNamesValue = listingIndexNames(environment.OPENSEARCH_INDEX_PREFIX);
+const listingIndex = new OpenSearchListingIndex(
+  openSearchClient,
+  listingIndexNamesValue.readAlias,
+  listingIndexNamesValue.writeAlias,
+);
 const outboxDispatcher = new OutboxDispatcher({
   repository: outboxRepository,
   publisher: new BullMqOutboxPublisher(outboxQueue, {
     maximumPayloadBytes: environment.OUTBOX_MAX_PAYLOAD_BYTES,
     jobAttempts: environment.OUTBOX_JOB_ATTEMPTS,
+    priorityEventTypes: urgentListingSearchEventTypes,
   }),
   observability: runtimeState.observability,
   configuration: {
@@ -114,6 +146,7 @@ const outboxDispatcher = new OutboxDispatcher({
     pollIntervalMilliseconds: environment.OUTBOX_POLL_INTERVAL_MS,
     retryBaseSeconds: environment.OUTBOX_RETRY_BASE_SECONDS,
     retryMaximumSeconds: environment.OUTBOX_RETRY_MAX_SECONDS,
+    priorityEventTypes: urgentListingSearchEventTypes,
   },
 });
 const listingExpiryDispatcher = new ListingExpiryDispatcher({
@@ -131,34 +164,67 @@ const organizationInvitationNotification = new OrganizationInvitationNotificatio
   notificationRepository,
   (outcome) => runtimeState.observability?.metrics.notificationEvent(outcome),
 );
+const listingIndexHandler = new ListingIndexHandler(
+  listingSearchRepository,
+  listingIndex,
+  (observation) => runtimeState.observability?.metrics.searchIndex(observation),
+);
+const listingIndexReconciler = new ListingIndexReconciler({
+  repository: listingSearchRepository,
+  index: listingIndex,
+  handler: listingIndexHandler,
+  observability: runtimeState.observability,
+  configuration: {
+    batchSize: environment.SEARCH_RECONCILIATION_BATCH_SIZE,
+    intervalMilliseconds: environment.SEARCH_RECONCILIATION_INTERVAL_MS,
+  },
+});
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   runtimeState.observability?.logger.info(event, fields);
 }
 
-const handlers: Record<string, (job: Job) => Promise<void>> = {
-  "search.index": () => Promise.resolve(),
-  "media.upload.completed": async (job) => {
+type JobHandler = (job: Job) => Promise<void>;
+const handlers: Record<string, JobHandler[]> = {};
+
+function registerHandler(eventType: string, handler: JobHandler): void {
+  handlers[eventType] = [...(handlers[eventType] ?? []), handler];
+}
+
+registerHandler("search.index", () => Promise.resolve());
+registerHandler("media.upload.completed", async (job) => {
+  try {
+    await mediaProcessing.handle(job.data);
+  } catch (error: unknown) {
+    if (error instanceof PermanentMediaProcessingError) {
+      throw new UnrecoverableError(error.code);
+    }
+    throw error;
+  }
+});
+registerHandler("notification.dispatch", () => Promise.resolve());
+registerHandler("organization.invitation.accepted", () => Promise.resolve());
+registerHandler("organization.invitation.revoked", () => Promise.resolve());
+registerHandler("organization.member.role.changed", () => Promise.resolve());
+registerHandler("organization.membership.removed", () => Promise.resolve());
+registerHandler("organization.owner.transferred", () => Promise.resolve());
+for (const eventType of listingSearchEventTypes) {
+  registerHandler(eventType, async (job) => {
     try {
-      await mediaProcessing.handle(job.data);
+      await listingIndexHandler.handle(job.data, eventType);
     } catch (error: unknown) {
-      if (error instanceof PermanentMediaProcessingError) {
+      if (
+        error instanceof PermanentListingSearchEventError ||
+        error instanceof ListingSearchProjectionError
+      ) {
         throw new UnrecoverableError(error.code);
       }
       throw error;
     }
-  },
-  "listing.draft.created": () => Promise.resolve(),
-  "listing.draft.updated": () => Promise.resolve(),
-  "notification.dispatch": () => Promise.resolve(),
-  "organization.invitation.accepted": () => Promise.resolve(),
-  "organization.invitation.revoked": () => Promise.resolve(),
-  "organization.member.role.changed": () => Promise.resolve(),
-  "organization.membership.removed": () => Promise.resolve(),
-  "organization.owner.transferred": () => Promise.resolve(),
-};
+  });
+}
 for (const eventType of listingNotificationEventTypes) {
-  handlers[eventType] = async (job) => {
+  registerHandler(eventType, async (job) => {
     try {
       await listingNotification.handle(job.data, eventType);
     } catch (error: unknown) {
@@ -167,10 +233,10 @@ for (const eventType of listingNotificationEventTypes) {
       }
       throw error;
     }
-  };
+  });
 }
 for (const eventType of organizationInvitationNotificationEventTypes) {
-  handlers[eventType] = async (job) => {
+  registerHandler(eventType, async (job) => {
     try {
       await organizationInvitationNotification.handle(job.data);
     } catch (error: unknown) {
@@ -179,16 +245,24 @@ for (const eventType of organizationInvitationNotificationEventTypes) {
       }
       throw error;
     }
-  };
+  });
 }
 
 const worker = new Worker(
   environment.OUTBOX_QUEUE_NAME,
   async (job) => {
-    const handler = handlers[job.name];
-    if (!handler) throw new Error(`No handler registered for job ${job.name}`);
+    const jobHandlers = handlers[job.name];
+    if (!jobHandlers || jobHandlers.length === 0) {
+      throw new Error(`No handler registered for job ${job.name}`);
+    }
     if (!runtimeState.observability) throw new Error("Observability runtime is unavailable");
-    await runObservedJob(job, () => handler(job), runtimeState.observability);
+    await runObservedJob(
+      job,
+      async () => {
+        for (const handler of jobHandlers) await handler(job);
+      },
+      runtimeState.observability,
+    );
   },
   { connection, concurrency: environment.WORKER_CONCURRENCY },
 );
@@ -248,6 +322,7 @@ healthServer.listen(environment.WORKER_HEALTH_PORT, "0.0.0.0");
 async function shutdown(signal: string): Promise<void> {
   logEvent("worker.shutdown.started", { signal });
   await listingExpiryDispatcher.stop();
+  await listingIndexReconciler.stop();
   await outboxDispatcher.stop();
   await new Promise<void>((resolve, reject) => {
     healthServer.close((error) => (error ? reject(error) : resolve()));
@@ -257,8 +332,10 @@ async function shutdown(signal: string): Promise<void> {
   mediaStorage.close();
   await mediaRepository.close();
   await listingRepository.close();
+  await listingSearchRepository.close();
   await notificationRepository.close();
   await outboxRepository.close();
+  await openSearchClient.close();
   await connection.quit();
   await shutdownTracing();
   process.exit(0);
@@ -269,11 +346,13 @@ process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 outboxDispatcher.start();
 listingExpiryDispatcher.start();
+listingIndexReconciler.start();
 logEvent("worker.started", {
   concurrency: environment.WORKER_CONCURRENCY,
   healthPort: environment.WORKER_HEALTH_PORT,
   outboxBatchSize: environment.OUTBOX_BATCH_SIZE,
   listingExpiryBatchSize: environment.LISTING_EXPIRY_BATCH_SIZE,
+  searchReconciliationBatchSize: environment.SEARCH_RECONCILIATION_BATCH_SIZE,
   queue: environment.OUTBOX_QUEUE_NAME,
   ...runtimeConfigSummary(environment),
 });
