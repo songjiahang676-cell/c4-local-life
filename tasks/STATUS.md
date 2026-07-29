@@ -5,19 +5,18 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成公开搜索查询的受保护交付，再进入同义词、建议和热门搜索隐私
+- 目标：实现版本化同义词、隐私安全的搜索建议和热门搜索聚合
 - 进度：3 个 G3 任务、49/101 个总任务完成
-- 风险：`SEARCH-002` 已由 PR #34 受保护合并为 `c66d59c`；evidence-head run `30481617516`
-  与 final-main run `30482212485` 均通过 395 个真实 PostgreSQL/Redis/ClamAV/OpenSearch 测试、
-  18/18 Linux E2E、8 个构建和四个非 root 镜像健康门禁。`SEARCH-003` PR #35 首轮
-  run `30485602948` 已通过 408 个真实服务测试、Linux E2E 和四镜像健康门禁；当前只剩证据记录头
-  的最终复验和受保护合并
+- 风险：`SEARCH-003` 已由 PR #35 受保护合并为 `4d3b899`；evidence-head run
+  `30486215533` attempt 2 与 final-main run `30487552179` 均通过 408 个真实
+  PostgreSQL/Redis/ClamAV/OpenSearch 测试、18/18 Linux E2E、8 个构建和四个非 root
+  镜像健康门禁。`SEARCH-004` 正在核对词典版本、suggestion API 和低频敏感 query 隐私边界
 
 ## 正在进行
 
-| Task       | Owner                | Started    | Target          | Status                  | Notes                    |
-| ---------- | -------------------- | ---------- | --------------- | ----------------------- | ------------------------ |
-| SEARCH-003 | @songjiahang676-cell | 2026-07-29 | protected merge | protected checks passed | evidence-head 待最终复验 |
+| Task       | Owner                | Started    | Target          | Status              | Notes                                   |
+| ---------- | -------------------- | ---------- | --------------- | ------------------- | --------------------------------------- |
+| SEARCH-004 | @songjiahang676-cell | 2026-07-29 | protected merge | architecture review | synonyms、suggestions、trending privacy |
 
 ## Gate Evidence
 
@@ -209,6 +208,9 @@
 | SEARCH-003 runtime/browser      | API runtime + production Playwright   | 67 paths / 160 schemas；Chromium 18/18 passed                              | 2026-07-29 |
 | SEARCH-003 architecture         | `scripts/check-architecture.sh`       | 101 tasks；57 models；67 paths；160 schemas passed                         | 2026-07-29 |
 | SEARCH-003 protected checks     | PR #35 / run `30485602948`            | 408 real-service tests；Linux 18/18 E2E；four images passed                | 2026-07-29 |
+| SEARCH-003 evidence head        | PR #35 / run `30486215533` attempt 2  | final head quality、real services、18/18 E2E and four images passed        | 2026-07-29 |
+| SEARCH-003 protected merge      | PR #35 / merge `4d3b899`              | protected squash merge completed                                           | 2026-07-29 |
+| SEARCH-003 final main quality   | GitHub Actions run `30487552179`      | merged head quality、real services、18/18 E2E and four images passed       | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -221,8 +223,8 @@
   final main run `30458526726` 受保护合并；`LIST-009` 已由 PR #30 / final main run
   `30463612335` 受保护合并；`MOD-003` 已由 PR #31 / final main run `30470203397` 受保护合并为
   `cdd3c53`；`WEB-004` 已由 PR #32 / final main run `30473551979` 受保护合并为 `1bdcab9`，
-  Gate 2 已关闭；`SEARCH-001`、`SEARCH-002` 已在受保护 `main` 完成；`SEARCH-003` PR #35
-  首轮真实服务、Linux E2E 和四镜像保护检查已通过，正在执行 evidence-head 复验和受保护合并。
+  Gate 2 已关闭；`SEARCH-001` 至 `SEARCH-003` 已在受保护 `main` 完成，现按
+  `IMPLEMENTATION_SEQUENCE.md` 执行 `SEARCH-004`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
