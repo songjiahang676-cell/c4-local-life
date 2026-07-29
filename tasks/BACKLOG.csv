@@ -53,7 +53,7 @@ NOTIF-001,G2,NOTIF,P0,站内通知与模板基线,EVT-001;AUTH-003,Listing 状�
 EVT-001,G2,EVT,P0,Transactional Outbox dispatcher,DATA-001;OBS-001,SKIP LOCKED、重试、幂等、oldest-age metrics,adr/0004-transactional-outbox.md,done
 EVT-002,G3,EVT,P1,队列 DLQ/replay/reconciliation 工具,EVT-001;ADMIN-001,受控重放、批次、权限、审计、PII 最小化,docs/20-operations-runbook.md,todo
 SEARCH-001,G3,SEARCH,P0,版本化 Listing index/mapping/analyzers,LIST-005,alias、公开字段、中文英文、geo、mapping tests,docs/09-search-and-ranking.md,done
-SEARCH-002,G3,SEARCH,P0,索引 Worker、下架优先和对账,SEARCH-001;EVT-001,version 防乱序；p95 freshness；reconciliation,docs/09-search-and-ranking.md,todo
+SEARCH-002,G3,SEARCH,P0,索引 Worker、下架优先和对账,SEARCH-001;EVT-001,version 防乱序；p95 freshness；reconciliation,docs/09-search-and-ranking.md,done
 SEARCH-003,G3,SEARCH,P0,搜索查询、facets、cursor、geo,SEARCH-001;API-002,过滤/排序稳定；公开状态；timeout/limits,openapi/openapi.yaml;docs/09-search-and-ranking.md,todo
 SEARCH-004,G3,SEARCH,P1,同义词、建议和热门搜索隐私,SEARCH-003,版本词典；低频敏感 query 不展示；bot 过滤,docs/09-search-and-ranking.md,todo
 SEARCH-005,G3,SEARCH,P1,全量重建与 alias 切换,SEARCH-002;EVT-002,新索引→追赶→校验→切换→回滚演练,docs/20-operations-runbook.md,todo
