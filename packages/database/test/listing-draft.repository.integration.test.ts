@@ -598,6 +598,7 @@ integration("ListingDraftRepository with PostgreSQL", () => {
       const scanningId = randomUUID();
       const foreignId = randomUUID();
       const mediaBase = {
+        createdAt: baseTime,
         purpose: MediaPurpose.LISTING_MEDIA,
         kind: MediaKind.IMAGE,
         bucket: "socal-test-private",
