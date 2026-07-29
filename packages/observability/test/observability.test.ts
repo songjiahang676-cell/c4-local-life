@@ -82,6 +82,7 @@ describe("observability primitives", () => {
       durationSeconds: 0.1,
     });
     runtime.metrics.mediaProcessing("ready");
+    runtime.metrics.notificationEvent("created");
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -91,6 +92,7 @@ describe("observability primitives", () => {
       'socal_worker_jobs_total{job_name="search.index",outcome="completed"} 1',
     );
     expect(metrics).toContain('socal_media_processing_total{outcome="ready"} 1');
+    expect(metrics).toContain('socal_notification_events_total{outcome="created"} 1');
     expect(metrics).not.toContain("person@example.com");
   });
 });

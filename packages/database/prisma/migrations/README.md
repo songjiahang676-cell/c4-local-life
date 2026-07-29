@@ -34,6 +34,8 @@
 18. `20260729150000_admin_moderation_workbench` adds immutable redacted Case snapshots, Case
     versions, and actor-scoped action idempotency.
 19. `20260729230000_listing_public_lifecycle` adds the partial Rental due-expiry polling index.
+20. `20260730010000_notification_in_app_baseline` adds immutable bilingual template versions and
+    source-event-idempotent in-app notification snapshots.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -261,6 +263,22 @@ and Outbox evidence in the same transaction. Repeated or concurrent polls are sa
 - Rollback: stop the poller and retain the additive index. It is rebuildable from canonical
   PostgreSQL state; exceptional physical removal is documented in the migration-local
   `ROLLBACK.md`.
+
+## `20260730010000_notification_in_app_baseline`
+
+Adds immutable, published bilingual template versions and extends Notification with rendered
+title/body snapshots, locale/version provenance, Listing resource linkage, source Outbox event ID,
+aggregate version, and a read-state timestamp. A user/channel/source-event uniqueness constraint
+plus Worker advisory lock makes duplicate delivery idempotent. Historical rows receive bounded
+compatibility content and coherent sent/read timestamps; new in-app rows always reference an exact
+published template version.
+
+- Roll forward: apply before enabling Listing status-event consumers and the notification read API;
+  verify all sixteen seed templates, concurrent duplicate delivery, occurrence-time ordering,
+  bilingual projection, user-scoped reads, immutable published rows, and tamper-bound cursors.
+- Rollback: stop the consumers and disable the notification API while retaining additive schema and
+  history. Do not drop notification provenance during an incident; exceptional stopped-writer
+  physical recovery is documented in the migration-local `ROLLBACK.md`.
 
 ## Roll-forward and recovery
 

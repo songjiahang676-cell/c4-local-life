@@ -218,6 +218,96 @@ test("completes the bilingual rental form and recovers its account-scoped autosa
   );
 });
 
+test("renders and updates the private bilingual notification center", async ({ page }) => {
+  const userId = "10000000-0000-4000-8000-000000000081";
+  const notificationId = "20000000-0000-4000-8000-000000000081";
+  const listingId = "30000000-0000-4000-8000-000000000081";
+  let status: "UNREAD" | "READ" = "UNREAD";
+  let readAt: string | null = null;
+
+  await page.route("**/v1/auth/session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          user: { id: userId, displayName: "Synthetic E2E Owner", avatarUrl: null },
+          expiresAt: "2026-07-30T01:00:00.000Z",
+          permissions: ["notification:read", "notification:update"],
+          platformRoles: [],
+          organizations: [],
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/notifications?**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            id: notificationId,
+            templateKey: "listing.published",
+            templateVersion: 1,
+            locale: "zh-Hans",
+            title: "信息已发布",
+            body: "您的出租信息已公开。",
+            resource: { type: "LISTING", id: listingId },
+            status,
+            createdAt: "2026-07-29T01:00:00.000Z",
+            readAt,
+          },
+        ],
+        pageInfo: { hasMore: false, nextCursor: null },
+        unreadCount: status === "UNREAD" ? 1 : 0,
+        generatedAt: "2026-07-29T01:01:00.000Z",
+      }),
+    });
+  });
+  await page.route(`**/v1/notifications/${notificationId}/read`, async (route) => {
+    status = "READ";
+    readAt = "2026-07-29T01:02:00.000Z";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          id: notificationId,
+          templateKey: "listing.published",
+          templateVersion: 1,
+          locale: "zh-Hans",
+          title: "信息已发布",
+          body: "您的出租信息已公开。",
+          resource: { type: "LISTING", id: listingId },
+          status,
+          createdAt: "2026-07-29T01:00:00.000Z",
+          readAt,
+        },
+      }),
+    });
+  });
+
+  const response = await page.goto("/zh-Hans/account/notifications");
+  expect(response?.ok()).toBe(true);
+  await expect(page.getByRole("heading", { level: 1, name: "站内通知" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "信息已发布" })).toBeVisible();
+  await expect(page.getByText("1 条未读")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    /noindex.*nofollow|nofollow.*noindex/,
+  );
+
+  await page.getByRole("button", { name: "标记为已读" }).click();
+  await expect(page.getByText("0 条未读")).toBeVisible();
+  await expect(page.getByRole("button", { name: "标记为已读" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Switch to English" })).toHaveAttribute(
+    "href",
+    "/en-US/account/notifications",
+  );
+  await expect(page.locator('[data-locale="zh-Hans"]')).toHaveAttribute("lang", "zh-Hans");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("serves API health, canonical OpenAPI, and sanitized validation errors", async ({
   request,
 }) => {
@@ -239,8 +329,8 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   };
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
-  expect(Object.keys(contract.paths)).toHaveLength(47);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(109);
+  expect(Object.keys(contract.paths)).toHaveLength(49);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(113);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);

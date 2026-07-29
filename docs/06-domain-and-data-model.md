@@ -269,3 +269,11 @@ Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner �
 状态、时间和 version。成功更新与 `AuditLog`、`OutboxEvent` 同事务；DELETE 写 `deleted_at` 而不物理
 级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
 Rental 只产生一次 `listing.expired` 审计和事件。
+
+### NOTIF-001 站内通知投影
+
+`notification_templates` 以稳定 key、channel、locale、version 唯一，已发布版本由数据库触发器禁止
+UPDATE/DELETE。`notifications` 保存渲染快照及 `template_id/template_version`、Listing 资源引用、
+`source_event_id/aggregate_version`；同一事件对同一用户和 channel 只能产生一行。Worker 可以接收
+重复或乱序事件，但按事件发生时间生成通知并通过 advisory lock/唯一键收敛。读取只返回当前用户的
+IN_APP 投影，按 `(created_at DESC,id DESC)` 稳定分页；已读更新绑定 user，外部标识不会越权改变状态。

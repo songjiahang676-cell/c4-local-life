@@ -6,6 +6,8 @@ export const selfServicePolicyActions = {
   currentSessionRead: "account:session:read",
   profileRead: "account:profile:read",
   profileUpdate: "account:profile:update",
+  notificationsRead: "notification:read",
+  notificationsUpdate: "notification:update",
   sessionsRead: "account:sessions:read",
   sessionsRevoke: "account:sessions:revoke",
 } as const;
@@ -51,6 +53,8 @@ export const accountSelfServicePermissions = [
   selfServicePolicyActions.currentSessionRead,
   selfServicePolicyActions.profileRead,
   selfServicePolicyActions.profileUpdate,
+  selfServicePolicyActions.notificationsRead,
+  selfServicePolicyActions.notificationsUpdate,
   selfServicePolicyActions.sessionsRead,
   selfServicePolicyActions.sessionsRevoke,
 ] as const;

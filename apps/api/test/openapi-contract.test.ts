@@ -18,6 +18,7 @@ import {
   MemoryOtpChallengeStore,
 } from "./support/memory-otp-challenge.store";
 import { MemoryOrganizationStore } from "./support/memory-organization.store";
+import { MemoryNotificationStore } from "./support/memory-notification.store";
 import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-media.store";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 import { MemoryMfaStore } from "./support/memory-mfa.store";
@@ -66,6 +67,7 @@ const environment = parseApiEnvironment({
 });
 const contractUserId = "20000000-0000-4000-8000-000000000001";
 const contractOrganizationId = "40000000-0000-4000-8000-000000000001";
+const contractNotificationId = "30000000-0000-4000-8000-000000000001";
 
 describe("canonical OpenAPI contract", () => {
   let app: NestFastifyApplication;
@@ -90,6 +92,7 @@ describe("canonical OpenAPI contract", () => {
       role: "OWNER",
     });
     const organizationStore = new MemoryOrganizationStore();
+    const notificationStore = new MemoryNotificationStore();
     const organizationTimestamp = new Date("2026-07-28T18:00:00.000Z");
     organizationStore.registerForUser(
       contractUserId,
@@ -115,6 +118,20 @@ describe("canonical OpenAPI contract", () => {
         },
       ],
     );
+    notificationStore.register({
+      id: contractNotificationId,
+      userId: contractUserId,
+      templateKey: "listing.status.published",
+      templateVersion: 1,
+      locale: "en-US",
+      title: "Listing published",
+      body: "Your listing is now published.",
+      resourceType: "LISTING",
+      resourceId: "30000000-0000-4000-8000-000000000002",
+      status: "UNREAD",
+      createdAt: new Date("2026-07-30T03:00:00.000Z"),
+      readAt: null,
+    });
     const taxonomyStore = new MemoryTaxonomyStore(
       [
         {
@@ -221,6 +238,7 @@ describe("canonical OpenAPI contract", () => {
       otpChallengeStore,
       otpDeliveryGateway: otpDelivery,
       organizationStore,
+      notificationStore,
       listingStore: new MemoryListingStore(),
       mediaStore: new MemoryMediaStore(),
       mediaObjectStorage: new CapturingMediaObjectStorage(),
@@ -254,9 +272,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(47);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(109);
-    expect(operationIds).toHaveLength(56);
+    expect(Object.keys(contract.paths)).toHaveLength(49);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(113);
+    expect(operationIds).toHaveLength(58);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -293,8 +311,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(47);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(47);
+    expect(Object.keys(servedJson.paths)).toHaveLength(49);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(49);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -578,6 +596,38 @@ describe("canonical OpenAPI contract", () => {
     expect(profile.headers.etag).toBe('"profile-v1"');
     expect(ajv.validate(profileSchema ?? false, profile.json())).toBe(true);
     expect(ajv.validate(devicesSchema ?? false, devices.json())).toBe(true);
+  });
+
+  it("validates in-app notification list and idempotent read projections against the contract", async () => {
+    const issued = await sessions.issueSession(contractUserId, {});
+    const headers = {
+      cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}`,
+      origin: environment.PUBLIC_WEB_URL,
+    };
+    const listed = await server.inject({
+      method: "GET",
+      url: "/v1/notifications?unreadOnly=true&limit=20",
+      headers,
+    });
+    const read = await server.inject({
+      method: "PUT",
+      url: `/v1/notifications/${contractNotificationId}/read`,
+      headers,
+    });
+    const listSchema =
+      contract.paths["/notifications"]?.get?.responses["200"]?.content?.["application/json"]
+        ?.schema;
+    const readSchema =
+      contract.paths["/notifications/{notificationId}/read"]?.put?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+
+    expect(listed.statusCode).toBe(200);
+    expect(read.statusCode).toBe(200);
+    expect(listed.headers["cache-control"]).toBe("no-store");
+    expect(read.headers["cache-control"]).toBe("no-store");
+    expect(ajv.validate(listSchema ?? false, listed.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    expect(ajv.validate(readSchema ?? false, read.json()), ajv.errorsText(ajv.errors)).toBe(true);
   });
 
   it("validates organization creation, detail, and member projections against the contract", async () => {

@@ -194,3 +194,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 过期测试先执行到期批次再重复执行，要求第二次为零并保留一组 SYSTEM Audit/Outbox；Worker 单元
   测试验证批次/间隔配置、idle/expired 指标和无资源标识日志。
 - 空库 baseline 要求 19 个 migration、31 个约束负例和过期部分索引；上一发布基线升级必须保留哨兵。
+
+## 18.19 NOTIF-001 验证增量
+
+- Worker 单元测试覆盖八类 Listing 状态事件、严格 envelope、风险分支、永久/瞬时错误、无 PII
+  payload 和 created/duplicate/ignored/unavailable/failed 有界结果。
+- PostgreSQL 集成使用两个独立 Repository 并发投递同一 eventId，要求恰好一条通知；同时覆盖双语、
+  canonical owner、LOW/MEDIUM 规则、稳定分页、跨用户已读拒绝、重复已读和模板 UPDATE/DELETE 失败。
+- HTTP/契约测试覆盖 guest/LIMITED、账号隔离、未读计数、签名 cursor 的账号/筛选绑定、篡改、未知/
+  外部 404、CSRF origin、严格 query 和 no-store。
+- Web DOM 与 production Playwright 覆盖登录门、畸形响应拒绝、已读状态、中英链接、noindex、桌面/
+  移动无横向溢出和 BFF method/path confusion。
+- 空库 baseline 要求 20 个 migration、16 条已发布双语模板和 33 个数据库负例；上一发布升级保留哨兵，
+  全量架构检查要求 49 paths、113 schemas 和 51 models。

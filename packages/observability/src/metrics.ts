@@ -14,6 +14,8 @@ type WorkerObservation = {
 type OutboxDispatchOutcome = "published" | "retry" | "failed" | "stale";
 type MediaProcessingOutcome = "ready" | "rejected" | "stale";
 type ListingExpiryOutcome = "expired" | "idle";
+type NotificationEventOutcome =
+  "created" | "duplicate" | "ignored" | "recipient_unavailable" | "failed";
 
 type Histogram = {
   count: number;
@@ -83,6 +85,7 @@ export class MetricsRegistry {
   readonly #outboxDispatches = new Map<OutboxDispatchOutcome, number>();
   readonly #mediaProcessing = new Map<MediaProcessingOutcome, number>();
   readonly #listingExpiryPolls = new Map<ListingExpiryOutcome, number>();
+  readonly #notificationEvents = new Map<NotificationEventOutcome, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -133,6 +136,10 @@ export class MetricsRegistry {
 
   mediaProcessing(outcome: MediaProcessingOutcome): void {
     this.#mediaProcessing.set(outcome, (this.#mediaProcessing.get(outcome) ?? 0) + 1);
+  }
+
+  notificationEvent(outcome: NotificationEventOutcome): void {
+    this.#notificationEvents.set(outcome, (this.#notificationEvents.get(outcome) ?? 0) + 1);
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -200,6 +207,13 @@ export class MetricsRegistry {
     );
     for (const [outcome, value] of [...this.#mediaProcessing].sort()) {
       lines.push(`socal_media_processing_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_notification_events_total Listing notification projection results by bounded outcome.",
+      "# TYPE socal_notification_events_total counter",
+    );
+    for (const [outcome, value] of [...this.#notificationEvents].sort()) {
+      lines.push(`socal_notification_events_total${labels({ outcome })} ${value}`);
     }
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",

@@ -56,6 +56,12 @@ export type UpdateMyProfileRequest = components["schemas"]["UpdateMyProfileReque
 export type SessionDevice = components["schemas"]["SessionDevice"];
 export type SessionDeviceCollection = components["schemas"]["SessionDeviceCollection"];
 export type ListMySessionsQuery = NonNullable<operations["listMySessions"]["parameters"]["query"]>;
+export type InAppNotification = components["schemas"]["InAppNotification"];
+export type NotificationCollection = components["schemas"]["NotificationCollection"];
+export type NotificationResponse = components["schemas"]["NotificationResponse"];
+export type ListNotificationsQuery = NonNullable<
+  operations["listNotifications"]["parameters"]["query"]
+>;
 export type Organization = components["schemas"]["Organization"];
 export type OrganizationResponse = components["schemas"]["OrganizationResponse"];
 export type OrganizationType = components["schemas"]["OrganizationType"];
@@ -564,6 +570,20 @@ export const listMySessionsQuerySchema: z.ZodType<ListMySessionsQuery> = z
   .object({
     cursor: z.string().max(512).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+
+const notificationBooleanQuerySchema = z.preprocess((value) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}, z.boolean());
+
+export const listNotificationsQuerySchema: z.ZodType<ListNotificationsQuery> = z
+  .object({
+    unreadOnly: notificationBooleanQuerySchema.default(false),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
   })
   .strict();
 

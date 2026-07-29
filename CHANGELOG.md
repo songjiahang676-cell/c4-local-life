@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added immutable bilingual in-app notification templates, strict idempotent Listing-event
+  projection, private cursor-paginated read APIs, bounded observability, and a responsive
+  bilingual noindex notification center with account isolation and idempotent read state.
 - Added the complete public Rental lifecycle: approved-only safe list/detail projections, signed
   filter-bound compound cursors, conditional idempotent archive/soft-delete, transactional
   Audit/Outbox evidence, and a bounded `SKIP LOCKED` expiry Worker with metrics.

@@ -8,6 +8,8 @@
 - `/` 到 `/zh-Hans` 的入口。
 - 响应式首页视觉参考，映射设想图的主要区域。
 - 静态模拟数据和纯 CSS，用于让开发者快速理解布局。
+- `NOTIF-001` 已增加私有、noindex 的中英文通知中心，具备登录门、未读筛选、稳定分页、已读和严格
+  同源 BFF allowlist。
 
 它尚未连接 API、身份、真实图片、i18n 库、无障碍测试、SEO 元数据、缓存和设计系统。因此不得把当前首页直接当作生产完成品。
 
@@ -26,7 +28,8 @@
   visibility 过滤；`LIST-003` 已接入数据库草稿创建/owner 读取/条件更新、actor-scoped 幂等、
   API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
   中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
-  轮询及事务化 READY 绑定。公开列表仍留给 `LIST-005`。
+  轮询及事务化 READY 绑定；`LIST-005` 已接公开安全列表/详情、归档/软删除和批量过期；
+  `NOTIF-001` 已接账号私有通知列表/已读 API 与 Policy。
 
 ### `apps/worker`
 
@@ -36,7 +39,10 @@
   oldest-age/结果指标。
 - `MEDIA-002` 已接真实媒体消费者：有界 S3/MinIO 读取、内容 hash/magic-byte、ClamAV INSTREAM、
   Sharp 解码/方向校正/去 metadata、三个确定性 WebP 变体和 lifecycleVersion 幂等终态。
-- 仍需其他领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
+- `NOTIF-001` 已接 Listing 状态通知消费者：严格 envelope、eventId 幂等投影、canonical recipient、
+  风险分支和有界结果指标。
+- 仍需搜索等其他领域真实幂等消费者、通知 provider adapter，以及 `EVT-002` 的
+  DLQ/replay/reconciliation 工具。
 
 ### `packages/database`
 
@@ -52,12 +58,14 @@
 - Moderation Case Repository 提供 MFA/current-role 范围队列与安全详情，并以 actor/key advisory
   lock、Case/Listing 行锁和 version predicate 原子提交 Action/Audit/Outbox。快照在 submission
   事务按历史表单 visibility 脱敏，数据库阻止 snapshot/action 改写。
+- Notification Repository 以 eventId advisory lock 和复合唯一键投影 Listing Outbox，只从 canonical
+  Listing 读取 owner/locale；已发布双语模板不可变，通知保存静态渲染快照并提供账号范围稳定分页/已读。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 
 ### 契约与数据
 
-- `openapi/openapi.yaml`：31 个主要 path 的初始 API 契约。
+- `openapi/openapi.yaml`：当前 49 个 path、58 个 operation 和 113 个 schema 的 REST 契约。
 - `schemas/`：Listing 动态表单、首页编排、分析事件。
 - `seed/`：分类、地区、首页和示例 Listing。
 - `diagrams/`：系统/容器/部署/流程/ER Mermaid 图。
@@ -111,6 +119,10 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
 公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
 `ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
+
+`NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
+瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
+`NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。
 
 ## 30.4 生成与手写边界
 

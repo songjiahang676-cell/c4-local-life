@@ -1329,6 +1329,256 @@ a {
   }
 }
 
+.notificationPage {
+  min-height: 100vh;
+  max-width: 860px;
+  padding-block: 24px 48px;
+}
+
+.notificationPage > nav {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.notificationPage > nav a {
+  color: var(--blue);
+}
+
+.notificationPageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 0;
+}
+
+.notificationPageHeader p {
+  margin: 0 0 6px;
+  color: var(--orange);
+  font-weight: 800;
+}
+
+.notificationPageHeader h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 38px);
+}
+
+.notificationPageHeader span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.notificationPageHeader > a {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding-inline: 16px;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 9px;
+  font-weight: 700;
+}
+
+.notificationCenter {
+  display: grid;
+  gap: 14px;
+}
+
+.notificationToolbar {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+}
+
+.notificationToolbar > strong {
+  color: var(--blue-strong);
+}
+
+.notificationToolbar label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.notificationToolbar input {
+  width: 20px;
+  height: 20px;
+}
+
+.notificationStatus,
+.notificationGate,
+.notificationEmpty,
+.notificationError {
+  padding: 24px;
+}
+
+.notificationGate h2,
+.notificationError p {
+  margin-top: 0;
+}
+
+.notificationGate p {
+  max-width: 640px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.notificationPrimaryButton,
+.notificationLoadMore,
+.notificationError button,
+.notificationItem button {
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.notificationPrimaryButton,
+.notificationLoadMore {
+  color: #fff;
+  background: var(--blue);
+  border: 1px solid var(--blue);
+}
+
+.notificationError {
+  color: #8f1d16;
+  background: #fff1f0;
+  border: 1px solid #f3c2be;
+  border-radius: 10px;
+}
+
+.notificationError button,
+.notificationItem button {
+  color: var(--blue);
+  background: #fff;
+  border: 1px solid #cbd7e8;
+}
+
+.notificationList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notificationItem {
+  padding: 20px;
+}
+
+.notificationItem.isUnread {
+  border-color: #bfd5fa;
+  box-shadow:
+    inset 4px 0 0 var(--blue),
+    var(--shadow);
+}
+
+.notificationItemHeader,
+.notificationItemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notificationBadge {
+  padding: 4px 8px;
+  color: #4b596e;
+  background: #eef1f6;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notificationItem.isUnread .notificationBadge {
+  color: #0759de;
+  background: var(--blue-soft);
+}
+
+.notificationItem time,
+.notificationItemFooter > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.notificationItem h2 {
+  margin: 14px 0 6px;
+  font-size: 18px;
+}
+
+.notificationItem p {
+  margin: 0;
+  color: #4b596e;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.notificationItemFooter {
+  margin-top: 16px;
+}
+
+.notificationLoadMore {
+  justify-self: center;
+  min-width: 140px;
+}
+
+.notificationLoadMore:disabled,
+.notificationItem button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.notificationPrimaryButton:focus-visible,
+.notificationLoadMore:focus-visible,
+.notificationError button:focus-visible,
+.notificationItem button:focus-visible,
+.notificationToolbar input:focus-visible,
+.notificationPageHeader > a:focus-visible {
+  outline: 3px solid rgba(18, 103, 237, 0.28);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .notificationPage {
+    width: min(100% - 20px, 860px);
+    padding-top: 10px;
+  }
+
+  .notificationPageHeader {
+    align-items: center;
+    padding: 12px 0 18px;
+  }
+
+  .notificationPageHeader span {
+    font-size: 12px;
+  }
+
+  .notificationItemHeader,
+  .notificationItemFooter {
+    align-items: flex-start;
+  }
+
+  .notificationItemFooter {
+    flex-direction: column;
+  }
+
+  .notificationItemFooter button {
+    width: 100%;
+  }
+}
+
 /* Unified icon and interaction layer */
 a:focus-visible,
 button:focus-visible,

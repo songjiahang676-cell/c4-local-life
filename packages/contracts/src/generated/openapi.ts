@@ -230,6 +230,46 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/notifications": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List the current user's in-app notifications
+         * @description Returns only rendered, private notification content owned by the authenticated user. Cursors are opaque and bound to the user and unread filter.
+         */
+        readonly get: operations["listNotifications"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/notifications/{notificationId}/read": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        /**
+         * Mark an owned in-app notification as read
+         * @description Idempotently marks only the authenticated user's notification as read. Unknown and foreign identifiers share one 404 response.
+         */
+        readonly put: operations["markNotificationRead"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/organizations": {
         readonly parameters: {
             readonly query?: never;
@@ -1139,6 +1179,39 @@ export interface components {
             readonly lastSeenAt: string;
             /** Format: date-time */
             readonly expiresAt: string;
+        };
+        readonly NotificationResource: {
+            /** @enum {string} */
+            readonly type: "LISTING";
+            /** Format: uuid */
+            readonly id: string;
+        };
+        readonly InAppNotification: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly templateKey: string;
+            readonly templateVersion: number;
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly body: string;
+            readonly resource: components["schemas"]["NotificationResource"];
+            /** @enum {string} */
+            readonly status: "UNREAD" | "READ";
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly readAt: string | null;
+        };
+        readonly NotificationCollection: {
+            readonly data: readonly components["schemas"]["InAppNotification"][];
+            readonly pageInfo: components["schemas"]["CursorPage"];
+            readonly unreadCount: number;
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly NotificationResponse: {
+            readonly data: components["schemas"]["InAppNotification"];
         };
         readonly UserSummary: {
             /** Format: uuid */
@@ -2140,6 +2213,7 @@ export interface components {
         readonly CategoryId: string;
         readonly ConversationId: string;
         readonly SessionId: string;
+        readonly NotificationId: string;
         readonly OrganizationId: string;
         readonly Cursor: string;
         readonly Limit: number;
@@ -2522,6 +2596,61 @@ export interface operations {
             };
             readonly 400: components["responses"]["BadRequest"];
             readonly 401: components["responses"]["Unauthorized"];
+        };
+    };
+    readonly listNotifications: {
+        readonly parameters: {
+            readonly query?: {
+                readonly unreadOnly?: boolean;
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Cursor-paginated in-app notifications */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NotificationCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly markNotificationRead: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly notificationId: components["parameters"]["NotificationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Notification is read */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NotificationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly createOrganization: {

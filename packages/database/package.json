@@ -33,6 +33,9 @@
       "moderation-case": [
         "src/repositories/moderation-case.repository.ts"
       ],
+      "notification": [
+        "src/repositories/notification.repository.ts"
+      ],
       "outbox": [
         "src/repositories/outbox-event.repository.ts"
       ],
@@ -90,6 +93,11 @@
       "types": "./src/repositories/moderation-case.repository.ts",
       "require": "./dist/src/repositories/moderation-case.repository.js",
       "default": "./dist/src/repositories/moderation-case.repository.js"
+    },
+    "./notification": {
+      "types": "./src/repositories/notification.repository.ts",
+      "require": "./dist/src/repositories/notification.repository.js",
+      "default": "./dist/src/repositories/notification.repository.js"
     },
     "./outbox": {
       "types": "./src/repositories/outbox-event.repository.ts",

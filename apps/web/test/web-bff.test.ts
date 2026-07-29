@@ -4,8 +4,10 @@ import { isAllowedWebApiPath } from "../src/app/v1/[...path]/route";
 describe("public Web API proxy allowlist", () => {
   const id = "11111111-1111-4111-8111-111111111111";
 
-  it("allows only the form, draft, session, taxonomy and media lifecycle routes", () => {
+  it("allows only the account, notification, form, draft, taxonomy and media routes", () => {
     expect(isAllowedWebApiPath("GET", "auth/session")).toBe(true);
+    expect(isAllowedWebApiPath("GET", "notifications")).toBe(true);
+    expect(isAllowedWebApiPath("PUT", `notifications/${id}/read`)).toBe(true);
     expect(isAllowedWebApiPath("GET", "categories")).toBe(true);
     expect(isAllowedWebApiPath("GET", `categories/${id}/form-schema`)).toBe(true);
     expect(isAllowedWebApiPath("POST", "listings")).toBe(true);
@@ -21,5 +23,7 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("GET", "media/not-a-uuid")).toBe(false);
     expect(isAllowedWebApiPath("GET", "categories/../../admin/session")).toBe(false);
     expect(isAllowedWebApiPath("PUT", "media/uploads")).toBe(false);
+    expect(isAllowedWebApiPath("PUT", "notifications/not-a-uuid/read")).toBe(false);
+    expect(isAllowedWebApiPath("DELETE", `notifications/${id}/read`)).toBe(false);
   });
 });

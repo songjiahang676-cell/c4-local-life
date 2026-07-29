@@ -4,6 +4,10 @@ import IORedis from "ioredis";
 import { parseWorkerEnvironment, RuntimeConfigError, runtimeConfigSummary } from "@socal/config";
 import { MediaAssetRepository } from "@socal/database/media";
 import { ListingRepository } from "@socal/database/listing";
+import {
+  NotificationRepository,
+  listingNotificationEventTypes,
+} from "@socal/database/notification";
 import { OutboxEventRepository } from "@socal/database/outbox";
 import {
   createObservabilityRuntime,
@@ -13,6 +17,10 @@ import {
 import { workerLiveness, workerReadiness } from "./health-status";
 import { runObservedJob } from "./job-observability";
 import { ListingExpiryDispatcher } from "./listing/listing-expiry-dispatcher";
+import {
+  ListingNotificationHandler,
+  PermanentListingNotificationError,
+} from "./notification/listing-notification";
 import { ClamAvScanner } from "./media/clamav-scanner";
 import { MediaProcessingHandler, PermanentMediaProcessingError } from "./media/media-processing";
 import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
@@ -66,6 +74,10 @@ const listingRepository = new ListingRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
+const notificationRepository = new NotificationRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
 const mediaStorage = new S3MediaProcessingStorage(environment);
 const mediaProcessing = new MediaProcessingHandler(
   mediaRepository,
@@ -107,6 +119,9 @@ const listingExpiryDispatcher = new ListingExpiryDispatcher({
     pollIntervalMilliseconds: environment.LISTING_EXPIRY_POLL_INTERVAL_MS,
   },
 });
+const listingNotification = new ListingNotificationHandler(notificationRepository, (outcome) =>
+  runtimeState.observability?.metrics.notificationEvent(outcome),
+);
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   runtimeState.observability?.logger.info(event, fields);
@@ -124,8 +139,22 @@ const handlers: Record<string, (job: Job) => Promise<void>> = {
       throw error;
     }
   },
+  "listing.draft.created": () => Promise.resolve(),
+  "listing.draft.updated": () => Promise.resolve(),
   "notification.dispatch": () => Promise.resolve(),
 };
+for (const eventType of listingNotificationEventTypes) {
+  handlers[eventType] = async (job) => {
+    try {
+      await listingNotification.handle(job.data, eventType);
+    } catch (error: unknown) {
+      if (error instanceof PermanentListingNotificationError) {
+        throw new UnrecoverableError(error.code);
+      }
+      throw error;
+    }
+  };
+}
 
 const worker = new Worker(
   environment.OUTBOX_QUEUE_NAME,
@@ -202,6 +231,7 @@ async function shutdown(signal: string): Promise<void> {
   mediaStorage.close();
   await mediaRepository.close();
   await listingRepository.close();
+  await notificationRepository.close();
   await outboxRepository.close();
   await connection.quit();
   await shutdownTracing();
