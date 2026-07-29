@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added Listing-only abuse reports with per-user quotas, concurrent active-target deduplication,
+  immutable redacted evidence, MFA/recent-auth moderator decisions, 30-day owner appeals,
+  independent-reviewer enforcement, atomic removal/restoration evidence and bilingual in-app
+  outcome notifications.
 - Added the Transfer, Secondhand and Service verticals from bilingual/mobile schema-driven drafts
   through coherent detail persistence, submission/moderation, safe public reads and duplicate-safe
   expiry, including financial disclaimers, prohibited-goods routing and owner-only license data.

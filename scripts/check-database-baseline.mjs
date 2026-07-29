@@ -60,6 +60,8 @@ try {
     "20260730010000_notification_in_app_baseline",
     "20260730020000_organization_membership_lifecycle",
     "20260730030000_job_vertical_baseline",
+    "20260730040000_remaining_verticals_baseline",
+    "20260730050000_report_appeal_workflow",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -96,6 +98,7 @@ try {
             to_regclass('public.moderation_evaluations') AS moderation_evaluations,
             to_regclass('public.moderation_rule_hits') AS moderation_rule_hits,
             to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots,
+            to_regclass('public.moderation_appeals') AS moderation_appeals,
             to_regclass('public.notification_templates') AS notification_templates`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
@@ -611,6 +614,54 @@ try {
     );
   }
 
+  const trustSafetyStorage = await client.query(
+    `SELECT
+       to_regclass('public.moderation_appeals') AS appeals,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'reports_reporter_id_idempotency_key_key'
+       ) AS report_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'reports_active_reporter_target_key'
+       ) AS active_report_deduplication,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'moderation_appeals_appellant_id_idempotency_key_key'
+       ) AS appeal_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND constraint_type = 'CHECK'
+            AND constraint_name IN (
+              'reports_target_type_check',
+              'reports_reason_code_check',
+              'reports_details_check',
+              'reports_request_hash_check',
+              'moderation_appeals_statement_check',
+              'moderation_appeals_request_hash_check',
+              'moderation_appeals_resolution_check',
+              'moderation_cases_source_check'
+            )
+       ) AS workflow_checks`,
+  );
+  if (
+    trustSafetyStorage.rows[0]?.appeals !== "moderation_appeals" ||
+    !trustSafetyStorage.rows[0]?.report_idempotency ||
+    !trustSafetyStorage.rows[0]?.active_report_deduplication ||
+    !trustSafetyStorage.rows[0]?.appeal_idempotency ||
+    trustSafetyStorage.rows[0]?.workflow_checks !== 8
+  ) {
+    throw new Error("Report or appeal workflow constraints are missing");
+  }
+
   const notificationStorage = await client.query(
     `SELECT
        to_regclass('public.notification_templates') AS templates,
@@ -657,7 +708,7 @@ try {
     !notificationStorage.rows[0]?.source_event_idempotency ||
     !notificationStorage.rows[0]?.immutable_trigger ||
     notificationStorage.rows[0]?.projection_columns !== 10 ||
-    Number(notificationStorage.rows[0]?.published_templates) < 18
+    Number(notificationStorage.rows[0]?.published_templates) < 40
   ) {
     throw new Error("In-app notification template or projection controls are missing");
   }
@@ -1038,6 +1089,117 @@ try {
     `DELETE FROM moderation_actions
       WHERE id = '00000000-0000-4000-8000-000000000038'`,
     "P0001",
+  );
+  await client.query(
+    `INSERT INTO reports (
+       id, reporter_id, target_type, target_id, reason_code, details,
+       idempotency_key, request_hash, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000050',
+       '00000000-0000-4000-8000-000000000001',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'MISLEADING_INFORMATION',
+       'Synthetic evidence used only inside a rolled-back baseline check.',
+       'baseline-report-create-0001',
+       repeat('f', 64),
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "active report deduplication",
+    `INSERT INTO reports (
+       id, reporter_id, target_type, target_id, reason_code, details,
+       idempotency_key, request_hash, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000051',
+       '00000000-0000-4000-8000-000000000001',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'OTHER',
+       'A second active report for the same reporter and target must fail.',
+       'baseline-report-create-0002',
+       repeat('a', 64),
+       now()
+     )`,
+    "23505",
+  );
+  await expectSqlState(
+    "report target type",
+    `INSERT INTO reports (
+       id, reporter_id, target_type, target_id, reason_code,
+       idempotency_key, request_hash, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000052',
+       '00000000-0000-4000-8000-000000000001',
+       'USER',
+       '00000000-0000-4000-8000-000000000004',
+       'OTHER',
+       'baseline-report-create-0003',
+       repeat('a', 64),
+       now()
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "moderation report case source",
+    `INSERT INTO moderation_cases (
+       id, target_type, target_id, queue, priority, status, version, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000053',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'listing-report',
+       50,
+       'OPEN',
+       1,
+       now()
+     )`,
+    "23514",
+  );
+  await client.query(
+    `INSERT INTO moderation_appeals (
+       id, moderation_action_id, appellant_id, statement,
+       idempotency_key, request_hash, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000054',
+       '00000000-0000-4000-8000-000000000038',
+       '00000000-0000-4000-8000-000000000001',
+       'Synthetic appeal evidence used only inside a rolled-back baseline check.',
+       'baseline-appeal-create-0001',
+       repeat('b', 64),
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "appeal resolution evidence pairing",
+    `UPDATE moderation_appeals
+        SET status = 'RESTORED',
+            decision_code = 'ACTION_OVERTURNED'
+      WHERE id = '00000000-0000-4000-8000-000000000054'`,
+    "23514",
+  );
+  await expectSqlState(
+    "moderation appeal case source",
+    `INSERT INTO moderation_cases (
+       id, target_type, target_id, queue, priority, status, version, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000055',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       'listing-appeal',
+       70,
+       'OPEN',
+       1,
+       now()
+     )`,
+    "23514",
   );
 
   await expectSqlState(
@@ -1449,6 +1611,7 @@ try {
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
+      trustSafetyStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
       remainingVerticalStorage: true,

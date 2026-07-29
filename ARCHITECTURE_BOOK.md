@@ -913,6 +913,20 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
 
+### MOD-002 举报与申诉证据模型
+
+`reports` 增加必填 actor-scoped `idempotency_key/request_hash`；部分唯一索引约束同一举报者、目标和
+`OPEN|TRIAGED` 状态只有一条活动举报。当前 `target_type` 由数据库约束为 `LISTING`，原因码、补充
+说明和请求摘要均有有界 check。接收事务同时创建 `listing-report` Case 和一份不可变脱敏
+`moderation_case_snapshots`，但公共或 Admin DTO 都不投影 `reporter_id`。
+
+`moderation_appeals` 与产生下架决定的 `moderation_actions` 一对一，保存 appellant-scoped 幂等证据、
+20–2000 字申诉陈述及 OPEN/UPHELD/RESTORED/CLOSED 决策证据；状态、decision code 和 resolved time
+由数据库 check 配对。每条申诉拥有独立 `listing-appeal` Case，`moderation_cases_source_check`
+强制 submission/report/appeal 三类队列恰好绑定一个来源。举报处置或申诉决定均在 Listing/Case 行锁
+内复核 actor/session/版本，并原子追加不可变 Action、最小 Audit 和 Outbox；申诉审核事务还会拒绝
+原下架 Action 的 actor。
+
 ### LIST-005/LIST-007 公共生命周期持久化
 
 五类 Listing 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
@@ -1406,7 +1420,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 57 个 path、123 个 schema、67 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 64 个 path、137 个 schema、74 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1460,6 +1474,21 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 
 `/auth/mfa/enrollment`、`/auth/mfa/enrollment/verify` 和 `/auth/mfa/verify` 是普通 ACTIVE 用户的
 自有 TOTP step-up 别名；不会授予平台角色，仍复用一次性恢复码、重放保护、限频和 Session rotation。
+
+## 8.18 Listing 举报与申诉契约
+
+- `POST /reports` 只接受登录用户对公开 Listing 的稳定原因和可选说明，必须带
+  `Idempotency-Key`，返回 202 opaque receipt。精确重试或活动同目标去重返回同一资源并标记
+  `deduplicated`；同键不同载荷返回 409，每账号小时配额返回 429。响应不包含举报者、证据正文或内部
+  优先级。
+- `POST /appeals` 只接受 Listing Owner 针对 30 天内可申诉的下架 Action，必须带
+  `Idempotency-Key`，返回 202 receipt 与明确 deadline；同一 Action 只能创建一次。
+- `GET /admin/moderation/reports|appeals` 和对应 `{id}` 详情要求 MFA moderator，使用有界签名 cursor、
+  `no-store` 与强 Case ETag。详情包含脱敏快照、稳定原因和动作历史，但从契约层移除 reporter identity。
+- 两个 `POST /admin/moderation/.../{id}/actions` 端点要求 recent MFA、`If-Match` 和
+  `Idempotency-Key`。Report 动作是 DISMISS/REMOVE_CONTENT/ESCALATE；Appeal 动作是 UPHOLD/RESTORE，
+  每个动作只接受配套原因码。失效角色、跨资源、原审核员复核、陈旧版本、键冲突和非法状态均返回
+  通用 Problem Details，不暴露内部存在性或规则阈值。
 
 ---
 
@@ -1772,6 +1801,9 @@ PUBLISHED
 
 防滥用：登录、速率、去重、恶意举报信誉；但不得因举报者新用户而完全忽略高危证据。多条举报不是自动定罪，需要可信度、独立性和内容证据。
 
+`MOD-002` 首个可验收切片只开放 Listing 举报；其他对象在相应 Gate 的主数据与对象授权完成后扩展，
+不能把尚未实现的对象伪装成可用接口。
+
 ## 11.6 申诉
 
 - 明确哪些动作可申诉和截止时间。
@@ -1779,6 +1811,8 @@ PUBLISHED
 - 展示足够原因让用户修正，同时不公开检测阈值或举报者。
 - 结果：维持、修改、恢复、部分恢复；记录依据。
 - 误杀率、恢复率和处理时长纳入审核质量指标。
+
+当前可申诉动作是由举报案件产生的 Listing 下架；Owner 在动作发生后 30 天内可提交一次申诉。
 
 ## 11.7 消息治理
 
@@ -1856,6 +1890,31 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   DELETE 是软删除并对同一 owner 重试保持 204。
 - Worker 有界轮询到期五类 Listing，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
   和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。
+
+## 11.14 MOD-002 举报、处置与申诉闭环
+
+- `POST /reports` 要求 ACTIVE 登录会话、同源写入和 actor-scoped `Idempotency-Key`；当前只接受
+  `LISTING`，稳定原因码为诈骗/禁限内容/误导/骚扰仇恨/隐私联系方式滥用/其他。补充说明为可选
+  10–2000 字，控制字符和双向文本控制符失败关闭。
+- 单一举报者对同一 Listing 只能保留一个 `OPEN|TRIAGED` 举报；并发请求由数据库 advisory lock 和
+  部分唯一索引共同去重。精确幂等重试返回同一 opaque receipt，键复用不同请求返回 409。每个账号
+  每小时最多新建 10 条举报，超过返回 429；同一举报重试和已存在目标去重不会消耗新的配额。
+- 接收事务保存最小 Report、不可变脱敏 Listing 快照、`listing-report` 案件和 Audit。快照过滤
+  email/phone/contact/address、精确坐标和未知私有 attributes；公共响应、审核队列、日志和通知均不
+  暴露举报者身份。数据库生产存储按基础设施合同加密，审核读取只对当前 MFA
+  `MODERATOR|SENIOR_MODERATOR` 开放。
+- 举报队列按 priority 降序、createdAt/UUID 升序稳定分页，cursor 与 actor、队列和状态 HMAC 绑定；
+  详情和动作响应使用强 ETag。处置要求十分钟内 MFA step-up、actor-scoped 幂等键、稳定动作/原因
+  组合和当前 Case 版本。驳回、下架、升级与 Case、不可变 Action、Audit、Outbox 原子提交。
+- 下架把 Listing 转为 `SUSPENDED/REJECTED`，保留原发布/到期证据并发送双语
+  `listing.status.removed` 站内通知。Owner 可在 30 天内调用 `POST /appeals`；每个下架动作只能有
+  一条申诉，精确重试不重复写，并创建独立 `listing-appeal` 案件。
+- 原下架审核员不能处理该申诉；数据库事务在最终动作前再次检查。不同审核员可维持原决定或恢复
+  尚未到期的 Listing；恢复保留原发布时间/到期时间并递增版本。结果通过
+  `listing.appeal.upheld|restored` Outbox 投影为双语通知，且案件、申诉、Listing、Action 和 Audit
+  同事务提交。
+- SLA 响应字段以举报 24 小时、申诉 3 个 UTC 工作日计算；节假日日历、人员班次、恶意举报信誉和
+  审核质量仪表盘分别由运营配置与 `MOD-004` 完成，当前不会自动定罪或因新账号自动忽略证据。
 
 ---
 
@@ -2378,6 +2437,22 @@ Idempotency-Key 或请求哈希。
 - 三类详情与 Listing 一对一，应用服务和 Repository 双层执行类型严格耦合，数据库约束独立保护各类
   核心字段；跨类型明细、缺失明细、未知动态字段均失败关闭。
   公开投影省略联系方式、精确坐标、执照号、政策确认和审核证据。
+
+## 14.20 MOD-002 举报与申诉威胁和缓解
+
+- 举报枚举/报复：只对当前可公开 Listing 接收举报，self-report 失败关闭；公共 receipt 与 Admin
+  案件 DTO 均不包含 reporter identity，Audit 只记录 actor 受限引用，不把举报者写入用户通知或
+  Outbox payload。
+- 恶意批量/重复举报：ACTIVE Session、同源校验、每账号每小时 10 条新举报、actor-scoped 幂等摘要、
+  target advisory lock 和活动部分唯一索引共同收敛；重复举报不能直接触发处罚。
+- 敏感证据扩散：详情有 2000 字上限并拒绝控制字符；不可变快照剔除联系方式、地址、精确点位和
+  owner-only/未知动态字段。生产 PostgreSQL 依基础设施合同启用静态加密，读取仅限当前 MFA 平台
+  moderator；日志、指标、Problem Details 和通知不包含证据正文。
+- 审核账号滥用：队列/详情要求 MFA 和当前角色，动作额外要求近期 step-up、强 ETag、幂等摘要及
+  事务内 Session/角色复核；稳定动作/原因组合阻止任意字符串处置。
+- 申诉利益冲突/覆盖：仅 Owner 可对 30 天内的下架动作申诉一次；原审核员在 Service 和 Repository
+  两层拒绝，独立审核员的维持/恢复使用 Listing/Case 行锁与版本检查，结果、Audit、不可变 Action、
+  Outbox 和状态在同一事务提交。
 
 ---
 
@@ -2976,6 +3051,20 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 空库 baseline 要求 23 个 migration、8 个 Listing 部分索引和 37 个数据库负例；上一发布基线升级
   必须保留哨兵并验证三个新增 detail 约束与五类到期索引。
 
+## 18.22 MOD-002 验证增量
+
+- 契约/HTTP 测试覆盖 Listing-only target、稳定原因、details 边界、同源、登录、幂等键、429、
+  no-store opaque receipt、MFA/recent-MFA、强 Case ETag 和动作/原因耦合。
+- Service 测试覆盖举报/申诉 deadline、签名 cursor 的 actor/queue/status 绑定、下架和恢复状态机，
+  并明确拒绝原审核员处理申诉。
+- PostgreSQL 集成以并发不同幂等键举报同一 target，要求一条活动 Report/Case/不可变脱敏快照；
+  继续覆盖下架、30 天申诉、同审核员拒绝、独立审核员恢复、Listing 版本，以及每步唯一
+  Action/Audit/Outbox/通知投影。
+- 数据泄漏断言在公共 receipt、Admin detail、快照、Audit/Outbox 和通知中搜索 reporter identity、
+  email、phone、contact/address 与原始私有 attributes。
+- 空库 baseline 要求 24 个 migration、40 条已发布双语 Listing 模板、8 个举报/申诉 check 和 42 个
+  数据库负例；上一发行版升级必须回填遗留 Report 的幂等证据并保留既有 Listing/审核哨兵。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3315,8 +3404,17 @@ Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复�
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
-覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
-revision diff、申诉/举报和搜索索引消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；Listing
+举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成。重新提交的历史 revision diff 和搜索索引
+消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+
+`MOD-002` 已验收 Listing 举报/申诉切片：ACTIVE actor、同源、幂等键、每账号小时配额和活动目标
+唯一约束保护接收；并发同目标举报只写一条 Report/脱敏快照/案件/Audit。公共 receipt 和 MFA
+审核详情均不含举报者身份。举报处置使用 recent MFA、稳定原因、强 ETag 与 actor-scoped 幂等键，
+并把下架状态、Case、不可变 Action、Audit 和 Outbox 原子提交。Owner 在 30 天内只能针对下架动作
+申诉一次；独立审核员可维持或恢复尚未到期内容，原审核员被应用层与事务内检查拒绝；三种结果均由
+版本化双语站内模板通知。当前对象范围刻意限于 Listing，Message/Review/Profile/User 举报随对应
+主数据 Gate 扩展。
 
 `LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
 安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选
@@ -4218,7 +4316,7 @@ Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、
 
 ### 契约与数据
 
-- `openapi/openapi.yaml`：当前 57 个 path、67 个 operation 和 123 个 schema 的 REST 契约。
+- `openapi/openapi.yaml`：当前 64 个 path、74 个 operation 和 137 个 schema 的 REST 契约。
 - `schemas/`：Listing 动态表单、首页编排、分析事件。
 - `seed/`：分类、地区、首页和示例 Listing。
 - `diagrams/`：系统/容器/部署/流程/ER Mermaid 图。
@@ -4287,6 +4385,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 不导入 Prisma。`OrganizationInvitationNotificationHandler` 只解析最小 envelope，
 `NotificationRepository` 从 canonical invitation/invitee 生成私有投影。Owner 转移的最终不变量由
 PostgreSQL deferred trigger 兜底，不依赖前端隐藏或单次队列执行假设。
+
+`MOD-002` 使用独立 `trust-safety` 应用模块但不增加进程边界：Controller 解析严格公共/Admin
+契约和 Policy，Service 管理 opaque receipt、签名 queue cursor、ETag、原因与 Listing 状态转换，
+database adapter 独占 actor/session 复核、advisory/row lock、去重和 Report/Appeal/Case/Action/
+Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing 事件投影，举报证据或举报者身份
+不会进入队列 payload。
 
 ## 30.4 生成与手写边界
 

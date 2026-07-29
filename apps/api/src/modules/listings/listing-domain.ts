@@ -112,6 +112,7 @@ export type ListingTransitionCommand =
   | (TransitionMetadata & { kind: "ESCALATE" })
   | (TransitionMetadata & { kind: "REJECT_TO_DRAFT" })
   | (TransitionMetadata & { kind: "SUSPEND" })
+  | (TransitionMetadata & { kind: "RESTORE" })
   | (TransitionMetadata & { kind: "EXPIRE" })
   | (TransitionMetadata & { kind: "ARCHIVE" })
   | (TransitionMetadata & { kind: "DELETE" });
@@ -425,6 +426,19 @@ export function transitionListing(
       }
       next.status = "SUSPENDED";
       next.moderationStatus = "REJECTED";
+      break;
+    case "RESTORE":
+      if (
+        current.status !== "SUSPENDED" ||
+        current.moderationStatus !== "REJECTED" ||
+        current.publishedAt === null ||
+        current.expiresAt === null ||
+        command.occurredAt >= current.expiresAt
+      ) {
+        fail("INVALID_STATE_TRANSITION");
+      }
+      next.status = "PUBLISHED";
+      next.moderationStatus = "APPROVED";
       break;
     case "EXPIRE":
       if (

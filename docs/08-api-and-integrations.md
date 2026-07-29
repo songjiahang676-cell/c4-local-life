@@ -284,7 +284,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 57 个 path、123 个 schema、67 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 64 个 path、137 个 schema、74 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -338,3 +338,18 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 
 `/auth/mfa/enrollment`、`/auth/mfa/enrollment/verify` 和 `/auth/mfa/verify` 是普通 ACTIVE 用户的
 自有 TOTP step-up 别名；不会授予平台角色，仍复用一次性恢复码、重放保护、限频和 Session rotation。
+
+## 8.18 Listing 举报与申诉契约
+
+- `POST /reports` 只接受登录用户对公开 Listing 的稳定原因和可选说明，必须带
+  `Idempotency-Key`，返回 202 opaque receipt。精确重试或活动同目标去重返回同一资源并标记
+  `deduplicated`；同键不同载荷返回 409，每账号小时配额返回 429。响应不包含举报者、证据正文或内部
+  优先级。
+- `POST /appeals` 只接受 Listing Owner 针对 30 天内可申诉的下架 Action，必须带
+  `Idempotency-Key`，返回 202 receipt 与明确 deadline；同一 Action 只能创建一次。
+- `GET /admin/moderation/reports|appeals` 和对应 `{id}` 详情要求 MFA moderator，使用有界签名 cursor、
+  `no-store` 与强 Case ETag。详情包含脱敏快照、稳定原因和动作历史，但从契约层移除 reporter identity。
+- 两个 `POST /admin/moderation/.../{id}/actions` 端点要求 recent MFA、`If-Match` 和
+  `Idempotency-Key`。Report 动作是 DISMISS/REMOVE_CONTENT/ESCALATE；Appeal 动作是 UPHOLD/RESTORE，
+  每个动作只接受配套原因码。失效角色、跨资源、原审核员复核、陈旧版本、键冲突和非法状态均返回
+  通用 Problem Details，不暴露内部存在性或规则阈值。

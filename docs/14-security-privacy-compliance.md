@@ -308,3 +308,19 @@ Idempotency-Key 或请求哈希。
 - 三类详情与 Listing 一对一，应用服务和 Repository 双层执行类型严格耦合，数据库约束独立保护各类
   核心字段；跨类型明细、缺失明细、未知动态字段均失败关闭。
   公开投影省略联系方式、精确坐标、执照号、政策确认和审核证据。
+
+## 14.20 MOD-002 举报与申诉威胁和缓解
+
+- 举报枚举/报复：只对当前可公开 Listing 接收举报，self-report 失败关闭；公共 receipt 与 Admin
+  案件 DTO 均不包含 reporter identity，Audit 只记录 actor 受限引用，不把举报者写入用户通知或
+  Outbox payload。
+- 恶意批量/重复举报：ACTIVE Session、同源校验、每账号每小时 10 条新举报、actor-scoped 幂等摘要、
+  target advisory lock 和活动部分唯一索引共同收敛；重复举报不能直接触发处罚。
+- 敏感证据扩散：详情有 2000 字上限并拒绝控制字符；不可变快照剔除联系方式、地址、精确点位和
+  owner-only/未知动态字段。生产 PostgreSQL 依基础设施合同启用静态加密，读取仅限当前 MFA 平台
+  moderator；日志、指标、Problem Details 和通知不包含证据正文。
+- 审核账号滥用：队列/详情要求 MFA 和当前角色，动作额外要求近期 step-up、强 ETag、幂等摘要及
+  事务内 Session/角色复核；稳定动作/原因组合阻止任意字符串处置。
+- 申诉利益冲突/覆盖：仅 Owner 可对 30 天内的下架动作申诉一次；原审核员在 Service 和 Repository
+  两层拒绝，独立审核员的维持/恢复使用 Listing/Case 行锁与版本检查，结果、Audit、不可变 Action、
+  Outbox 和状态在同一事务提交。

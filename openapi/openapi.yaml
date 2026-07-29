@@ -1454,7 +1454,7 @@ paths:
   /reports:
     post:
       tags: [Reports]
-      summary: Submit a user report
+      summary: Report a published listing
       operationId: createReport
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -1466,11 +1466,53 @@ paths:
               $ref: "#/components/schemas/CreateReportRequest"
       responses:
         "202":
-          description: Report accepted
+          description: Opaque receipt for an accepted or deduplicated report
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcceptedResponse"
+                $ref: "#/components/schemas/ReportReceiptResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /appeals:
+    post:
+      tags: [Reports]
+      summary: Appeal an eligible listing-removal action
+      operationId: createModerationAppeal
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModerationAppealRequest"
+      responses:
+        "202":
+          description: Appeal accepted into an independent queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationAppealReceiptResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
   /billing/checkout-sessions:
     post:
       tags: [Billing]
@@ -1866,6 +1908,204 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+  /admin/moderation/reports:
+    get:
+      tags: [Admin]
+      summary: List listing-report cases without reporter identity
+      operationId: listReportModerationCases
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, CLOSED], default: OPEN }
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Report queue ordered by priority and age
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportModerationCaseCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/moderation/reports/{reportId}:
+    get:
+      tags: [Admin]
+      summary: Get report evidence and an immutable redacted target snapshot
+      operationId: getReportModerationCase
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Canonical report decision context
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportModerationCaseDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/moderation/reports/{reportId}/actions:
+    post:
+      tags: [Admin]
+      summary: Dismiss, escalate, or remove content for a report
+      operationId: actOnReportModerationCase
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportModerationActionRequest"
+      responses:
+        "200":
+          description: Report action committed with AuditLog and, when applicable, Outbox
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustSafetyActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /admin/moderation/appeals:
+    get:
+      tags: [Admin]
+      summary: List independent listing-appeal cases
+      operationId: listAppealModerationCases
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, UPHELD, RESTORED, CLOSED], default: OPEN }
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Independent appeal queue
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealModerationCaseCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/moderation/appeals/{appealId}:
+    get:
+      tags: [Admin]
+      summary: Get appeal evidence and original removal decision
+      operationId: getAppealModerationCase
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Canonical appeal context
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealModerationCaseDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/moderation/appeals/{appealId}/actions:
+    post:
+      tags: [Admin]
+      summary: Independently uphold or restore an appealed listing
+      operationId: actOnAppealModerationCase
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealModerationActionRequest"
+      responses:
+        "200":
+          description: Independent appeal decision committed and owner notification queued
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustSafetyActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 components:
   securitySchemes:
     sessionCookie:
@@ -2036,12 +2276,6 @@ components:
         checks:
           type: object
           additionalProperties: { type: string }
-    AcceptedResponse:
-      type: object
-      required: [accepted, requestId]
-      properties:
-        accepted: { type: boolean, const: true }
-        requestId: { type: string }
     ProblemDetails:
       type: object
       required: [type, title, status, detail, instance, requestId]
@@ -3578,12 +3812,65 @@ components:
     CreateReportRequest:
       type: object
       required: [targetType, targetId, reasonCode]
+      additionalProperties: false
       properties:
-        targetType:
-          { type: string, enum: [LISTING, MESSAGE, REVIEW, USER, BUSINESS, PROVIDER, FORUM_POST] }
+        targetType: { type: string, const: LISTING }
         targetId: { type: string, format: uuid }
-        reasonCode: { type: string, maxLength: 80 }
-        details: { type: string, maxLength: 2000 }
+        reasonCode:
+          $ref: "#/components/schemas/ReportReasonCode"
+        details: { type: string, minLength: 10, maxLength: 2000 }
+    ReportReasonCode:
+      type: string
+      enum:
+        [
+          SCAM_OR_FRAUD,
+          PROHIBITED_CONTENT,
+          MISLEADING_INFORMATION,
+          HARASSMENT_OR_HATE,
+          PRIVACY_OR_CONTACT_ABUSE,
+          OTHER,
+        ]
+    ReportReceiptResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [id, targetType, targetId, reasonCode, status, deduplicated, submittedAt]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            targetType: { type: string, const: LISTING }
+            targetId: { type: string, format: uuid }
+            reasonCode:
+              $ref: "#/components/schemas/ReportReasonCode"
+            status: { type: string, enum: [OPEN, TRIAGED] }
+            deduplicated: { type: boolean }
+            submittedAt: { type: string, format: date-time }
+    CreateModerationAppealRequest:
+      type: object
+      required: [moderationActionId, statement]
+      additionalProperties: false
+      properties:
+        moderationActionId: { type: string, format: uuid }
+        statement: { type: string, minLength: 20, maxLength: 2000 }
+    ModerationAppealReceiptResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [id, moderationActionId, status, appealDeadline, deduplicated, submittedAt]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            moderationActionId: { type: string, format: uuid }
+            status: { type: string, const: OPEN }
+            appealDeadline: { type: string, format: date-time }
+            deduplicated: { type: boolean }
+            submittedAt: { type: string, format: date-time }
     CreateCheckoutRequest:
       type: object
       required: [productCode, subjectType, subjectId, returnUrl]
@@ -3979,6 +4266,302 @@ components:
                 type: string,
                 enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED],
               }
+            currentModerationStatus:
+              {
+                type: string,
+                enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED],
+              }
+            caseVersion: { type: integer, minimum: 1 }
+            listingVersion: { type: integer, minimum: 1 }
+            occurredAt: { type: string, format: date-time }
+    ReportModerationCase:
+      type: object
+      required:
+        [
+          reportId,
+          caseId,
+          targetId,
+          reasonCode,
+          reportStatus,
+          caseStatus,
+          priority,
+          caseVersion,
+          title,
+          listingType,
+          slaDueAt,
+          isSlaBreached,
+          createdAt,
+          updatedAt,
+        ]
+      additionalProperties: false
+      properties:
+        reportId: { type: string, format: uuid }
+        caseId: { type: string, format: uuid }
+        targetId: { type: string, format: uuid }
+        reasonCode:
+          $ref: "#/components/schemas/ReportReasonCode"
+        reportStatus: { type: string, enum: [OPEN, TRIAGED, ACTIONED, DISMISSED, CLOSED] }
+        caseStatus: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, CLOSED] }
+        priority: { type: integer, minimum: 0, maximum: 100 }
+        caseVersion: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        listingType:
+          $ref: "#/components/schemas/ListingType"
+        slaDueAt: { type: string, format: date-time }
+        isSlaBreached: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReportModerationCaseCollection:
+      type: object
+      required: [data, page, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportModerationCase"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
+    ReportModerationCaseDetailResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required:
+            [
+              case,
+              reporterStatement,
+              snapshot,
+              snapshotHash,
+              evidenceCapturedAt,
+              availableActions,
+              reasonOptions,
+              actionHistory,
+              generatedAt,
+              source,
+            ]
+          additionalProperties: false
+          properties:
+            case:
+              $ref: "#/components/schemas/ReportModerationCase"
+            reporterStatement: { type: [string, "null"], maxLength: 2000 }
+            snapshot:
+              $ref: "#/components/schemas/ModerationListingSnapshot"
+            snapshotHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+            evidenceCapturedAt: { type: string, format: date-time }
+            availableActions:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [DISMISS, REMOVE_CONTENT, ESCALATE] }
+            reasonOptions:
+              type: array
+              items:
+                $ref: "#/components/schemas/TrustSafetyReasonOption"
+            actionHistory:
+              type: array
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/TrustSafetyActionHistoryItem"
+            generatedAt: { type: string, format: date-time }
+            source: { type: string, const: POSTGRESQL }
+    AppealModerationCase:
+      type: object
+      required:
+        [
+          appealId,
+          caseId,
+          moderationActionId,
+          targetId,
+          appealStatus,
+          caseStatus,
+          priority,
+          caseVersion,
+          title,
+          listingType,
+          slaDueAt,
+          isSlaBreached,
+          createdAt,
+          updatedAt,
+        ]
+      additionalProperties: false
+      properties:
+        appealId: { type: string, format: uuid }
+        caseId: { type: string, format: uuid }
+        moderationActionId: { type: string, format: uuid }
+        targetId: { type: string, format: uuid }
+        appealStatus: { type: string, enum: [OPEN, UPHELD, RESTORED, CLOSED] }
+        caseStatus: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, CLOSED] }
+        priority: { type: integer, minimum: 0, maximum: 100 }
+        caseVersion: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        listingType:
+          $ref: "#/components/schemas/ListingType"
+        slaDueAt: { type: string, format: date-time }
+        isSlaBreached: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AppealModerationCaseCollection:
+      type: object
+      required: [data, page, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppealModerationCase"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
+    AppealModerationCaseDetailResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required:
+            [
+              case,
+              statement,
+              originalAction,
+              snapshot,
+              snapshotHash,
+              evidenceCapturedAt,
+              availableActions,
+              reasonOptions,
+              actionHistory,
+              generatedAt,
+              source,
+            ]
+          additionalProperties: false
+          properties:
+            case:
+              $ref: "#/components/schemas/AppealModerationCase"
+            statement: { type: string, minLength: 20, maxLength: 2000 }
+            originalAction:
+              type: object
+              required: [id, action, reasonCode, occurredAt]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+                action: { type: string, const: REMOVE_CONTENT }
+                reasonCode: { type: string }
+                occurredAt: { type: string, format: date-time }
+            snapshot:
+              $ref: "#/components/schemas/ModerationListingSnapshot"
+            snapshotHash: { type: string, pattern: "^[0-9a-f]{64}$" }
+            evidenceCapturedAt: { type: string, format: date-time }
+            availableActions:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [UPHOLD, RESTORE] }
+            reasonOptions:
+              type: array
+              items:
+                $ref: "#/components/schemas/TrustSafetyReasonOption"
+            actionHistory:
+              type: array
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/TrustSafetyActionHistoryItem"
+            generatedAt: { type: string, format: date-time }
+            source: { type: string, const: POSTGRESQL }
+    TrustSafetyReasonOption:
+      type: object
+      required: [code, actions]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            [
+              NOT_A_VIOLATION,
+              DUPLICATE_REPORT,
+              INSUFFICIENT_EVIDENCE,
+              CONFIRMED_SCAM,
+              PROHIBITED_CONTENT,
+              MISLEADING_CONTENT,
+              PRIVACY_VIOLATION,
+              ESCALATE_SENIOR_REVIEW,
+              ACTION_CONFIRMED,
+              ACTION_OVERTURNED,
+            ]
+        actions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [DISMISS, REMOVE_CONTENT, ESCALATE, UPHOLD, RESTORE]
+    TrustSafetyActionHistoryItem:
+      type: object
+      required: [id, action, reasonCode, note, createdAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, enum: [DISMISS, REMOVE_CONTENT, ESCALATE, UPHOLD, RESTORE] }
+        reasonCode: { type: string }
+        note: { type: [string, "null"], maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+    ReportModerationActionRequest:
+      type: object
+      required: [action, reasonCode]
+      additionalProperties: false
+      properties:
+        action: { type: string, enum: [DISMISS, REMOVE_CONTENT, ESCALATE] }
+        reasonCode:
+          type: string
+          enum:
+            [
+              NOT_A_VIOLATION,
+              DUPLICATE_REPORT,
+              INSUFFICIENT_EVIDENCE,
+              CONFIRMED_SCAM,
+              PROHIBITED_CONTENT,
+              MISLEADING_CONTENT,
+              PRIVACY_VIOLATION,
+              ESCALATE_SENIOR_REVIEW,
+            ]
+        note: { type: string, minLength: 1, maxLength: 500 }
+    AppealModerationActionRequest:
+      type: object
+      required: [action, reasonCode]
+      additionalProperties: false
+      properties:
+        action: { type: string, enum: [UPHOLD, RESTORE] }
+        reasonCode: { type: string, enum: [ACTION_CONFIRMED, ACTION_OVERTURNED] }
+        note: { type: string, minLength: 1, maxLength: 500 }
+    TrustSafetyActionResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required:
+            [
+              caseId,
+              actionId,
+              action,
+              reasonCode,
+              currentCaseStatus,
+              currentContentStatus,
+              currentModerationStatus,
+              caseVersion,
+              listingVersion,
+              occurredAt,
+            ]
+          additionalProperties: false
+          properties:
+            caseId: { type: string, format: uuid }
+            actionId: { type: string, format: uuid }
+            action: { type: string, enum: [DISMISS, REMOVE_CONTENT, ESCALATE, UPHOLD, RESTORE] }
+            reasonCode: { type: string }
+            currentCaseStatus: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, CLOSED] }
+            currentContentStatus:
+              $ref: "#/components/schemas/ContentStatus"
             currentModerationStatus:
               {
                 type: string,

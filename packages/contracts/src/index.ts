@@ -37,8 +37,30 @@ export type ModerationCaseCollection = components["schemas"]["ModerationCaseColl
 export type ModerationCaseDetailResponse = components["schemas"]["ModerationCaseDetailResponse"];
 export type ModerationActionRequest = components["schemas"]["ModerationActionRequest"];
 export type ModerationActionResponse = components["schemas"]["ModerationActionResponse"];
+export type CreateReportRequest = components["schemas"]["CreateReportRequest"];
+export type ReportReceiptResponse = components["schemas"]["ReportReceiptResponse"];
+export type CreateModerationAppealRequest = components["schemas"]["CreateModerationAppealRequest"];
+export type ModerationAppealReceiptResponse =
+  components["schemas"]["ModerationAppealReceiptResponse"];
+export type ReportModerationCaseCollection =
+  components["schemas"]["ReportModerationCaseCollection"];
+export type ReportModerationCaseDetailResponse =
+  components["schemas"]["ReportModerationCaseDetailResponse"];
+export type AppealModerationCaseCollection =
+  components["schemas"]["AppealModerationCaseCollection"];
+export type AppealModerationCaseDetailResponse =
+  components["schemas"]["AppealModerationCaseDetailResponse"];
+export type ReportModerationActionRequest = components["schemas"]["ReportModerationActionRequest"];
+export type AppealModerationActionRequest = components["schemas"]["AppealModerationActionRequest"];
+export type TrustSafetyActionResponse = components["schemas"]["TrustSafetyActionResponse"];
 export type ListModerationCasesQuery = NonNullable<
   operations["listModerationCases"]["parameters"]["query"]
+>;
+export type ListReportModerationCasesQuery = NonNullable<
+  operations["listReportModerationCases"]["parameters"]["query"]
+>;
+export type ListAppealModerationCasesQuery = NonNullable<
+  operations["listAppealModerationCases"]["parameters"]["query"]
 >;
 export type OtpRequest = components["schemas"]["OtpRequest"];
 export type OtpVerifyRequest = components["schemas"]["OtpVerifyRequest"];
@@ -517,6 +539,116 @@ export const moderationActionRequestSchema: z.ZodType<ModerationActionRequest> =
         code: "custom",
         path: ["reasonCode"],
         message: "Reason code is not allowed for this moderation action",
+      });
+    }
+  });
+
+const reportReasonCodeSchema = z.enum([
+  "SCAM_OR_FRAUD",
+  "PROHIBITED_CONTENT",
+  "MISLEADING_INFORMATION",
+  "HARASSMENT_OR_HATE",
+  "PRIVACY_OR_CONTACT_ABUSE",
+  "OTHER",
+]);
+
+const trustSafetyTextSchema = (minimum: number, maximum: number) =>
+  z
+    .string()
+    .trim()
+    .min(minimum)
+    .max(maximum)
+    .refine(safeModerationNote, "Text contains unsupported characters");
+
+export const createReportRequestSchema: z.ZodType<CreateReportRequest> = z
+  .object({
+    targetType: z.literal("LISTING"),
+    targetId: z.uuid(),
+    reasonCode: reportReasonCodeSchema,
+    details: trustSafetyTextSchema(10, 2000).optional(),
+  })
+  .strict();
+
+export const createModerationAppealRequestSchema: z.ZodType<CreateModerationAppealRequest> = z
+  .object({
+    moderationActionId: z.uuid(),
+    statement: trustSafetyTextSchema(20, 2000),
+  })
+  .strict();
+
+export const listReportModerationCasesQuerySchema: z.ZodType<ListReportModerationCasesQuery> = z
+  .object({
+    status: z.enum(["OPEN", "ASSIGNED", "RESOLVED", "CLOSED"]).default("OPEN"),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+export const listAppealModerationCasesQuerySchema: z.ZodType<ListAppealModerationCasesQuery> = z
+  .object({
+    status: z.enum(["OPEN", "UPHELD", "RESTORED", "CLOSED"]).default("OPEN"),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+const reportReasonByAction = {
+  DISMISS: ["NOT_A_VIOLATION", "DUPLICATE_REPORT", "INSUFFICIENT_EVIDENCE"],
+  REMOVE_CONTENT: [
+    "CONFIRMED_SCAM",
+    "PROHIBITED_CONTENT",
+    "MISLEADING_CONTENT",
+    "PRIVACY_VIOLATION",
+  ],
+  ESCALATE: ["ESCALATE_SENIOR_REVIEW"],
+} as const;
+
+export const reportModerationActionRequestSchema: z.ZodType<ReportModerationActionRequest> = z
+  .object({
+    action: z.enum(["DISMISS", "REMOVE_CONTENT", "ESCALATE"]),
+    reasonCode: z.enum([
+      "NOT_A_VIOLATION",
+      "DUPLICATE_REPORT",
+      "INSUFFICIENT_EVIDENCE",
+      "CONFIRMED_SCAM",
+      "PROHIBITED_CONTENT",
+      "MISLEADING_CONTENT",
+      "PRIVACY_VIOLATION",
+      "ESCALATE_SENIOR_REVIEW",
+    ]),
+    note: trustSafetyTextSchema(1, 500).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const allowed = reportReasonByAction[value.action] as readonly string[];
+    if (!allowed.includes(value.reasonCode)) {
+      context.addIssue({
+        code: "custom",
+        path: ["reasonCode"],
+        message: "Reason code is not allowed for this report action",
+      });
+    }
+  });
+
+const appealReasonByAction = {
+  UPHOLD: ["ACTION_CONFIRMED"],
+  RESTORE: ["ACTION_OVERTURNED"],
+} as const;
+
+export const appealModerationActionRequestSchema: z.ZodType<AppealModerationActionRequest> = z
+  .object({
+    action: z.enum(["UPHOLD", "RESTORE"]),
+    reasonCode: z.enum(["ACTION_CONFIRMED", "ACTION_OVERTURNED"]),
+    note: trustSafetyTextSchema(1, 500).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const allowed = appealReasonByAction[value.action] as readonly string[];
+    if (!allowed.includes(value.reasonCode)) {
+      context.addIssue({
+        code: "custom",
+        path: ["reasonCode"],
+        message: "Reason code is not allowed for this appeal action",
       });
     }
   });

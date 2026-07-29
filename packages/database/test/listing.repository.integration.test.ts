@@ -470,7 +470,12 @@ integration("ListingRepository safe PostgreSQL projections", () => {
       });
       const repository = new ListingRepository(transaction);
 
-      const publicJobs = await repository.listPublic({ type: "JOB", now, limit: 20 });
+      const publicJobs = await repository.listPublic({
+        type: "JOB",
+        categoryId: jobCategoryId,
+        now,
+        limit: 20,
+      });
       expect(publicJobs.items).toHaveLength(1);
       expect(publicJobs.items[0]).toMatchObject({
         id: visibleJobId,

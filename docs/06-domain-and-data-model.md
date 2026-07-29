@@ -258,6 +258,20 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
 
+### MOD-002 举报与申诉证据模型
+
+`reports` 增加必填 actor-scoped `idempotency_key/request_hash`；部分唯一索引约束同一举报者、目标和
+`OPEN|TRIAGED` 状态只有一条活动举报。当前 `target_type` 由数据库约束为 `LISTING`，原因码、补充
+说明和请求摘要均有有界 check。接收事务同时创建 `listing-report` Case 和一份不可变脱敏
+`moderation_case_snapshots`，但公共或 Admin DTO 都不投影 `reporter_id`。
+
+`moderation_appeals` 与产生下架决定的 `moderation_actions` 一对一，保存 appellant-scoped 幂等证据、
+20–2000 字申诉陈述及 OPEN/UPHELD/RESTORED/CLOSED 决策证据；状态、decision code 和 resolved time
+由数据库 check 配对。每条申诉拥有独立 `listing-appeal` Case，`moderation_cases_source_check`
+强制 submission/report/appeal 三类队列恰好绑定一个来源。举报处置或申诉决定均在 Listing/Case 行锁
+内复核 actor/session/版本，并原子追加不可变 Action、最小 Audit 和 Outbox；申诉审核事务还会拒绝
+原下架 Action 的 actor。
+
 ### LIST-005/LIST-007 公共生命周期持久化
 
 五类 Listing 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求

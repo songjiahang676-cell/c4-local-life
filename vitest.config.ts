@@ -73,6 +73,9 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/trust-safety": fileURLToPath(
+        new URL("./packages/database/src/repositories/trust-safety.repository.ts", import.meta.url),
+      ),
       "@socal/database/notification": fileURLToPath(
         new URL("./packages/database/src/repositories/notification.repository.ts", import.meta.url),
       ),

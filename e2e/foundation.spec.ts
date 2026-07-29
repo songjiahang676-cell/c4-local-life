@@ -1013,8 +1013,8 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   };
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
-  expect(Object.keys(contract.paths)).toHaveLength(57);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(123);
+  expect(Object.keys(contract.paths)).toHaveLength(64);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(137);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);

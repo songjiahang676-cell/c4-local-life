@@ -1,7 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { z } from "zod";
 import {
-  ListingType,
   NotificationChannel,
   NotificationStatus,
   Prisma,
@@ -20,6 +19,9 @@ export const listingNotificationEventTypes = [
   "listing.moderation.escalated",
   "listing.moderation.returned",
   "listing.moderation.rejected",
+  "listing.moderation.removed",
+  "listing.appeal.upheld",
+  "listing.appeal.restored",
   "listing.archived",
   "listing.deleted",
   "listing.expired",
@@ -170,6 +172,9 @@ function templateKey(input: ListingNotificationEventInput): string | null {
     "listing.moderation.escalated": "listing.status.reviewing",
     "listing.moderation.returned": "listing.status.changes_requested",
     "listing.moderation.rejected": "listing.status.rejected",
+    "listing.moderation.removed": "listing.status.removed",
+    "listing.appeal.upheld": "listing.status.appeal_upheld",
+    "listing.appeal.restored": "listing.status.appeal_restored",
     "listing.archived": "listing.status.archived",
     "listing.deleted": "listing.status.deleted",
     "listing.expired": "listing.status.expired",
@@ -278,7 +283,6 @@ export class NotificationRepository {
         throw new NotificationEventValidationError();
       }
       if (
-        listing.type !== ListingType.RENTAL ||
         (listing.owner.status !== UserStatus.ACTIVE &&
           listing.owner.status !== UserStatus.LIMITED) ||
         listing.owner.deletedAt ||
