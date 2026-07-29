@@ -39,13 +39,14 @@ Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证�
 - [x] 共享账户壳、短效 no-store 能力快照、主动重验、失败关闭和双语错误状态。
 - [x] 五类移动端中英文发布 E2E。
 
-Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实 PostgreSQL 与生产 Chromium 回归；
-最终退出还要求 `WEB-004` 的受保护 Linux 真实服务和四镜像门禁、evidence-head、受保护合并及
-merged-main 复验全部通过，证据记录在 `tasks/STATUS.md`。
+Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实 PostgreSQL 与生产 Chromium 回归。
+`WEB-004` 的受保护 Linux 真实服务和四镜像门禁、evidence-head、受保护合并及 merged-main 复验也已
+全部通过，Gate 2 关闭证据记录在 `tasks/STATUS.md`。
 
 ## G3 Search / Web / SEO
 
-- [ ] Outbox、版本索引、reconciliation。
+- [x] Outbox 和 `SEARCH-001` 版本索引/双语 analyzer/geo/公开字段契约。
+- [ ] `SEARCH-002` 下架优先、external version 和 reconciliation。
 - [ ] 双语/地理/筛选/排序和推广标识。
 - [ ] 首页真实数据与模块隔离。
 - [ ] canonical/hreflang/sitemap/schema/a11y/performance。

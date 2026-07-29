@@ -179,3 +179,12 @@ Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing
 最小组织摘要。`/[locale]/account/layout.tsx` 组合 Provider/Shell，使 Listing 管理与通知中心不再
 分别请求或持久化 Session。所有业务数据仍从各自同源 BFF/API 读取，Web 不导入 Prisma、不自行授予
 权限，也不新增服务、数据库、契约或架构边界。
+
+## 30.7 SEARCH-001 索引定义边界
+
+`apps/worker/src/search/listing-index-definition.ts` 只定义可序列化的公共 Listing 搜索 DTO、版本化名称、
+analyzer、mapping 和 alias；`listing-index-manager.ts` 只负责针对 OpenSearch 的 create-or-validate；
+`opensearch-client.ts` 是官方 Node client 和 SecretValue 的 adapter；CLI 只组合配置、client 和
+manager。Web/API 不导入这些模块，Worker 不把 OpenSearch 当 canonical store，也不在本切片消费
+Outbox 或实现查询 API。事件投影、乱序保护和 reconciliation 由 `SEARCH-002` 实现，公共搜索查询由
+`SEARCH-003` 实现，重建和 alias 切换由 `SEARCH-005` 实现。

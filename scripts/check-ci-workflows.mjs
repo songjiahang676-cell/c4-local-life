@@ -27,11 +27,26 @@ if (!job.env?.REDIS_INTEGRATION_URL) {
 if (!job.env?.CLAMAV_INTEGRATION_HOST || !job.env?.CLAMAV_INTEGRATION_PORT) {
   throw new Error("CI quality gate must run media malware integration tests against clamd");
 }
+if (!job.env?.OPENSEARCH_INTEGRATION_URL || !job.env?.OPENSEARCH_NODE) {
+  throw new Error("CI quality gate must run search integration tests against OpenSearch");
+}
 if (!job.services?.clamav || !String(job.services.clamav.image).startsWith("clamav/clamav:")) {
   throw new Error("CI quality gate must provide a versioned ClamAV service");
 }
 if (!String(job.services.clamav.options).includes("clamdscan --ping 1")) {
   throw new Error("CI ClamAV service must be health checked before integration tests");
+}
+if (
+  !job.services?.opensearch ||
+  !String(job.services.opensearch.image).startsWith("opensearchproject/opensearch:")
+) {
+  throw new Error("CI quality gate must provide a versioned OpenSearch service");
+}
+if (!String(job.services.opensearch.options).includes("_cluster/health")) {
+  throw new Error("CI OpenSearch service must be health checked before integration tests");
+}
+if (job.services.opensearch.env?.DISABLE_SECURITY_PLUGIN !== "true") {
+  throw new Error("CI OpenSearch service must explicitly disable the demo security installer");
 }
 
 if (workflow.permissions?.contents !== "read") {
@@ -102,6 +117,9 @@ for (const healthPath of [
 }
 if (!containerRunScripts.includes("--env DATABASE_URL=")) {
   throw new Error("CI Worker container smoke must provide the required database contract");
+}
+if (!containerRunScripts.includes("--env OPENSEARCH_NODE=")) {
+  throw new Error("CI Worker container smoke must provide the OpenSearch contract");
 }
 
 console.log(

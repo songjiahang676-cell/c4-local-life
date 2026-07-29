@@ -81,6 +81,7 @@ services:
       APP_ENV: local
       DATABASE_URL: postgresql://socal:socal_dev_password@postgres:5432/socal?schema=public
       NODE_ENV: production
+      OPENSEARCH_NODE: http://opensearch:9200
       OTEL_SERVICE_NAME: socal-worker
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT: http://minio:9000
@@ -98,6 +99,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      opensearch:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
@@ -141,7 +144,7 @@ services:
     image: opensearchproject/opensearch:2.19.5
     environment:
       discovery.type: single-node
-      plugins.security.disabled: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
       bootstrap.memory_lock: "true"
       OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
     ulimits:

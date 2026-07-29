@@ -232,6 +232,9 @@ importers:
       "@aws-sdk/client-s3":
         specifier: 3.1096.0
         version: 3.1096.0
+      "@opensearch-project/opensearch":
+        specifier: 2.13.0
+        version: 2.13.0(supports-color@10.2.2)
       "@socal/config":
         specifier: workspace:*
         version: link:../../packages/config
@@ -1765,6 +1768,13 @@ packages:
       }
     engines: { node: ">=12.4.0" }
 
+  "@opensearch-project/opensearch@2.13.0":
+    resolution:
+      {
+        integrity: sha512-Bu3jJ7pKzumbMMeefu7/npAWAvFu5W9SlbBow1ulhluqUpqc7QoXe0KidDrMy7Dy3BQrkI6llR3cWL4lQTZOFw==,
+      }
+    engines: { node: ">=10", yarn: ^1.22.10 }
+
   "@opentelemetry/api-logs@0.221.0":
     resolution:
       {
@@ -3218,6 +3228,12 @@ packages:
       }
     engines: { node: ">= 6.0.0" }
 
+  aws4@1.13.2:
+    resolution:
+      {
+        integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==,
+      }
+
   axe-core@4.12.1:
     resolution:
       {
@@ -4490,6 +4506,13 @@ packages:
         integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==,
       }
 
+  hpagent@1.2.0:
+    resolution:
+      {
+        integrity: sha512-A91dYTeIB6NoXG+PxTQpCCDDnfHsW9kc06Lvpu1TEe9gnd6ZFeiBoRO9JvzEv6xK7EX97/dUE8g/vBMTqTS3CA==,
+      }
+    engines: { node: ">=14" }
+
   html-encoding-sniffer@6.0.0:
     resolution:
       {
@@ -4956,6 +4979,13 @@ packages:
       {
         integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==,
       }
+
+  json11@2.0.2:
+    resolution:
+      {
+        integrity: sha512-HIrd50UPYmP6sqLuLbFVm75g16o0oZrVfxrsY0EEys22klz8mRoWlX9KAEDOSOR9Q34rcxsyC8oDveGrCz5uLQ==,
+      }
+    hasBin: true
 
   json5@1.0.2:
     resolution:
@@ -6107,6 +6137,12 @@ packages:
     resolution:
       {
         integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==,
+      }
+
+  secure-json-parse@2.7.0:
+    resolution:
+      {
+        integrity: sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw==,
       }
 
   secure-json-parse@4.1.0:
@@ -7778,6 +7814,17 @@ snapshots:
 
   "@nolyfill/is-core-module@1.0.39": {}
 
+  "@opensearch-project/opensearch@2.13.0(supports-color@10.2.2)":
+    dependencies:
+      aws4: 1.13.2
+      debug: 4.4.3(supports-color@10.2.2)
+      hpagent: 1.2.0
+      json11: 2.0.2
+      ms: 2.1.3
+      secure-json-parse: 2.7.0
+    transitivePeerDependencies:
+      - supports-color
+
   "@opentelemetry/api-logs@0.221.0":
     dependencies:
       "@opentelemetry/api": 1.9.1
@@ -8720,6 +8767,8 @@ snapshots:
 
   aws-ssl-profiles@1.1.2: {}
 
+  aws4@1.13.2: {}
+
   axe-core@4.12.1: {}
 
   axobject-query@4.1.0: {}
@@ -9630,6 +9679,8 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
+  hpagent@1.2.0: {}
+
   html-encoding-sniffer@6.0.0:
     dependencies:
       "@exodus/bytes": 1.15.1
@@ -9909,6 +9960,8 @@ snapshots:
   json-schema-traverse@1.0.0: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
+
+  json11@2.0.2: {}
 
   json5@1.0.2:
     dependencies:
@@ -10570,6 +10623,8 @@ snapshots:
       xmlchars: 2.2.0
 
   scheduler@0.27.0: {}
+
+  secure-json-parse@2.7.0: {}
 
   secure-json-parse@4.1.0: {}
 

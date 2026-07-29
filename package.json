@@ -44,6 +44,7 @@
     "db:studio": "pnpm --filter @socal/database prisma:studio",
     "infra:up": "docker compose up -d postgres redis opensearch minio minio-init mailpit",
     "infra:down": "docker compose down",
+    "search:index:ensure": "pnpm --filter @socal/worker search:index:ensure",
     "app:up": "docker compose --profile app up --build",
     "app:down": "docker compose down",
     "check:architecture": "bash scripts/check-architecture.sh"

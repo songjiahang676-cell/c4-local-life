@@ -4,19 +4,19 @@
 
 ## 当前 Gate
 
-- Gate：G2 Listings / Moderation（本地实现完成，最终托管退出验证中）
-- 目标：完成账户中心共享壳的受保护托管验证并关闭 Gate 2，再按序进入 G3 Search / Web / SEO
-- 进度：16/16 个 G2 任务、46/101 个总任务完成
-- 风险：`MOD-003` 已由 PR #31 受保护合并且 merged-main 门禁通过；`WEB-004` 已通过完整本地质量、
-  真实 PostgreSQL、生产 Chromium 18/18，以及 PR #32 首轮受保护 Linux 380/380 真实服务测试和
-  四镜像门禁；正在固化 evidence-head，随后仍需受保护合并与 merged-main 复验。生产重复阈值校准、
-  HMAC 密钥轮换/保留清理、Beta 查询计划及数据库加密仍需运营/法律/基础设施确认
+- Gate：G3 Search / Homepage / SEO
+- 目标：先完成版本化 Listing 索引、公开字段、双语 analyzer、geo 和真实 OpenSearch 契约，再进入索引消费
+- 进度：1 个 G3 任务、47/101 个总任务完成
+- 风险：`WEB-004` 已由 PR #32 受保护合并为 `1bdcab9`，evidence-head 和 merged-main 的 Linux
+  真实服务、18/18 E2E 与四镜像门禁均通过，Gate 2 已关闭。`SEARCH-001` 的本地单元/静态检查通过，
+  托管 run `30476171572` 已用 OpenSearch 2.19.5 证明 analyzer、alias、geo 和 strict mapping 负例，
+  并通过完整真实服务、E2E 与四镜像门禁；正在固化 evidence-head，之后仍需受保护合并和 merged-main 复验
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target  | Status               | Notes                                                         |
-| ------- | -------------------- | ---------- | ------- | -------------------- | ------------------------------------------------------------- |
-| WEB-004 | @songjiahang676-cell | 2026-07-29 | pending | evidence-head checks | 共享 no-store Session、能力导航、主动失效、双语/移动/错误状态 |
+| Task       | Owner                | Started    | Target          | Status               | Notes                                                              |
+| ---------- | -------------------- | ---------- | --------------- | -------------------- | ------------------------------------------------------------------ |
+| SEARCH-001 | @songjiahang676-cell | 2026-07-29 | protected merge | evidence-head checks | v1 index、read/write alias、strict public mapping、zh/en/geo tests |
 
 ## Gate Evidence
 
@@ -192,6 +192,10 @@
 | WEB-004 runtime/browser         | production Chromium desktop/mobile    | private capability shell and existing journeys；18/18 E2E passed           | 2026-07-29 |
 | WEB-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI passed；101 tasks / 57 models / 67 paths / 153 schemas passed  | 2026-07-29 |
 | WEB-004 protected checks        | PR #32 / run `30472304542`            | 380 real-service tests；Linux 18/18 E2E and four non-root images passed    | 2026-07-29 |
+| WEB-004 evidence-head checks    | PR #32 / run `30472954506`            | evidence head quality、Linux E2E and four non-root images passed           | 2026-07-29 |
+| WEB-004 protected merge         | PR #32 / merge `1bdcab9`              | protected squash merge completed                                           | 2026-07-29 |
+| WEB-004 final main quality      | GitHub Actions run `30473551979`      | merged-head quality and four non-root images passed                        | 2026-07-29 |
+| SEARCH-001 protected checks     | PR #33 / run `30476171572`            | 385 real-service tests incl. OpenSearch；18/18 E2E；four images passed     | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -203,7 +207,8 @@
   `MOD-002` 已由 PR #28 / final main run `30452750250` 受保护合并；`LIST-008` 已由 PR #29 /
   final main run `30458526726` 受保护合并；`LIST-009` 已由 PR #30 / final main run
   `30463612335` 受保护合并；`MOD-003` 已由 PR #31 / final main run `30470203397` 受保护合并为
-  `cdd3c53`；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-004`。
+  `cdd3c53`；`WEB-004` 已由 PR #32 / final main run `30473551979` 受保护合并为 `1bdcab9`，
+  Gate 2 已关闭；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `SEARCH-001`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。

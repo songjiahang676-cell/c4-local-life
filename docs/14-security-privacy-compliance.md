@@ -381,3 +381,16 @@ Idempotency-Key 或请求哈希。
   Repository 授权。隐藏入口既不授权，也不泄露未知资源存在性。
 - PII/共享缓存：壳只消费安全 UserSummary 和 OrganizationSummary，不读取联系方式、地址或 token；
   页面与 BFF no-store，错误状态和日志不包含 Session payload。
+
+## 14.25 SEARCH-001 公共索引最小化
+
+- Listing 搜索文档使用显式 TypeScript DTO 和 `dynamic: strict` mapping 双重 allowlist；未知字段会被
+  OpenSearch 拒绝，而不是自动扩展为可检索字段。
+- 仅允许模糊公开位置的 `geo_point`；精确地址、电话、邮箱、联系方式策略、审核备注、风险分、媒体
+  object key、执照/认证材料和原始私有 attributes 不进入索引。
+- 索引 `_meta` 固定声明 `public-listing`、`postgresql` 和 `pii: excluded`，启动工具遇到版本或 alias
+  漂移时失败关闭；它不会把索引当成事实源，也不会原地覆盖未知 mapping。
+- OpenSearch 用户名和 SecretValue 密码必须成对提供；配置摘要、CLI 成功日志和失败日志都不输出
+  节点 URL、凭据、文档内容或查询文本。
+- 真实集成测试证明额外 `phone` 字段被 strict mapping 拒绝；后续 `SEARCH-002` 仍必须从 canonical
+  PostgreSQL 重新加载授权公开投影，不能信任 Outbox payload 作为完整索引文档。

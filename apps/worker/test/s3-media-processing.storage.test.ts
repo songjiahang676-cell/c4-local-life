@@ -9,6 +9,7 @@ const environment = parseWorkerEnvironment({
   APP_ENV: "test",
   DATABASE_URL: "postgresql://example.invalid/socal",
   REDIS_URL: "redis://localhost:6379/0",
+  OPENSEARCH_NODE: "http://localhost:9200",
   S3_ENDPOINT: "http://localhost:9000",
   S3_ACCESS_KEY: "synthetic-access-key",
   S3_SECRET_KEY: "synthetic-secret-key",

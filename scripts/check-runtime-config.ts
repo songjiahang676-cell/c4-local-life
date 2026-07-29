@@ -55,6 +55,7 @@ const workerEnvironment = parseWorkerEnvironment({
   APP_ENV: "test",
   DATABASE_URL: "postgresql://user:password@localhost:5432/socal_test",
   REDIS_URL: "redis://localhost:6379/0",
+  OPENSEARCH_NODE: "http://localhost:9200",
   WORKER_CONCURRENCY: "7",
 });
 assert.equal(workerEnvironment.WORKER_CONCURRENCY, 7);
@@ -65,6 +66,7 @@ assert.equal(workerEnvironment.OUTBOX_MAX_ATTEMPTS, 10);
 assert.equal(workerEnvironment.S3_MEDIA_BUCKET, "socal-media-processed-local");
 assert.equal(workerEnvironment.CLAMAV_HOST, "clamav");
 assert.equal(workerEnvironment.MEDIA_PROCESS_MAX_BYTES, 20_971_520);
+assert.equal(workerEnvironment.OPENSEARCH_INDEX_PREFIX, "socal_local");
 
 let missingConfigurationError: RuntimeConfigError | undefined;
 try {

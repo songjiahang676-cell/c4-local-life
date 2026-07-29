@@ -296,3 +296,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   noindex/no-store 和无横向溢出，并回归子页 guest 与双语通知路径。
 - 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构语义和托管真实服务/四镜像门禁继续执行；
   本任务不修改 OpenAPI、Prisma 或 migration。
+
+## 18.27 SEARCH-001 索引契约验证增量
+
+- 单元测试锁定 v1 物理名和读写 alias、非法 prefix、strict mapping、双语/CJK/英文/前缀 analyzer、
+  `geo_point`、写 alias 和 PII/审核字段负断言。
+- Manager 测试覆盖首次创建、重复启动、mapping version 漂移和 write-alias 漂移；漂移必须抛出稳定
+  `LISTING_INDEX_CONTRACT_MISMATCH`，不得就地覆盖。
+- 托管 CI 启动 OpenSearch 2.19.5 真实节点；集成测试实际创建随机命名索引、运行中英文 `_analyze`、
+  经 write alias 写入、经 read alias 执行中文+geo 查询，并证明 strict mapping 拒绝额外电话字段。
+- Runtime config 测试覆盖 index prefix 边界和用户名/SecretValue 密码成对要求；Workflow checker
+  锁定版本化 OpenSearch service、cluster health 和 integration URL，避免 CI 静默跳过。
+- 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构和四镜像门禁继续执行；本任务不修改
+  OpenAPI、Prisma 或 migration。

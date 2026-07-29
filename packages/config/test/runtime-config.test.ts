@@ -47,6 +47,7 @@ describe("runtime configuration", () => {
     expect(environment.MEDIA_UPLOAD_URL_TTL_SECONDS).toBe(300);
     expect(environment.MEDIA_UPLOAD_MAX_ACTIVE).toBe(20);
     expect(environment.MEDIA_UPLOAD_DAILY_BYTES).toBe(209_715_200);
+    expect(environment.OPENSEARCH_INDEX_PREFIX).toBe("socal_local");
     expect(JSON.stringify(environment.SESSION_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.OTP_SECRET)).toBe('"[REDACTED]"');
     expect(JSON.stringify(environment.MFA_SECRET)).toBe('"[REDACTED]"');
@@ -141,12 +142,25 @@ describe("runtime configuration", () => {
         S3_ACCESS_KEY: "local-access-key",
       }),
     ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        OPENSEARCH_USERNAME: "search-user",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseApiEnvironment({
+        ...validApiEnvironment,
+        OPENSEARCH_INDEX_PREFIX: "Invalid-Prefix",
+      }),
+    ).toThrow(RuntimeConfigError);
   });
 
   it("validates bounded outbox worker controls and retry ordering", () => {
     const environment = parseWorkerEnvironment({
       DATABASE_URL: "postgresql://example.invalid/socal",
       REDIS_URL: "redis://localhost:6379/0",
+      OPENSEARCH_NODE: "http://localhost:9200",
     });
     expect(environment.OUTBOX_QUEUE_NAME).toBe("platform-events");
     expect(environment.OUTBOX_BATCH_SIZE).toBe(25);
@@ -159,11 +173,13 @@ describe("runtime configuration", () => {
     expect(environment.CLAMAV_PORT).toBe(3310);
     expect(environment.MEDIA_PROCESS_MAX_BYTES).toBe(20_971_520);
     expect(environment.MEDIA_IMAGE_MAX_PIXELS).toBe(40_000_000);
+    expect(environment.OPENSEARCH_INDEX_PREFIX).toBe("socal_local");
 
     expect(() =>
       parseWorkerEnvironment({
         DATABASE_URL: "postgresql://example.invalid/socal",
         REDIS_URL: "redis://localhost:6379/0",
+        OPENSEARCH_NODE: "http://localhost:9200",
         OUTBOX_RETRY_BASE_SECONDS: "60",
         OUTBOX_RETRY_MAX_SECONDS: "30",
       }),
@@ -172,7 +188,16 @@ describe("runtime configuration", () => {
       parseWorkerEnvironment({
         DATABASE_URL: "postgresql://example.invalid/socal",
         REDIS_URL: "redis://localhost:6379/0",
+        OPENSEARCH_NODE: "http://localhost:9200",
         S3_ACCESS_KEY: "local-access-key",
+      }),
+    ).toThrow(RuntimeConfigError);
+    expect(() =>
+      parseWorkerEnvironment({
+        DATABASE_URL: "postgresql://example.invalid/socal",
+        REDIS_URL: "redis://localhost:6379/0",
+        OPENSEARCH_NODE: "http://localhost:9200",
+        OPENSEARCH_PASSWORD: "search-password",
       }),
     ).toThrow(RuntimeConfigError);
   });
