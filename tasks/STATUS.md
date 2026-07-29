@@ -177,6 +177,7 @@
 | LIST-009 local quality          | `pnpm ci:quality`                     | 81 files / 364 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-29 |
 | LIST-009 runtime/browser        | API runtime + Chromium desktop/mobile | 67 paths / 152 schemas；16/16 production E2E passed                        | 2026-07-29 |
 | LIST-009 architecture           | `scripts/check-architecture.sh`       | 101 tasks；55 models；67 paths；152 schemas；36 JSON files passed          | 2026-07-29 |
+| LIST-009 protected checks       | PR #30 / run `30462257981`            | 366 real-service tests；Linux 16/16 E2E and four non-root images passed    | 2026-07-29 |
 
 ## Decisions / Blocks
 
