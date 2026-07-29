@@ -5,17 +5,16 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `SEARCH-004` 证据头复验与受保护合并，再按实施顺序进入 `WEB-001`
+- 目标：按实施顺序完成 `WEB-001` 公开列表、详情与筛选页面
 - 进度：4 个 G3 任务、50/101 个总任务完成
-- 风险：`SEARCH-004` PR #36 首个受保护 run `30490452692` 已通过 97/97 文件、430/430 个真实
-  PostgreSQL/Redis/ClamAV/OpenSearch 测试、27 个迁移 fresh/upgrade/baseline、18/18 Linux E2E、
-  8 个构建、API 运行时和四个非 root 镜像健康门禁；现仅待证据记录提交后的最终 head 复验与合并
+- 风险：公开列表依赖 OpenSearch 搜索可用性；详情必须只使用匿名公开投影，不能把 Cookie、
+  所有者视图或精确位置带入可缓存 SSR；生产域名与最终品牌资产仍待负责人确认
 
 ## 正在进行
 
 | Task       | Owner                | Started    | Target          | Status                | Notes                            |
 | ---------- | -------------------- | ---------- | --------------- | --------------------- | -------------------------------- |
-| SEARCH-004 | @songjiahang676-cell | 2026-07-29 | protected merge | evidence head pending | PR #36 / run `30490452692` green |
+| WEB-001    | @songjiahang676-cell | 2026-07-29 | public web UI   | in progress           | SSR list/detail/filter pages     |
 
 ## Gate Evidence
 
@@ -214,6 +213,9 @@
 | SEARCH-004 runtime/browser      | API runtime + production Playwright   | 68 paths / 163 schemas；Chromium 18/18 passed                              | 2026-07-29 |
 | SEARCH-004 architecture         | `scripts/check-architecture.sh`       | 101 tasks；60 models；68 paths；163 schemas；36 JSON files passed          | 2026-07-29 |
 | SEARCH-004 protected checks     | PR #36 / run `30490452692`            | 430 real-service tests；Linux 18/18 E2E；8 builds；four images passed      | 2026-07-29 |
+| SEARCH-004 evidence head        | PR #36 / run `30491148630`            | final review head quality、real services、18/18 E2E and four images passed | 2026-07-29 |
+| SEARCH-004 protected merge      | PR #36 / merge `30be880`              | protected squash merge completed                                           | 2026-07-29 |
+| SEARCH-004 final main quality   | GitHub Actions run `30491653244`      | merged head quality、real services、18/18 E2E and four images passed       | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -226,9 +228,9 @@
   final main run `30458526726` 受保护合并；`LIST-009` 已由 PR #30 / final main run
   `30463612335` 受保护合并；`MOD-003` 已由 PR #31 / final main run `30470203397` 受保护合并为
   `cdd3c53`；`WEB-004` 已由 PR #32 / final main run `30473551979` 受保护合并为 `1bdcab9`，
-  Gate 2 已关闭；`SEARCH-001` 至 `SEARCH-003` 已在受保护 `main` 完成；`SEARCH-004` PR #36 /
-  run `30490452692` 已通过首个完整保护门禁，正在进行证据头复验，合并后按
-  `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-001`。
+  Gate 2 已关闭；`SEARCH-001` 至 `SEARCH-004` 已在受保护 `main` 完成，其中 `SEARCH-004`
+  由 PR #36 / evidence-head run `30491148630` 合并为 `30be880`，final main run
+  `30491653244` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-001`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
