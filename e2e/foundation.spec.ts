@@ -10,10 +10,16 @@ test("renders the localized public homepage at desktop and mobile widths", async
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: "洛杉矶华人生活 一站式服务平台",
+      name: "南加州华人生活，一站式本地服务",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("search")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "最新租房" })).toBeVisible();
+  await expect(page.getByText("Synthetic public listing")).toBeVisible();
+  await expect(page.getByText("测试城市")).toBeVisible();
+  await expect(page.getByText("256,893")).toHaveCount(0);
+  await expect(page.getByText("鼎泰丰")).toHaveCount(0);
+  await expect(page.getByText("首页广告位合作")).toHaveCount(0);
+  await expect(page.getByRole("banner").getByRole("search")).toBeVisible();
   const languageLink = page.getByRole("link", { name: /中文 \/ English/ });
   await expect(languageLink).toBeVisible();
   await expect(languageLink).toHaveAttribute("href", "/en-US");
@@ -1181,8 +1187,8 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   };
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
-  expect(Object.keys(contract.paths)).toHaveLength(68);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(163);
+  expect(Object.keys(contract.paths)).toHaveLength(69);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(177);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);

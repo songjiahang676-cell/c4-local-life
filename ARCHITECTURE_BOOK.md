@@ -1678,6 +1678,20 @@ scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共
 `WEB-002` 必须复用该服务生成 `GET /v1/homepage` 的公开投影，不得让 Controller 直接访问 Prisma。
 发布事件是最小化 cache-invalidation 信号，不携带 layout 正文，消费者须从 PostgreSQL 重读指定版本。
 
+## 8.26 WEB-002 公共首页聚合契约
+
+- `GET /homepage` 是无认证、`no-store` 的聚合端点；只接受 `locale`、`regionCode` 和 `device`，
+  unknown query key 返回 400。未找到对应已发布布局返回 503 Problem Details，不回退到草稿或 seed。
+- 响应固定包含布局版本、scope、设备、生成时间、`partial` 和按发布布局顺序排列的模块。当前公开
+  discriminated union 只允许 HERO、HOT_SEARCHES、CITY_CHIPS、LISTING_FEED；尚无真实实现的商家、
+  师傅、广告、行情、资源产品和角色入口不会被序列化为空壳或占位内容。
+- 每个模块包含内容 hash `dataVersion` 与有界 TTL/tag 元数据。热门词沿用至少五个独立来源及读取时
+  二次隐私筛查；城市只来自 active CITY taxonomy；Listing feed 只读取当前地区、PUBLISHED 且未过期的
+  canonical PostgreSQL 公共投影，并再次移除精确坐标、正文、联系方式、审核和风险字段。
+- 单个数据源失败只省略对应模块并令 `partial=true`；真实空集合省略模块但不伪装为故障。Controller
+  只做生成契约校验、缓存头和 Problem Details 映射，应用服务编排 Store 端口，数据库 adapter 独占
+  Repository/Prisma 访问。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -3071,6 +3085,17 @@ locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读
 派生状态。TTL 由严格配置限制在 0–86400 秒，故障时允许短暂读取最后一个已发布版本，不得读取草稿或
 静默拼接不同版本模块。
 
+## 15.13 WEB-002 首页读取与失效边界
+
+- 当前 Web SSR 对首页聚合 API 只有一次匿名读取，固定 5 秒超时、禁 redirect、正文最大 1 MB，并用
+  shared Zod contract 失败关闭；不会从浏览器并发请求十几个内部模块，也不转发 Cookie。
+- API 对支持的已启用模块并发读取且逐模块隔离；Listing feed 使用布局 limit 与当前 region scope，
+  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据，但在 `PERF-001` 完成共享缓存与实测预算前，
+  API 和 Web 都保持 `no-store`，不得宣称 CDN/Redis 命中率或生产 LCP。
+- `homepage.layout.published` Worker 以 locale/region/version 为幂等键，在 Redis Lua 中原子推进版本
+  水位并删除 desktop/tablet/mobile 派生 key。重复或乱序旧版本为 `stale`；Redis 丢失只丢可重建水位，
+  不影响 PostgreSQL canonical 布局与业务数据。
+
 ---
 
 <!-- source: docs\16-infrastructure-devops.md -->
@@ -3359,6 +3384,16 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
 `homepage.layout.published`。允许的诊断字段只有 operation、locale 类别、版本和固定 outcome；配置
 正文、content key、region code、actor ID 和内容 hash 不进入指标标签。`WEB-002` 接入消费者时再增加
 固定 outcome 的 cache invalidation 指标，TAX-003 不虚构尚未存在的消费端可用性。
+
+## 17.16 WEB-002 首页模块与失效指标
+
+- `socal_homepage_modules_total{kind,outcome}` 的 kind 只允许 HERO/HOT_SEARCHES/CITY_CHIPS/
+  LISTING_FEED，outcome 只允许 success/empty/unavailable；用于区分真实空模块与依赖故障。
+- `socal_homepage_cache_invalidations_total{outcome}` 只允许 invalidated/stale/failed；重复或乱序版本
+  计入 stale，依赖故障计入 failed 后由既有队列重试。
+- locale、region、layout/module key、版本、content hash、query、Listing/用户 ID、正文、错误消息和
+  provider detail 均不进入指标标签。HTTP RED 继续覆盖 `/v1/homepage`，正式 SLO/告警由 OBS-002
+  结合生产流量设定。
 
 ---
 
@@ -3993,6 +4028,19 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 追加更高版本并产生新失效事件。只有 migration 故障才按随迁移提供的 roll-forward/rollback 说明处理，
 删除表前必须确认版本历史和 Outbox 均已备份。
 
+## 20.19 WEB-002 首页模块或缓存失效异常
+
+- 首页整体 503 时先检查 locale/region scope 是否有已发布版本、Web 的 `API_BASE_URL` 与 API
+  `/v1/homepage`；不得临时读取草稿、layout seed 或静态 mock。响应 `partial=true` 时根据固定 kind/
+  outcome 指标定位单一模块，不在日志复制热门词、Listing 内容或 provider 错误。
+- 模块持续 `empty` 时分别核对 active CITY taxonomy、热门词五来源阈值和当前地区有效公开 Listing；
+  不降低隐私阈值、不放宽 PUBLISHED/未过期/region 条件，也不插入假内容掩盖空态。
+- 新布局未生效时检查 Outbox 重投与 `socal:homepage:v1:<locale>:<region>:layout-version` 水位。旧版本
+  重投为 stale 是预期；failed 应修复 Redis 后让 BullMQ 重试。必要时可删除可重建的首页派生 key，
+  但不得修改 PostgreSQL 已发布版本或清空业务事实。
+- Web 契约失败时比较 OpenAPI、生成类型与 API payload；不要放宽 strict parser、增加任意代理 URL、
+  转发 Cookie 或把模块内部 DTO 直接暴露给浏览器。
+
 ---
 
 <!-- source: docs\21-risk-register.md -->
@@ -4356,6 +4404,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   原子提交，事件不携带正文或 PII。
 - JSON Schema、Zod、Prisma、migration/回滚说明、单元与 PostgreSQL 负例、种子、全仓质量和受保护
   CI 有真实证据后才可标记完成。公共首页聚合 API 和模块数据隔离仍属于 `WEB-002`。
+
+## 22.19 WEB-002 首页真实数据与模块隔离验收
+
+- `GET /v1/homepage` 严格校验 locale/region/device，返回已发布布局版本和按 slot 排序的 strict
+  模块 union；缺少发布 scope 为 no-store 503，unknown query 为无输入反射的 400 Problem Details。
+- Hero 仅来自 allowlist 本地化 content key；热门词保留五来源和敏感/bot 筛查；城市来自 active
+  taxonomy；Listing feed 限定当前地区、PUBLISHED、未过期 canonical 投影，且不含精确坐标、正文、
+  联系方式、审核、风险或内部计数。
+- 一个模块失败只省略该模块并标记 partial；真实空模块隐藏且不输出测试 fixture、模拟数字、虚构商家/
+  师傅/评价/行情/广告。未实现布局 kind 不出现在响应或页面。
+- Web 用一次匿名、限时、限体积、strict SSR 读取渲染双语 Hero/热门/城市/Listing 模块及诚实空态；
+  页面无 Cookie 转发、无客户端 Prisma/OpenSearch 访问、语义结构可键盘访问且桌面/移动无横向溢出。
+- 发布事件消费者严格验证 Outbox envelope，并以 Redis Lua 原子处理新版本失效与重复/乱序 stale；
+  指标只有固定 kind/outcome。OpenAPI、生成类型、单元/HTTP/Worker/Web、全量质量、生产 Chromium 与
+  受保护 CI 有真实证据后方可标记 done。
 
 ---
 
@@ -4749,7 +4812,7 @@ Homepage
 避免浏览器首屏请求十几个 endpoint。服务端可调用组合 endpoint：
 
 ```http
-GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
+GET /v1/homepage?locale=zh-Hans&regionCode=US-CA-SOCAL&device=desktop
 ```
 
 响应包含 layout version、模块列表、模块级 data/version/cache policy。高变化内容（消息数、登录状态）独立请求/服务端 session 读取；广告可在合规延迟加载。
@@ -4802,6 +4865,23 @@ Hero、热门搜索、城市、Listing feed、商家、师傅、广告、行情�
 业务数据、任意 HTML、外部 URL、查询表达式或私有字段。草稿可 preview；publish 切换 canonical
 版本；rollback 复制历史配置为新版本并发送原子失效事件。`WEB-002` 负责从各领域公开投影装配数据，
 模块失败需隔离为真实空态/错误态，不能从 layout seed 伪造 500 条内容或生产指标。
+
+## 26.8 WEB-002 已实现模块映射
+
+公共响应与 SSR 目前只实现具有 canonical 数据口径的四类：
+
+| Layout kind  | API 数据源                                 | Web 组件        | 空/错策略                                  |
+| ------------ | ------------------------------------------ | --------------- | ------------------------------------------ |
+| HERO         | allowlist 本地化 `contentKey`              | `Hero`          | 无文案时隐藏；无可用 Hero 时显示全页恢复态 |
+| HOT_SEARCHES | 隐私安全 Search Discovery                  | `Trending`      | 空集合隐藏；依赖失败令响应 partial         |
+| CITY_CHIPS   | active CITY taxonomy                       | `CityModule`    | 空集合隐藏；链接只携带公开 region code     |
+| LISTING_FEED | region-scoped PostgreSQL 公共 Listing 投影 | `ListingModule` | 空集合隐藏；推广使用文字披露               |
+
+API 应用服务从已发布 layout 读取顺序并并发装配，Controller 不访问 Prisma；Web 只调用一次
+`/v1/homepage` 并在 strict contract 后进行 Server Component 渲染。原参考实现中的 `256,893`、虚构
+商家/师傅、评分、广告、价格行情和模拟 Listing 已从生产运行路径移除。BUSINESS_FEATURED、
+PROVIDER_FEATURED、AD、PRICE_METRIC、RESOURCE_PRODUCTS、PORTAL_LINKS 即使出现在布局中，也必须等
+各自真实领域投影和验收完成后才能加入公共响应。
 
 ---
 
@@ -5389,3 +5469,15 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 事务 Outbox；API 的 `HomepageLayoutService` 通过 Store 端口调用 Repository。当前模块没有 Controller，
 不会提前改变 68-path 公共 REST 契约，也不会让 Web/Admin 导入 Prisma。`WEB-002` 只需装配该应用服务
 与各领域公共读模型；未来 Admin 编辑器同样必须通过授权 use case，不能绕过版本与审计边界。
+
+## 30.13 WEB-002 首页实现边界
+
+`HomepageService` 复用 `HomepageLayoutService` 并只依赖 `HomepageDataSource` 端口；生产 adapter
+组合 Listing、Taxonomy 与 Search Discovery Repository，Controller 不接触 Prisma。公共 OpenAPI
+由 68 paths / 163 schemas / 78 operationIds 增量为 69 / 177 / 79，生成 TypeScript 与严格 Zod
+响应同步更新。未实现模块不会通过宽松对象穿透。
+
+`apps/web/src/lib/homepage.ts` 是一次性匿名 SSR adapter，限制协议、超时、redirect、响应体与 strict
+schema；`home-page.tsx` 按受支持模块映射 Server Components，并保留双语、语义 HTML、键盘焦点、
+诚实空态与 canonical 发布/浏览入口。Worker 在既有 BullMQ 进程中消费最小化布局事件，用 Redis Lua
+原子推进派生缓存版本水位；没有新增进程、主数据库、消息系统、API 范式或不可逆迁移，因此不需要 ADR。

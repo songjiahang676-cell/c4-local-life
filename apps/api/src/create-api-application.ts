@@ -28,6 +28,8 @@ import type { PasswordNotificationGateway } from "./modules/auth/password-notifi
 import type { PasswordStore } from "./modules/auth/password.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import type { ListingStore } from "./modules/listings/listing.store";
+import type { HomepageDataSource } from "./modules/homepage/homepage-data.source";
+import type { HomepageLayoutStore } from "./modules/homepage-layout/homepage-layout.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import type { MediaStore } from "./modules/media/media.store";
 import type { NotificationStore } from "./modules/notifications/notification.store";
@@ -71,6 +73,8 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   trustSafetyStore?: TrustSafetyStore;
   searchStore?: SearchStore;
   searchDiscoveryStore?: SearchDiscoveryStore;
+  homepageLayoutStore?: HomepageLayoutStore;
+  homepageDataSource?: HomepageDataSource;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -155,6 +159,8 @@ export async function createApiApplication(
       options.searchStore,
       options.searchDiscoveryStore,
       observability.metrics,
+      options.homepageLayoutStore,
+      options.homepageDataSource,
     ),
     adapter,
     {

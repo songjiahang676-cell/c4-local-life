@@ -436,3 +436,17 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
 scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共 HTTP endpoint，因而 OpenAPI 不变；
 `WEB-002` 必须复用该服务生成 `GET /v1/homepage` 的公开投影，不得让 Controller 直接访问 Prisma。
 发布事件是最小化 cache-invalidation 信号，不携带 layout 正文，消费者须从 PostgreSQL 重读指定版本。
+
+## 8.26 WEB-002 公共首页聚合契约
+
+- `GET /homepage` 是无认证、`no-store` 的聚合端点；只接受 `locale`、`regionCode` 和 `device`，
+  unknown query key 返回 400。未找到对应已发布布局返回 503 Problem Details，不回退到草稿或 seed。
+- 响应固定包含布局版本、scope、设备、生成时间、`partial` 和按发布布局顺序排列的模块。当前公开
+  discriminated union 只允许 HERO、HOT_SEARCHES、CITY_CHIPS、LISTING_FEED；尚无真实实现的商家、
+  师傅、广告、行情、资源产品和角色入口不会被序列化为空壳或占位内容。
+- 每个模块包含内容 hash `dataVersion` 与有界 TTL/tag 元数据。热门词沿用至少五个独立来源及读取时
+  二次隐私筛查；城市只来自 active CITY taxonomy；Listing feed 只读取当前地区、PUBLISHED 且未过期的
+  canonical PostgreSQL 公共投影，并再次移除精确坐标、正文、联系方式、审核和风险字段。
+- 单个数据源失败只省略对应模块并令 `partial=true`；真实空集合省略模块但不伪装为故障。Controller
+  只做生成契约校验、缓存头和 Problem Details 映射，应用服务编排 Store 端口，数据库 adapter 独占
+  Repository/Prisma 访问。

@@ -112,6 +112,87 @@ function publicDetail(type = "RENTAL") {
   };
 }
 
+function homepage(locale) {
+  const detail = publicDetail("RENTAL");
+  const { body: _body, createdAt: _createdAt, ...summary } = detail;
+  void _body;
+  void _createdAt;
+  const localized =
+    locale === "zh-Hans"
+      ? {
+          title: "南加州华人生活，一站式本地服务",
+          subtitle: "连接真实的招聘、租房、转让、二手与本地服务信息。",
+          searchPlaceholder: "搜索招聘、租房、转让、二手或本地服务",
+          city: "测试城市",
+          query: "测试租房",
+        }
+      : {
+          title: "Southern California life, in one local place",
+          subtitle: "Explore real local listings.",
+          searchPlaceholder: "Search local listings",
+          city: "Synthetic City",
+          query: "Synthetic rentals",
+        };
+  return {
+    layout: {
+      version: 1,
+      locale,
+      regionCode: "US-CA-SOCAL",
+      device: "desktop",
+    },
+    modules: [
+      {
+        key: "hero",
+        kind: "HERO",
+        dataVersion: "a".repeat(64),
+        cache: { ttlSeconds: 300, tags: [`homepage.config.${locale}.US-CA-SOCAL.v1`] },
+        data: {
+          contentKey: "homepage.hero",
+          title: localized.title,
+          subtitle: localized.subtitle,
+          searchPlaceholder: localized.searchPlaceholder,
+        },
+      },
+      {
+        key: "hot-searches",
+        kind: "HOT_SEARCHES",
+        dataVersion: "b".repeat(64),
+        cache: { ttlSeconds: 120, tags: ["homepage.search-trends"] },
+        data: {
+          window: "DAY_7",
+          items: [{ query: localized.query, rank: 1, locale }],
+        },
+      },
+      {
+        key: "cities",
+        kind: "CITY_CHIPS",
+        dataVersion: "c".repeat(64),
+        cache: { ttlSeconds: 3600, tags: ["homepage.regions"] },
+        data: {
+          items: [
+            {
+              id: region.id,
+              code: region.code,
+              slug: region.slug,
+              type: "CITY",
+              name: localized.city,
+            },
+          ],
+        },
+      },
+      {
+        key: "rentals",
+        kind: "LISTING_FEED",
+        dataVersion: "d".repeat(64),
+        cache: { ttlSeconds: 60, tags: ["homepage.listings.RENTAL"] },
+        data: { listingType: "RENTAL", items: [summary] },
+      },
+    ],
+    partial: false,
+    generatedAt: publishedAt,
+  };
+}
+
 function send(response, status, value) {
   const body = JSON.stringify(value);
   response.writeHead(status, {
@@ -139,6 +220,11 @@ const server = createServer((request, response) => {
   }
   if (url.pathname === "/v1/regions") {
     send(response, 200, { data: [region] });
+    return;
+  }
+  if (url.pathname === "/v1/homepage") {
+    const locale = url.searchParams.get("locale") === "en-US" ? "en-US" : "zh-Hans";
+    send(response, 200, homepage(locale));
     return;
   }
   if (url.pathname === "/v1/search") {

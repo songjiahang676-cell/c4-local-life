@@ -589,6 +589,26 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/homepage": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get the modular public homepage
+         * @description Composes the current published layout with canonical public projections. Modules with no real data are omitted, and one module dependency failure does not fail otherwise available modules.
+         */
+        readonly get: operations["getHomepage"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/listings": {
         readonly parameters: {
             readonly query?: never;
@@ -2293,6 +2313,101 @@ export interface components {
             readonly data: readonly components["schemas"]["SearchTrendingItem"][];
             /** @enum {string} */
             readonly window: "DAY_1" | "DAY_7" | "DAY_30";
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        /**
+         * @default desktop
+         * @enum {string}
+         */
+        readonly HomepageDevice: "desktop" | "tablet" | "mobile";
+        readonly HomepageModuleCachePolicy: {
+            readonly ttlSeconds: number;
+            readonly tags: readonly string[];
+        };
+        readonly HomepageHeroData: {
+            readonly contentKey: string;
+            readonly title: string;
+            readonly subtitle: string;
+            readonly searchPlaceholder: string;
+        };
+        readonly HomepageHotSearchesData: {
+            /** @enum {string} */
+            readonly window: "DAY_1" | "DAY_7" | "DAY_30";
+            readonly items: readonly components["schemas"]["SearchTrendingItem"][];
+        };
+        readonly HomepageRegion: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly code: string;
+            readonly slug: string;
+            /** @constant */
+            readonly type: "CITY";
+            readonly name: string;
+        };
+        readonly HomepageCitiesData: {
+            readonly items: readonly components["schemas"]["HomepageRegion"][];
+        };
+        readonly HomepageListingFeedData: {
+            readonly listingType: components["schemas"]["ListingType"];
+            readonly items: readonly components["schemas"]["PublicListingSummaryView"][];
+        };
+        readonly HomepageHeroModule: {
+            readonly key: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            readonly kind: "HERO";
+            readonly dataVersion: string;
+            readonly cache: components["schemas"]["HomepageModuleCachePolicy"];
+            readonly data: components["schemas"]["HomepageHeroData"];
+        };
+        readonly HomepageHotSearchesModule: {
+            readonly key: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            readonly kind: "HOT_SEARCHES";
+            readonly dataVersion: string;
+            readonly cache: components["schemas"]["HomepageModuleCachePolicy"];
+            readonly data: components["schemas"]["HomepageHotSearchesData"];
+        };
+        readonly HomepageCitiesModule: {
+            readonly key: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            readonly kind: "CITY_CHIPS";
+            readonly dataVersion: string;
+            readonly cache: components["schemas"]["HomepageModuleCachePolicy"];
+            readonly data: components["schemas"]["HomepageCitiesData"];
+        };
+        readonly HomepageListingFeedModule: {
+            readonly key: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            readonly kind: "LISTING_FEED";
+            readonly dataVersion: string;
+            readonly cache: components["schemas"]["HomepageModuleCachePolicy"];
+            readonly data: components["schemas"]["HomepageListingFeedData"];
+        };
+        readonly HomepageModule: components["schemas"]["HomepageHeroModule"] | components["schemas"]["HomepageHotSearchesModule"] | components["schemas"]["HomepageCitiesModule"] | components["schemas"]["HomepageListingFeedModule"];
+        readonly HomepageLayoutProjection: {
+            readonly version: number;
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly regionCode: string;
+            readonly device: components["schemas"]["HomepageDevice"];
+        };
+        readonly HomepageResponse: {
+            readonly layout: components["schemas"]["HomepageLayoutProjection"];
+            readonly modules: readonly components["schemas"]["HomepageModule"][];
+            readonly partial: boolean;
             /** Format: date-time */
             readonly generatedAt: string;
         };
@@ -4039,6 +4154,35 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["SearchTrendingResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    readonly getHomepage: {
+        readonly parameters: {
+            readonly query?: {
+                readonly locale?: "zh-Hans" | "en-US";
+                /** @description Published homepage layout scope and public data region. */
+                readonly regionCode?: string;
+                readonly device?: components["schemas"]["HomepageDevice"];
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Available real-data homepage modules in published layout order */
+            readonly 200: {
+                headers: {
+                    /** @description Shared caching remains disabled until PERF-001 validates production budgets. */
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["HomepageResponse"];
                 };
             };
             readonly 400: components["responses"]["BadRequest"];

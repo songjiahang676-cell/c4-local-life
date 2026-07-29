@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a strict anonymous homepage aggregate and bilingual server-rendered module mapping backed
+  only by published layout, privacy-safe trends, active cities, and region-scoped public Listings,
+  with per-module failure isolation, honest empty states, deterministic data versions, bounded
+  cache metadata, duplicate-safe Redis invalidation, and removal of fabricated homepage content.
 - Added strict, versioned homepage layout configuration with per-module source allowlists,
   optimistic drafts, immutable publication history, append-only rollback, canonical bilingual
   seeds, and transactional cache-invalidation Outbox events.

@@ -33,6 +33,9 @@ type SearchDiscoveryOutcome =
   | "rejected_bot"
   | "rejected_sensitive"
   | "unavailable";
+type HomepageModuleKind = "HERO" | "HOT_SEARCHES" | "CITY_CHIPS" | "LISTING_FEED";
+type HomepageModuleOutcome = "success" | "empty" | "unavailable";
+type HomepageCacheInvalidationOutcome = "invalidated" | "stale" | "failed";
 
 type Histogram = {
   count: number;
@@ -117,6 +120,8 @@ export class MetricsRegistry {
   readonly #searchReconciliations = new Map<SearchReconciliationOutcome, number>();
   readonly #searchQueries = new Map<string, number>();
   readonly #searchDiscoveryEvents = new Map<string, number>();
+  readonly #homepageModules = new Map<string, number>();
+  readonly #homepageCacheInvalidations = new Map<HomepageCacheInvalidationOutcome, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -219,6 +224,17 @@ export class MetricsRegistry {
     outcome: SearchDiscoveryOutcome;
   }): void {
     increment(this.#searchDiscoveryEvents, labelKey(input));
+  }
+
+  homepageModule(input: { kind: HomepageModuleKind; outcome: HomepageModuleOutcome }): void {
+    increment(this.#homepageModules, labelKey(input));
+  }
+
+  homepageCacheInvalidation(outcome: HomepageCacheInvalidationOutcome): void {
+    this.#homepageCacheInvalidations.set(
+      outcome,
+      (this.#homepageCacheInvalidations.get(outcome) ?? 0) + 1,
+    );
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -337,6 +353,20 @@ export class MetricsRegistry {
     );
     for (const [key, value] of [...this.#searchDiscoveryEvents].sort()) {
       lines.push(`socal_search_discovery_events_total${labels(parseLabelKey(key))} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_homepage_modules_total Homepage module composition by fixed kind and outcome.",
+      "# TYPE socal_homepage_modules_total counter",
+    );
+    for (const [key, value] of [...this.#homepageModules].sort()) {
+      lines.push(`socal_homepage_modules_total${labels(parseLabelKey(key))} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_homepage_cache_invalidations_total Homepage layout cache invalidation outcomes.",
+      "# TYPE socal_homepage_cache_invalidations_total counter",
+    );
+    for (const [outcome, value] of [...this.#homepageCacheInvalidations].sort()) {
+      lines.push(`socal_homepage_cache_invalidations_total${labels({ outcome })} ${value}`);
     }
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",

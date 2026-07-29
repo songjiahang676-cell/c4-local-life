@@ -237,3 +237,15 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 事务 Outbox；API 的 `HomepageLayoutService` 通过 Store 端口调用 Repository。当前模块没有 Controller，
 不会提前改变 68-path 公共 REST 契约，也不会让 Web/Admin 导入 Prisma。`WEB-002` 只需装配该应用服务
 与各领域公共读模型；未来 Admin 编辑器同样必须通过授权 use case，不能绕过版本与审计边界。
+
+## 30.13 WEB-002 首页实现边界
+
+`HomepageService` 复用 `HomepageLayoutService` 并只依赖 `HomepageDataSource` 端口；生产 adapter
+组合 Listing、Taxonomy 与 Search Discovery Repository，Controller 不接触 Prisma。公共 OpenAPI
+由 68 paths / 163 schemas / 78 operationIds 增量为 69 / 177 / 79，生成 TypeScript 与严格 Zod
+响应同步更新。未实现模块不会通过宽松对象穿透。
+
+`apps/web/src/lib/homepage.ts` 是一次性匿名 SSR adapter，限制协议、超时、redirect、响应体与 strict
+schema；`home-page.tsx` 按受支持模块映射 Server Components，并保留双语、语义 HTML、键盘焦点、
+诚实空态与 canonical 发布/浏览入口。Worker 在既有 BullMQ 进程中消费最小化布局事件，用 Redis Lua
+原子推进派生缓存版本水位；没有新增进程、主数据库、消息系统、API 范式或不可逆迁移，因此不需要 ADR。

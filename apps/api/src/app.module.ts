@@ -15,6 +15,9 @@ import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import type { PasswordNotificationGateway } from "./modules/auth/password-notification.gateway";
 import type { PasswordStore } from "./modules/auth/password.store";
 import { HealthModule } from "./modules/health/health.module";
+import type { HomepageDataSource } from "./modules/homepage/homepage-data.source";
+import { HomepageModule } from "./modules/homepage/homepage.module";
+import type { HomepageLayoutStore } from "./modules/homepage-layout/homepage-layout.store";
 import { ListingsModule } from "./modules/listings/listings.module";
 import type { ListingStore } from "./modules/listings/listing.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
@@ -52,6 +55,8 @@ export class AppModule {
     searchStore?: SearchStore,
     searchDiscoveryStore?: SearchDiscoveryStore,
     metrics?: MetricsRegistry,
+    homepageLayoutStore?: HomepageLayoutStore,
+    homepageDataSource?: HomepageDataSource,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -67,6 +72,7 @@ export class AppModule {
         ),
         AdminModule.register(environment, mfaStore, moderationStore, metrics),
         HealthModule,
+        HomepageModule.register(environment, homepageLayoutStore, homepageDataSource, metrics),
         ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
         NotificationsModule.register(environment, notificationStore),

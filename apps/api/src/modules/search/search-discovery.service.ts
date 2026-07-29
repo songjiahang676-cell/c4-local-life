@@ -86,7 +86,7 @@ function blockedByDictionary(
   );
 }
 
-function privacySafeQuery(
+export function privacySafeSearchQuery(
   query: string,
   locale: "zh-Hans" | "en-US",
   dictionary: SearchDictionaryDefinition | null,
@@ -203,7 +203,7 @@ export class SearchDiscoveryService {
       this.metrics?.searchDiscovery({ operation: "sample", outcome: "rejected_bot" });
       return;
     }
-    const query = privacySafeQuery(input.query, context.locale, input.dictionary);
+    const query = privacySafeSearchQuery(input.query, context.locale, input.dictionary);
     if (!query) {
       this.metrics?.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
       return;
@@ -241,7 +241,7 @@ export class SearchDiscoveryService {
   ): Promise<SearchSuggestionResponse> {
     const dictionaryRecord = await this.store.getPublishedDictionary();
     const dictionary = dictionaryRecord?.definition ?? null;
-    if (query.q && !privacySafeQuery(query.q, query.locale, dictionary)) {
+    if (query.q && !privacySafeSearchQuery(query.q, query.locale, dictionary)) {
       this.metrics?.searchDiscovery({ operation: "suggestions", outcome: "empty" });
       return { data: [], generatedAt: now.toISOString() };
     }
@@ -281,7 +281,7 @@ export class SearchDiscoveryService {
           }))
       : [];
     const recentSuggestions: SearchSuggestion[] = recentQueries.flatMap((entry) => {
-      const safe = privacySafeQuery(entry.queryText, query.locale, dictionary);
+      const safe = privacySafeSearchQuery(entry.queryText, query.locale, dictionary);
       return safe
         ? [{ type: "QUERY" as const, label: safe, value: safe, locale: query.locale }]
         : [];
@@ -315,7 +315,7 @@ export class SearchDiscoveryService {
     });
     const data = entries
       .flatMap((entry) => {
-        const safe = privacySafeQuery(entry.queryText, query.locale, dictionary);
+        const safe = privacySafeSearchQuery(entry.queryText, query.locale, dictionary);
         return safe ? [safe] : [];
       })
       .slice(0, query.limit)

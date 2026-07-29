@@ -49,6 +49,16 @@ export type ValidatedSearchTrendingQuery = Omit<
 };
 export type SearchTrendingItem = components["schemas"]["SearchTrendingItem"];
 export type SearchTrendingResponse = components["schemas"]["SearchTrendingResponse"];
+export type HomepageQuery = NonNullable<operations["getHomepage"]["parameters"]["query"]>;
+export type ValidatedHomepageQuery = Required<HomepageQuery>;
+export type HomepageDevice = components["schemas"]["HomepageDevice"];
+export type HomepageModuleCachePolicy = components["schemas"]["HomepageModuleCachePolicy"];
+export type HomepageHeroModule = components["schemas"]["HomepageHeroModule"];
+export type HomepageHotSearchesModule = components["schemas"]["HomepageHotSearchesModule"];
+export type HomepageCitiesModule = components["schemas"]["HomepageCitiesModule"];
+export type HomepageListingFeedModule = components["schemas"]["HomepageListingFeedModule"];
+export type HomepageModule = components["schemas"]["HomepageModule"];
+export type HomepageResponse = components["schemas"]["HomepageResponse"];
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ListListingRevisionsQuery = NonNullable<
   operations["listListingRevisions"]["parameters"]["query"]
@@ -1014,6 +1024,128 @@ export const homepageLayoutDefinitionSchema = z
 
 export type HomepageLayoutSlot = z.infer<typeof homepageLayoutSlotSchema>;
 export type HomepageLayoutDefinition = z.infer<typeof homepageLayoutDefinitionSchema>;
+
+export const homepageQuerySchema: z.ZodType<ValidatedHomepageQuery> = z
+  .object({
+    locale: localeSchema.default("zh-Hans"),
+    regionCode: listingRegionCodeSchema.default("US-CA-SOCAL"),
+    device: z.enum(["desktop", "tablet", "mobile"]).default("desktop"),
+  })
+  .strict();
+
+export const homepageModuleCachePolicySchema: z.ZodType<HomepageModuleCachePolicy> = z
+  .object({
+    ttlSeconds: z.number().int().min(0).max(86_400),
+    tags: z
+      .array(
+        z
+          .string()
+          .min(2)
+          .max(160)
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+      )
+      .max(8)
+      .refine((values) => new Set(values).size === values.length, {
+        message: "Homepage cache tags must be unique",
+      }),
+  })
+  .strict();
+
+const homepageDataVersionSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const homepageModuleCommon = {
+  key: homepageConfigurationKeySchema,
+  dataVersion: homepageDataVersionSchema,
+  cache: homepageModuleCachePolicySchema,
+} as const;
+
+export const homepageHeroModuleSchema: z.ZodType<HomepageHeroModule> = z
+  .object({
+    ...homepageModuleCommon,
+    kind: z.literal("HERO"),
+    data: z
+      .object({
+        contentKey: homepageConfigurationKeySchema,
+        title: z.string().min(1).max(120),
+        subtitle: z.string().min(1).max(240),
+        searchPlaceholder: z.string().min(1).max(160),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const homepageHotSearchesModuleSchema: z.ZodType<HomepageHotSearchesModule> = z
+  .object({
+    ...homepageModuleCommon,
+    kind: z.literal("HOT_SEARCHES"),
+    data: z
+      .object({
+        window: z.enum(["DAY_1", "DAY_7", "DAY_30"]),
+        items: z.array(searchTrendingItemSchema).min(1).max(10),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const homepageCitiesModuleSchema: z.ZodType<HomepageCitiesModule> = z
+  .object({
+    ...homepageModuleCommon,
+    kind: z.literal("CITY_CHIPS"),
+    data: z
+      .object({
+        items: z
+          .array(
+            z
+              .object({
+                id: z.uuid(),
+                code: listingRegionCodeSchema,
+                slug: z.string().min(1).max(120),
+                type: z.literal("CITY"),
+                name: z.string().min(1).max(160),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(100),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const homepageListingFeedModuleSchema: z.ZodType<HomepageListingFeedModule> = z
+  .object({
+    ...homepageModuleCommon,
+    kind: z.literal("LISTING_FEED"),
+    data: z
+      .object({
+        listingType: listingTypeSchema,
+        items: z.array(publicListingSummarySchema).min(1).max(100),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const homepageModuleSchema: z.ZodType<HomepageModule> = z.union([
+  homepageHeroModuleSchema,
+  homepageHotSearchesModuleSchema,
+  homepageCitiesModuleSchema,
+  homepageListingFeedModuleSchema,
+]);
+
+export const homepageResponseSchema: z.ZodType<HomepageResponse> = z
+  .object({
+    layout: z
+      .object({
+        version: z.number().int().min(1),
+        locale: localeSchema,
+        regionCode: listingRegionCodeSchema,
+        device: z.enum(["desktop", "tablet", "mobile"]),
+      })
+      .strict(),
+    modules: z.array(homepageModuleSchema).max(32),
+    partial: z.boolean(),
+    generatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
 
 export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
   .object({

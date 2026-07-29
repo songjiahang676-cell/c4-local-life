@@ -318,3 +318,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   原子提交，事件不携带正文或 PII。
 - JSON Schema、Zod、Prisma、migration/回滚说明、单元与 PostgreSQL 负例、种子、全仓质量和受保护
   CI 有真实证据后才可标记完成。公共首页聚合 API 和模块数据隔离仍属于 `WEB-002`。
+
+## 22.19 WEB-002 首页真实数据与模块隔离验收
+
+- `GET /v1/homepage` 严格校验 locale/region/device，返回已发布布局版本和按 slot 排序的 strict
+  模块 union；缺少发布 scope 为 no-store 503，unknown query 为无输入反射的 400 Problem Details。
+- Hero 仅来自 allowlist 本地化 content key；热门词保留五来源和敏感/bot 筛查；城市来自 active
+  taxonomy；Listing feed 限定当前地区、PUBLISHED、未过期 canonical 投影，且不含精确坐标、正文、
+  联系方式、审核、风险或内部计数。
+- 一个模块失败只省略该模块并标记 partial；真实空模块隐藏且不输出测试 fixture、模拟数字、虚构商家/
+  师傅/评价/行情/广告。未实现布局 kind 不出现在响应或页面。
+- Web 用一次匿名、限时、限体积、strict SSR 读取渲染双语 Hero/热门/城市/Listing 模块及诚实空态；
+  页面无 Cookie 转发、无客户端 Prisma/OpenSearch 访问、语义结构可键盘访问且桌面/移动无横向溢出。
+- 发布事件消费者严格验证 Outbox envelope，并以 Redis Lua 原子处理新版本失效与重复/乱序 stale；
+  指标只有固定 kind/outcome。OpenAPI、生成类型、单元/HTTP/Worker/Web、全量质量、生产 Chromium 与
+  受保护 CI 有真实证据后方可标记 done。

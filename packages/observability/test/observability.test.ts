@@ -99,6 +99,8 @@ describe("observability primitives", () => {
     runtime.metrics.searchReconciliation("deleted");
     runtime.metrics.searchQuery({ outcome: "success", sort: "DISTANCE", geo: true });
     runtime.metrics.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
+    runtime.metrics.homepageModule({ kind: "LISTING_FEED", outcome: "success" });
+    runtime.metrics.homepageCacheInvalidation("invalidated");
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -131,6 +133,10 @@ describe("observability primitives", () => {
     expect(metrics).toContain(
       'socal_search_discovery_events_total{operation="sample",outcome="rejected_sensitive"} 1',
     );
+    expect(metrics).toContain(
+      'socal_homepage_modules_total{kind="LISTING_FEED",outcome="success"} 1',
+    );
+    expect(metrics).toContain('socal_homepage_cache_invalidations_total{outcome="invalidated"} 1');
     expect(metrics).not.toContain("person@example.com");
   });
 });
