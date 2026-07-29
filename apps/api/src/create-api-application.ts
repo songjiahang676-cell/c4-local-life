@@ -32,6 +32,7 @@ import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import type { MediaStore } from "./modules/media/media.store";
 import type { NotificationStore } from "./modules/notifications/notification.store";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
+import type { TrustSafetyStore } from "./modules/trust-safety/trust-safety.store";
 
 const requestIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const trustedProxyNetworks = [
@@ -65,6 +66,7 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   listingStore?: ListingStore;
   moderationStore?: ModerationStore;
   notificationStore?: NotificationStore;
+  trustSafetyStore?: TrustSafetyStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -145,6 +147,7 @@ export async function createApiApplication(
       options.listingStore,
       options.moderationStore,
       options.notificationStore,
+      options.trustSafetyStore,
     ),
     adapter,
     {

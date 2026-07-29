@@ -825,8 +825,25 @@ export interface paths {
         };
         readonly get?: never;
         readonly put?: never;
-        /** Submit a user report */
+        /** Report a published listing */
         readonly post: operations["createReport"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/appeals": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Appeal an eligible listing-removal action */
+        readonly post: operations["createModerationAppeal"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -1092,6 +1109,108 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/admin/moderation/reports": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** List listing-report cases without reporter identity */
+        readonly get: operations["listReportModerationCases"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/moderation/reports/{reportId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get report evidence and an immutable redacted target snapshot */
+        readonly get: operations["getReportModerationCase"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/moderation/reports/{reportId}/actions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Dismiss, escalate, or remove content for a report */
+        readonly post: operations["actOnReportModerationCase"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/moderation/appeals": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** List independent listing-appeal cases */
+        readonly get: operations["listAppealModerationCases"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/moderation/appeals/{appealId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get appeal evidence and original removal decision */
+        readonly get: operations["getAppealModerationCase"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/moderation/appeals/{appealId}/actions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Independently uphold or restore an appealed listing */
+        readonly post: operations["actOnAppealModerationCase"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1124,11 +1243,6 @@ export interface components {
             readonly checks: {
                 readonly [key: string]: string;
             };
-        };
-        readonly AcceptedResponse: {
-            /** @constant */
-            readonly accepted: true;
-            readonly requestId: string;
         };
         /**
          * @example {
@@ -2106,12 +2220,50 @@ export interface components {
             readonly createdAt: string;
         };
         readonly CreateReportRequest: {
-            /** @enum {string} */
-            readonly targetType: "LISTING" | "MESSAGE" | "REVIEW" | "USER" | "BUSINESS" | "PROVIDER" | "FORUM_POST";
+            /** @constant */
+            readonly targetType: "LISTING";
             /** Format: uuid */
             readonly targetId: string;
-            readonly reasonCode: string;
+            readonly reasonCode: components["schemas"]["ReportReasonCode"];
             readonly details?: string;
+        };
+        /** @enum {string} */
+        readonly ReportReasonCode: "SCAM_OR_FRAUD" | "PROHIBITED_CONTENT" | "MISLEADING_INFORMATION" | "HARASSMENT_OR_HATE" | "PRIVACY_OR_CONTACT_ABUSE" | "OTHER";
+        readonly ReportReceiptResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly id: string;
+                /** @constant */
+                readonly targetType: "LISTING";
+                /** Format: uuid */
+                readonly targetId: string;
+                readonly reasonCode: components["schemas"]["ReportReasonCode"];
+                /** @enum {string} */
+                readonly status: "OPEN" | "TRIAGED";
+                readonly deduplicated: boolean;
+                /** Format: date-time */
+                readonly submittedAt: string;
+            };
+        };
+        readonly CreateModerationAppealRequest: {
+            /** Format: uuid */
+            readonly moderationActionId: string;
+            readonly statement: string;
+        };
+        readonly ModerationAppealReceiptResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly id: string;
+                /** Format: uuid */
+                readonly moderationActionId: string;
+                /** @constant */
+                readonly status: "OPEN";
+                /** Format: date-time */
+                readonly appealDeadline: string;
+                readonly deduplicated: boolean;
+                /** Format: date-time */
+                readonly submittedAt: string;
+            };
         };
         readonly CreateCheckoutRequest: {
             /** @enum {string} */
@@ -2337,6 +2489,159 @@ export interface components {
                 readonly currentContentStatus: components["schemas"]["ContentStatus"];
                 /** @enum {string} */
                 readonly previousModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                /** @enum {string} */
+                readonly currentModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                readonly caseVersion: number;
+                readonly listingVersion: number;
+                /** Format: date-time */
+                readonly occurredAt: string;
+            };
+        };
+        readonly ReportModerationCase: {
+            /** Format: uuid */
+            readonly reportId: string;
+            /** Format: uuid */
+            readonly caseId: string;
+            /** Format: uuid */
+            readonly targetId: string;
+            readonly reasonCode: components["schemas"]["ReportReasonCode"];
+            /** @enum {string} */
+            readonly reportStatus: "OPEN" | "TRIAGED" | "ACTIONED" | "DISMISSED" | "CLOSED";
+            /** @enum {string} */
+            readonly caseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "CLOSED";
+            readonly priority: number;
+            readonly caseVersion: number;
+            readonly title: string;
+            readonly listingType: components["schemas"]["ListingType"];
+            /** Format: date-time */
+            readonly slaDueAt: string;
+            readonly isSlaBreached: boolean;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly ReportModerationCaseCollection: {
+            readonly data: readonly components["schemas"]["ReportModerationCase"][];
+            readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly ReportModerationCaseDetailResponse: {
+            readonly data: {
+                readonly case: components["schemas"]["ReportModerationCase"];
+                readonly reporterStatement: string | null;
+                readonly snapshot: components["schemas"]["ModerationListingSnapshot"];
+                readonly snapshotHash: string;
+                /** Format: date-time */
+                readonly evidenceCapturedAt: string;
+                readonly availableActions: readonly ("DISMISS" | "REMOVE_CONTENT" | "ESCALATE")[];
+                readonly reasonOptions: readonly components["schemas"]["TrustSafetyReasonOption"][];
+                readonly actionHistory: readonly components["schemas"]["TrustSafetyActionHistoryItem"][];
+                /** Format: date-time */
+                readonly generatedAt: string;
+                /** @constant */
+                readonly source: "POSTGRESQL";
+            };
+        };
+        readonly AppealModerationCase: {
+            /** Format: uuid */
+            readonly appealId: string;
+            /** Format: uuid */
+            readonly caseId: string;
+            /** Format: uuid */
+            readonly moderationActionId: string;
+            /** Format: uuid */
+            readonly targetId: string;
+            /** @enum {string} */
+            readonly appealStatus: "OPEN" | "UPHELD" | "RESTORED" | "CLOSED";
+            /** @enum {string} */
+            readonly caseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "CLOSED";
+            readonly priority: number;
+            readonly caseVersion: number;
+            readonly title: string;
+            readonly listingType: components["schemas"]["ListingType"];
+            /** Format: date-time */
+            readonly slaDueAt: string;
+            readonly isSlaBreached: boolean;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly AppealModerationCaseCollection: {
+            readonly data: readonly components["schemas"]["AppealModerationCase"][];
+            readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly AppealModerationCaseDetailResponse: {
+            readonly data: {
+                readonly case: components["schemas"]["AppealModerationCase"];
+                readonly statement: string;
+                readonly originalAction: {
+                    /** Format: uuid */
+                    readonly id: string;
+                    /** @constant */
+                    readonly action: "REMOVE_CONTENT";
+                    readonly reasonCode: string;
+                    /** Format: date-time */
+                    readonly occurredAt: string;
+                };
+                readonly snapshot: components["schemas"]["ModerationListingSnapshot"];
+                readonly snapshotHash: string;
+                /** Format: date-time */
+                readonly evidenceCapturedAt: string;
+                readonly availableActions: readonly ("UPHOLD" | "RESTORE")[];
+                readonly reasonOptions: readonly components["schemas"]["TrustSafetyReasonOption"][];
+                readonly actionHistory: readonly components["schemas"]["TrustSafetyActionHistoryItem"][];
+                /** Format: date-time */
+                readonly generatedAt: string;
+                /** @constant */
+                readonly source: "POSTGRESQL";
+            };
+        };
+        readonly TrustSafetyReasonOption: {
+            /** @enum {string} */
+            readonly code: "NOT_A_VIOLATION" | "DUPLICATE_REPORT" | "INSUFFICIENT_EVIDENCE" | "CONFIRMED_SCAM" | "PROHIBITED_CONTENT" | "MISLEADING_CONTENT" | "PRIVACY_VIOLATION" | "ESCALATE_SENIOR_REVIEW" | "ACTION_CONFIRMED" | "ACTION_OVERTURNED";
+            readonly actions: readonly ("DISMISS" | "REMOVE_CONTENT" | "ESCALATE" | "UPHOLD" | "RESTORE")[];
+        };
+        readonly TrustSafetyActionHistoryItem: {
+            /** Format: uuid */
+            readonly id: string;
+            /** @enum {string} */
+            readonly action: "DISMISS" | "REMOVE_CONTENT" | "ESCALATE" | "UPHOLD" | "RESTORE";
+            readonly reasonCode: string;
+            readonly note: string | null;
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
+        readonly ReportModerationActionRequest: {
+            /** @enum {string} */
+            readonly action: "DISMISS" | "REMOVE_CONTENT" | "ESCALATE";
+            /** @enum {string} */
+            readonly reasonCode: "NOT_A_VIOLATION" | "DUPLICATE_REPORT" | "INSUFFICIENT_EVIDENCE" | "CONFIRMED_SCAM" | "PROHIBITED_CONTENT" | "MISLEADING_CONTENT" | "PRIVACY_VIOLATION" | "ESCALATE_SENIOR_REVIEW";
+            readonly note?: string;
+        };
+        readonly AppealModerationActionRequest: {
+            /** @enum {string} */
+            readonly action: "UPHOLD" | "RESTORE";
+            /** @enum {string} */
+            readonly reasonCode: "ACTION_CONFIRMED" | "ACTION_OVERTURNED";
+            readonly note?: string;
+        };
+        readonly TrustSafetyActionResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly caseId: string;
+                /** Format: uuid */
+                readonly actionId: string;
+                /** @enum {string} */
+                readonly action: "DISMISS" | "REMOVE_CONTENT" | "ESCALATE" | "UPHOLD" | "RESTORE";
+                readonly reasonCode: string;
+                /** @enum {string} */
+                readonly currentCaseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "CLOSED";
+                readonly currentContentStatus: components["schemas"]["ContentStatus"];
                 /** @enum {string} */
                 readonly currentModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
                 readonly caseVersion: number;
@@ -3953,15 +4258,52 @@ export interface operations {
             };
         };
         readonly responses: {
-            /** @description Report accepted */
+            /** @description Opaque receipt for an accepted or deduplicated report */
             readonly 202: {
                 headers: {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["AcceptedResponse"];
+                    readonly "application/json": components["schemas"]["ReportReceiptResponse"];
                 };
             };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly createModerationAppeal: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateModerationAppealRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Appeal accepted into an independent queue */
+            readonly 202: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ModerationAppealReceiptResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
         };
     };
     readonly createCheckoutSession: {
@@ -4345,6 +4687,192 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ModerationActionResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    readonly listReportModerationCases: {
+        readonly parameters: {
+            readonly query?: {
+                readonly status?: "OPEN" | "ASSIGNED" | "RESOLVED" | "CLOSED";
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Report queue ordered by priority and age */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ReportModerationCaseCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly getReportModerationCase: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly reportId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Canonical report decision context */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ReportModerationCaseDetailResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly actOnReportModerationCase: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path: {
+                readonly reportId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ReportModerationActionRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Report action committed with AuditLog and, when applicable, Outbox */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TrustSafetyActionResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    readonly listAppealModerationCases: {
+        readonly parameters: {
+            readonly query?: {
+                readonly status?: "OPEN" | "UPHELD" | "RESTORED" | "CLOSED";
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Independent appeal queue */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AppealModerationCaseCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly getAppealModerationCase: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly appealId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Canonical appeal context */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AppealModerationCaseDetailResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly actOnAppealModerationCase: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path: {
+                readonly appealId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AppealModerationActionRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Independent appeal decision committed and owner notification queued */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["TrustSafetyActionResponse"];
                 };
             };
             readonly 400: components["responses"]["BadRequest"];

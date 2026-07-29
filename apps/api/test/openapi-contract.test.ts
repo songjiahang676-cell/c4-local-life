@@ -33,6 +33,7 @@ import {
   CapturingPasswordNotificationGateway,
   MemoryPasswordStore,
 } from "./support/memory-password.store";
+import { MemoryTrustSafetyStore } from "./support/memory-trust-safety.store";
 
 type JsonSchema = Record<string, unknown>;
 type ResponseObject = {
@@ -269,6 +270,7 @@ describe("canonical OpenAPI contract", () => {
       taxonomyStore,
       mfaStore: new MemoryMfaStore(),
       moderationStore: new MemoryModerationStore(),
+      trustSafetyStore: new MemoryTrustSafetyStore(),
       passwordStore,
       passwordNotificationGateway: passwordNotifications,
       observability: createObservabilityRuntime({
@@ -296,9 +298,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(57);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(123);
-    expect(operationIds).toHaveLength(67);
+    expect(Object.keys(contract.paths)).toHaveLength(64);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(137);
+    expect(operationIds).toHaveLength(74);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -335,8 +337,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(57);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(57);
+    expect(Object.keys(servedJson.paths)).toHaveLength(64);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(64);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 

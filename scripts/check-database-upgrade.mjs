@@ -77,6 +77,22 @@ try {
   );
 
   for (const migration of upgradeMigrations) {
+    if (migration === "20260730050000_report_appeal_workflow") {
+      await upgrade.query(`
+        INSERT INTO "reports" (
+          "id", "reporter_id", "target_type", "target_id", "reason_code", "details", "updated_at"
+        )
+        VALUES (
+          '00000000-0000-4000-8000-000000000411',
+          '00000000-0000-4000-8000-000000000405',
+          'LISTING',
+          '00000000-0000-4000-8000-000000000407',
+          'OTHER',
+          'Synthetic legacy report retained through the upgrade check.',
+          now()
+        )
+      `);
+    }
     const sql = await readFile(resolve(migrationsRoot, migration, "migration.sql"), "utf8");
     await upgrade.query(sql);
     if (migration === "20260729130000_listing_submission_moderation") {
@@ -437,7 +453,49 @@ try {
                'service_details_license_nonblank'
              )
              AND constraint_type = 'CHECK'
-        ) AS detail_checks`,
+       ) AS detail_checks`,
+  );
+  const trustSafetyStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.moderation_appeals') AS appeals,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'reports_active_reporter_target_key'
+       ) AS active_report_deduplication,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND constraint_type = 'CHECK'
+            AND constraint_name IN (
+              'reports_target_type_check',
+              'reports_reason_code_check',
+              'reports_details_check',
+              'reports_request_hash_check',
+              'moderation_appeals_statement_check',
+              'moderation_appeals_request_hash_check',
+              'moderation_appeals_resolution_check',
+              'moderation_cases_source_check'
+            )
+       ) AS workflow_checks,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND (
+              (table_name = 'reports' AND column_name IN ('idempotency_key', 'request_hash'))
+              OR (table_name = 'moderation_cases' AND column_name = 'appeal_id')
+            )
+       ) AS workflow_columns,
+       (
+         SELECT count(*)::integer
+           FROM reports
+          WHERE id = '00000000-0000-4000-8000-000000000411'::uuid
+            AND idempotency_key = 'legacy:00000000-0000-4000-8000-000000000411'
+            AND request_hash ~ '^[0-9a-f]{64}$'
+       ) AS legacy_report_backfilled`,
   );
   const notificationStorage = await upgrade.query(
     `SELECT
@@ -536,7 +594,12 @@ try {
     notificationStorage.rows[0].templates !== "notification_templates" ||
     !notificationStorage.rows[0].source_event_idempotency ||
     !notificationStorage.rows[0].immutable_trigger ||
-    Number(notificationStorage.rows[0].published_templates) < 18 ||
+    trustSafetyStorage.rows[0].appeals !== "moderation_appeals" ||
+    !trustSafetyStorage.rows[0].active_report_deduplication ||
+    trustSafetyStorage.rows[0].workflow_checks !== 8 ||
+    trustSafetyStorage.rows[0].workflow_columns !== 3 ||
+    trustSafetyStorage.rows[0].legacy_report_backfilled !== 1 ||
+    Number(notificationStorage.rows[0].published_templates) < 40 ||
     organizationMembershipLifecycle.rows[0].invitations !== "organization_invitations" ||
     organizationMembershipLifecycle.rows[0].owner_transfers !== "organization_owner_transfers" ||
     organizationMembershipLifecycle.rows[0].membership_columns !== 2 ||
@@ -575,6 +638,7 @@ try {
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
       listingPublicLifecycleStorage: true,
+      trustSafetyStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
       moderationSnapshotBackfilledAndRedacted: true,

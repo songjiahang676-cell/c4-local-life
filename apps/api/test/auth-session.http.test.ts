@@ -101,9 +101,11 @@ describe("auth session HTTP boundary", () => {
         "listing:submit",
         "media:upload:complete",
         "media:upload:create",
+        "moderation:appeal:create",
         "account:mfa:manage",
         "organization:create",
         "organization:invitation:accept",
+        "moderation:report:create",
       ],
       organizations: [],
     });

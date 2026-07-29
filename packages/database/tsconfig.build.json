@@ -18,6 +18,7 @@
     "src/repositories/listing-draft.repository.ts",
     "src/repositories/listing-submission.repository.ts",
     "src/repositories/moderation-case.repository.ts",
+    "src/repositories/trust-safety.repository.ts",
     "src/repositories/notification.repository.ts",
     "src/repositories/outbox-event.repository.ts",
     "src/repositories/media-asset.repository.ts",

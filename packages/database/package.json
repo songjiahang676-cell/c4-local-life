@@ -33,6 +33,9 @@
       "moderation-case": [
         "src/repositories/moderation-case.repository.ts"
       ],
+      "trust-safety": [
+        "src/repositories/trust-safety.repository.ts"
+      ],
       "notification": [
         "src/repositories/notification.repository.ts"
       ],
@@ -93,6 +96,11 @@
       "types": "./src/repositories/moderation-case.repository.ts",
       "require": "./dist/src/repositories/moderation-case.repository.js",
       "default": "./dist/src/repositories/moderation-case.repository.js"
+    },
+    "./trust-safety": {
+      "types": "./src/repositories/trust-safety.repository.ts",
+      "require": "./dist/src/repositories/trust-safety.repository.js",
+      "default": "./dist/src/repositories/trust-safety.repository.js"
     },
     "./notification": {
       "types": "./src/repositories/notification.repository.ts",

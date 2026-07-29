@@ -232,8 +232,21 @@ describe("Listing domain", () => {
     const published = publish();
     const suspended = transitionListing(published, command("SUSPEND", published)).listing;
     expect(suspended.publishedAt).toEqual(published.publishedAt);
+    const restored = transitionListing(
+      suspended,
+      command("RESTORE", suspended, {
+        occurredAt: new Date(suspended.updatedAt.getTime() + 1_000),
+      }),
+    ).listing;
+    expect(restored).toMatchObject({
+      status: "PUBLISHED",
+      moderationStatus: "APPROVED",
+      publishedAt: published.publishedAt,
+      expiresAt: published.expiresAt,
+      version: suspended.version + 1,
+    });
 
-    for (const listing of [draft(), submit(), published, suspended]) {
+    for (const listing of [draft(), submit(), published, suspended, restored]) {
       const deleted = transitionListing(listing, command("DELETE", listing)).listing;
       expect(deleted.status).toBe("DELETED");
       expect(deleted.deletedAt).toEqual(deleted.updatedAt);
@@ -247,6 +260,10 @@ describe("Listing domain", () => {
   it("rejects illegal transitions, stale versions and unsafe transition metadata", () => {
     expectDomainError(
       () => transitionListing(draft(), command("ARCHIVE", draft())),
+      "INVALID_STATE_TRANSITION",
+    );
+    expectDomainError(
+      () => transitionListing(draft(), command("RESTORE", draft())),
       "INVALID_STATE_TRANSITION",
     );
     const submitted = submit();

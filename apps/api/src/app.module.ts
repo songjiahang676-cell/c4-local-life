@@ -24,6 +24,8 @@ import type { NotificationStore } from "./modules/notifications/notification.sto
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
+import { TrustSafetyModule } from "./modules/trust-safety/trust-safety.module";
+import type { TrustSafetyStore } from "./modules/trust-safety/trust-safety.store";
 
 @Module({})
 export class AppModule {
@@ -42,6 +44,7 @@ export class AppModule {
     listingStore?: ListingStore,
     moderationStore?: ModerationStore,
     notificationStore?: NotificationStore,
+    trustSafetyStore?: TrustSafetyStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -61,6 +64,7 @@ export class AppModule {
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
         NotificationsModule.register(environment, notificationStore),
         OrganizationsModule.register(environment, organizationStore),
+        TrustSafetyModule.register(environment, trustSafetyStore),
       ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },

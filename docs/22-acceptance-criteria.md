@@ -92,8 +92,17 @@ Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复�
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
-覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
-revision diff、申诉/举报和搜索索引消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；Listing
+举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成。重新提交的历史 revision diff 和搜索索引
+消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+
+`MOD-002` 已验收 Listing 举报/申诉切片：ACTIVE actor、同源、幂等键、每账号小时配额和活动目标
+唯一约束保护接收；并发同目标举报只写一条 Report/脱敏快照/案件/Audit。公共 receipt 和 MFA
+审核详情均不含举报者身份。举报处置使用 recent MFA、稳定原因、强 ETag 与 actor-scoped 幂等键，
+并把下架状态、Case、不可变 Action、Audit 和 Outbox 原子提交。Owner 在 30 天内只能针对下架动作
+申诉一次；独立审核员可维持或恢复尚未到期内容，原审核员被应用层与事务内检查拒绝；三种结果均由
+版本化双语站内模板通知。当前对象范围刻意限于 Listing，Message/Review/Profile/User 举报随对应
+主数据 Gate 扩展。
 
 `LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
 安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选

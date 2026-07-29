@@ -162,7 +162,7 @@ integration("NotificationRepository with PostgreSQL", () => {
       expect(stored[0]).toMatchObject({
         channel: "IN_APP",
         templateKey: "listing.status.published",
-        templateVersion: 1,
+        templateVersion: 2,
         locale: "zh-Hans",
         status: "SENT",
         resourceType: "LISTING",

@@ -82,6 +82,36 @@ describe("listing notification worker", () => {
   });
 
   it.each([
+    "listing.moderation.removed",
+    "listing.appeal.upheld",
+    "listing.appeal.restored",
+  ] as const)("accepts the bounded %s outcome envelope", (eventType) => {
+    const input = parseListingNotificationEnvelope(
+      envelope({
+        eventType,
+        payload: {
+          schemaVersion: 1,
+          aggregateVersion: 6,
+          listingId,
+          actionId: randomUUID(),
+          reasonCode: "INTERNAL_ONLY",
+        },
+      }),
+      eventType,
+    );
+
+    expect(input).toEqual({
+      eventId,
+      eventType,
+      listingId,
+      aggregateVersion: 6,
+      occurredAt: new Date("2026-07-30T01:00:00.000Z"),
+    });
+    expect(JSON.stringify(input)).not.toContain("actionId");
+    expect(JSON.stringify(input)).not.toContain("INTERNAL_ONLY");
+  });
+
+  it.each([
     ["wrong version", { version: 2 }],
     ["wrong aggregate type", { aggregateType: "USER" }],
     ["aggregate mismatch", { aggregateId: randomUUID() }],

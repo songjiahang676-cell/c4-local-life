@@ -61,12 +61,17 @@ export function createPolicyService(): PolicyService {
     requireActiveActorPermissionPolicy,
   );
   policies.register(activeUserPolicyActions.mediaUploadCreate, requireActiveActorPermissionPolicy);
+  policies.register(
+    activeUserPolicyActions.moderationAppealCreate,
+    requireActiveActorPermissionPolicy,
+  );
   policies.register(activeUserPolicyActions.mfaManage, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.organizationCreate, requireActiveActorPermissionPolicy);
   policies.register(
     activeUserPolicyActions.organizationInvitationAccept,
     requireActiveActorPermissionPolicy,
   );
+  policies.register(activeUserPolicyActions.reportCreate, requireActiveActorPermissionPolicy);
   policies.register(adminPolicyActions.consoleAccess, requireActiveActorPermissionPolicy);
   policies.register(adminPolicyActions.privilegedAccess, requireMfaActorPermissionPolicy);
   policies.register(adminPolicyActions.sensitiveAccess, requireRecentMfaActorPermissionPolicy);

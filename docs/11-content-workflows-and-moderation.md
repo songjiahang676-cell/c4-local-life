@@ -71,6 +71,9 @@ PUBLISHED
 
 防滥用：登录、速率、去重、恶意举报信誉；但不得因举报者新用户而完全忽略高危证据。多条举报不是自动定罪，需要可信度、独立性和内容证据。
 
+`MOD-002` 首个可验收切片只开放 Listing 举报；其他对象在相应 Gate 的主数据与对象授权完成后扩展，
+不能把尚未实现的对象伪装成可用接口。
+
 ## 11.6 申诉
 
 - 明确哪些动作可申诉和截止时间。
@@ -78,6 +81,8 @@ PUBLISHED
 - 展示足够原因让用户修正，同时不公开检测阈值或举报者。
 - 结果：维持、修改、恢复、部分恢复；记录依据。
 - 误杀率、恢复率和处理时长纳入审核质量指标。
+
+当前可申诉动作是由举报案件产生的 Listing 下架；Owner 在动作发生后 30 天内可提交一次申诉。
 
 ## 11.7 消息治理
 
@@ -155,3 +160,28 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   DELETE 是软删除并对同一 owner 重试保持 204。
 - Worker 有界轮询到期五类 Listing，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
   和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。
+
+## 11.14 MOD-002 举报、处置与申诉闭环
+
+- `POST /reports` 要求 ACTIVE 登录会话、同源写入和 actor-scoped `Idempotency-Key`；当前只接受
+  `LISTING`，稳定原因码为诈骗/禁限内容/误导/骚扰仇恨/隐私联系方式滥用/其他。补充说明为可选
+  10–2000 字，控制字符和双向文本控制符失败关闭。
+- 单一举报者对同一 Listing 只能保留一个 `OPEN|TRIAGED` 举报；并发请求由数据库 advisory lock 和
+  部分唯一索引共同去重。精确幂等重试返回同一 opaque receipt，键复用不同请求返回 409。每个账号
+  每小时最多新建 10 条举报，超过返回 429；同一举报重试和已存在目标去重不会消耗新的配额。
+- 接收事务保存最小 Report、不可变脱敏 Listing 快照、`listing-report` 案件和 Audit。快照过滤
+  email/phone/contact/address、精确坐标和未知私有 attributes；公共响应、审核队列、日志和通知均不
+  暴露举报者身份。数据库生产存储按基础设施合同加密，审核读取只对当前 MFA
+  `MODERATOR|SENIOR_MODERATOR` 开放。
+- 举报队列按 priority 降序、createdAt/UUID 升序稳定分页，cursor 与 actor、队列和状态 HMAC 绑定；
+  详情和动作响应使用强 ETag。处置要求十分钟内 MFA step-up、actor-scoped 幂等键、稳定动作/原因
+  组合和当前 Case 版本。驳回、下架、升级与 Case、不可变 Action、Audit、Outbox 原子提交。
+- 下架把 Listing 转为 `SUSPENDED/REJECTED`，保留原发布/到期证据并发送双语
+  `listing.status.removed` 站内通知。Owner 可在 30 天内调用 `POST /appeals`；每个下架动作只能有
+  一条申诉，精确重试不重复写，并创建独立 `listing-appeal` 案件。
+- 原下架审核员不能处理该申诉；数据库事务在最终动作前再次检查。不同审核员可维持原决定或恢复
+  尚未到期的 Listing；恢复保留原发布时间/到期时间并递增版本。结果通过
+  `listing.appeal.upheld|restored` Outbox 投影为双语通知，且案件、申诉、Listing、Action 和 Audit
+  同事务提交。
+- SLA 响应字段以举报 24 小时、申诉 3 个 UTC 工作日计算；节假日日历、人员班次、恶意举报信誉和
+  审核质量仪表盘分别由运营配置与 `MOD-004` 完成，当前不会自动定罪或因新账号自动忽略证据。

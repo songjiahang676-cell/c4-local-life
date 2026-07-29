@@ -203,6 +203,13 @@ enum ModerationCaseStatus {
   CLOSED
 }
 
+enum ModerationAppealStatus {
+  OPEN
+  UPHELD
+  RESTORED
+  CLOSED
+}
+
 enum ModerationRiskTier {
   LOW
   MEDIUM
@@ -285,49 +292,50 @@ enum OutboxStatus {
 }
 
 model User {
-  id                      String                    @id @default(uuid()) @db.Uuid
-  email                   String?                   @unique @db.VarChar(320)
-  phoneE164               String?                   @unique @map("phone_e164") @db.VarChar(32)
-  passwordHash            String?                   @map("password_hash") @db.VarChar(255)
-  passwordChangedAt       DateTime?                 @map("password_changed_at") @db.Timestamptz(6)
-  passwordFailedAttempts  Int                       @default(0) @map("password_failed_attempts")
-  passwordLockedUntil     DateTime?                 @map("password_locked_until") @db.Timestamptz(6)
-  status                  UserStatus                @default(ACTIVE)
-  trustScore              Int                       @default(0) @map("trust_score")
-  lastLoginAt             DateTime?                 @map("last_login_at") @db.Timestamptz(6)
-  createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt               DateTime?                 @map("deleted_at") @db.Timestamptz(6)
-  profile                 UserProfile?
-  providerProfile         ProviderProfile?
-  identities              Identity[]
-  sessions                AuthSession[]
-  otpChallenges           OtpChallenge[]
-  memberships             OrganizationMembership[]
-  organizationInvitations OrganizationInvitation[]  @relation("OrganizationInvitationInvitee")
-  sentOrganizationInvites OrganizationInvitation[]  @relation("OrganizationInvitationInviter")
-  revokedOrganizationInvites OrganizationInvitation[] @relation("OrganizationInvitationRevoker")
-  ownerTransfersSent      OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferFrom")
-  ownerTransfersReceived  OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferTo")
-  listings                Listing[]
-  favorites               Favorite[]
-  participants            ConversationParticipant[]
-  messages                Message[]                 @relation("MessageSender")
-  reviews                 Review[]                  @relation("ReviewAuthor")
-  reports                 Report[]                  @relation("ReportReporter")
-  assignedCases           ModerationCase[]          @relation("CaseAssignee")
-  moderationActions       ModerationAction[]        @relation("ActionActor")
-  notifications           Notification[]
-  orders                  Order[]
-  mediaAssets             MediaAsset[]
-  auditLogs               AuditLog[]                @relation("AuditActor")
-  platformRoles           PlatformRoleAssignment[]  @relation("PlatformRoleSubject")
-  platformRoleGrants      PlatformRoleAssignment[]  @relation("PlatformRoleGranter")
-  platformRoleRevocations PlatformRoleAssignment[]  @relation("PlatformRoleRevoker")
-  mfaCredential           MfaCredential?
-  passwordAuthAttempts    PasswordAuthAttempt[]
-  passwordRecoveries      PasswordRecoveryRequest[]
-  submissionEvaluations   ModerationEvaluation[]      @relation("SubmissionEvaluationActor")
+  id                         String                      @id @default(uuid()) @db.Uuid
+  email                      String?                     @unique @db.VarChar(320)
+  phoneE164                  String?                     @unique @map("phone_e164") @db.VarChar(32)
+  passwordHash               String?                     @map("password_hash") @db.VarChar(255)
+  passwordChangedAt          DateTime?                   @map("password_changed_at") @db.Timestamptz(6)
+  passwordFailedAttempts     Int                         @default(0) @map("password_failed_attempts")
+  passwordLockedUntil        DateTime?                   @map("password_locked_until") @db.Timestamptz(6)
+  status                     UserStatus                  @default(ACTIVE)
+  trustScore                 Int                         @default(0) @map("trust_score")
+  lastLoginAt                DateTime?                   @map("last_login_at") @db.Timestamptz(6)
+  createdAt                  DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                  DateTime?                   @map("deleted_at") @db.Timestamptz(6)
+  profile                    UserProfile?
+  providerProfile            ProviderProfile?
+  identities                 Identity[]
+  sessions                   AuthSession[]
+  otpChallenges              OtpChallenge[]
+  memberships                OrganizationMembership[]
+  organizationInvitations    OrganizationInvitation[]    @relation("OrganizationInvitationInvitee")
+  sentOrganizationInvites    OrganizationInvitation[]    @relation("OrganizationInvitationInviter")
+  revokedOrganizationInvites OrganizationInvitation[]    @relation("OrganizationInvitationRevoker")
+  ownerTransfersSent         OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferFrom")
+  ownerTransfersReceived     OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferTo")
+  listings                   Listing[]
+  favorites                  Favorite[]
+  participants               ConversationParticipant[]
+  messages                   Message[]                   @relation("MessageSender")
+  reviews                    Review[]                    @relation("ReviewAuthor")
+  reports                    Report[]                    @relation("ReportReporter")
+  moderationAppeals          ModerationAppeal[]          @relation("ModerationAppealAppellant")
+  assignedCases              ModerationCase[]            @relation("CaseAssignee")
+  moderationActions          ModerationAction[]          @relation("ActionActor")
+  notifications              Notification[]
+  orders                     Order[]
+  mediaAssets                MediaAsset[]
+  auditLogs                  AuditLog[]                  @relation("AuditActor")
+  platformRoles              PlatformRoleAssignment[]    @relation("PlatformRoleSubject")
+  platformRoleGrants         PlatformRoleAssignment[]    @relation("PlatformRoleGranter")
+  platformRoleRevocations    PlatformRoleAssignment[]    @relation("PlatformRoleRevoker")
+  mfaCredential              MfaCredential?
+  passwordAuthAttempts       PasswordAuthAttempt[]
+  passwordRecoveries         PasswordRecoveryRequest[]
+  submissionEvaluations      ModerationEvaluation[]      @relation("SubmissionEvaluationActor")
 
   @@index([status, createdAt])
   @@map("users")
@@ -483,16 +491,16 @@ model OtpChallenge {
 }
 
 model Organization {
-  id                 String                   @id @default(uuid()) @db.Uuid
+  id                 String                      @id @default(uuid()) @db.Uuid
   type               OrganizationType
-  legalName          String?                  @map("legal_name") @db.VarChar(200)
-  displayName        String                   @map("display_name") @db.VarChar(120)
-  slug               String                   @unique @db.VarChar(140)
-  status             UserStatus               @default(ACTIVE)
-  verificationStatus VerificationStatus       @default(UNVERIFIED) @map("verification_status")
-  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt          DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  legalName          String?                     @map("legal_name") @db.VarChar(200)
+  displayName        String                      @map("display_name") @db.VarChar(120)
+  slug               String                      @unique @db.VarChar(140)
+  status             UserStatus                  @default(ACTIVE)
+  verificationStatus VerificationStatus          @default(UNVERIFIED) @map("verification_status")
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?                   @map("deleted_at") @db.Timestamptz(6)
   memberships        OrganizationMembership[]
   invitations        OrganizationInvitation[]
   ownerTransfers     OrganizationOwnerTransfer[]
@@ -522,24 +530,24 @@ model OrganizationMembership {
 }
 
 model OrganizationInvitation {
-  id              String                       @id @default(uuid()) @db.Uuid
-  organizationId  String                       @map("organization_id") @db.Uuid
-  inviteeUserId   String                       @map("invitee_user_id") @db.Uuid
-  invitedById     String                       @map("invited_by_id") @db.Uuid
-  revokedById     String?                      @map("revoked_by_id") @db.Uuid
-  role            MembershipRole
-  status          OrganizationInvitationStatus @default(PENDING)
-  idempotencyKey  String                       @map("idempotency_key") @db.VarChar(128)
-  requestHash     String                       @map("request_hash") @db.Char(64)
-  expiresAt       DateTime                     @map("expires_at") @db.Timestamptz(6)
-  acceptedAt      DateTime?                    @map("accepted_at") @db.Timestamptz(6)
-  revokedAt       DateTime?                    @map("revoked_at") @db.Timestamptz(6)
-  createdAt       DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  organization    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitee         User                         @relation("OrganizationInvitationInvitee", fields: [inviteeUserId], references: [id], onDelete: Restrict)
-  invitedBy       User                         @relation("OrganizationInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
-  revokedBy       User?                        @relation("OrganizationInvitationRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  id             String                       @id @default(uuid()) @db.Uuid
+  organizationId String                       @map("organization_id") @db.Uuid
+  inviteeUserId  String                       @map("invitee_user_id") @db.Uuid
+  invitedById    String                       @map("invited_by_id") @db.Uuid
+  revokedById    String?                      @map("revoked_by_id") @db.Uuid
+  role           MembershipRole
+  status         OrganizationInvitationStatus @default(PENDING)
+  idempotencyKey String                       @map("idempotency_key") @db.VarChar(128)
+  requestHash    String                       @map("request_hash") @db.Char(64)
+  expiresAt      DateTime                     @map("expires_at") @db.Timestamptz(6)
+  acceptedAt     DateTime?                    @map("accepted_at") @db.Timestamptz(6)
+  revokedAt      DateTime?                    @map("revoked_at") @db.Timestamptz(6)
+  createdAt      DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitee        User                         @relation("OrganizationInvitationInvitee", fields: [inviteeUserId], references: [id], onDelete: Restrict)
+  invitedBy      User                         @relation("OrganizationInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  revokedBy      User?                        @relation("OrganizationInvitationRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, invitedById, idempotencyKey])
   @@index([inviteeUserId, status, expiresAt])
@@ -549,18 +557,18 @@ model OrganizationInvitation {
 }
 
 model OrganizationOwnerTransfer {
-  id              String           @id @default(uuid()) @db.Uuid
-  organizationId  String           @map("organization_id") @db.Uuid
-  fromUserId      String           @map("from_user_id") @db.Uuid
-  toUserId        String           @map("to_user_id") @db.Uuid
-  idempotencyKey  String           @map("idempotency_key") @db.VarChar(128)
-  requestHash     String           @map("request_hash") @db.Char(64)
-  fromRoleAfter   MembershipRole   @default(ADMIN) @map("from_role_after")
-  toRoleAfter     MembershipRole   @default(OWNER) @map("to_role_after")
-  occurredAt      DateTime         @map("occurred_at") @db.Timestamptz(6)
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  fromUser        User             @relation("OrganizationOwnerTransferFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
-  toUser          User             @relation("OrganizationOwnerTransferTo", fields: [toUserId], references: [id], onDelete: Restrict)
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  fromUserId     String         @map("from_user_id") @db.Uuid
+  toUserId       String         @map("to_user_id") @db.Uuid
+  idempotencyKey String         @map("idempotency_key") @db.VarChar(128)
+  requestHash    String         @map("request_hash") @db.Char(64)
+  fromRoleAfter  MembershipRole @default(ADMIN) @map("from_role_after")
+  toRoleAfter    MembershipRole @default(OWNER) @map("to_role_after")
+  occurredAt     DateTime       @map("occurred_at") @db.Timestamptz(6)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fromUser       User           @relation("OrganizationOwnerTransferFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUser         User           @relation("OrganizationOwnerTransferTo", fields: [toUserId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, fromUserId, idempotencyKey])
   @@index([organizationId, occurredAt(sort: Desc)])
@@ -710,53 +718,53 @@ model CategoryFormSchemaVersion {
 }
 
 model Listing {
-  id                String                    @id @default(uuid()) @db.Uuid
-  type              ListingType
-  ownerId           String                    @map("owner_id") @db.Uuid
-  organizationId    String?                   @map("organization_id") @db.Uuid
-  categoryId        String                    @map("category_id") @db.Uuid
-  formSchemaVersion Int                       @default(1) @map("form_schema_version")
-  regionId          String                    @map("region_id") @db.Uuid
-  status            ContentStatus             @default(DRAFT)
-  moderationStatus  ModerationStatus          @default(NOT_REVIEWED) @map("moderation_status")
-  locale            String                    @default("zh-Hans") @db.VarChar(16)
-  title             String                    @db.VarChar(120)
-  slug              String                    @db.VarChar(160)
-  summary           String?                   @db.VarChar(240)
-  body              String                    @db.Text
-  priceAmount       Decimal?                  @map("price_amount") @db.Decimal(14, 2)
-  currency          String                    @default("USD") @db.Char(3)
-  priceUnit         PriceUnit?                @map("price_unit")
-  contactMode       ContactMode               @default(IN_APP) @map("contact_mode")
-  createIdempotencyKey String?                @map("create_idempotency_key") @db.VarChar(128)
-  createRequestHash  String?                  @map("create_request_hash") @db.Char(64)
-  attributes        Json                      @default("{}")
-  latitude          Decimal?                  @db.Decimal(9, 6)
-  longitude         Decimal?                  @db.Decimal(9, 6)
-  geoPoint          Unsupported("geography")? @default(dbgenerated("\nCASE\n    WHEN ((longitude IS NULL) OR (latitude IS NULL)) THEN NULL::geography\n    ELSE (st_setsrid(st_makepoint((longitude)::double precision, (latitude)::double precision), 4326))::geography\nEND")) @map("geo_point")
-  locationPrecision String                    @default("CITY") @map("location_precision") @db.VarChar(24)
-  qualityScore      Float                     @default(0) @map("quality_score")
-  isFeatured        Boolean                   @default(false) @map("is_featured")
-  featuredUntil     DateTime?                 @map("featured_until") @db.Timestamptz(6)
-  publishedAt       DateTime?                 @map("published_at") @db.Timestamptz(6)
-  expiresAt         DateTime?                 @map("expires_at") @db.Timestamptz(6)
-  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt         DateTime?                 @map("deleted_at") @db.Timestamptz(6)
-  version           Int                       @default(1)
-  owner             User                      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  organization      Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  category          Category                  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  region            Region                    @relation(fields: [regionId], references: [id], onDelete: Restrict)
-  jobDetail         JobDetail?
-  rentalDetail      RentalDetail?
-  transferDetail    TransferDetail?
-  secondhandDetail  SecondhandDetail?
-  serviceDetail     ServiceDetail?
-  media             ListingMedia[]
-  uploadedMedia     MediaAsset[]
-  favorites         Favorite[]
-  conversations     Conversation[]
+  id                    String                    @id @default(uuid()) @db.Uuid
+  type                  ListingType
+  ownerId               String                    @map("owner_id") @db.Uuid
+  organizationId        String?                   @map("organization_id") @db.Uuid
+  categoryId            String                    @map("category_id") @db.Uuid
+  formSchemaVersion     Int                       @default(1) @map("form_schema_version")
+  regionId              String                    @map("region_id") @db.Uuid
+  status                ContentStatus             @default(DRAFT)
+  moderationStatus      ModerationStatus          @default(NOT_REVIEWED) @map("moderation_status")
+  locale                String                    @default("zh-Hans") @db.VarChar(16)
+  title                 String                    @db.VarChar(120)
+  slug                  String                    @db.VarChar(160)
+  summary               String?                   @db.VarChar(240)
+  body                  String                    @db.Text
+  priceAmount           Decimal?                  @map("price_amount") @db.Decimal(14, 2)
+  currency              String                    @default("USD") @db.Char(3)
+  priceUnit             PriceUnit?                @map("price_unit")
+  contactMode           ContactMode               @default(IN_APP) @map("contact_mode")
+  createIdempotencyKey  String?                   @map("create_idempotency_key") @db.VarChar(128)
+  createRequestHash     String?                   @map("create_request_hash") @db.Char(64)
+  attributes            Json                      @default("{}")
+  latitude              Decimal?                  @db.Decimal(9, 6)
+  longitude             Decimal?                  @db.Decimal(9, 6)
+  geoPoint              Unsupported("geography")? @default(dbgenerated("\nCASE\n    WHEN ((longitude IS NULL) OR (latitude IS NULL)) THEN NULL::geography\n    ELSE (st_setsrid(st_makepoint((longitude)::double precision, (latitude)::double precision), 4326))::geography\nEND")) @map("geo_point")
+  locationPrecision     String                    @default("CITY") @map("location_precision") @db.VarChar(24)
+  qualityScore          Float                     @default(0) @map("quality_score")
+  isFeatured            Boolean                   @default(false) @map("is_featured")
+  featuredUntil         DateTime?                 @map("featured_until") @db.Timestamptz(6)
+  publishedAt           DateTime?                 @map("published_at") @db.Timestamptz(6)
+  expiresAt             DateTime?                 @map("expires_at") @db.Timestamptz(6)
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?                 @map("deleted_at") @db.Timestamptz(6)
+  version               Int                       @default(1)
+  owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  organization          Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  category              Category                  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  region                Region                    @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  jobDetail             JobDetail?
+  rentalDetail          RentalDetail?
+  transferDetail        TransferDetail?
+  secondhandDetail      SecondhandDetail?
+  serviceDetail         ServiceDetail?
+  media                 ListingMedia[]
+  uploadedMedia         MediaAsset[]
+  favorites             Favorite[]
+  conversations         Conversation[]
   moderationEvaluations ModerationEvaluation[]
 
   @@unique([type, slug])
@@ -1051,36 +1059,41 @@ model Report {
   targetId       String          @map("target_id") @db.Uuid
   reasonCode     String          @map("reason_code") @db.VarChar(80)
   details        String?         @db.VarChar(2000)
+  idempotencyKey String          @map("idempotency_key") @db.VarChar(128)
+  requestHash    String          @map("request_hash") @db.Char(64)
   status         ReportStatus    @default(OPEN)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
   reporter       User?           @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
   moderationCase ModerationCase?
 
+  @@unique([reporterId, idempotencyKey])
   @@index([targetType, targetId, status])
   @@index([status, createdAt])
   @@map("reports")
 }
 
 model ModerationCase {
-  id             String               @id @default(uuid()) @db.Uuid
-  reportId       String?              @unique @map("report_id") @db.Uuid
-  evaluationId   String?              @unique @map("evaluation_id") @db.Uuid
-  targetType     String               @map("target_type") @db.VarChar(40)
-  targetId       String               @map("target_id") @db.Uuid
-  queue          String               @db.VarChar(80)
-  priority       Int                  @default(50)
-  status         ModerationCaseStatus @default(OPEN)
-  assignedToId   String?              @map("assigned_to_id") @db.Uuid
-  decisionCode   String?              @map("decision_code") @db.VarChar(80)
-  resolutionNote String?              @map("resolution_note") @db.VarChar(2000)
-  version        Int                  @default(1)
-  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  resolvedAt     DateTime?            @map("resolved_at") @db.Timestamptz(6)
-  report         Report?              @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  evaluation     ModerationEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
-  assignedTo     User?                @relation("CaseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  id             String                  @id @default(uuid()) @db.Uuid
+  reportId       String?                 @unique @map("report_id") @db.Uuid
+  appealId       String?                 @unique @map("appeal_id") @db.Uuid
+  evaluationId   String?                 @unique @map("evaluation_id") @db.Uuid
+  targetType     String                  @map("target_type") @db.VarChar(40)
+  targetId       String                  @map("target_id") @db.Uuid
+  queue          String                  @db.VarChar(80)
+  priority       Int                     @default(50)
+  status         ModerationCaseStatus    @default(OPEN)
+  assignedToId   String?                 @map("assigned_to_id") @db.Uuid
+  decisionCode   String?                 @map("decision_code") @db.VarChar(80)
+  resolutionNote String?                 @map("resolution_note") @db.VarChar(2000)
+  version        Int                     @default(1)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?               @map("resolved_at") @db.Timestamptz(6)
+  report         Report?                 @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  appeal         ModerationAppeal?       @relation(fields: [appealId], references: [id], onDelete: SetNull)
+  evaluation     ModerationEvaluation?   @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  assignedTo     User?                   @relation("CaseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   actions        ModerationAction[]
   snapshot       ModerationCaseSnapshot?
 
@@ -1103,25 +1116,25 @@ model ModerationCaseSnapshot {
 }
 
 model ModerationEvaluation {
-  id                       String             @id @default(uuid()) @db.Uuid
-  listingId                String             @map("listing_id") @db.Uuid
-  actorUserId              String             @map("actor_user_id") @db.Uuid
-  listingVersion           Int                @map("listing_version")
-  ruleSetKey               String             @map("rule_set_key") @db.VarChar(80)
-  ruleSetVersion           Int                @map("rule_set_version")
-  riskTier                 ModerationRiskTier @map("risk_tier")
-  inputHash                String             @map("input_hash") @db.Char(64)
-  idempotencyKey           String             @map("idempotency_key") @db.VarChar(128)
-  requestHash              String             @map("request_hash") @db.Char(64)
-  resultContentStatus      ContentStatus      @map("result_content_status")
-  resultModerationStatus   ModerationStatus   @map("result_moderation_status")
-  resultListingVersion     Int                @map("result_listing_version")
-  occurredAt               DateTime           @map("occurred_at") @db.Timestamptz(6)
-  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  listing                  Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
-  actor                    User               @relation("SubmissionEvaluationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  ruleHits                 ModerationRuleHit[]
-  moderationCase           ModerationCase?
+  id                     String              @id @default(uuid()) @db.Uuid
+  listingId              String              @map("listing_id") @db.Uuid
+  actorUserId            String              @map("actor_user_id") @db.Uuid
+  listingVersion         Int                 @map("listing_version")
+  ruleSetKey             String              @map("rule_set_key") @db.VarChar(80)
+  ruleSetVersion         Int                 @map("rule_set_version")
+  riskTier               ModerationRiskTier  @map("risk_tier")
+  inputHash              String              @map("input_hash") @db.Char(64)
+  idempotencyKey         String              @map("idempotency_key") @db.VarChar(128)
+  requestHash            String              @map("request_hash") @db.Char(64)
+  resultContentStatus    ContentStatus       @map("result_content_status")
+  resultModerationStatus ModerationStatus    @map("result_moderation_status")
+  resultListingVersion   Int                 @map("result_listing_version")
+  occurredAt             DateTime            @map("occurred_at") @db.Timestamptz(6)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  listing                Listing             @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  actor                  User                @relation("SubmissionEvaluationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  ruleHits               ModerationRuleHit[]
+  moderationCase         ModerationCase?
 
   @@unique([actorUserId, idempotencyKey])
   @@unique([listingId, listingVersion])
@@ -1131,14 +1144,14 @@ model ModerationEvaluation {
 }
 
 model ModerationRuleHit {
-  id              String             @id @default(uuid()) @db.Uuid
-  evaluationId    String             @map("evaluation_id") @db.Uuid
-  ruleCode        String             @map("rule_code") @db.VarChar(80)
-  ruleVersion     Int                @map("rule_version")
-  severity        ModerationRiskTier
-  evidenceKey     String             @map("evidence_key") @db.VarChar(80)
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  evaluation      ModerationEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  id           String               @id @default(uuid()) @db.Uuid
+  evaluationId String               @map("evaluation_id") @db.Uuid
+  ruleCode     String               @map("rule_code") @db.VarChar(80)
+  ruleVersion  Int                  @map("rule_version")
+  severity     ModerationRiskTier
+  evidenceKey  String               @map("evidence_key") @db.VarChar(80)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  evaluation   ModerationEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
 
   @@unique([evaluationId, ruleCode])
   @@index([ruleCode, createdAt(sort: Desc)])
@@ -1146,22 +1159,45 @@ model ModerationRuleHit {
 }
 
 model ModerationAction {
-  id             String         @id @default(uuid()) @db.Uuid
-  caseId         String         @map("case_id") @db.Uuid
-  actorId        String         @map("actor_id") @db.Uuid
-  action         String         @db.VarChar(80)
-  reasonCode     String?        @map("reason_code") @db.VarChar(80)
-  note           String?        @db.VarChar(2000)
-  idempotencyKey String?        @map("idempotency_key") @db.VarChar(128)
-  requestHash    String?        @map("request_hash") @db.Char(64)
+  id             String            @id @default(uuid()) @db.Uuid
+  caseId         String            @map("case_id") @db.Uuid
+  actorId        String            @map("actor_id") @db.Uuid
+  action         String            @db.VarChar(80)
+  reasonCode     String?           @map("reason_code") @db.VarChar(80)
+  note           String?           @db.VarChar(2000)
+  idempotencyKey String?           @map("idempotency_key") @db.VarChar(128)
+  requestHash    String?           @map("request_hash") @db.Char(64)
   metadata       Json?
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  actor          User           @relation("ActionActor", fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  moderationCase ModerationCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor          User              @relation("ActionActor", fields: [actorId], references: [id], onDelete: Restrict)
+  appeal         ModerationAppeal?
 
   @@unique([actorId, idempotencyKey])
   @@index([caseId, createdAt])
   @@map("moderation_actions")
+}
+
+model ModerationAppeal {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  moderationActionId String                 @unique @map("moderation_action_id") @db.Uuid
+  appellantId        String                 @map("appellant_id") @db.Uuid
+  statement          String                 @db.VarChar(2000)
+  status             ModerationAppealStatus @default(OPEN)
+  idempotencyKey     String                 @map("idempotency_key") @db.VarChar(128)
+  requestHash        String                 @map("request_hash") @db.Char(64)
+  decisionCode       String?                @map("decision_code") @db.VarChar(80)
+  resolutionNote     String?                @map("resolution_note") @db.VarChar(2000)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  resolvedAt         DateTime?              @map("resolved_at") @db.Timestamptz(6)
+  moderationAction   ModerationAction       @relation(fields: [moderationActionId], references: [id], onDelete: Restrict)
+  appellant          User                   @relation("ModerationAppealAppellant", fields: [appellantId], references: [id], onDelete: Restrict)
+  moderationCase     ModerationCase?
+
+  @@unique([appellantId, idempotencyKey])
+  @@index([status, createdAt])
+  @@map("moderation_appeals")
 }
 
 model Notification {

@@ -20,9 +20,11 @@ export const activeUserPolicyActions = {
   listingSubmit: "listing:submit",
   mediaUploadComplete: "media:upload:complete",
   mediaUploadCreate: "media:upload:create",
+  moderationAppealCreate: "moderation:appeal:create",
   mfaManage: "account:mfa:manage",
   organizationCreate: "organization:create",
   organizationInvitationAccept: "organization:invitation:accept",
+  reportCreate: "moderation:report:create",
 } as const;
 
 export const listingObjectPolicyActions = {
@@ -71,9 +73,11 @@ export const activeUserPermissions = [
   activeUserPolicyActions.listingSubmit,
   activeUserPolicyActions.mediaUploadComplete,
   activeUserPolicyActions.mediaUploadCreate,
+  activeUserPolicyActions.moderationAppealCreate,
   activeUserPolicyActions.mfaManage,
   activeUserPolicyActions.organizationCreate,
   activeUserPolicyActions.organizationInvitationAccept,
+  activeUserPolicyActions.reportCreate,
 ] as const;
 
 export type PolicyAction = string;

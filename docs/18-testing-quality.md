@@ -231,3 +231,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   媒体路径、中英文入口、桌面/移动无横向溢出，以及 Job/Transfer/Secondhand/Service 幂等提交。
 - 空库 baseline 要求 23 个 migration、8 个 Listing 部分索引和 37 个数据库负例；上一发布基线升级
   必须保留哨兵并验证三个新增 detail 约束与五类到期索引。
+
+## 18.22 MOD-002 验证增量
+
+- 契约/HTTP 测试覆盖 Listing-only target、稳定原因、details 边界、同源、登录、幂等键、429、
+  no-store opaque receipt、MFA/recent-MFA、强 Case ETag 和动作/原因耦合。
+- Service 测试覆盖举报/申诉 deadline、签名 cursor 的 actor/queue/status 绑定、下架和恢复状态机，
+  并明确拒绝原审核员处理申诉。
+- PostgreSQL 集成以并发不同幂等键举报同一 target，要求一条活动 Report/Case/不可变脱敏快照；
+  继续覆盖下架、30 天申诉、同审核员拒绝、独立审核员恢复、Listing 版本，以及每步唯一
+  Action/Audit/Outbox/通知投影。
+- 数据泄漏断言在公共 receipt、Admin detail、快照、Audit/Outbox 和通知中搜索 reporter identity、
+  email、phone、contact/address 与原始私有 attributes。
+- 空库 baseline 要求 24 个 migration、40 条已发布双语 Listing 模板、8 个举报/申诉 check 和 42 个
+  数据库负例；上一发行版升级必须回填遗留 Report 的幂等证据并保留既有 Listing/审核哨兵。
