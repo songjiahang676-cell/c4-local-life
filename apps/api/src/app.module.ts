@@ -5,6 +5,7 @@ import { API_ENVIRONMENT } from "./common/api-environment.token";
 import { AuthorizationModule } from "./common/authorization/authorization.module";
 import { CsrfOriginGuard } from "./common/csrf-origin.guard";
 import { AdminModule } from "./modules/admin/admin.module";
+import type { ModerationStore } from "./modules/admin/moderation.store";
 import type { MfaStore } from "./modules/admin/mfa.store";
 import { AuthModule } from "./modules/auth/auth.module";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
@@ -37,6 +38,7 @@ export class AppModule {
     passwordStore?: PasswordStore,
     passwordNotificationGateway?: PasswordNotificationGateway,
     listingStore?: ListingStore,
+    moderationStore?: ModerationStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -50,7 +52,7 @@ export class AppModule {
           passwordStore,
           passwordNotificationGateway,
         ),
-        AdminModule.register(environment, mfaStore),
+        AdminModule.register(environment, mfaStore, moderationStore),
         HealthModule,
         ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),

@@ -29,6 +29,8 @@ export const adminPolicyActions = {
   consoleAccess: "admin:console:access",
   privilegedAccess: "admin:console:privileged",
   sensitiveAccess: "admin:sensitive:access",
+  moderationRead: "admin:moderation:read",
+  moderationAct: "admin:moderation:act",
 } as const;
 
 export const organizationPolicyActions = {
@@ -194,6 +196,31 @@ export function requireRecentMfaActorPermissionPolicy(
     return denyPolicy("INSUFFICIENT_PERMISSION");
   }
   return allowPolicy();
+}
+
+export function requireModeratorMfaPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const mfa = requireMfaActorPermissionPolicy({
+    ...input,
+    action: adminPolicyActions.privilegedAccess,
+  });
+  if (!mfa.allowed) return mfa;
+  const { actor } = input.context;
+  if (
+    actor.kind === "guest" ||
+    !actor.platformRoles.some((role) => role === "MODERATOR" || role === "SENIOR_MODERATOR")
+  ) {
+    return denyPolicy("INSUFFICIENT_PERMISSION");
+  }
+  return allowPolicy();
+}
+
+export function requireModeratorRecentMfaPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const moderator = requireModeratorMfaPolicy(input);
+  if (!moderator.allowed) return moderator;
+  const { actor } = input.context;
+  return actor.kind === "authenticated" && actor.recentMfa
+    ? allowPolicy()
+    : denyPolicy("INSUFFICIENT_PERMISSION");
 }
 
 export function ownerOrOrganizationPolicy(options: ObjectAccessPolicyOptions): PolicyRule {

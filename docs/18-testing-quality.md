@@ -147,7 +147,7 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 45 个 path 的唯一 OpenAPI 文档；
+- 运行时提供包含 46 个 path 的唯一 OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
 - Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
 
@@ -171,3 +171,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - PostgreSQL 集成测试覆盖一次事务内的状态、evaluation/hits、case、Audit/Outbox，以及
   evaluation/hit 不可变触发器。
 - 空库重放、上一发布基线升级和数据库负例必须识别提交审核表、唯一约束、状态一致性与触发器。
+
+## 18.17 ADMIN-002 验证增量
+
+- Policy/HTTP 测试覆盖 guest、PRIMARY、SUPPORT、MODERATOR/SENIOR_MODERATOR、过期 step-up、严格
+  query、no-store、通用错误、ETag、action/reason 和幂等冲突。
+- cursor 单元测试覆盖签名、actor/filter 绑定、篡改和跨范围重放；OpenAPI 运行时用实际 queue、
+  detail、action 响应验证三个 schema。
+- PostgreSQL 集成覆盖稳定分页、撤销角色立即失效、脱敏快照、批准原子状态、精确重试/冲突、
+  单一 Action/Audit/Outbox，以及 snapshot/action 直接更新/删除失败。
+- Admin DOM 测试覆盖脱敏证据、无 recent MFA 禁用动作、准确 concurrency/idempotency headers、
+  J/K/方向键与 Alt+A；BFF 测试覆盖精确 allowlist 和 method confusion。
+- 空库 baseline 要求 18 个 migration 和 31 个约束负例；upgrade 合成一条旧审核案件，证明新迁移
+  自动生成不含动态 attributes/坐标的快照。

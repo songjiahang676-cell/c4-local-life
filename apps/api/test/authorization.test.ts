@@ -292,6 +292,62 @@ describe("PolicyService", () => {
         expected: allowPolicy(),
       },
     ]);
+    await expectPolicyMatrix(policies, "admin:moderation:read", [
+      {
+        name: "MFA support session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["SUPPORT"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T20:00:00.000Z",
+            recentMfa: true,
+          }),
+        ),
+        expected: denyPolicy("INSUFFICIENT_PERMISSION"),
+      },
+      {
+        name: "MFA moderator session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["MODERATOR"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T20:00:00.000Z",
+            recentMfa: false,
+          }),
+        ),
+        expected: allowPolicy(),
+      },
+    ]);
+    await expectPolicyMatrix(policies, "admin:moderation:act", [
+      {
+        name: "stale senior moderator session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["SENIOR_MODERATOR"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T18:00:00.000Z",
+            recentMfa: false,
+          }),
+        ),
+        expected: denyPolicy("INSUFFICIENT_PERMISSION"),
+      },
+      {
+        name: "recent moderator session",
+        context: requestContext(
+          authenticatedActor({
+            permissions: ["admin:console:privileged"],
+            platformRoles: ["MODERATOR"],
+            authenticationStrength: "MFA",
+            mfaVerifiedAt: "2026-07-28T20:00:00.000Z",
+            recentMfa: true,
+          }),
+        ),
+        expected: allowPolicy(),
+      },
+    ]);
   });
 });
 

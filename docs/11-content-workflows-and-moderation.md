@@ -119,3 +119,17 @@ OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险�
 的 `ModerationRuleHit`、可选 `ModerationCase`、最小 Audit 和逐状态 Outbox。命中原文、阈值、
 手机号、邮箱和风险输入不进入公开响应或日志；输入仅保存 canonical SHA-256。后续调整规则必须
 增加规则集/规则版本，不能改写历史证据。
+
+## 11.12 ADMIN-002 已实现的人工审核闭环
+
+- 队列按 priority 降序、createdAt/UUID 升序稳定分页；高风险 15 分钟、普通提交 4 小时的计划 SLA
+  在响应和双语界面明确展示。cursor 与 actor/筛选 HMAC 绑定，limit 最大 50。
+- 每个案件读取提交事务生成的不可变脱敏快照。当前仅存在首次提交历史，因此 diff 明确把字段标记为
+  ADDED；后续 `listing_revisions` 上线后可在不改变当前契约的情况下增加 previous published diff。
+- 详情同时展示非 LOW 规则代码/版本/严重度/字段名、媒体扫描结果和发布者状态聚合；不展示规则阈值、
+  命中原文、联系方式、精确坐标、原始对象 key 或请求 hash。
+- 审核员可批准、要求修改、拒绝或升级，动作与稳定原因码绑定。读取要求 MFA + 当前
+  MODERATOR/SENIOR_MODERATOR；写入再要求十分钟内 step-up、强 ETag 和 actor-scoped 幂等键。
+- Listing、Case、不可变 Action、Audit 与 Outbox 原子提交。批准发布、要求修改返回草稿、拒绝暂停、
+  升级保持提交并提高优先级；Controller 不直接访问 Prisma。
+- 工作台支持中文/英文、移动布局、可见 focus，以及 J/K/方向键切换、R 刷新和 Alt+A 聚焦动作。

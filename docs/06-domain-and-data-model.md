@@ -245,3 +245,15 @@ Gate 0 CI 同时执行两类迁移保护：
 `moderation_rule_hits` 只保存稳定规则代码、规则版本、严重度和证据字段名。
 两表由数据库触发器阻止 UPDATE/DELETE。中高风险 evaluation 与
 `moderation_cases` 一对一；Listing 状态、evaluation、case、Audit 和 Outbox 在同一事务提交。
+
+### ADMIN-002 人工审核证据模型
+
+`moderation_case_snapshots` 与 Listing submission Case 一对一，保存提交时 Listing 版本、canonical
+SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字段与精确坐标不会进入快照；
+快照和 `moderation_actions` 均由数据库触发器禁止 UPDATE/DELETE。`moderation_cases.version` 提供
+强 ETag 并发控制，`moderation_actions(actor_id,idempotency_key)` 保证 actor 范围精确重试；历史动作
+允许两个证据字段均为空，新工作台动作必须同时写入 key 与 request hash。
+
+批准/要求修改/拒绝/升级在一个事务内更新 Listing 与 Case version，追加 ModerationAction、
+最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
+事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。

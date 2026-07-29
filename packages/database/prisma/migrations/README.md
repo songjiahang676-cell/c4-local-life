@@ -19,6 +19,20 @@
 9. `20260728201500_media_upload_intents` adds owner-scoped, idempotent quarantine upload intents.
 10. `20260728203000_admin_platform_roles` adds auditable, expiring platform-role grants for the
     independent Admin boundary.
+11. `20260728221000_admin_mfa` adds encrypted TOTP enrollment, one-time recovery evidence, and
+    MFA-bound sessions.
+12. `20260728223000_password_recovery` adds optional password authentication, bounded attempts,
+    and one-time recovery proofs.
+13. `20260728234500_outbox_dispatcher_constraints` hardens Outbox state, attempts, and claim
+    indexing.
+14. `20260729003000_media_processing_lifecycle` adds scan/processing lifecycle evidence and safe
+    variants.
+15. `20260729010000_listing_draft_idempotency` adds owner-scoped Listing create retry evidence.
+16. `20260729020000_listing_media_binding` adds atomic READY-media binding and stable order.
+17. `20260729130000_listing_submission_moderation` adds versioned submission evaluations and rule
+    hits.
+18. `20260729150000_admin_moderation_workbench` adds immutable redacted Case snapshots, Case
+    versions, and actor-scoped action idempotency.
 
 The unsupported geography field and custom indexes are also represented in `schema.prisma`.
 `prisma migrate diff --from-migrations ... --to-schema ... --exit-code` must remain empty so a later
@@ -217,6 +231,22 @@ resulting content/moderation state and keep hashes, rule codes and versions boun
   evidence, Audit and Outbox atomicity.
 - Rollback: disable submission writes and retain evidence. Do not remove production moderation
   history; the migration-local `ROLLBACK.md` documents exceptional pre-production physical removal.
+
+## `20260729150000_admin_moderation_workbench`
+
+Adds a positive Case version, one immutable redacted snapshot per Listing submission Case, and
+nullable paired idempotency/request-hash evidence for historical compatibility. Existing
+medium/high Cases are backfilled from canonical Listings while dynamic attributes are replaced by
+an empty object and exact coordinates are omitted. New Cases write a schema-aware redacted snapshot
+inside the submission transaction. Snapshot/action triggers prevent UPDATE/DELETE; Case deletion is
+restricted by snapshot evidence.
+
+- Roll forward: apply before enabling moderation queue/detail/actions; verify the backfilled
+  snapshot contains no dynamic contact fields or coordinates, then verify current-role/MFA access,
+  exact retry/conflict, Case/Listing concurrency, Audit/Outbox atomicity, and immutable evidence.
+- Rollback: disable the workbench and retain additive evidence. Do not remove moderation history in
+  an incident; exceptional pre-production physical recovery is documented in the migration-local
+  `ROLLBACK.md`.
 
 ## Roll-forward and recovery
 

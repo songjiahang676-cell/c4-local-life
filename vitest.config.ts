@@ -67,6 +67,12 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/moderation-case": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/moderation-case.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/outbox": fileURLToPath(
         new URL("./packages/database/src/repositories/outbox-event.repository.ts", import.meta.url),
       ),

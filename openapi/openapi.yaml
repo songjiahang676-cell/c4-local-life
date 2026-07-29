@@ -1389,24 +1389,65 @@ paths:
       parameters:
         - name: queue
           in: query
-          schema: { type: string }
+          schema: { type: string, enum: [listing-submission], default: listing-submission }
         - name: status
           in: query
-          schema: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
+          schema:
+            { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED], default: OPEN }
+        - name: riskTier
+          in: query
+          schema: { type: string, enum: [MEDIUM, HIGH] }
         - name: minPriority
           in: query
           schema: { type: integer, minimum: 0, maximum: 100 }
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         "200":
           description: Operator moderation queue
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ModerationCaseCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /admin/moderation/cases/{caseId}:
+    get:
+      tags: [Admin]
+      summary: Get an immutable listing moderation snapshot and decision context
+      operationId: getModerationCase
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Canonical moderation case detail
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationCaseDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /admin/moderation/cases/{caseId}/actions:
     post:
       tags: [Admin]
@@ -1418,6 +1459,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
         - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -1427,14 +1469,27 @@ paths:
       responses:
         "200":
           description: Action committed with audit log and outbox event
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkflowTransitionResponse"
+                $ref: "#/components/schemas/ModerationActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 components:
   securitySchemes:
     sessionCookie:
@@ -3017,24 +3072,60 @@ components:
           additionalProperties: true
     ModerationCase:
       type: object
-      required: [id, targetType, targetId, queue, priority, status, createdAt]
+      additionalProperties: false
+      required:
+        [
+          id,
+          targetType,
+          targetId,
+          queue,
+          priority,
+          riskTier,
+          status,
+          version,
+          listing,
+          ruleCodes,
+          slaDueAt,
+          isSlaBreached,
+          createdAt,
+          updatedAt,
+        ]
       properties:
         id: { type: string, format: uuid }
-        reportId: { type: [string, "null"], format: uuid }
-        targetType: { type: string }
+        targetType: { type: string, const: LISTING }
         targetId: { type: string, format: uuid }
-        queue: { type: string }
+        queue: { type: string, const: listing-submission }
         priority: { type: integer, minimum: 0, maximum: 100 }
+        riskTier: { type: string, enum: [MEDIUM, HIGH] }
         status: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
-        assignedTo:
-          oneOf:
-            - $ref: "#/components/schemas/UserSummary"
-            - type: "null"
+        version: { type: integer, minimum: 1 }
+        listing:
+          type: object
+          additionalProperties: false
+          required: [id, type, locale, title, category, region]
+          properties:
+            id: { type: string, format: uuid }
+            type:
+              $ref: "#/components/schemas/ListingType"
+            locale: { type: string, enum: [zh-Hans, en-US] }
+            title: { type: string, minLength: 1, maxLength: 120 }
+            category:
+              $ref: "#/components/schemas/LocalizedReference"
+            region:
+              $ref: "#/components/schemas/LocalizedReference"
+        ruleCodes:
+          type: array
+          maxItems: 50
+          uniqueItems: true
+          items: { type: string, pattern: "^[A-Z][A-Z0-9_]{2,79}$" }
+        slaDueAt: { type: string, format: date-time }
+        isSlaBreached: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     ModerationCaseCollection:
       type: object
-      required: [data, page]
+      additionalProperties: false
+      required: [data, page, generatedAt]
       properties:
         data:
           type: array
@@ -3042,26 +3133,258 @@ components:
             $ref: "#/components/schemas/ModerationCase"
         page:
           $ref: "#/components/schemas/CursorPage"
-    ModerationActionRequest:
+        generatedAt: { type: string, format: date-time }
+    LocalizedReference:
       type: object
-      required: [action, reasonCode]
+      additionalProperties: false
+      required: [id, code, nameZhHans, nameEn]
       properties:
-        action:
+        id: { type: string, format: uuid }
+        code: { type: string, minLength: 1, maxLength: 120 }
+        nameZhHans: { type: string, minLength: 1, maxLength: 160 }
+        nameEn: { type: string, minLength: 1, maxLength: 160 }
+    ModerationRuleEvidence:
+      type: object
+      additionalProperties: false
+      required: [ruleCode, ruleVersion, severity, evidenceKey]
+      properties:
+        ruleCode: { type: string, pattern: "^[A-Z][A-Z0-9_]{2,79}$" }
+        ruleVersion: { type: integer, minimum: 1 }
+        severity: { type: string, enum: [MEDIUM, HIGH] }
+        evidenceKey: { type: string, pattern: "^[a-z][A-Za-z0-9_.]{1,79}$" }
+    ModerationMediaEvidence:
+      type: object
+      additionalProperties: false
+      required: [mediaId, status, rejectionCode, updatedAt]
+      properties:
+        mediaId: { type: string, format: uuid }
+        status: { type: string, enum: [UPLOADING, SCANNING, READY, REJECTED] }
+        rejectionCode:
+          type: [string, "null"]
+          pattern: "^[A-Z][A-Z0-9_]{2,63}$"
+        updatedAt: { type: string, format: date-time }
+    ModerationListingSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          listingId,
+          listingVersion,
+          type,
+          locale,
+          title,
+          summary,
+          body,
+          price,
+          attributes,
+          contactMode,
+          locationPrecision,
+          mediaIds,
+          category,
+          region,
+          formSchemaVersion,
+          defaultLifetimeDays,
+          sensitiveFieldsRedacted,
+          capturedAt,
+        ]
+      properties:
+        listingId: { type: string, format: uuid }
+        listingVersion: { type: integer, minimum: 1 }
+        type:
+          $ref: "#/components/schemas/ListingType"
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        summary: { type: [string, "null"], maxLength: 240 }
+        body: { type: string, minLength: 1, maxLength: 10000 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        attributes:
+          type: object
+          additionalProperties: true
+        contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
+        locationPrecision: { type: string, enum: [CITY, NEIGHBORHOOD, APPROXIMATE, EXACT] }
+        mediaIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        category:
+          $ref: "#/components/schemas/LocalizedReference"
+        region:
+          $ref: "#/components/schemas/LocalizedReference"
+        formSchemaVersion: { type: integer, minimum: 1 }
+        defaultLifetimeDays: { type: integer, minimum: 1, maximum: 365 }
+        sensitiveFieldsRedacted: { type: boolean, const: true }
+        capturedAt: { type: string, format: date-time }
+    ModerationDiffEntry:
+      type: object
+      additionalProperties: false
+      required: [field, kind, before, after]
+      properties:
+        field: { type: string, pattern: "^[a-z][A-Za-z0-9_.]{0,79}$" }
+        kind: { type: string, enum: [ADDED, CHANGED, REMOVED] }
+        before: {}
+        after: {}
+    ModerationReasonOption:
+      type: object
+      additionalProperties: false
+      required: [code, actions]
+      properties:
+        code:
           {
             type: string,
             enum:
               [
-                APPROVE,
-                REJECT,
-                SUSPEND,
-                RESTORE,
-                REQUEST_CHANGES,
-                ESCALATE,
-                DISMISS_REPORT,
-                WARN_USER,
-                SUSPEND_USER,
+                CONTENT_POLICY_COMPLIANT,
+                NEEDS_CLARIFICATION,
+                PROHIBITED_CONTENT,
+                EXTERNAL_PAYMENT_RISK,
+                ESCALATE_SENIOR_REVIEW,
               ],
           }
-        reasonCode: { type: string, maxLength: 80 }
-        note: { type: string, maxLength: 2000 }
-        expectedCaseVersion: { type: integer, minimum: 1 }
+        actions:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [APPROVE, REQUEST_CHANGES, REJECT, ESCALATE] }
+    ModerationCaseDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              case,
+              snapshot,
+              diff,
+              rules,
+              media,
+              publisherHistory,
+              availableActions,
+              reasonOptions,
+              generatedAt,
+              source,
+            ]
+          properties:
+            case:
+              $ref: "#/components/schemas/ModerationCase"
+            snapshot:
+              $ref: "#/components/schemas/ModerationListingSnapshot"
+            diff:
+              type: array
+              maxItems: 50
+              items:
+                $ref: "#/components/schemas/ModerationDiffEntry"
+            rules:
+              type: array
+              maxItems: 50
+              items:
+                $ref: "#/components/schemas/ModerationRuleEvidence"
+            media:
+              type: array
+              maxItems: 20
+              items:
+                $ref: "#/components/schemas/ModerationMediaEvidence"
+            publisherHistory:
+              type: object
+              additionalProperties: false
+              required:
+                [accountAgeDays, submittedCount, publishedCount, rejectedCount, suspendedCount]
+              properties:
+                accountAgeDays: { type: integer, minimum: 0 }
+                submittedCount: { type: integer, minimum: 0 }
+                publishedCount: { type: integer, minimum: 0 }
+                rejectedCount: { type: integer, minimum: 0 }
+                suspendedCount: { type: integer, minimum: 0 }
+            availableActions:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [APPROVE, REQUEST_CHANGES, REJECT, ESCALATE] }
+            reasonOptions:
+              type: array
+              items:
+                $ref: "#/components/schemas/ModerationReasonOption"
+            generatedAt: { type: string, format: date-time }
+            source: { type: string, const: POSTGRESQL }
+    ModerationActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, reasonCode]
+      properties:
+        action: { type: string, enum: [APPROVE, REQUEST_CHANGES, REJECT, ESCALATE] }
+        reasonCode:
+          {
+            type: string,
+            enum:
+              [
+                CONTENT_POLICY_COMPLIANT,
+                NEEDS_CLARIFICATION,
+                PROHIBITED_CONTENT,
+                EXTERNAL_PAYMENT_RISK,
+                ESCALATE_SENIOR_REVIEW,
+              ],
+          }
+        note: { type: string, minLength: 1, maxLength: 500 }
+    ModerationActionResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            [
+              caseId,
+              actionId,
+              action,
+              reasonCode,
+              previousCaseStatus,
+              currentCaseStatus,
+              previousContentStatus,
+              currentContentStatus,
+              previousModerationStatus,
+              currentModerationStatus,
+              caseVersion,
+              listingVersion,
+              occurredAt,
+            ]
+          properties:
+            caseId: { type: string, format: uuid }
+            actionId: { type: string, format: uuid }
+            action: { type: string, enum: [APPROVE, REQUEST_CHANGES, REJECT, ESCALATE] }
+            reasonCode:
+              {
+                type: string,
+                enum:
+                  [
+                    CONTENT_POLICY_COMPLIANT,
+                    NEEDS_CLARIFICATION,
+                    PROHIBITED_CONTENT,
+                    EXTERNAL_PAYMENT_RISK,
+                    ESCALATE_SENIOR_REVIEW,
+                  ],
+              }
+            previousCaseStatus: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
+            currentCaseStatus: { type: string, enum: [OPEN, ASSIGNED, RESOLVED, APPEALED, CLOSED] }
+            previousContentStatus:
+              $ref: "#/components/schemas/ContentStatus"
+            currentContentStatus:
+              $ref: "#/components/schemas/ContentStatus"
+            previousModerationStatus:
+              {
+                type: string,
+                enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED],
+              }
+            currentModerationStatus:
+              {
+                type: string,
+                enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED],
+              }
+            caseVersion: { type: integer, minimum: 1 }
+            listingVersion: { type: integer, minimum: 1 }
+            occurredAt: { type: string, format: date-time }

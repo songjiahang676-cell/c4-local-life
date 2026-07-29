@@ -276,7 +276,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 45 个 path、99 个 schema、54 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 46 个 path、108 个 schema、55 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -303,3 +303,14 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
 审核状态、风险层、规则集版本、可空 caseId、发生时间和资源版本。响应不公开命中规则、
 阈值或输入摘要。相同 actor/key/Listing 版本返回原结果；同 key 不同请求返回 409。
 owner 范围外统一 404，受限账户 403，缺少/错误前置条件 400。
+
+## 8.16 Admin Listing 审核契约
+
+`GET /admin/moderation/cases` 固定 `listing-submission` 队列，默认 OPEN，limit 最大 50；priority、
+riskTier 和 cursor 均严格校验。cursor 使用 HMAC 并绑定 actor、队列、状态与筛选，不能跨账号或修改
+筛选重放。`GET /admin/moderation/cases/{caseId}` 返回强 ETag、不可变脱敏快照、首提 diff、稳定规则
+证据、媒体扫描状态、发布者聚合和可用动作；所有 Admin 响应均 no-store。
+
+`POST /admin/moderation/cases/{caseId}/actions` 要求 `If-Match`、`Idempotency-Key`、recent MFA 和
+APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试返回相同投影；同 key 不同请求、
+陈旧版本或并发处置返回 409。401/403/404 均使用通用 Problem Details，不暴露角色、案件或 PII。

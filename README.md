@@ -193,6 +193,13 @@ actor-scoped 幂等键保护提交。`listing-submission` v1 对新账户、人�
 高风险进入优先队列。Listing 状态、不可变 evaluation/rule hits、case、Audit 和 Outbox 在同一
 PostgreSQL 事务提交，公开响应与日志不包含命中原文、阈值或联系信息。
 
+`ADMIN-002` 已把中/高风险案件接入真实审核工作台：队列按风险优先级、创建时间和稳定 UUID 排序，
+提供有界且与 actor/筛选条件绑定的签名 cursor；详情只读取提交时不可变快照、最小规则证据、媒体状态
+和发布者聚合，不返回联系方式、精确坐标或请求哈希。审核员必须使用当前有效
+MODERATOR/SENIOR_MODERATOR 角色与 MFA；批准、要求修改、拒绝和升级还要求十分钟内的 step-up、
+强 Case ETag 和 actor-scoped 幂等键。Listing、Case、不可变动作、Audit 与 Outbox 在同一
+PostgreSQL 事务写入；Admin BFF 仅开放这些精确 method/path。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

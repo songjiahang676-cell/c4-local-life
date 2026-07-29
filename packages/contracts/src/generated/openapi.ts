@@ -839,6 +839,23 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/admin/moderation/cases/{caseId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get an immutable listing moderation snapshot and decision context */
+        readonly get: operations["getModerationCase"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/admin/moderation/cases/{caseId}/actions": {
         readonly parameters: {
             readonly query?: never;
@@ -1822,31 +1839,160 @@ export interface components {
         readonly ModerationCase: {
             /** Format: uuid */
             readonly id: string;
-            /** Format: uuid */
-            readonly reportId?: string | null;
-            readonly targetType: string;
+            /** @constant */
+            readonly targetType: "LISTING";
             /** Format: uuid */
             readonly targetId: string;
-            readonly queue: string;
+            /** @constant */
+            readonly queue: "listing-submission";
             readonly priority: number;
             /** @enum {string} */
+            readonly riskTier: "MEDIUM" | "HIGH";
+            /** @enum {string} */
             readonly status: "OPEN" | "ASSIGNED" | "RESOLVED" | "APPEALED" | "CLOSED";
-            readonly assignedTo?: components["schemas"]["UserSummary"] | null;
+            readonly version: number;
+            readonly listing: {
+                /** Format: uuid */
+                readonly id: string;
+                readonly type: components["schemas"]["ListingType"];
+                /** @enum {string} */
+                readonly locale: "zh-Hans" | "en-US";
+                readonly title: string;
+                readonly category: components["schemas"]["LocalizedReference"];
+                readonly region: components["schemas"]["LocalizedReference"];
+            };
+            readonly ruleCodes: readonly string[];
+            /** Format: date-time */
+            readonly slaDueAt: string;
+            readonly isSlaBreached: boolean;
             /** Format: date-time */
             readonly createdAt: string;
             /** Format: date-time */
-            readonly updatedAt?: string;
+            readonly updatedAt: string;
         };
         readonly ModerationCaseCollection: {
             readonly data: readonly components["schemas"]["ModerationCase"][];
             readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly LocalizedReference: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly code: string;
+            readonly nameZhHans: string;
+            readonly nameEn: string;
+        };
+        readonly ModerationRuleEvidence: {
+            readonly ruleCode: string;
+            readonly ruleVersion: number;
+            /** @enum {string} */
+            readonly severity: "MEDIUM" | "HIGH";
+            readonly evidenceKey: string;
+        };
+        readonly ModerationMediaEvidence: {
+            /** Format: uuid */
+            readonly mediaId: string;
+            /** @enum {string} */
+            readonly status: "UPLOADING" | "SCANNING" | "READY" | "REJECTED";
+            readonly rejectionCode: string | null;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly ModerationListingSnapshot: {
+            /** Format: uuid */
+            readonly listingId: string;
+            readonly listingVersion: number;
+            readonly type: components["schemas"]["ListingType"];
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+            readonly title: string;
+            readonly summary: string | null;
+            readonly body: string;
+            readonly price: components["schemas"]["Money"] | null;
+            readonly attributes: {
+                readonly [key: string]: unknown;
+            };
+            /** @enum {string} */
+            readonly contactMode: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
+            /** @enum {string} */
+            readonly locationPrecision: "CITY" | "NEIGHBORHOOD" | "APPROXIMATE" | "EXACT";
+            readonly mediaIds: readonly string[];
+            readonly category: components["schemas"]["LocalizedReference"];
+            readonly region: components["schemas"]["LocalizedReference"];
+            readonly formSchemaVersion: number;
+            readonly defaultLifetimeDays: number;
+            /** @constant */
+            readonly sensitiveFieldsRedacted: true;
+            /** Format: date-time */
+            readonly capturedAt: string;
+        };
+        readonly ModerationDiffEntry: {
+            readonly field: string;
+            /** @enum {string} */
+            readonly kind: "ADDED" | "CHANGED" | "REMOVED";
+            readonly before: unknown;
+            readonly after: unknown;
+        };
+        readonly ModerationReasonOption: {
+            /** @enum {string} */
+            readonly code: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
+            readonly actions: readonly ("APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE")[];
+        };
+        readonly ModerationCaseDetailResponse: {
+            readonly data: {
+                readonly case: components["schemas"]["ModerationCase"];
+                readonly snapshot: components["schemas"]["ModerationListingSnapshot"];
+                readonly diff: readonly components["schemas"]["ModerationDiffEntry"][];
+                readonly rules: readonly components["schemas"]["ModerationRuleEvidence"][];
+                readonly media: readonly components["schemas"]["ModerationMediaEvidence"][];
+                readonly publisherHistory: {
+                    readonly accountAgeDays: number;
+                    readonly submittedCount: number;
+                    readonly publishedCount: number;
+                    readonly rejectedCount: number;
+                    readonly suspendedCount: number;
+                };
+                readonly availableActions: readonly ("APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE")[];
+                readonly reasonOptions: readonly components["schemas"]["ModerationReasonOption"][];
+                /** Format: date-time */
+                readonly generatedAt: string;
+                /** @constant */
+                readonly source: "POSTGRESQL";
+            };
         };
         readonly ModerationActionRequest: {
             /** @enum {string} */
-            readonly action: "APPROVE" | "REJECT" | "SUSPEND" | "RESTORE" | "REQUEST_CHANGES" | "ESCALATE" | "DISMISS_REPORT" | "WARN_USER" | "SUSPEND_USER";
-            readonly reasonCode: string;
+            readonly action: "APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE";
+            /** @enum {string} */
+            readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
             readonly note?: string;
-            readonly expectedCaseVersion?: number;
+        };
+        readonly ModerationActionResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly caseId: string;
+                /** Format: uuid */
+                readonly actionId: string;
+                /** @enum {string} */
+                readonly action: "APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE";
+                /** @enum {string} */
+                readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
+                /** @enum {string} */
+                readonly previousCaseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "APPEALED" | "CLOSED";
+                /** @enum {string} */
+                readonly currentCaseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "APPEALED" | "CLOSED";
+                readonly previousContentStatus: components["schemas"]["ContentStatus"];
+                readonly currentContentStatus: components["schemas"]["ContentStatus"];
+                /** @enum {string} */
+                readonly previousModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                /** @enum {string} */
+                readonly currentModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                readonly caseVersion: number;
+                readonly listingVersion: number;
+                /** Format: date-time */
+                readonly occurredAt: string;
+            };
         };
     };
     responses: {
@@ -3383,11 +3529,12 @@ export interface operations {
     readonly listModerationCases: {
         readonly parameters: {
             readonly query?: {
-                readonly queue?: string;
+                readonly queue?: "listing-submission";
                 readonly status?: "OPEN" | "ASSIGNED" | "RESOLVED" | "APPEALED" | "CLOSED";
+                readonly riskTier?: "MEDIUM" | "HIGH";
                 readonly minPriority?: number;
                 readonly cursor?: components["parameters"]["Cursor"];
-                readonly limit?: components["parameters"]["Limit"];
+                readonly limit?: number;
             };
             readonly header?: never;
             readonly path?: never;
@@ -3398,13 +3545,43 @@ export interface operations {
             /** @description Operator moderation queue */
             readonly 200: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ModerationCaseCollection"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly getModerationCase: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly caseId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Canonical moderation case detail */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ModerationCaseDetailResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly actOnModerationCase: {
@@ -3412,6 +3589,8 @@ export interface operations {
             readonly query?: never;
             readonly header: {
                 readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
             };
             readonly path: {
                 readonly caseId: string;
@@ -3427,14 +3606,20 @@ export interface operations {
             /** @description Action committed with audit log and outbox event */
             readonly 200: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["WorkflowTransitionResponse"];
+                    readonly "application/json": components["schemas"]["ModerationActionResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
             readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
         };
     };
 }

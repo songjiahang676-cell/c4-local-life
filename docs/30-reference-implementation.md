@@ -49,6 +49,9 @@
   version predicate，并在相同事务写 Audit/Outbox。
 - Listing 媒体绑定按 UUID 加行锁，只接受 owner 或同一可编辑 Listing 已绑定的 READY 图片；
   `media_assets_listing_binding_check`、外键和稳定 sort order 提供数据库兜底。
+- Moderation Case Repository 提供 MFA/current-role 范围队列与安全详情，并以 actor/key advisory
+  lock、Case/Listing 行锁和 version predicate 原子提交 Action/Audit/Outbox。快照在 submission
+  事务按历史表单 visibility 脱敏，数据库阻止 snapshot/action 改写。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 
@@ -99,6 +102,10 @@ apps/api/src/modules/listings/
 `ListingsService.submit` 负责 Policy、历史表单策略和领域状态转换，
 `ListingSubmissionRepository` 只负责 PostgreSQL 范围复核、幂等锁与原子证据持久化。
 Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
+
+`ADMIN-002` 延续相同边界：`ModerationController` 只做严格契约、Policy 和 HTTP 映射；
+`ModerationService` 管理签名 cursor、ETag、原因与 Listing 领域转换；数据库 adapter 复核 Session/
+角色并持久化。Admin React 组件只调用同源 BFF，不导入 Prisma 或数据库模型。
 
 ## 30.4 生成与手写边界
 

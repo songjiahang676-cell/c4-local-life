@@ -892,6 +892,18 @@ Gate 0 CI 同时执行两类迁移保护：
 两表由数据库触发器阻止 UPDATE/DELETE。中高风险 evaluation 与
 `moderation_cases` 一对一；Listing 状态、evaluation、case、Audit 和 Outbox 在同一事务提交。
 
+### ADMIN-002 人工审核证据模型
+
+`moderation_case_snapshots` 与 Listing submission Case 一对一，保存提交时 Listing 版本、canonical
+SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字段与精确坐标不会进入快照；
+快照和 `moderation_actions` 均由数据库触发器禁止 UPDATE/DELETE。`moderation_cases.version` 提供
+强 ETag 并发控制，`moderation_actions(actor_id,idempotency_key)` 保证 actor 范围精确重试；历史动作
+允许两个证据字段均为空，新工作台动作必须同时写入 key 与 request hash。
+
+批准/要求修改/拒绝/升级在一个事务内更新 Listing 与 Case version，追加 ModerationAction、
+最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
+事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1343,7 +1355,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 45 个 path、99 个 schema、54 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 46 个 path、108 个 schema、55 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1370,6 +1382,17 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
 审核状态、风险层、规则集版本、可空 caseId、发生时间和资源版本。响应不公开命中规则、
 阈值或输入摘要。相同 actor/key/Listing 版本返回原结果；同 key 不同请求返回 409。
 owner 范围外统一 404，受限账户 403，缺少/错误前置条件 400。
+
+## 8.16 Admin Listing 审核契约
+
+`GET /admin/moderation/cases` 固定 `listing-submission` 队列，默认 OPEN，limit 最大 50；priority、
+riskTier 和 cursor 均严格校验。cursor 使用 HMAC 并绑定 actor、队列、状态与筛选，不能跨账号或修改
+筛选重放。`GET /admin/moderation/cases/{caseId}` 返回强 ETag、不可变脱敏快照、首提 diff、稳定规则
+证据、媒体扫描状态、发布者聚合和可用动作；所有 Admin 响应均 no-store。
+
+`POST /admin/moderation/cases/{caseId}/actions` 要求 `If-Match`、`Idempotency-Key`、recent MFA 和
+APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试返回相同投影；同 key 不同请求、
+陈旧版本或并发处置返回 409。401/403/404 均使用通用 Problem Details，不暴露角色、案件或 PII。
 
 ---
 
@@ -1719,6 +1742,20 @@ OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险�
 的 `ModerationRuleHit`、可选 `ModerationCase`、最小 Audit 和逐状态 Outbox。命中原文、阈值、
 手机号、邮箱和风险输入不进入公开响应或日志；输入仅保存 canonical SHA-256。后续调整规则必须
 增加规则集/规则版本，不能改写历史证据。
+
+## 11.12 ADMIN-002 已实现的人工审核闭环
+
+- 队列按 priority 降序、createdAt/UUID 升序稳定分页；高风险 15 分钟、普通提交 4 小时的计划 SLA
+  在响应和双语界面明确展示。cursor 与 actor/筛选 HMAC 绑定，limit 最大 50。
+- 每个案件读取提交事务生成的不可变脱敏快照。当前仅存在首次提交历史，因此 diff 明确把字段标记为
+  ADDED；后续 `listing_revisions` 上线后可在不改变当前契约的情况下增加 previous published diff。
+- 详情同时展示非 LOW 规则代码/版本/严重度/字段名、媒体扫描结果和发布者状态聚合；不展示规则阈值、
+  命中原文、联系方式、精确坐标、原始对象 key 或请求 hash。
+- 审核员可批准、要求修改、拒绝或升级，动作与稳定原因码绑定。读取要求 MFA + 当前
+  MODERATOR/SENIOR_MODERATOR；写入再要求十分钟内 step-up、强 ETag 和 actor-scoped 幂等键。
+- Listing、Case、不可变 Action、Audit 与 Outbox 原子提交。批准发布、要求修改返回草稿、拒绝暂停、
+  升级保持提交并提高优先级；Controller 不直接访问 Prisma。
+- 工作台支持中文/英文、移动布局、可见 focus，以及 J/K/方向键切换、R 刷新和 Alt+A 聚焦动作。
 
 ---
 
@@ -2177,6 +2214,19 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 版本、严重度和字段名；公开响应仅返回 LOW/MEDIUM/HIGH 与规则集版本。数据库将 evaluation/hit
 设为不可变，避免审核历史被覆盖；Audit/Outbox payload 不包含正文、attributes、联系信息、
 Idempotency-Key 或请求哈希。
+
+## 14.15 人工审核威胁与缓解
+
+- 越权/授权陈旧：Controller Policy 要求 MFA moderator；Repository 每次读写重新查询 ACTIVE user、
+  未撤销 Session 与当前未过期平台角色，UI 导航不作为权限。
+- 并发覆盖/重复动作：强 Case ETag、Listing/Case 行锁、版本 predicate、actor/key advisory lock、
+  唯一索引和 request hash 将精确重试与不同请求冲突分开。
+- PII 扩散：提交快照按历史表单 schema 删除 PHONE/EMAIL/contact/address 类动态字段，不存 latitude/
+  longitude；API 只返回快照、稳定 evidence key 与聚合计数，内部备注不进入响应/Audit/Outbox。
+- 审核证据篡改：snapshot/action 更新与删除由数据库触发器拒绝，快照对 Case 使用 RESTRICT；历史
+  evaluation/hits 仍保持不可变。
+- CSRF/代理扩大：写动作要求可信 Admin Origin；Admin 同源 BFF 使用精确 method/path 和 UUID
+  allowlist，未知/方法混淆路径失败关闭。
 
 ---
 
@@ -2688,7 +2738,7 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 45 个 path 的唯一 OpenAPI 文档；
+- 运行时提供包含 46 个 path 的唯一 OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
 - Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
 
@@ -2712,6 +2762,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - PostgreSQL 集成测试覆盖一次事务内的状态、evaluation/hits、case、Audit/Outbox，以及
   evaluation/hit 不可变触发器。
 - 空库重放、上一发布基线升级和数据库负例必须识别提交审核表、唯一约束、状态一致性与触发器。
+
+## 18.17 ADMIN-002 验证增量
+
+- Policy/HTTP 测试覆盖 guest、PRIMARY、SUPPORT、MODERATOR/SENIOR_MODERATOR、过期 step-up、严格
+  query、no-store、通用错误、ETag、action/reason 和幂等冲突。
+- cursor 单元测试覆盖签名、actor/filter 绑定、篡改和跨范围重放；OpenAPI 运行时用实际 queue、
+  detail、action 响应验证三个 schema。
+- PostgreSQL 集成覆盖稳定分页、撤销角色立即失效、脱敏快照、批准原子状态、精确重试/冲突、
+  单一 Action/Audit/Outbox，以及 snapshot/action 直接更新/删除失败。
+- Admin DOM 测试覆盖脱敏证据、无 recent MFA 禁用动作、准确 concurrency/idempotency headers、
+  J/K/方向键与 Alt+A；BFF 测试覆盖精确 allowlist 和 method confusion。
+- 空库 baseline 要求 18 个 migration 和 31 个约束负例；upgrade 合成一条旧审核案件，证明新迁移
+  自动生成不含动态 attributes/坐标的快照。
 
 ---
 
@@ -3033,6 +3096,12 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
 规则阈值或内部输入。公开列表/详情、人工审核动作、删除和过期仍由 LIST-005/ADMIN-002 等后续
 切片完成，因此 22.4 尚不能整体标记完成。
+
+`ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
+脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
+Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
+覆盖。公开列表/详情、重新提交的历史 revision diff、通知、删除和过期仍由 LIST-005/NOTIF 等后续
+切片负责，因此整个 Listing 生命周期尚未完成。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3680,6 +3749,21 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 - enrollment、TOTP 验证和恢复码消费写最小审计事件。审计与 HTTP 日志不得包含 secret、明文
   recovery code、token、联系方式或 IP 原文。当前不提供自助禁用/重置以避免降级绕过。
 
+## 28.10 ADMIN-002 Listing 审核工作台
+
+- `/admin/moderation/listings` 只有 API 返回 moderation navigation 时才挂载真实工作台。Admin BFF
+  只增加 queue GET、UUID detail GET 和 UUID action POST；路径穿越、方法混淆及其他 Admin 资源 404。
+- 队列固定使用 PostgreSQL canonical Case，按 priority、createdAt、UUID 排序；高风险 15 分钟、
+  中风险 4 小时的计划 SLA 与数据时间可见。列表 limit 最大 50，cursor 对 actor 和全部筛选签名。
+- 详情来自提交时不可变快照；动态联系方式/地址和精确坐标已移除。界面展示首提 ADDED diff、
+  非 LOW 规则证据、媒体状态和发布者聚合，不加载 email/phone、原图 key、内部 hash 或假指标。
+- 读取要求当前 MODERATOR/SENIOR_MODERATOR + MFA；动作另要求 recent MFA。批准、要求修改、拒绝、
+  升级与稳定原因码绑定，并携带强 `If-Match` 和 actor-scoped `Idempotency-Key`。
+- 写事务同时更新 Listing/Case version，追加 immutable ModerationAction、最小 Audit 和 Outbox。
+  客户端 409 后重新加载当前案件，不静默覆盖另一审核员的决定。
+- 中文/英文与移动布局共用语义结构；队列可用 J/K/方向键切换，R 刷新，Alt+A 聚焦动作，状态/错误
+  使用 live region，focus 保持可见。
+
 ---
 
 <!-- source: docs\29-migration-and-launch.md -->
@@ -3830,6 +3914,9 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   version predicate，并在相同事务写 Audit/Outbox。
 - Listing 媒体绑定按 UUID 加行锁，只接受 owner 或同一可编辑 Listing 已绑定的 READY 图片；
   `media_assets_listing_binding_check`、外键和稳定 sort order 提供数据库兜底。
+- Moderation Case Repository 提供 MFA/current-role 范围队列与安全详情，并以 actor/key advisory
+  lock、Case/Listing 行锁和 version predicate 原子提交 Action/Audit/Outbox。快照在 submission
+  事务按历史表单 visibility 脱敏，数据库阻止 snapshot/action 改写。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 
@@ -3880,6 +3967,10 @@ apps/api/src/modules/listings/
 `ListingsService.submit` 负责 Policy、历史表单策略和领域状态转换，
 `ListingSubmissionRepository` 只负责 PostgreSQL 范围复核、幂等锁与原子证据持久化。
 Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
+
+`ADMIN-002` 延续相同边界：`ModerationController` 只做严格契约、Policy 和 HTTP 映射；
+`ModerationService` 管理签名 cursor、ETag、原因与 Listing 领域转换；数据库 adapter 复核 Session/
+角色并持久化。Admin React 组件只调用同源 BFF，不导入 Prisma 或数据库模型。
 
 ## 30.4 生成与手写边界
 

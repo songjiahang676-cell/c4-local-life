@@ -30,6 +30,9 @@
       "listing-submission": [
         "src/repositories/listing-submission.repository.ts"
       ],
+      "moderation-case": [
+        "src/repositories/moderation-case.repository.ts"
+      ],
       "outbox": [
         "src/repositories/outbox-event.repository.ts"
       ],
@@ -82,6 +85,11 @@
       "types": "./src/repositories/listing-submission.repository.ts",
       "require": "./dist/src/repositories/listing-submission.repository.js",
       "default": "./dist/src/repositories/listing-submission.repository.js"
+    },
+    "./moderation-case": {
+      "types": "./src/repositories/moderation-case.repository.ts",
+      "require": "./dist/src/repositories/moderation-case.repository.js",
+      "default": "./dist/src/repositories/moderation-case.repository.js"
     },
     "./outbox": {
       "types": "./src/repositories/outbox-event.repository.ts",

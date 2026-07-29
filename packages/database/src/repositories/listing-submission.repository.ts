@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   ContentStatus,
@@ -122,6 +123,61 @@ const organizationListingRoles = [
   MembershipRole.ADMIN,
   MembershipRole.EDITOR,
 ] as const;
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+    .join(",")}}`;
+}
+
+function safeSnapshotAttributes(
+  attributes: Prisma.JsonValue,
+  definition: Prisma.JsonValue,
+): Prisma.InputJsonObject {
+  if (
+    !attributes ||
+    Array.isArray(attributes) ||
+    typeof attributes !== "object" ||
+    !definition ||
+    Array.isArray(definition) ||
+    typeof definition !== "object"
+  ) {
+    return {};
+  }
+  const fields = definition.fields;
+  if (!Array.isArray(fields)) return {};
+  const allowed = new Set(
+    fields.flatMap((field) => {
+      if (!field || Array.isArray(field) || typeof field !== "object") return [];
+      const candidate = field;
+      const key = candidate.key;
+      const type = candidate.type;
+      if (
+        typeof key !== "string" ||
+        type === "PHONE" ||
+        type === "EMAIL" ||
+        /(phone|email|contact|address)/i.test(key)
+      ) {
+        return [];
+      }
+      return [key];
+    }),
+  );
+  return Object.fromEntries(Object.entries(attributes).filter(([key]) => allowed.has(key)));
+}
+
+function defaultLifetimeDays(definition: Prisma.JsonValue): number {
+  if (!definition || Array.isArray(definition) || typeof definition !== "object") return 30;
+  const policy = definition.publicationPolicy;
+  if (!policy || Array.isArray(policy) || typeof policy !== "object") return 30;
+  const value = policy.defaultLifetimeDays;
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 365
+    ? value
+    : 30;
+}
 
 function isRepositoryOptions(
   target: ListingSubmissionClient | ListingSubmissionRepositoryOptions,
@@ -345,11 +401,34 @@ export class ListingSubmissionRepository {
           type: true,
           ownerId: true,
           organizationId: true,
+          categoryId: true,
+          formSchemaVersion: true,
+          locale: true,
+          title: true,
+          summary: true,
+          body: true,
+          priceAmount: true,
+          currency: true,
+          priceUnit: true,
+          contactMode: true,
+          attributes: true,
+          locationPrecision: true,
           status: true,
           moderationStatus: true,
           deletedAt: true,
           updatedAt: true,
           version: true,
+          category: {
+            select: { id: true, slug: true, nameZhHans: true, nameEn: true },
+          },
+          region: {
+            select: { id: true, code: true, nameZhHans: true, nameEn: true },
+          },
+          uploadedMedia: {
+            where: { status: { not: "DELETED" } },
+            select: { id: true },
+            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+          },
         },
       });
       if (!current || current.deletedAt !== null) return { kind: "not_found" };
@@ -432,6 +511,62 @@ export class ListingSubmissionRepository {
               },
               select: { id: true },
             });
+      if (moderationCase) {
+        const formSchema = await transaction.categoryFormSchemaVersion.findUniqueOrThrow({
+          where: {
+            categoryId_version: {
+              categoryId: current.categoryId,
+              version: current.formSchemaVersion,
+            },
+          },
+          select: { definition: true },
+        });
+        const snapshot = {
+          listingId: current.id,
+          listingVersion: input.decision.resultVersion,
+          type: current.type,
+          locale: current.locale,
+          title: current.title,
+          summary: current.summary,
+          body: current.body,
+          price: current.priceUnit
+            ? {
+                amount: current.priceAmount?.toFixed(2) ?? null,
+                currency: "USD",
+                unit: current.priceUnit,
+              }
+            : null,
+          attributes: safeSnapshotAttributes(current.attributes, formSchema.definition),
+          contactMode: current.contactMode,
+          locationPrecision: current.locationPrecision,
+          mediaIds: current.uploadedMedia.map((media) => media.id),
+          category: {
+            id: current.category.id,
+            code: current.category.slug,
+            nameZhHans: current.category.nameZhHans,
+            nameEn: current.category.nameEn,
+          },
+          region: {
+            id: current.region.id,
+            code: current.region.code,
+            nameZhHans: current.region.nameZhHans,
+            nameEn: current.region.nameEn,
+          },
+          formSchemaVersion: current.formSchemaVersion,
+          defaultLifetimeDays: defaultLifetimeDays(formSchema.definition),
+          sensitiveFieldsRedacted: true,
+          capturedAt: input.occurredAt.toISOString(),
+        } satisfies Prisma.InputJsonObject;
+        await transaction.moderationCaseSnapshot.create({
+          data: {
+            caseId: moderationCase.id,
+            listingVersion: input.decision.resultVersion,
+            snapshot,
+            snapshotHash: createHash("sha256").update(canonicalJson(snapshot)).digest("hex"),
+            capturedAt: input.occurredAt,
+          },
+        });
+      }
 
       await transaction.auditLog.create({
         data: {

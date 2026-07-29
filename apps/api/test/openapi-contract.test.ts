@@ -21,6 +21,7 @@ import { MemoryOrganizationStore } from "./support/memory-organization.store";
 import { CapturingMediaObjectStorage, MemoryMediaStore } from "./support/memory-media.store";
 import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 import { MemoryMfaStore } from "./support/memory-mfa.store";
+import { memoryModerationCaseId, MemoryModerationStore } from "./support/memory-moderation.store";
 import {
   MemoryListingStore,
   memoryListingCategoryId,
@@ -80,6 +81,7 @@ describe("canonical OpenAPI contract", () => {
     const authSessionStore = new MemoryAuthSessionStore();
     authSessionStore.registerSubject(buildActiveSubject({ id: contractUserId }));
     authSessionStore.registerPlatformRole(contractUserId, "READ_ONLY_AUDITOR");
+    authSessionStore.registerPlatformRole(contractUserId, "MODERATOR");
     authSessionStore.registerOrganization(contractUserId, {
       id: contractOrganizationId,
       type: "MERCHANT",
@@ -224,6 +226,7 @@ describe("canonical OpenAPI contract", () => {
       mediaObjectStorage: new CapturingMediaObjectStorage(),
       taxonomyStore,
       mfaStore: new MemoryMfaStore(),
+      moderationStore: new MemoryModerationStore(),
       passwordStore,
       passwordNotificationGateway: passwordNotifications,
       observability: createObservabilityRuntime({
@@ -251,9 +254,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(45);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(100);
-    expect(operationIds).toHaveLength(54);
+    expect(Object.keys(contract.paths)).toHaveLength(46);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(108);
+    expect(operationIds).toHaveLength(55);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -290,8 +293,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(45);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(45);
+    expect(Object.keys(servedJson.paths)).toHaveLength(46);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(46);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -652,6 +655,62 @@ describe("canonical OpenAPI contract", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+  });
+
+  it("validates the moderation queue, immutable detail, and action against the contract", async () => {
+    const primary = await sessions.issueSession(contractUserId, {});
+    const elevated = await sessions.elevateWithMfa(primary.token, {});
+    if (!elevated) throw new Error("Expected an MFA-bound contract session");
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${elevated.token}`;
+    const queue = await server.inject({
+      method: "GET",
+      url: "/v1/admin/moderation/cases?queue=listing-submission&status=OPEN&limit=20",
+      headers: { cookie },
+    });
+    const detail = await server.inject({
+      method: "GET",
+      url: `/v1/admin/moderation/cases/${memoryModerationCaseId}`,
+      headers: { cookie },
+    });
+    const action = await server.inject({
+      method: "POST",
+      url: `/v1/admin/moderation/cases/${memoryModerationCaseId}/actions`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+        "if-match": '"moderation-case-v1"',
+        "idempotency-key": "contract-moderation-action-0001",
+      },
+      payload: {
+        action: "APPROVE",
+        reasonCode: "CONTENT_POLICY_COMPLIANT",
+      },
+    });
+    const queueSchema =
+      contract.paths["/admin/moderation/cases"]?.get?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+    const detailSchema =
+      contract.paths["/admin/moderation/cases/{caseId}"]?.get?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+    const actionSchema =
+      contract.paths["/admin/moderation/cases/{caseId}/actions"]?.post?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema;
+
+    expect([queue.statusCode, detail.statusCode, action.statusCode]).toEqual([200, 200, 200]);
+    expect(queue.headers["cache-control"]).toBe("no-store");
+    expect(detail.headers.etag).toBe('"moderation-case-v1"');
+    expect(action.headers.etag).toBe('"moderation-case-v2"');
+    expect(ajv.validate(queueSchema ?? false, queue.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    expect(ajv.validate(detailSchema ?? false, detail.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(actionSchema ?? false, action.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
   });
 
   it("validates Admin MFA enrollment, activation, and recovery verification against the contract", async () => {

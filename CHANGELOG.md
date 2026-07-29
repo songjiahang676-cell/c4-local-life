@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added the bilingual, keyboard-efficient Listing moderation workbench with priority/SLA queue,
+  immutable redacted submission snapshots, first-submission diffs, rule/media/publisher evidence,
+  current moderator-role and MFA enforcement, recent-auth actions, strong ETags, actor-scoped
+  idempotency, and atomic immutable Action/Audit/Outbox writes.
 - Added versioned Listing submission risk rules, owner-scoped conditional/idempotent submission,
   low-risk auto-publication, medium/high moderation queues, immutable rule-hit evidence, and
   transactional Audit/Outbox state changes.
