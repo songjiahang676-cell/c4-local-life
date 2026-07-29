@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task      | Owner                | Started    | Target            | Status      | Notes                                                       |
-| --------- | -------------------- | ---------- | ----------------- | ----------- | ----------------------------------------------------------- |
-| ADMIN-002 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | 审核队列、脱敏快照/diff、规则证据、并发安全动作和键盘工作流 |
+| Task      | Owner                | Started    | Target            | Status          | Notes                                                       |
+| --------- | -------------------- | ---------- | ----------------- | --------------- | ----------------------------------------------------------- |
+| ADMIN-002 | @songjiahang676-cell | 2026-07-29 | protected task PR | protected green | 审核队列、脱敏快照/diff、规则证据、并发安全动作和键盘工作流 |
 
 ## Gate Evidence
 
@@ -115,6 +115,7 @@
 | ADMIN-002 local quality         | `pnpm ci:quality`                     | 69 files / 263 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | ADMIN-002 runtime/browser       | API runtime + Chromium desktop/mobile | canonical contract and 8/8 production E2E passed                          | 2026-07-29 |
 | ADMIN-002 architecture          | `scripts/check-architecture.sh`       | 101 tasks、50 models、46 paths、108 schemas passed                        | 2026-07-29 |
+| ADMIN-002 protected checks      | PR #22 / run `30419424360`            | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
 
 ## Decisions / Blocks
 
