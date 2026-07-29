@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status      | Notes                                                         |
-| -------- | -------------------- | ---------- | ----------------- | ----------- | ------------------------------------------------------------- |
-| LIST-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | local green | public/owner/moderator 查询授权、显式投影和动态字段可见性过滤 |
+| Task     | Owner                | Started    | Target            | Status       | Notes                                                         |
+| -------- | -------------------- | ---------- | ----------------- | ------------ | ------------------------------------------------------------- |
+| LIST-002 | @songjiahang676-cell | 2026-07-28 | protected task PR | hosted green | public/owner/moderator 查询授权、显式投影和动态字段可见性过滤 |
 
 ## Gate Evidence
 
@@ -87,6 +87,7 @@
 | LIST-002 local quality          | `pnpm ci:quality`                  | 57 files / 215 tests；9 typechecks/lints；8 builds passed                 | 2026-07-28 |
 | LIST-002 browser/runtime        | Chromium desktop/mobile            | observability runtime and 6/6 E2E passed                                  | 2026-07-28 |
 | LIST-002 architecture           | `scripts/check-architecture.sh`    | 101 tasks、47 models、44 paths、89 schemas passed                         | 2026-07-28 |
+| LIST-002 protected checks       | PR #18 / run `30409724740`         | real services、Linux build/E2E and four non-root images passed            | 2026-07-28 |
 
 ## Decisions / Blocks
 
