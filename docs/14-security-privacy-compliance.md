@@ -434,3 +434,18 @@ Idempotency-Key 或请求哈希。
   过期且数据库上限 90 天。日志和指标从不记录 query/hash/source/region/version 等动态值。
 - 依赖降级：首次普通搜索在发现库不可用时可用无同义词的 version 0 继续；已绑定非零词典的 cursor
   若无法加载历史版本则 503，避免静默改变语义。建议/热门依赖失败明确 503，不回退展示低频原文。
+
+## 14.29 WEB-001 公共 SSR 威胁和缓解
+
+- Session/PII 缓存混淆：公共 SSR 直接发匿名 API 请求，不转发 Cookie、Authorization 或浏览器 header；
+  严格 `PublicListingView` Schema 拒绝 `ownerId`、contactMode、mediaIds、审核字段和其他额外键。
+- SSRF/响应放大：API origin 只来自受控 `API_BASE_URL` 的 HTTP(S) URL；调用方只能选择固定内部 path，
+  路径禁止 `/` 前缀和 `..`；5 秒超时、禁 redirect、Content-Length 与实际正文双重 1 MB 上限。
+- 搜索趋势污染：SSR 使用明确 bot User-Agent，使服务端代理 IP/公共查询不能计入用户热门样本；query、
+  cursor、价格、位置和 Listing ID 不写 Web 日志或指标。
+- XSS/Unicode 欺骗：标题、摘要、正文和属性仅作为 React 文本输出，混合语言用 `bdi`；属性键必须符合
+  有界 ASCII 标识符，值只接受有界 primitive/primitive array，嵌套对象、超长或越界集合不展示。
+- 枚举/状态泄露：详情 UUID、垂类或 canonical slug 不一致统一 404/永久 canonical redirect；非公开、
+  已下架和未知对象的内部原因不进入页面。依赖/契约异常只显示通用可重试状态。
+- 降级扩大：只有固定垂类、无 q/price/geo/cursor 且为默认/最新排序的首屏可降级 PostgreSQL；搜索和
+  canonical cursor 不互换，降级页不暴露后续 cursor，避免筛选语义或快照边界被静默改变。

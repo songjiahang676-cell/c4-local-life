@@ -279,10 +279,225 @@ export const moneySchema: z.ZodType<Money> = z
     }
   });
 
-const geoPointSchema = z
+export const geoPointSchema = z
   .object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
+  })
+  .strict();
+
+const publicListingRegionSchema = z
+  .object({
+    id: z.uuid(),
+    type: z.enum([
+      "COUNTRY",
+      "STATE",
+      "COUNTY",
+      "CITY",
+      "NEIGHBORHOOD",
+      "ZIP_CODE",
+      "REGION_GROUP",
+    ]),
+    code: z.string().min(1).max(80),
+    slug: z.string().min(1).max(140),
+    nameZhHans: z.string().min(1).max(160),
+    nameEn: z.string().min(1).max(160),
+    timezone: z.string().min(1).max(80),
+  })
+  .strict();
+
+const publicListingCategorySchema = z
+  .object({
+    id: z.uuid(),
+    vertical: listingTypeSchema.nullable(),
+    slug: z.string().min(1).max(140),
+    nameZhHans: z.string().min(1).max(160),
+    nameEn: z.string().min(1).max(160),
+  })
+  .strict();
+
+const publicListingOwnerSchema = z
+  .object({
+    id: z.uuid(),
+    displayName: z.string().min(1).max(120),
+    avatarUrl: z.string().url().nullable(),
+  })
+  .strict();
+
+const publicListingOrganizationSchema = z
+  .object({
+    id: z.uuid(),
+    displayName: z.string().min(1).max(120),
+    slug: z.string().min(1).max(140),
+    verificationStatus: z.enum(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED", "EXPIRED"]),
+  })
+  .strict();
+
+const publicListingLocationSchema = z
+  .object({
+    precision: z.enum(["CITY", "NEIGHBORHOOD", "APPROXIMATE", "EXACT"]),
+    point: geoPointSchema.optional(),
+  })
+  .strict();
+
+const publicListingBaseShape = {
+  id: z.uuid(),
+  type: listingTypeSchema,
+  status: z.literal("PUBLISHED"),
+  locale: localeSchema,
+  title: z.string().min(1).max(120),
+  slug: z.string().min(1).max(180),
+  summary: z.string().max(240).nullable(),
+  price: moneySchema.nullable(),
+  region: publicListingRegionSchema,
+  category: publicListingCategorySchema,
+  owner: publicListingOwnerSchema,
+  organization: publicListingOrganizationSchema.nullable(),
+  location: publicListingLocationSchema,
+  attributes: z.record(z.string(), z.unknown()),
+  featured: z.boolean(),
+  featuredUntil: z.iso.datetime({ offset: true }).nullable(),
+  publishedAt: z.iso.datetime({ offset: true }),
+  expiresAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
+  version: z.number().int().min(1),
+} as const;
+
+export const publicListingSummarySchema: z.ZodType<PublicListingSummaryView> = z
+  .object(publicListingBaseShape)
+  .strict();
+
+export const publicListingViewSchema: z.ZodType<PublicListingView> = z
+  .object({
+    ...publicListingBaseShape,
+    body: z.string().max(10_000),
+    createdAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+const publicCursorPageSchema = z
+  .object({
+    nextCursor: z.string().max(2_048).nullable().optional(),
+    hasMore: z.boolean(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.hasMore && !value.nextCursor) {
+      context.addIssue({
+        code: "custom",
+        path: ["nextCursor"],
+        message: "A next cursor is required when more results are available",
+      });
+    }
+  });
+
+export const listingCollectionSchema: z.ZodType<ListingCollection> = z
+  .object({
+    data: z.array(publicListingSummarySchema).max(50),
+    page: publicCursorPageSchema,
+    generatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const publicListingResponseSchema: z.ZodType<{ readonly data: PublicListingView }> = z
+  .object({ data: publicListingViewSchema })
+  .strict();
+
+const searchRegionSchema = z
+  .object({
+    id: z.uuid(),
+    code: z.string().min(1).max(80),
+    slug: z.string().min(1).max(140),
+    nameZhHans: z.string().min(1).max(160),
+    nameEn: z.string().min(1).max(160),
+  })
+  .strict();
+
+const searchOrganizationSchema = z
+  .object({
+    id: z.uuid(),
+    slug: z.string().min(1).max(140),
+    verificationStatus: z.enum(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED", "EXPIRED"]),
+  })
+  .strict();
+
+const searchLocationSchema = z
+  .object({
+    precision: z.enum(["CITY", "NEIGHBORHOOD", "APPROXIMATE"]),
+    point: geoPointSchema.nullable(),
+  })
+  .strict();
+
+export const searchListingResultSchema: z.ZodType<SearchListingResult> = z
+  .object({
+    id: z.uuid(),
+    type: listingTypeSchema,
+    status: z.literal("PUBLISHED"),
+    locale: localeSchema,
+    slug: z.string().min(1).max(180),
+    title: z.string().min(1).max(180),
+    summary: z.string().max(600).nullable(),
+    price: moneySchema.nullable(),
+    region: searchRegionSchema,
+    category: publicListingCategorySchema,
+    owner: publicListingOwnerSchema,
+    organization: searchOrganizationSchema.nullable(),
+    location: searchLocationSchema,
+    attributes: z.record(z.string(), z.union([z.string().max(1_000), z.number(), z.boolean()])),
+    sponsored: z.boolean(),
+    distanceMiles: z.number().min(0).nullable(),
+    publishedAt: z.iso.datetime({ offset: true }),
+    expiresAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+    version: z.number().int().min(1),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (Object.keys(value.attributes).length > 100) {
+      context.addIssue({
+        code: "custom",
+        path: ["attributes"],
+        message: "Search attributes must contain at most 100 properties",
+      });
+    }
+  });
+
+const searchFacetBucketSchema = z
+  .object({
+    value: z.string().max(120),
+    count: z.number().int().min(0),
+  })
+  .strict();
+
+export const searchResponseSchema: z.ZodType<SearchResponse> = z
+  .object({
+    data: z.array(searchListingResultSchema).max(50),
+    page: z
+      .object({
+        nextCursor: z.string().max(2_048).nullable(),
+        hasMore: z.boolean(),
+      })
+      .strict()
+      .superRefine((value, context) => {
+        if (value.hasMore && !value.nextCursor) {
+          context.addIssue({
+            code: "custom",
+            path: ["nextCursor"],
+            message: "A next cursor is required when more results are available",
+          });
+        }
+      }),
+    facets: z
+      .object({
+        types: z.array(searchFacetBucketSchema).max(5),
+        categories: z.array(searchFacetBucketSchema).max(50),
+        regions: z.array(searchFacetBucketSchema).max(50),
+        priceUnits: z.array(searchFacetBucketSchema).max(20),
+      })
+      .strict(),
+    correctedQuery: z.string().max(120).nullable(),
+    tookMs: z.number().int().min(0),
+    generatedAt: z.iso.datetime({ offset: true }),
   })
   .strict();
 
@@ -1147,6 +1362,74 @@ export const listCategoriesQuerySchema: z.ZodType<ListCategoriesQuery> = z
     activeOnly: activeOnlyQuerySchema.default(true),
     q: taxonomyQueryTextSchema.optional(),
   })
+  .strict();
+
+export const taxonomyAliasSchema: z.ZodType<TaxonomyAlias> = z
+  .object({
+    locale: z.enum(["zh-Hans", "en-US", "und"]),
+    value: z.string().min(1).max(160),
+  })
+  .strict();
+
+export const regionSchema: z.ZodType<Region> = z.lazy(() =>
+  z
+    .object({
+      id: z.uuid(),
+      parentId: z.uuid().nullable(),
+      code: z.string().min(2).max(80),
+      type: z.enum([
+        "COUNTRY",
+        "STATE",
+        "COUNTY",
+        "CITY",
+        "NEIGHBORHOOD",
+        "ZIP_CODE",
+        "REGION_GROUP",
+      ]),
+      slug: z.string().min(1).max(140),
+      name: z
+        .object({
+          "zh-Hans": z.string().min(1).max(160),
+          "en-US": z.string().min(1).max(160),
+        })
+        .strict(),
+      timezone: z.string().min(1).max(80),
+      centroid: geoPointSchema.nullable(),
+      active: z.boolean(),
+      aliases: z.array(taxonomyAliasSchema).max(100),
+      children: z.array(regionSchema).max(1_000),
+    })
+    .strict(),
+);
+
+export const categorySchema: z.ZodType<Category> = z.lazy(() =>
+  z
+    .object({
+      id: z.uuid(),
+      parentId: z.uuid().nullable(),
+      vertical: listingTypeSchema.nullable(),
+      slug: z.string().min(1).max(140),
+      name: z
+        .object({
+          "zh-Hans": z.string().min(1).max(160),
+          "en-US": z.string().min(1).max(160),
+        })
+        .strict(),
+      iconKey: z.string().max(120).nullable(),
+      formSchemaVersion: z.number().int().min(1),
+      active: z.boolean(),
+      aliases: z.array(taxonomyAliasSchema).max(100),
+      children: z.array(categorySchema).max(1_000),
+    })
+    .strict(),
+);
+
+export const regionCollectionResponseSchema: z.ZodType<RegionCollectionResponse> = z
+  .object({ data: z.array(regionSchema).max(2_000) })
+  .strict();
+
+export const categoryCollectionResponseSchema: z.ZodType<CategoryCollectionResponse> = z
+  .object({ data: z.array(categorySchema).max(2_000) })
   .strict();
 
 export const getCategoryFormSchemaQuerySchema: z.ZodType<GetCategoryFormSchemaQuery> = z

@@ -280,6 +280,14 @@ reconciliation 扫描 Listing 版本并修复缺失、落后或应删除的文�
 active taxonomy 或至少五个独立 HMAC 来源的非 bot、非敏感、有效结果查询，热门响应不暴露 count。
 查询样本默认 30 天且数据库硬上限 90 天。原子索引重建仍由后续 `SEARCH-005` 负责。
 
+`WEB-001` 已将五类公共频道和全站搜索落地为真实 SSR 页面：`/[locale]/jobs`、`rentals`、
+`transfers`、`marketplace`、`services` 与 `/search` 共用严格的搜索响应、taxonomy 和公开详情
+运行时 Schema，支持中英文、城市/分类/价格/排序筛选、PIT cursor 翻页、城市聚合路径和稳定
+`[slug]-[UUID]` 详情路径。SSR 只发匿名服务端请求且不转发 Cookie；Owner 投影或未知字段会失败关闭。
+推广、有效状态、验证、地点精度和安全提醒均有文字标识。OpenSearch 不可用时，仅无全文/价格/cursor
+的单垂类首屏降级到 PostgreSQL 公开列表，且不混用两种 cursor；复杂筛选显示明确恢复状态。任意搜索、
+cursor 和筛选页先行 `noindex,follow`，完整 canonical/hreflang/schema/sitemap 仍由 `SEO-001` 负责。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

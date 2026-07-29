@@ -218,3 +218,15 @@ OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为�
 普通 Search Store 只接收已解析且最多八个 `queryTerms`；OpenSearch 仍是可重建只读派生状态。
 测试注入 Search Store 时默认使用显式 no-op discovery store，避免单元/HTTP 测试意外访问数据库；
 生产未注入时使用 PostgreSQL adapter。没有新增服务、队列、数据库或 API 范式，因此不需要 ADR。
+
+## 30.11 WEB-001 公共页面实现边界
+
+`apps/web/src/lib/public-listings.ts` 是匿名公开读取 adapter：只组合既有 `/search`、`/listings`、
+`/categories`、`/regions`，以共享 Contracts 的严格运行时 Schema 映射视图模型，不导入 Prisma、
+OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 locale/垂类注册表、城市/UUID
+路由、canonical redirect 与 Next metadata；`public-listing-pages.tsx` 是无客户端状态的 SSR 展示层。
+
+五个 literal optional-catchall 页面只绑定固定 ListingType，全站搜索另有固定路由；Web 不创建新 API、
+事实表、迁移、服务或消息范式。简单首屏降级仍调用 API 的 PostgreSQL 公共 projection，不直接访问
+数据库。E2E fixture 是 Playwright 独立进程且只提供虚构数据，不会进入应用 runtime 或生产镜像。因此
+该实现保持模块化单体和既有 REST/事实源边界，不需要 ADR。

@@ -48,6 +48,21 @@ export default defineConfig({
         NEXT_TELEMETRY_DISABLED: "1",
         HOSTNAME: "127.0.0.1",
         PORT: "3100",
+        API_BASE_URL: "http://127.0.0.1:4200/v1",
+      },
+    },
+    {
+      name: "Public API fixture",
+      command: "node scripts/e2e-public-api-fixture.mjs",
+      url: "http://127.0.0.1:4200/health/ready",
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: "ignore",
+      stderr: "pipe",
+      env: {
+        NODE_ENV: "test",
+        HOSTNAME: "127.0.0.1",
+        PORT: "4200",
       },
     },
     {

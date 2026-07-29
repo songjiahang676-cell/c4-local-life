@@ -141,3 +141,16 @@
   version 0；建议/热门或已固定非零版本的 cursor 返回 503。不要用手工热门词伪装依赖恢复。
 - 每日确认过期清理有进展且最老未过期样本不超过批准窗口；积压时只提高有界批次/调度频率。物理回滚
   按 migration `ROLLBACK.md` 先停写、保留词典审计并让短期样本安全到期。
+
+## 20.17 公共 SSR 页面异常
+
+- 先区分 Search 503/504、cursor 410、taxonomy 部分失败、公开详情 404 和 Web 到 API 的超时/契约失败；
+  不在工单复制 query、cursor、正文、发布者标识或完整 API 响应。
+- 只有单垂类简单首屏应显示“主数据库最新公开信息”降级横幅；若带 q/价格/cursor 仍出现结果，立即检查
+  是否错误放宽了 `canUseCanonicalFallback`。降级页不得发放 canonical 列表 cursor 给 Search。
+- 大量通用详情错误时比较匿名 `GET /listings/{id}` 与 OpenAPI 生成类型；不要临时转发用户 Cookie、
+  放宽 strict Schema、增加任意代理 path 或把 Owner 响应直接渲染。
+- SSR 超时先检查 API origin、网络、响应大小和固定 5 秒预算。禁止把 `API_BASE_URL` 指向用户输入、
+  开启 redirect 或为排障记录完整 URL query。
+- 回滚 Web 应用不改变 API/数据库；旧 `/housing/rent`、`/business-transfer` 和 `/classified` 当前仅由
+  首页链接切换到 canonical 新路由，正式 301/slug 历史表仍由 `SEO-001` 统一处理。

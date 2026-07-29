@@ -432,6 +432,14 @@ ETag，不从 URL 推导 owner。加载、空态、错误、未登录和会话�
 
 每个列表和详情模板必须设计：无结果、筛选过窄、资源过期/下架、权限不足、登录过期、上传失败、支付处理中、服务降级和网络重试状态。错误不能只显示内部代码，应提供明确下一步但不泄露安全细节。
 
+`WEB-001` 已实现五类公共聚合、城市聚合、全站搜索和详情模板。聚合页使用 GET 表单承载关键词、类型、
+分类、城市、decimal 价格与排序，翻页只保留受支持字段和不透明 cursor；推广、有效发布和机构验证均有
+可见文字。详情从稳定 `[listingSlug]-[UUID]` 解析 ID，但只以 API 返回的 canonical type/region/slug
+生成路径，路径输入不参与授权。正文以 React 文本节点和 `bdi` 输出，不执行用户 HTML；结构化属性只
+显示有界 primitive 值。无结果不填充模拟卡片，失效 cursor 回第一页，未知城市/资源走通用 404，依赖
+故障给出重试路径。OpenSearch 故障时只允许无全文、价格和 cursor 的单垂类首屏读取 PostgreSQL 公开
+摘要，明确显示降级且不继续发放不可互换的 cursor。
+
 ---
 
 <!-- source: docs\04-user-journeys.md -->
@@ -2437,6 +2445,14 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 - Search Console/日志监控索引覆盖、软 404、重复 canonical 和结构化数据错误。
 - SEO 变更灰度并跟踪自然流量之外的质量指标，避免靠薄内容换流量。
 
+`WEB-001` 先落实模板级安全基线：全站搜索及带任意筛选/cursor 的频道页为 `noindex,follow`，公开
+频道/城市与详情只生成描述性 title/description；完整 canonical、hreflang、Open Graph、结构化数据和
+sitemap 仍必须由 `SEO-001` 按质量白名单完成，不能将当前模板元数据误报为 SEO Gate 已关闭。页面具备
+skip link、main/nav/search/aside/article 语义地标、连续标题、原生 label、44px 控件、可见焦点、
+纯文字广告/状态标签、`bdi` 用户内容隔离以及 720/520px reflow。货币和日期使用 `Intl` 与
+`America/Los_Angeles`；用户正文保留原语言，不伪装机器翻译。axe、200% zoom 和屏幕阅读器人工基线
+仍由 `SEO-004` 验收。
+
 ---
 
 <!-- source: docs\14-security-privacy-compliance.md -->
@@ -2878,6 +2894,21 @@ Idempotency-Key 或请求哈希。
 - 依赖降级：首次普通搜索在发现库不可用时可用无同义词的 version 0 继续；已绑定非零词典的 cursor
   若无法加载历史版本则 503，避免静默改变语义。建议/热门依赖失败明确 503，不回退展示低频原文。
 
+## 14.29 WEB-001 公共 SSR 威胁和缓解
+
+- Session/PII 缓存混淆：公共 SSR 直接发匿名 API 请求，不转发 Cookie、Authorization 或浏览器 header；
+  严格 `PublicListingView` Schema 拒绝 `ownerId`、contactMode、mediaIds、审核字段和其他额外键。
+- SSRF/响应放大：API origin 只来自受控 `API_BASE_URL` 的 HTTP(S) URL；调用方只能选择固定内部 path，
+  路径禁止 `/` 前缀和 `..`；5 秒超时、禁 redirect、Content-Length 与实际正文双重 1 MB 上限。
+- 搜索趋势污染：SSR 使用明确 bot User-Agent，使服务端代理 IP/公共查询不能计入用户热门样本；query、
+  cursor、价格、位置和 Listing ID 不写 Web 日志或指标。
+- XSS/Unicode 欺骗：标题、摘要、正文和属性仅作为 React 文本输出，混合语言用 `bdi`；属性键必须符合
+  有界 ASCII 标识符，值只接受有界 primitive/primitive array，嵌套对象、超长或越界集合不展示。
+- 枚举/状态泄露：详情 UUID、垂类或 canonical slug 不一致统一 404/永久 canonical redirect；非公开、
+  已下架和未知对象的内部原因不进入页面。依赖/契约异常只显示通用可重试状态。
+- 降级扩大：只有固定垂类、无 q/price/geo/cursor 且为默认/最新排序的首屏可降级 PostgreSQL；搜索和
+  canonical cursor 不互换，降级页不暴露后续 cursor，避免筛选语义或快照边界被静默改变。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -2991,6 +3022,16 @@ reconciliation 仍属于 `EVT-002`。
 - 数据规模接近目标，避免空数据库压测。
 - 逐步负载、突发、耐久、队列积压和依赖故障测试。
 - 记录版本、数据集、环境、阈值和瓶颈；性能结果可重复。
+
+## 15.11 WEB-001 公共 SSR 边界
+
+- 一次公共 SSR 最多读取 Search、active Category 和 CITY taxonomy；非城市频道并行请求，城市聚合先用
+  taxonomy 解析 canonical code。每个上游调用固定 5 秒、禁 redirect、JSON 正文最多 1 MB。
+- OpenSearch/Search 不可用时，只有单垂类简单首屏额外读取 canonical PostgreSQL 列表；不对 q、价格、
+  geo、cursor 或全站搜索降级，避免把故障扩大为多次错误查询。
+- 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
+  taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
+  本地 fixture 延迟宣称生产 SLO。
 
 ---
 
@@ -3627,6 +3668,20 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 真实 OpenSearch 测试证明审核扩展可命中且不改变索引事实源；CI 继续运行 fresh baseline、upgrade、
   全量质量、Linux Chromium 和四镜像。没有本地服务时必须明确 skip，不能声称通过。
 
+## 18.31 WEB-001 公共页面验证增量
+
+- Contracts 单测覆盖公开 list/detail/search/taxonomy 的严格运行时响应、PUBLISHED 常量、分页 cursor
+  一致性、Owner 字段/未知键拒绝、递归 taxonomy 和 Search attributes 上限。
+- Web 单测覆盖 NFKC/decimal/倒置价格/重复参数、匿名 header、SSR bot 采样排除、Search 查询参数、
+  503 简单首屏降级、复杂筛选失败、两类 cursor 不混用、Owner 投影失败关闭、稳定路由/货币/属性输出。
+- 组件测试覆盖中英文筛选、原生 label、有效/推广/验证文字、诚实空态、详情安全提示、用户
+  `<script>` 文本转义和嵌套属性不展示。
+- Playwright 使用独立、纯虚构、无网络依赖的公共 API fixture，生产 standalone Web 在桌面/Pixel 7
+  验证 SSR HTML、搜索 noindex、筛选值、列表/详情、推广/验证、无效价格恢复和无横向溢出；fixture
+  只在 E2E 进程存在，不进入应用、seed 或生产数据路径。
+- 全仓格式、类型、lint、单元/集成、八应用构建、API 运行时、架构和四镜像保护门禁继续执行。本任务
+  不修改 OpenAPI、Prisma 或 migration；真实 OpenSearch 查询回归继续由既有 SEARCH 测试承担。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3861,6 +3916,19 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   version 0；建议/热门或已固定非零版本的 cursor 返回 503。不要用手工热门词伪装依赖恢复。
 - 每日确认过期清理有进展且最老未过期样本不超过批准窗口；积压时只提高有界批次/调度频率。物理回滚
   按 migration `ROLLBACK.md` 先停写、保留词典审计并让短期样本安全到期。
+
+## 20.17 公共 SSR 页面异常
+
+- 先区分 Search 503/504、cursor 410、taxonomy 部分失败、公开详情 404 和 Web 到 API 的超时/契约失败；
+  不在工单复制 query、cursor、正文、发布者标识或完整 API 响应。
+- 只有单垂类简单首屏应显示“主数据库最新公开信息”降级横幅；若带 q/价格/cursor 仍出现结果，立即检查
+  是否错误放宽了 `canUseCanonicalFallback`。降级页不得发放 canonical 列表 cursor 给 Search。
+- 大量通用详情错误时比较匿名 `GET /listings/{id}` 与 OpenAPI 生成类型；不要临时转发用户 Cookie、
+  放宽 strict Schema、增加任意代理 path 或把 Owner 响应直接渲染。
+- SSR 超时先检查 API origin、网络、响应大小和固定 5 秒预算。禁止把 `API_BASE_URL` 指向用户输入、
+  开启 redirect 或为排障记录完整 URL query。
+- 回滚 Web 应用不改变 API/数据库；旧 `/housing/rent`、`/business-transfer` 和 `/classified` 当前仅由
+  首页链接切换到 canonical 新路由，正式 301/slug 历史表仍由 `SEO-001` 统一处理。
 
 ---
 
@@ -4199,6 +4267,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 样本默认 30 天、数据库不超过 90 天并可有界清理；query/source/hash 不进入日志或指标标签。
 - OpenAPI/生成类型、Prisma/migration/回滚说明、单元/HTTP/PostgreSQL/OpenSearch、全量质量、Linux
   Chromium 和四镜像保护门禁均有真实通过证据后才可标记 done。
+
+## 22.17 WEB-001 公开列表、详情与筛选验收
+
+- 五类 `jobs/rentals/transfers/marketplace/services`、城市路径、全站 `/search` 与
+  `[city]/[slug]-[UUID]` 详情均为真实动态 SSR；首页对应入口使用 canonical 新路由。
+- 搜索 GET 表单支持中英文 q、类型、分类、城市、decimal 价格与相关度/最新/价格排序；重复参数、
+  bidi/control、倒置价格、未知城市和过期 cursor 有明确、安全的恢复或 404。
+- 响应经严格 Search/Public Listing/recursive taxonomy Schema；SSR 不转发 Cookie，Owner/内部字段或
+  越界响应失败关闭。用户 HTML 不执行，结构化属性只显示有界公开 primitive。
+- 卡片和详情以文字标明 PUBLISHED、Sponsored/推广和已验证机构；日期/货币本地化，地点仅显示区域与
+  精度，不显示 point、联系方式、审核、风险或媒体内部标识。
+- 无结果明确不使用模拟内容；Search 故障仅简单单垂类首屏降级 canonical PostgreSQL 且无后续 cursor，
+  复杂筛选显示通用恢复状态。搜索/筛选/cursor 页面 `noindex,follow`。
+- 单元/组件/生产 Chromium 桌面和移动覆盖 SSR HTML、双语、label/skip/focus/44px/reflow、列表/详情、
+  空态/错误、推广/状态和无横向溢出；完整质量与受保护门禁有真实证据后才可标记 done。
 
 ---
 
@@ -4674,6 +4757,11 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 | `/[locale]/about`                | 关于                     | 否   | index          |
 
 五类详情路由可由统一内部 route builder 生成，公开 URL 保持垂直清晰。
+
+`WEB-001` 已用每个垂类的 literal optional-catchall 路由覆盖列表、城市聚合和详情，优先级高于历史
+通用占位 catchall；内部统一 builder 只接受 `JOB/RENTAL/TRANSFER/SECONDHAND/SERVICE` 注册表。
+详情当前使用完整 UUID 作为稳定 key 后缀，不用标题推断 ID；API 返回的 type、region slug 或 Listing
+slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[locale]/search`。
 
 ## 27.2 发布与账户
 
@@ -5199,3 +5287,15 @@ OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为�
 普通 Search Store 只接收已解析且最多八个 `queryTerms`；OpenSearch 仍是可重建只读派生状态。
 测试注入 Search Store 时默认使用显式 no-op discovery store，避免单元/HTTP 测试意外访问数据库；
 生产未注入时使用 PostgreSQL adapter。没有新增服务、队列、数据库或 API 范式，因此不需要 ADR。
+
+## 30.11 WEB-001 公共页面实现边界
+
+`apps/web/src/lib/public-listings.ts` 是匿名公开读取 adapter：只组合既有 `/search`、`/listings`、
+`/categories`、`/regions`，以共享 Contracts 的严格运行时 Schema 映射视图模型，不导入 Prisma、
+OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 locale/垂类注册表、城市/UUID
+路由、canonical redirect 与 Next metadata；`public-listing-pages.tsx` 是无客户端状态的 SSR 展示层。
+
+五个 literal optional-catchall 页面只绑定固定 ListingType，全站搜索另有固定路由；Web 不创建新 API、
+事实表、迁移、服务或消息范式。简单首屏降级仍调用 API 的 PostgreSQL 公共 projection，不直接访问
+数据库。E2E fixture 是 Playwright 独立进程且只提供虚构数据，不会进入应用 runtime 或生产镜像。因此
+该实现保持模块化单体和既有 REST/事实源边界，不需要 ADR。

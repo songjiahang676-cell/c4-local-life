@@ -22,6 +22,64 @@ test("renders the localized public homepage at desktop and mobile widths", async
   );
 });
 
+test("renders bilingual public Listing filters and sponsored status from SSR data", async ({
+  page,
+  request,
+}) => {
+  const ssrResponse = await request.get("/en-US/rentals?q=synthetic");
+  const html = await ssrResponse.text();
+  expect(ssrResponse.ok()).toBe(true);
+  expect(html).toContain("Synthetic public listing");
+
+  const response = await page.goto("/en-US/rentals?q=synthetic");
+  expect(response?.ok()).toBe(true);
+  await expect(page.getByRole("heading", { level: 1, name: "Rentals" })).toBeVisible();
+  await expect(page.getByRole("search", { name: "Filters" })).toBeVisible();
+  await expect(page.getByLabel("Keywords")).toHaveValue("synthetic");
+  await expect(page.getByRole("heading", { name: "Synthetic public listing" })).toBeVisible();
+  await expect(page.getByText("Sponsored")).toBeVisible();
+  await expect(page.getByText("Active")).toBeVisible();
+  await expect(page.getByText("Verified organization")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex.*follow/);
+  await expect(page.getByRole("link", { name: "简体中文" })).toHaveAttribute(
+    "href",
+    "/zh-Hans/rentals",
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
+test("renders the strict public Listing detail and generic invalid-filter recovery", async ({
+  page,
+}) => {
+  const listingId = "91000000-0000-4000-8000-000000000001";
+  const detailResponse = await page.goto(
+    `/en-US/rentals/synthetic-city/synthetic-public-listing-${listingId}`,
+  );
+  expect(detailResponse?.ok()).toBe(true);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Synthetic public listing" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "This fictional description is rendered on the server and contains no real user data.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Safety reminder" })).toBeVisible();
+  await expect(page.getByText("Sponsored")).toBeVisible();
+  await expect(page.getByText("Verified organization").first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  const invalidResponse = await page.goto("/zh-Hans/rentals?minPrice=3000&maxPrice=1000");
+  expect(invalidResponse?.ok()).toBe(true);
+  await expect(page.getByRole("heading", { level: 1, name: "筛选条件无效" })).toBeVisible();
+  await expect(page.getByText(/请检查价格范围/)).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex.*follow/);
+});
+
 test("completes the bilingual rental form and recovers its account-scoped autosave", async ({
   page,
 }) => {

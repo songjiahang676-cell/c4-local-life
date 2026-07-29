@@ -32,6 +32,11 @@
 
 五类详情路由可由统一内部 route builder 生成，公开 URL 保持垂直清晰。
 
+`WEB-001` 已用每个垂类的 literal optional-catchall 路由覆盖列表、城市聚合和详情，优先级高于历史
+通用占位 catchall；内部统一 builder 只接受 `JOB/RENTAL/TRANSFER/SECONDHAND/SERVICE` 注册表。
+详情当前使用完整 UUID 作为稳定 key 后缀，不用标题推断 ID；API 返回的 type、region slug 或 Listing
+slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[locale]/search`。
+
 ## 27.2 发布与账户
 
 | Route                                  | 说明           |
