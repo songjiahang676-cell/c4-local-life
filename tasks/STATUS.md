@@ -11,14 +11,15 @@
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target          | Status                       | Notes             |
-| ------- | -------------------- | ---------- | --------------- | ---------------------------- | ----------------- |
-| TAX-003 | @songjiahang676-cell | 2026-07-29 | homepage config | protected validation pending | unlocks `WEB-002` |
+| Task    | Owner                | Started    | Target          | Status                | Notes             |
+| ------- | -------------------- | ---------- | --------------- | --------------------- | ----------------- |
+| TAX-003 | @songjiahang676-cell | 2026-07-29 | homepage config | evidence head pending | unlocks `WEB-002` |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| TAX-003 protected checks        | PR #38 / run `30496917730`            | 450 tests、22 E2E、fresh/upgrade DB、4 images passed                       | 2026-07-29 |
 | TAX-003 local quality           | `pnpm ci:quality` + runtime/E2E       | passed：450 tests、8 builds、22 E2E、API runtime                           | 2026-07-29 |
 | Static architecture check       | `scripts/check-architecture.sh`       | passed：101 tasks、31 paths、52 schemas、36 models                         | 2026-07-25 |
 | Hosted quality gate             | GitHub Actions run `30186103447`      | passed：locked install、51 tests、7 builds、E2E                            | 2026-07-25 |
