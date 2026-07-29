@@ -108,6 +108,7 @@
 | MOD-001 local quality           | `pnpm ci:quality`                     | 63 files / 243 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | MOD-001 runtime/browser         | API runtime + Chromium desktop/mobile | canonical contract and 8/8 production E2E passed                          | 2026-07-29 |
 | MOD-001 architecture            | `scripts/check-architecture.sh`       | 101 tasks、49 models、45 paths、100 schemas passed                        | 2026-07-29 |
+| MOD-001 protected checks        | PR #21 / run `30416761469`            | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
 
 ## Decisions / Blocks
 
