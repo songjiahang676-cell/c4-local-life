@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { ListingSearchInput } from "@socal/contracts";
 import type { SearchCriteria, SearchSortValue } from "./search.store";
 
-const cursorVersion = 1;
+const cursorVersion = 2;
 const fingerprintPattern = /^[0-9a-f]{64}$/;
 const maximumSnapshotIdLength = 1_024;
 const maximumSearchAfterValues = 8;
@@ -13,6 +13,7 @@ type SearchCursorPayload = Readonly<{
   snapshotId: string;
   snapshotAt: string;
   searchAfter: readonly SearchSortValue[];
+  dictionaryVersion: number;
   expiresAt: number;
 }>;
 
@@ -47,10 +48,11 @@ function isSearchSortValue(value: unknown): value is SearchSortValue {
 }
 
 function parsePayload(value: unknown): SearchCursorPayload {
-  if (!isRecord(value) || Object.keys(value).length !== 6) {
+  if (!isRecord(value) || Object.keys(value).length !== 7) {
     throw new SearchCursorInvalidError();
   }
-  const { v, fingerprint, snapshotId, snapshotAt, searchAfter, expiresAt } = value;
+  const { v, fingerprint, snapshotId, snapshotAt, searchAfter, dictionaryVersion, expiresAt } =
+    value;
   if (
     v !== cursorVersion ||
     typeof fingerprint !== "string" ||
@@ -64,6 +66,9 @@ function parsePayload(value: unknown): SearchCursorPayload {
     searchAfter.length < 1 ||
     searchAfter.length > maximumSearchAfterValues ||
     !searchAfter.every(isSearchSortValue) ||
+    typeof dictionaryVersion !== "number" ||
+    !Number.isSafeInteger(dictionaryVersion) ||
+    dictionaryVersion < 0 ||
     typeof expiresAt !== "number" ||
     !Number.isSafeInteger(expiresAt) ||
     expiresAt <= 0
@@ -76,6 +81,7 @@ function parsePayload(value: unknown): SearchCursorPayload {
     snapshotId,
     snapshotAt,
     searchAfter,
+    dictionaryVersion,
     expiresAt,
   };
 }
@@ -122,7 +128,7 @@ export class SearchCursorCodec {
   readonly #key: Buffer;
 
   constructor(secret: string) {
-    this.#key = createHmac("sha256", secret).update("socal-life:search-cursor:v1").digest();
+    this.#key = createHmac("sha256", secret).update("socal-life:search-cursor:v2").digest();
   }
 
   encode(input: {
@@ -130,6 +136,7 @@ export class SearchCursorCodec {
     snapshotId: string;
     snapshotAt: string;
     searchAfter: readonly SearchSortValue[];
+    dictionaryVersion: number;
     expiresAt: number;
   }): string {
     const payload = parsePayload({ v: cursorVersion, ...input });

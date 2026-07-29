@@ -140,3 +140,11 @@ expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 
 histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可变 bucket。query、cursor、PIT、
 Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
 零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
+
+## 17.14 SEARCH-004 发现隐私指标
+
+`socal_search_discovery_events_total{operation,outcome}` 仅允许固定 operation：
+dictionary/sample/suggestions/trending/retention，和固定 outcome：
+success/empty/recorded/duplicate/rejected_bot/rejected_sensitive/unavailable。不得添加 query、query hash、
+source hash、IP、User-Agent、region、locale、dictionary version、count 或资源 ID 标签。HTTP RED
+继续覆盖两个公开端点；热门内容、来源数和测试样本数不得作为生产 Dashboard 数据。

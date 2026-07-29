@@ -413,4 +413,19 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
 - `SearchCursorPage.nextCursor` 最长 2048 且必须与全部 query 条件一致；失效 cursor 返回 410。
   OpenSearch 超时返回 504，依赖或投影不可用返回 503，全部使用 RFC 9457 Problem Details。
 - 价格输入是最多两位小数的 decimal string，响应复用 `Money`；距离仅在 DISTANCE 排序时返回，
-  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 在 SEARCH-004 前固定为 null。
+  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 仅在命中已发布同义词的非 canonical
+  精确词时返回 canonical 值。
+
+## 8.24 SEARCH-004 发现契约
+
+- `GET /search/suggestions` 的 q 可省略；q 最大 50，regionCode、locale 和 limit 均严格有界，
+  unknown key 返回 400。响应是 strict `SearchSuggestionResponse`，类型仅 QUERY/CATEGORY/REGION，
+  最多 10 条，使用 `private, no-store`。
+- `GET /search/trending` 只接受 DAY_1/DAY_7/DAY_30、可选 region/locale 和 1–10 limit。strict
+  `SearchTrendingResponse` 只返回 query/rank/locale，不返回原始计数或来源数，缓存为
+  `public, max-age=300`。
+- 两个端点无认证但不使用客户端身份决定隐私阈值；依赖不可用返回 503 Problem Details。低于五个
+  独立来源、敏感或 bot 流量不会进入公共结果，空结果是真实状态而不是模拟数据。
+- 词典维护没有开放匿名/公共 mutation；内部 `SearchDictionaryService` 验证定义、生成 content hash，
+  再经 Store/Repository 保存、双人发布或追加式回滚。未来 Admin UI 必须复用该应用服务与 Policy，
+  Controller 不得直接调用 Prisma。

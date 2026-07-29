@@ -556,8 +556,31 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        /** Get search suggestions */
+        /**
+         * Get search suggestions
+         * @description Returns operational dictionary, active taxonomy, and privacy-thresholded query suggestions. Omit q to receive safe category and region defaults.
+         */
         readonly get: operations["getSearchSuggestions"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/search/trending": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get privacy-safe trending searches
+         * @description Returns only bot-filtered, result-bearing searches that satisfy the minimum anonymity threshold. Raw query counts are never exposed.
+         */
+        readonly get: operations["getTrendingSearches"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -2249,12 +2272,29 @@ export interface components {
         };
         readonly SearchSuggestion: {
             /** @enum {string} */
-            readonly type: "QUERY" | "CATEGORY" | "REGION" | "BUSINESS" | "PROVIDER";
+            readonly type: "QUERY" | "CATEGORY" | "REGION";
             readonly label: string;
             readonly value: string;
-            readonly metadata?: {
-                readonly [key: string]: unknown;
-            };
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+        };
+        readonly SearchSuggestionResponse: {
+            readonly data: readonly components["schemas"]["SearchSuggestion"][];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly SearchTrendingItem: {
+            readonly query: string;
+            readonly rank: number;
+            /** @enum {string} */
+            readonly locale: "zh-Hans" | "en-US";
+        };
+        readonly SearchTrendingResponse: {
+            readonly data: readonly components["schemas"]["SearchTrendingItem"][];
+            /** @enum {string} */
+            readonly window: "DAY_1" | "DAY_7" | "DAY_30";
+            /** Format: date-time */
+            readonly generatedAt: string;
         };
         readonly CursorPage: {
             readonly nextCursor?: string | null;
@@ -3951,9 +3991,11 @@ export interface operations {
     };
     readonly getSearchSuggestions: {
         readonly parameters: {
-            readonly query: {
-                readonly q: string;
+            readonly query?: {
+                readonly q?: string;
                 readonly regionCode?: string;
+                readonly locale?: "zh-Hans" | "en-US";
+                readonly limit?: number;
             };
             readonly header?: never;
             readonly path?: never;
@@ -3961,17 +4003,46 @@ export interface operations {
         };
         readonly requestBody?: never;
         readonly responses: {
-            /** @description Query, category, city, and entity suggestions */
+            /** @description Safe query, category, and region suggestions */
             readonly 200: {
                 headers: {
+                    readonly "Cache-Control"?: "private, no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": {
-                        readonly data: readonly components["schemas"]["SearchSuggestion"][];
-                    };
+                    readonly "application/json": components["schemas"]["SearchSuggestionResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    readonly getTrendingSearches: {
+        readonly parameters: {
+            readonly query?: {
+                readonly regionCode?: string;
+                readonly locale?: "zh-Hans" | "en-US";
+                readonly window?: "DAY_1" | "DAY_7" | "DAY_30";
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Privacy-thresholded trending searches */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "public, max-age=300";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SearchTrendingResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 503: components["responses"]["ServiceUnavailable"];
         };
     };
     readonly listListings: {

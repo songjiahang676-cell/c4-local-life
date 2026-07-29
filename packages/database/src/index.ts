@@ -210,6 +210,19 @@ export {
   type ListListingSearchStatesInput,
 } from "./repositories/listing-search.repository";
 export {
+  SearchDiscoveryRepository,
+  type FindPrivacySafeQueriesInput,
+  type PrivacySafeQuery,
+  type PublishSearchDictionaryDraftInput,
+  type RecordSearchQuerySampleInput,
+  type RollbackSearchDictionaryInput,
+  type SaveSearchDictionaryDraftInput,
+  type SearchDictionaryLifecycle,
+  type SearchDictionaryMutationResult,
+  type SearchDictionaryRecord,
+  type SearchDiscoveryRepositoryOptions,
+} from "./repositories/search-discovery.repository";
+export {
   CategoryFormSchemaRepository,
   normalizeTaxonomyAlias,
   TaxonomyRepository,

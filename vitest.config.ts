@@ -61,6 +61,12 @@ export default defineConfig({
       "@socal/database/listing": fileURLToPath(
         new URL("./packages/database/src/repositories/listing.repository.ts", import.meta.url),
       ),
+      "@socal/database/search-discovery": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/search-discovery.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/listing-submission": fileURLToPath(
         new URL(
           "./packages/database/src/repositories/listing-submission.repository.ts",

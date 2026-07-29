@@ -280,3 +280,15 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   详情、发布和 PostgreSQL canonical 写链不依赖搜索。
 - 指标只有固定 outcome/sort/geo；query/cursor/PIT/ID/筛选值/坐标/金额不进入日志或标签。OpenAPI、
   生成类型、单元/HTTP/真实 OpenSearch、完整质量和保护门禁通过后方可标记完成。
+
+## 22.16 SEARCH-004 发现隐私验收
+
+- 已发布词典不可变、只有一个草稿、最后编辑者不能发布，历史回滚先追加草稿并由第二人发布新版本；
+  同 scope 歧义词拒绝。
+- cursor 固定词典版本；最多八个审核词 OR 展开，每词内部 AND；真实 OpenSearch 能通过同义词命中。
+- 建议与热门契约严格、有界、无占位数据；空 q 只用 active taxonomy，热门仅 rank 且无 count。
+- 只有首屏、有效结果、非 bot、非敏感 query 可采样；来源为 IP 派生 HMAC，同源换 User-Agent 不增源；
+  每 query/source/day 唯一，少于五来源绝不公开。
+- 样本默认 30 天、数据库不超过 90 天并可有界清理；query/source/hash 不进入日志或指标标签。
+- OpenAPI/生成类型、Prisma/migration/回滚说明、单元/HTTP/PostgreSQL/OpenSearch、全量质量、Linux
+  Chromium 和四镜像保护门禁均有真实通过证据后才可标记 done。

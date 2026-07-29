@@ -335,3 +335,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   明确 skip，不能把 skip 声称为通过。
 - metrics 测试只接受固定 outcome/sort/geo，禁止 query、cursor、PIT 或资源标识。全仓格式、类型、
   lint、测试、八应用构建、运行时、生产 Chromium 和四镜像门禁继续执行。
+
+## 18.30 SEARCH-004 发现与隐私验证增量
+
+- 契约测试覆盖空 q、安全 normalization、region/locale/window/limit、unknown key、strict 响应、无 count、
+  缓存头和 400/503 Problem Details。
+- 单元测试覆盖 locale/region 同义词 scope、最多八词、canonical correction、cursor 词典版本固定、
+  bot/PII/阻止词拒绝、IP HMAC 来源、User-Agent 轮换不增源、空查询 taxonomy 和敏感二次筛查。
+- PostgreSQL 集成测试覆盖草稿并发、双人发布、发布不可变、追加回滚、每日 source 去重、五来源硬阈值、
+  literal prefix、30–90 天保留约束和有界过期删除；低于阈值即使调用方传 1 也不得返回。
+- 真实 OpenSearch 测试证明审核扩展可命中且不改变索引事实源；CI 继续运行 fresh baseline、upgrade、
+  全量质量、Linux Chromium 和四镜像。没有本地服务时必须明确 skip，不能声称通过。

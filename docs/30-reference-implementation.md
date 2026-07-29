@@ -207,3 +207,14 @@ query-bound HMAC cursor、PIT 生命周期、分页编排和低基数结果指�
 OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为最小公共 DTO。Controller/Service
 不导入 Prisma，adapter 不写 PostgreSQL 或 OpenSearch 文档；Worker 仍独占索引写入。Web/Admin
 不导入搜索 adapter，PostgreSQL 始终是 canonical，新增搜索功能没有改变进程、数据库或 REST 版本。
+
+## 30.10 SEARCH-004 发现实现边界
+
+`SearchDiscoveryService` 负责同义词解析、隐私筛查、HMAC 来源、建议/热门编排和固定指标；
+`SearchDictionaryService` 是未来受 Policy 保护的运营 mutation 应用边界；Controller 只做生成契约验证、
+请求上下文提取、缓存头和 Problem Details。`DatabaseSearchDiscoveryStore` 组合专用
+`SearchDiscoveryRepository` 与只读 `TaxonomyRepository`，是唯一 Prisma adapter。
+
+普通 Search Store 只接收已解析且最多八个 `queryTerms`；OpenSearch 仍是可重建只读派生状态。
+测试注入 Search Store 时默认使用显式 no-op discovery store，避免单元/HTTP 测试意外访问数据库；
+生产未注入时使用 PostgreSQL adapter。没有新增服务、队列、数据库或 API 范式，因此不需要 ADR。

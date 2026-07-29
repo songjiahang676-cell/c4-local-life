@@ -24,6 +24,15 @@ type SearchReconciliationOutcome = "current" | "upserted" | "deleted" | "failed"
 type SearchQueryOutcome =
   "success" | "empty" | "invalid_cursor" | "expired_cursor" | "timeout" | "unavailable";
 type SearchQuerySort = "RELEVANCE" | "NEWEST" | "PRICE_ASC" | "PRICE_DESC" | "DISTANCE";
+type SearchDiscoveryOperation = "dictionary" | "sample" | "suggestions" | "trending" | "retention";
+type SearchDiscoveryOutcome =
+  | "success"
+  | "empty"
+  | "recorded"
+  | "duplicate"
+  | "rejected_bot"
+  | "rejected_sensitive"
+  | "unavailable";
 
 type Histogram = {
   count: number;
@@ -107,6 +116,7 @@ export class MetricsRegistry {
   readonly #searchIndexFreshness = new Map<string, Histogram>();
   readonly #searchReconciliations = new Map<SearchReconciliationOutcome, number>();
   readonly #searchQueries = new Map<string, number>();
+  readonly #searchDiscoveryEvents = new Map<string, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -202,6 +212,13 @@ export class MetricsRegistry {
         geo: input.geo ? "true" : "false",
       }),
     );
+  }
+
+  searchDiscovery(input: {
+    operation: SearchDiscoveryOperation;
+    outcome: SearchDiscoveryOutcome;
+  }): void {
+    increment(this.#searchDiscoveryEvents, labelKey(input));
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -313,6 +330,13 @@ export class MetricsRegistry {
     );
     for (const [key, value] of [...this.#searchQueries].sort()) {
       lines.push(`socal_search_queries_total${labels(parseLabelKey(key))} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_search_discovery_events_total Search discovery operations by fixed operation and privacy-safe outcome.",
+      "# TYPE socal_search_discovery_events_total counter",
+    );
+    for (const [key, value] of [...this.#searchDiscoveryEvents].sort()) {
+      lines.push(`socal_search_discovery_events_total${labels(parseLabelKey(key))} ${value}`);
     }
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",

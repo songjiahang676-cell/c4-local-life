@@ -98,6 +98,7 @@ describe("observability primitives", () => {
     });
     runtime.metrics.searchReconciliation("deleted");
     runtime.metrics.searchQuery({ outcome: "success", sort: "DISTANCE", geo: true });
+    runtime.metrics.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -126,6 +127,9 @@ describe("observability primitives", () => {
     expect(metrics).toContain('socal_search_reconciliation_total{outcome="deleted"} 1');
     expect(metrics).toContain(
       'socal_search_queries_total{outcome="success",sort="DISTANCE",geo="true"} 1',
+    );
+    expect(metrics).toContain(
+      'socal_search_discovery_events_total{operation="sample",outcome="rejected_sensitive"} 1',
     );
     expect(metrics).not.toContain("person@example.com");
   });

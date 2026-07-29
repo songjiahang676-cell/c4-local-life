@@ -1,15 +1,22 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
-import type { ProblemDetails, SearchResponse } from "@socal/contracts";
+import type {
+  ProblemDetails,
+  SearchResponse,
+  SearchSuggestionResponse,
+  SearchTrendingResponse,
+} from "@socal/contracts";
 import { createObservabilityRuntime } from "@socal/observability";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
+import { SearchDiscoveryUnavailableError } from "../src/modules/search/search-discovery.store";
 import {
   SearchSnapshotExpiredError,
   SearchTimeoutError,
   SearchUnavailableError,
 } from "../src/modules/search/search.store";
+import { MemorySearchDiscoveryStore } from "./support/memory-search-discovery.store";
 import {
   MemorySearchStore,
   searchStoreResult,
@@ -36,12 +43,15 @@ describe("public search HTTP API", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
   let store: MemorySearchStore;
+  let discoveryStore: MemorySearchDiscoveryStore;
 
   beforeAll(async () => {
     store = new MemorySearchStore();
+    discoveryStore = new MemorySearchDiscoveryStore();
     app = await createApiApplication(environment, {
       logger: false,
       searchStore: store,
+      searchDiscoveryStore: discoveryStore,
       observability: createObservabilityRuntime({
         serviceName: "socal-search-http-test",
         serviceVersion: "0.1.0",
@@ -144,5 +154,109 @@ describe("public search HTTP API", () => {
     );
     expect(response.body).not.toContain("private-query");
     expect(response.body).not.toContain("memory-pit");
+  });
+
+  it("serves strict no-store suggestions and never reflects sensitive recent queries", async () => {
+    discoveryStore.taxonomySuggestions.push({
+      type: "REGION",
+      label: "Irvine",
+      value: "US-CA-ORANGE-IRVINE",
+      locale: "en-US",
+    });
+    discoveryStore.privacySafeQueries.push(
+      {
+        queryText: "Irvine apartment",
+        sourceCount: 5,
+        lastSeenAt: new Date("2026-07-29T11:00:00.000Z"),
+      },
+      {
+        queryText: "person@example.com",
+        sourceCount: 50,
+        lastSeenAt: new Date("2026-07-29T11:00:00.000Z"),
+      },
+    );
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/search/suggestions?q=Irv&locale=en-US&limit=10",
+    });
+    const payload = response.json<SearchSuggestionResponse>();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(payload.data).toContainEqual({
+      type: "REGION",
+      label: "Irvine",
+      value: "US-CA-ORANGE-IRVINE",
+      locale: "en-US",
+    });
+    expect(payload.data).toContainEqual({
+      type: "QUERY",
+      label: "Irvine apartment",
+      value: "Irvine apartment",
+      locale: "en-US",
+    });
+    expect(JSON.stringify(payload)).not.toContain("person@example.com");
+    expect(JSON.stringify(payload)).not.toContain("sourceCount");
+  });
+
+  it("returns safe empty-query taxonomy defaults without consulting private query samples", async () => {
+    const before = discoveryStore.privacyInputs.length;
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/search/suggestions?locale=en-US&limit=1",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<SearchSuggestionResponse>().data).toHaveLength(1);
+    expect(discoveryStore.privacyInputs).toHaveLength(before);
+  });
+
+  it("serves count-free cached trends only after the five-source threshold", async () => {
+    discoveryStore.privacySafeQueries.push({
+      queryText: "Irvine jobs",
+      sourceCount: 4,
+      lastSeenAt: new Date("2026-07-29T11:00:00.000Z"),
+    });
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/search/trending?locale=en-US&window=DAY_7&limit=10",
+    });
+    const payload = response.json<SearchTrendingResponse>();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=300");
+    expect(payload.data).toContainEqual({
+      query: "Irvine apartment",
+      rank: 1,
+      locale: "en-US",
+    });
+    expect(JSON.stringify(payload)).not.toContain("Irvine jobs");
+    expect(JSON.stringify(payload)).not.toContain("sourceCount");
+  });
+
+  it("rejects discovery abuse inputs and maps dependency failures without reflection", async () => {
+    for (const url of [
+      "/v1/search/suggestions?limit=11",
+      "/v1/search/suggestions?unknown=true",
+      `/v1/search/suggestions?q=${encodeURIComponent("private\u202equery")}`,
+      "/v1/search/trending?window=HOUR_1",
+      "/v1/search/trending?includeCounts=true",
+    ]) {
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode, url).toBe(400);
+      expect(response.body).not.toContain("private");
+    }
+
+    discoveryStore.error = new SearchDiscoveryUnavailableError();
+    const unavailable = await server.inject({
+      method: "GET",
+      url: "/v1/search/trending",
+    });
+    discoveryStore.error = null;
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.json<ProblemDetails>()).toMatchObject({
+      status: 503,
+      title: "Service Unavailable",
+    });
   });
 });

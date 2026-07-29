@@ -159,3 +159,14 @@ PIT、固定快照时间和稳定 sort values；篡改、跨筛选/排序/limit 
 枚举、模糊位置、金额与最小公开 publisher 字段，正文、内部质量分、campaign/placement、审核状态、
 联系数据和精确位置均不能返回。日志和 `socal_search_queries_total` 只使用固定 outcome/sort/geo
 标签，不记录 query、cursor、PIT、坐标或资源标识。
+
+## 搜索建议与热门隐私边界
+
+公开建议/热门只消费 PostgreSQL 内已筛查、有效结果且至少五个独立来源的短期 query 样本；响应不返回
+来源数或原始计数。email、电话、URL、长数字、地址、联系方式句柄、控制/双向字符、运营阻止词和
+bot 流量在入库前拒绝，读取时再次筛查。来源摘要由可信 IP 和独立 HMAC domain 生成，同一
+query/source/UTC day 只贡献一次，原 IP/User-Agent 不入样本表。
+
+词典草稿必须不同审核人发布，发布版本由数据库 trigger 保护不可变，回滚只能追加。cursor v2 固定
+词典版本；加载不到已绑定历史版本时失败为 503，不静默改变查询。样本默认 30 天、硬上限 90 天，
+日志/指标不得包含 query、hash、source、region 或 dictionary version。

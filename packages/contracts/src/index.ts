@@ -27,6 +27,28 @@ export type BatchListingActionResponse = components["schemas"]["BatchListingActi
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type SearchListingResult = components["schemas"]["SearchListingResult"];
 export type SearchResponse = components["schemas"]["SearchResponse"];
+export type SearchSuggestionsQuery = NonNullable<
+  operations["getSearchSuggestions"]["parameters"]["query"]
+>;
+export type ValidatedSearchSuggestionsQuery = Omit<SearchSuggestionsQuery, "locale" | "limit"> & {
+  locale: Locale;
+  limit: number;
+};
+export type SearchSuggestion = components["schemas"]["SearchSuggestion"];
+export type SearchSuggestionResponse = components["schemas"]["SearchSuggestionResponse"];
+export type SearchTrendingQuery = NonNullable<
+  operations["getTrendingSearches"]["parameters"]["query"]
+>;
+export type ValidatedSearchTrendingQuery = Omit<
+  SearchTrendingQuery,
+  "locale" | "window" | "limit"
+> & {
+  locale: Locale;
+  window: "DAY_1" | "DAY_7" | "DAY_30";
+  limit: number;
+};
+export type SearchTrendingItem = components["schemas"]["SearchTrendingItem"];
+export type SearchTrendingResponse = components["schemas"]["SearchTrendingResponse"];
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ListListingRevisionsQuery = NonNullable<
   operations["listListingRevisions"]["parameters"]["query"]
@@ -430,6 +452,189 @@ export const listingSearchSchema: z.ZodType<ListingSearchInput> = z
       });
     }
   });
+
+const suggestionQueryTextSchema = z
+  .string()
+  .transform((value) => value.trim().normalize("NFKC"))
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(50)
+      .refine(
+        (value) => safeListingText(value, false),
+        "Suggestion query contains unsupported characters",
+      ),
+  );
+
+export const searchSuggestionsQuerySchema: z.ZodType<ValidatedSearchSuggestionsQuery> = z
+  .object({
+    q: suggestionQueryTextSchema.optional(),
+    regionCode: listingRegionCodeSchema.optional(),
+    locale: localeSchema.default("zh-Hans"),
+    limit: z.coerce.number().int().min(1).max(10).default(10),
+  })
+  .strict();
+
+export const searchTrendingQuerySchema: z.ZodType<ValidatedSearchTrendingQuery> = z
+  .object({
+    regionCode: listingRegionCodeSchema.optional(),
+    locale: localeSchema.default("zh-Hans"),
+    window: z.enum(["DAY_1", "DAY_7", "DAY_30"]).default("DAY_7"),
+    limit: z.coerce.number().int().min(1).max(10).default(10),
+  })
+  .strict();
+
+export const searchSuggestionSchema: z.ZodType<SearchSuggestion> = z
+  .object({
+    type: z.enum(["QUERY", "CATEGORY", "REGION"]),
+    label: z.string().min(1).max(120),
+    value: z.string().min(1).max(120),
+    locale: localeSchema,
+  })
+  .strict();
+
+export const searchSuggestionResponseSchema: z.ZodType<SearchSuggestionResponse> = z
+  .object({
+    data: z.array(searchSuggestionSchema).max(10),
+    generatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export const searchTrendingItemSchema: z.ZodType<SearchTrendingItem> = z
+  .object({
+    query: z.string().min(1).max(120),
+    rank: z.number().int().min(1).max(10),
+    locale: localeSchema,
+  })
+  .strict();
+
+export const searchTrendingResponseSchema: z.ZodType<SearchTrendingResponse> = z
+  .object({
+    data: z.array(searchTrendingItemSchema).max(10),
+    window: z.enum(["DAY_1", "DAY_7", "DAY_30"]),
+    generatedAt: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const ranks = value.data.map((item) => item.rank);
+    if (new Set(ranks).size !== ranks.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["data"],
+        message: "Trending ranks must be unique",
+      });
+    }
+  });
+
+const searchDictionaryTermSchema = z
+  .string()
+  .transform((value) => value.trim().normalize("NFKC"))
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(120)
+      .refine(
+        (value) => safeListingText(value, false),
+        "Search dictionary term contains unsupported characters",
+      ),
+  );
+
+export const searchDictionaryDefinitionSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    synonymGroups: z
+      .array(
+        z
+          .object({
+            key: z
+              .string()
+              .min(3)
+              .max(80)
+              .regex(/^[a-z][a-z0-9-]*$/),
+            locale: z.enum(["zh-Hans", "en-US", "und"]),
+            canonical: searchDictionaryTermSchema.pipe(z.string().max(50)),
+            alternatives: z
+              .array(searchDictionaryTermSchema.pipe(z.string().max(50)))
+              .min(1)
+              .max(20),
+            regionCodes: z.array(listingRegionCodeSchema).max(20).default([]),
+          })
+          .strict()
+          .superRefine((value, context) => {
+            const terms = [value.canonical, ...value.alternatives].map((term) =>
+              term.toLocaleLowerCase("en-US"),
+            );
+            if (new Set(terms).size !== terms.length) {
+              context.addIssue({
+                code: "custom",
+                path: ["alternatives"],
+                message: "Synonym terms must be unique within a group",
+              });
+            }
+            if (new Set(value.regionCodes).size !== value.regionCodes.length) {
+              context.addIssue({
+                code: "custom",
+                path: ["regionCodes"],
+                message: "Synonym region codes must be unique",
+              });
+            }
+          }),
+      )
+      .max(500),
+    blockedTerms: z
+      .array(
+        z
+          .object({
+            term: searchDictionaryTermSchema,
+            locale: z.enum(["zh-Hans", "en-US", "und"]),
+            reason: z.enum(["ADULT", "ILLEGAL", "SCAM", "PII"]),
+          })
+          .strict(),
+      )
+      .max(1_000),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const keys = value.synonymGroups.map((group) => group.key);
+    if (new Set(keys).size !== keys.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["synonymGroups"],
+        message: "Synonym group keys must be unique",
+      });
+    }
+
+    const scopedTerms = new Set<string>();
+    for (const [groupIndex, group] of value.synonymGroups.entries()) {
+      const scope = `${group.locale}:${[...group.regionCodes].sort().join(",")}`;
+      for (const term of [group.canonical, ...group.alternatives]) {
+        const scopedTerm = `${scope}:${term.toLocaleLowerCase("en-US")}`;
+        if (scopedTerms.has(scopedTerm)) {
+          context.addIssue({
+            code: "custom",
+            path: ["synonymGroups", groupIndex],
+            message: "A synonym term cannot belong to multiple groups in the same scope",
+          });
+        }
+        scopedTerms.add(scopedTerm);
+      }
+    }
+
+    const blockedTerms = value.blockedTerms.map(
+      (entry) => `${entry.locale}:${entry.term.toLocaleLowerCase("en-US")}`,
+    );
+    if (new Set(blockedTerms).size !== blockedTerms.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["blockedTerms"],
+        message: "Blocked terms must be unique within a locale",
+      });
+    }
+  });
+
+export type SearchDictionaryDefinition = z.infer<typeof searchDictionaryDefinitionSchema>;
 
 export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
   .object({

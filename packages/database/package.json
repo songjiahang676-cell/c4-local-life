@@ -27,6 +27,9 @@
       "listing-search": [
         "src/repositories/listing-search.repository.ts"
       ],
+      "search-discovery": [
+        "src/repositories/search-discovery.repository.ts"
+      ],
       "listing-draft": [
         "src/repositories/listing-draft.repository.ts"
       ],
@@ -92,6 +95,11 @@
       "types": "./src/repositories/listing-search.repository.ts",
       "require": "./dist/src/repositories/listing-search.repository.js",
       "default": "./dist/src/repositories/listing-search.repository.js"
+    },
+    "./search-discovery": {
+      "types": "./src/repositories/search-discovery.repository.ts",
+      "require": "./dist/src/repositories/search-discovery.repository.js",
+      "default": "./dist/src/repositories/search-discovery.repository.js"
     },
     "./listing-draft": {
       "types": "./src/repositories/listing-draft.repository.ts",

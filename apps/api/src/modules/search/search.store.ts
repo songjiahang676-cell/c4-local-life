@@ -22,6 +22,7 @@ export type SearchStoreInput = Readonly<{
   snapshotId: string;
   snapshotAt: string;
   criteria: SearchCriteria;
+  queryTerms?: readonly string[];
   searchAfter?: readonly SearchSortValue[];
   keepAliveSeconds: number;
   timeoutMilliseconds: number;

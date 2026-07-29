@@ -162,5 +162,24 @@ OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/s
 因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
 
 `socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
-分类/地区、坐标和金额均不记录。SEARCH-004 才负责同义词、建议和热门查询隐私，SEARCH-005 才负责
-全量重建与 alias 回滚。
+分类/地区、坐标和金额均不记录。SEARCH-004 负责的同义词、建议和热门查询隐私见下一节；
+SEARCH-005 才负责全量重建与 alias 回滚。
+
+## 9.14 SEARCH-004 同义词、建议与热门查询隐私
+
+PostgreSQL 的 `search_dictionary_states/search_dictionary_versions` 是词典事实源。词典只有一个草稿，
+发布前必须由不同于最后编辑者的审核人确认；已发布版本不可更新或删除，回滚通过复制历史定义为新草稿，
+再由第二人审核发布为追加版本完成。定义限制为中英/通用 locale、可选 region scope、最多 500 组同义词和 1,000 个阻止词；
+同 scope 的词不能跨组歧义复用。搜索 cursor v2 固定 `dictionaryVersion`，因此翻页期间发布新词典不会
+改变已有 PIT 的查询语义。每次最多展开 8 个审核词，组间 OR、每个词内部仍按 AND 匹配。
+
+`GET /search/suggestions` 可省略 q，空查询只返回 active Category/Region；有 q 时按词典、taxonomy、
+达到隐私阈值的近期有效查询去重，最多 10 条并使用 `private, no-store`。`GET /search/trending` 支持
+1/7/30 天和可选 region，最多 10 条，响应只公开 rank，不公开 count，并使用五分钟公共缓存。
+BUSINESS/PROVIDER 实体建议在相应信任档案任务完成前不进入契约，不使用占位实体或伪造热门词。
+
+只有首屏、有公开结果、长度合规、非 bot 的查询可成为内部样本。email、电话、URL、长数字、地址、
+联系方式句柄、控制/双向字符和版本阻止词在写前拒绝；来源只保存由服务端可信 IP 经独立 HMAC domain
+生成的 64 位十六进制摘要，不保存 IP/User-Agent。相同 query/source/UTC day 只能贡献一次；任何公开
+近期建议或热门词都要求至少 5 个不同来源，读取时再次做敏感词筛查。样本默认 30 天到期，数据库强制
+不超过 90 天，过期行按有界批次清理；低频行始终内部可见性且绝不进入响应。

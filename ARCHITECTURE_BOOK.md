@@ -1033,6 +1033,18 @@ evaluation/candidate 只有一行；数据库 check 约束有界分值、Hamming
 联系方式指纹精确匹配和图片 Hamming 距离，最多返回 10 条。`(type,created_at DESC)`、指纹反向索引及
 候选审核索引支持有界访问；OpenSearch 不参与审核写事务，也不是重复证据事实源。
 
+## 6.9 SEARCH-004 词典与查询样本
+
+`search_dictionary_states` 是 singleton 当前版本指针，`search_dictionary_versions` 保存 JSON 定义、
+content hash、revision、创建/编辑/发布 actor 和追加回滚来源。每个 version 唯一、每个 dictionary
+最多一个未发布草稿；发布行由 trigger 禁止更新/删除，当前指针和发布在 Serializable 事务内一起推进。
+定义由 API 应用服务的共享 Zod 契约验证，Repository 只负责并发和持久化。
+
+`search_query_samples` 保存经过应用层 bot/PII 筛查的内部 query、locale/可选 region、query hash、
+独立 HMAC source hash、UTC window date 和到期时间。`(query_hash,source_hash,window_date)` 防止同源
+每日重复贡献；查询按 locale/region/time、query/time 和 expiresAt 有界索引。数据库约束 hash、locale、
+region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COUNT(DISTINCT source_hash) >= 5`。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1626,7 +1638,22 @@ permission/role、用户状态及最多 50 个最小组织摘要。`permissions`
 - `SearchCursorPage.nextCursor` 最长 2048 且必须与全部 query 条件一致；失效 cursor 返回 410。
   OpenSearch 超时返回 504，依赖或投影不可用返回 503，全部使用 RFC 9457 Problem Details。
 - 价格输入是最多两位小数的 decimal string，响应复用 `Money`；距离仅在 DISTANCE 排序时返回，
-  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 在 SEARCH-004 前固定为 null。
+  位置仅来自已经模糊化的公共索引 point。`correctedQuery` 仅在命中已发布同义词的非 canonical
+  精确词时返回 canonical 值。
+
+## 8.24 SEARCH-004 发现契约
+
+- `GET /search/suggestions` 的 q 可省略；q 最大 50，regionCode、locale 和 limit 均严格有界，
+  unknown key 返回 400。响应是 strict `SearchSuggestionResponse`，类型仅 QUERY/CATEGORY/REGION，
+  最多 10 条，使用 `private, no-store`。
+- `GET /search/trending` 只接受 DAY_1/DAY_7/DAY_30、可选 region/locale 和 1–10 limit。strict
+  `SearchTrendingResponse` 只返回 query/rank/locale，不返回原始计数或来源数，缓存为
+  `public, max-age=300`。
+- 两个端点无认证但不使用客户端身份决定隐私阈值；依赖不可用返回 503 Problem Details。低于五个
+  独立来源、敏感或 bot 流量不会进入公共结果，空结果是真实状态而不是模拟数据。
+- 词典维护没有开放匿名/公共 mutation；内部 `SearchDictionaryService` 验证定义、生成 content hash，
+  再经 Store/Repository 保存、双人发布或追加式回滚。未来 Admin UI 必须复用该应用服务与 Policy，
+  Controller 不得直接调用 Prisma。
 
 ---
 
@@ -1796,8 +1823,27 @@ OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/s
 因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
 
 `socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
-分类/地区、坐标和金额均不记录。SEARCH-004 才负责同义词、建议和热门查询隐私，SEARCH-005 才负责
-全量重建与 alias 回滚。
+分类/地区、坐标和金额均不记录。SEARCH-004 负责的同义词、建议和热门查询隐私见下一节；
+SEARCH-005 才负责全量重建与 alias 回滚。
+
+## 9.14 SEARCH-004 同义词、建议与热门查询隐私
+
+PostgreSQL 的 `search_dictionary_states/search_dictionary_versions` 是词典事实源。词典只有一个草稿，
+发布前必须由不同于最后编辑者的审核人确认；已发布版本不可更新或删除，回滚通过复制历史定义为新草稿，
+再由第二人审核发布为追加版本完成。定义限制为中英/通用 locale、可选 region scope、最多 500 组同义词和 1,000 个阻止词；
+同 scope 的词不能跨组歧义复用。搜索 cursor v2 固定 `dictionaryVersion`，因此翻页期间发布新词典不会
+改变已有 PIT 的查询语义。每次最多展开 8 个审核词，组间 OR、每个词内部仍按 AND 匹配。
+
+`GET /search/suggestions` 可省略 q，空查询只返回 active Category/Region；有 q 时按词典、taxonomy、
+达到隐私阈值的近期有效查询去重，最多 10 条并使用 `private, no-store`。`GET /search/trending` 支持
+1/7/30 天和可选 region，最多 10 条，响应只公开 rank，不公开 count，并使用五分钟公共缓存。
+BUSINESS/PROVIDER 实体建议在相应信任档案任务完成前不进入契约，不使用占位实体或伪造热门词。
+
+只有首屏、有公开结果、长度合规、非 bot 的查询可成为内部样本。email、电话、URL、长数字、地址、
+联系方式句柄、控制/双向字符和版本阻止词在写前拒绝；来源只保存由服务端可信 IP 经独立 HMAC domain
+生成的 64 位十六进制摘要，不保存 IP/User-Agent。相同 query/source/UTC day 只能贡献一次；任何公开
+近期建议或热门词都要求至少 5 个不同来源，读取时再次做敏感词筛查。样本默认 30 天到期，数据库强制
+不超过 90 天，过期行按有界批次清理；低频行始终内部可见性且绝不进入响应。
 
 ---
 
@@ -2819,6 +2865,19 @@ Idempotency-Key 或请求哈希。
 - 依赖故障：PIT 过期、查询超时、OpenSearch 不可用分别映射 410/504/503 且 no-store；搜索 adapter
   不在应用启动或 Listing 写入链做远程探测，详情、发布和 PostgreSQL canonical 状态保持可用。
 
+## 14.28 SEARCH-004 查询发现威胁和缓解
+
+- 低频 PII 枚举：样本写前拒绝 email、电话、URL、长数字、英中地址、联系方式句柄、控制/双向字符及
+  运营阻止词；建议/热门读取再次筛查，并硬性要求至少五个不同 HMAC 来源。响应不返回 count。
+- bot/操纵：缺失或命中 crawler/headless/脚本特征的 User-Agent 不采样；来源摘要只由可信代理解析后的
+  IP 和独立 HMAC key 生成，因此轮换 User-Agent 不能增加来源数；同 query/source/UTC day 唯一。
+- 词典投毒/漂移：定义有严格大小、locale、region、重复和字符约束；最后编辑者不能自行发布；发布行
+  由 PostgreSQL trigger 保护不可变，回滚追加新版本。cursor v2 绑定词典版本，不跨页切换规则。
+- 数据泄漏/保留：数据库内部保存已筛查 query 文本以生成建议，但不保存原 IP/User-Agent；默认 30 天
+  过期且数据库上限 90 天。日志和指标从不记录 query/hash/source/region/version 等动态值。
+- 依赖降级：首次普通搜索在发现库不可用时可用无同义词的 version 0 继续；已绑定非零词典的 cursor
+  若无法加载历史版本则 503，避免静默改变语义。建议/热门依赖失败明确 503，不回退展示低频原文。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3207,6 +3266,14 @@ histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可�
 Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
 零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
 
+## 17.14 SEARCH-004 发现隐私指标
+
+`socal_search_discovery_events_total{operation,outcome}` 仅允许固定 operation：
+dictionary/sample/suggestions/trending/retention，和固定 outcome：
+success/empty/recorded/duplicate/rejected_bot/rejected_sensitive/unavailable。不得添加 query、query hash、
+source hash、IP、User-Agent、region、locale、dictionary version、count 或资源 ID 标签。HTTP RED
+继续覆盖两个公开端点；热门内容、来源数和测试样本数不得作为生产 Dashboard 数据。
+
 ---
 
 <!-- source: docs\18-testing-quality.md -->
@@ -3549,6 +3616,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - metrics 测试只接受固定 outcome/sort/geo，禁止 query、cursor、PIT 或资源标识。全仓格式、类型、
   lint、测试、八应用构建、运行时、生产 Chromium 和四镜像门禁继续执行。
 
+## 18.30 SEARCH-004 发现与隐私验证增量
+
+- 契约测试覆盖空 q、安全 normalization、region/locale/window/limit、unknown key、strict 响应、无 count、
+  缓存头和 400/503 Problem Details。
+- 单元测试覆盖 locale/region 同义词 scope、最多八词、canonical correction、cursor 词典版本固定、
+  bot/PII/阻止词拒绝、IP HMAC 来源、User-Agent 轮换不增源、空查询 taxonomy 和敏感二次筛查。
+- PostgreSQL 集成测试覆盖草稿并发、双人发布、发布不可变、追加回滚、每日 source 去重、五来源硬阈值、
+  literal prefix、30–90 天保留约束和有界过期删除；低于阈值即使调用方传 1 也不得返回。
+- 真实 OpenSearch 测试证明审核扩展可命中且不改变索引事实源；CI 继续运行 fresh baseline、upgrade、
+  全量质量、Linux Chromium 和四镜像。没有本地服务时必须明确 skip，不能声称通过。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3772,6 +3850,17 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 每月：权限审查、Feature Flag 清理、数据保留任务、容量趋势、恢复点验证。
 
 每季度：灾难恢复演练、渗透/威胁模型更新、供应商与合规审查、运行手册演练。
+
+## 20.16 搜索发现与隐私异常
+
+- `rejected_bot/rejected_sensitive` 突增先检查流量来源、代理解析和阻止词版本，不查看或复制原 query；
+  禁止临时降低五来源阈值、关闭筛查或开放 count。
+- 词典发布前核对 content hash、编辑者与审核者分离、scope 冲突和 targeted 测试。错误发布通过
+  `SearchDictionaryService.rollback` 追加回滚草稿，必须由另一人审核发布为新版本，不更新/删除历史发布行。
+- `unavailable` 增长时区分 dictionary/sample/suggestions/trending/retention。普通首屏搜索可降级为
+  version 0；建议/热门或已固定非零版本的 cursor 返回 503。不要用手工热门词伪装依赖恢复。
+- 每日确认过期清理有进展且最老未过期样本不超过批准窗口；积压时只提高有界批次/调度频率。物理回滚
+  按 migration `ROLLBACK.md` 先停写、保留词典审计并让短期样本安全到期。
 
 ---
 
@@ -4099,6 +4188,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 指标只有固定 outcome/sort/geo；query/cursor/PIT/ID/筛选值/坐标/金额不进入日志或标签。OpenAPI、
   生成类型、单元/HTTP/真实 OpenSearch、完整质量和保护门禁通过后方可标记完成。
 
+## 22.16 SEARCH-004 发现隐私验收
+
+- 已发布词典不可变、只有一个草稿、最后编辑者不能发布，历史回滚先追加草稿并由第二人发布新版本；
+  同 scope 歧义词拒绝。
+- cursor 固定词典版本；最多八个审核词 OR 展开，每词内部 AND；真实 OpenSearch 能通过同义词命中。
+- 建议与热门契约严格、有界、无占位数据；空 q 只用 active taxonomy，热门仅 rank 且无 count。
+- 只有首屏、有效结果、非 bot、非敏感 query 可采样；来源为 IP 派生 HMAC，同源换 User-Agent 不增源；
+  每 query/source/day 唯一，少于五来源绝不公开。
+- 样本默认 30 天、数据库不超过 90 天并可有界清理；query/source/hash 不进入日志或指标标签。
+- OpenAPI/生成类型、Prisma/migration/回滚说明、单元/HTTP/PostgreSQL/OpenSearch、全量质量、Linux
+  Chromium 和四镜像保护门禁均有真实通过证据后才可标记 done。
+
 ---
 
 <!-- source: docs\23-content-taxonomy.md -->
@@ -4323,6 +4424,17 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 ## 24.5 备份中的删除
 
 不可现实地逐条修改不可变备份时：备份保持加密、严格访问、仅灾难恢复、按短周期过期；若恢复，必须重新应用删除 tombstone/任务后才可投入生产。此流程需在恢复演练中验证。
+
+## 24.6 SEARCH-004 查询样本执行基线
+
+`search_query_samples` 只接收应用层通过 bot/敏感筛查且有公开结果的首屏 query。query 文本为内部数据，
+来源只保存服务端 IP 经独立 HMAC domain 生成的摘要；不保存原 IP 或 User-Agent。默认 expiresAt 为
+createdAt 后 30 天，数据库约束强制大于 createdAt 且不超过 90 天，并用 `(expires_at,id)` 有界删除。
+所有读取忽略过期行；低于五个不同来源的 query 只等待到期删除，不进入建议、热门、日志或分析事件。
+
+过期清理失败不应使主搜索失败，但必须记录固定 `retention/unavailable` 指标并重试。词典版本属于行为
+审计而非 query 样本：已发布版本不可更新/删除，常规应用回滚保留；物理删除仅按 migration 回滚说明、
+停写和审计导出后执行。
 
 ---
 
@@ -5076,3 +5188,14 @@ query-bound HMAC cursor、PIT 生命周期、分页编排和低基数结果指�
 OpenSearch 查询 adapter，构造固定查询并把 strict v1 source 映射为最小公共 DTO。Controller/Service
 不导入 Prisma，adapter 不写 PostgreSQL 或 OpenSearch 文档；Worker 仍独占索引写入。Web/Admin
 不导入搜索 adapter，PostgreSQL 始终是 canonical，新增搜索功能没有改变进程、数据库或 REST 版本。
+
+## 30.10 SEARCH-004 发现实现边界
+
+`SearchDiscoveryService` 负责同义词解析、隐私筛查、HMAC 来源、建议/热门编排和固定指标；
+`SearchDictionaryService` 是未来受 Policy 保护的运营 mutation 应用边界；Controller 只做生成契约验证、
+请求上下文提取、缓存头和 Problem Details。`DatabaseSearchDiscoveryStore` 组合专用
+`SearchDiscoveryRepository` 与只读 `TaxonomyRepository`，是唯一 Prisma adapter。
+
+普通 Search Store 只接收已解析且最多八个 `queryTerms`；OpenSearch 仍是可重建只读派生状态。
+测试注入 Search Store 时默认使用显式 no-op discovery store，避免单元/HTTP 测试意外访问数据库；
+生产未注入时使用 PostgreSQL adapter。没有新增服务、队列、数据库或 API 范式，因此不需要 ADR。

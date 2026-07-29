@@ -130,3 +130,14 @@
 每月：权限审查、Feature Flag 清理、数据保留任务、容量趋势、恢复点验证。
 
 每季度：灾难恢复演练、渗透/威胁模型更新、供应商与合规审查、运行手册演练。
+
+## 20.16 搜索发现与隐私异常
+
+- `rejected_bot/rejected_sensitive` 突增先检查流量来源、代理解析和阻止词版本，不查看或复制原 query；
+  禁止临时降低五来源阈值、关闭筛查或开放 count。
+- 词典发布前核对 content hash、编辑者与审核者分离、scope 冲突和 targeted 测试。错误发布通过
+  `SearchDictionaryService.rollback` 追加回滚草稿，必须由另一人审核发布为新版本，不更新/删除历史发布行。
+- `unavailable` 增长时区分 dictionary/sample/suggestions/trending/retention。普通首屏搜索可降级为
+  version 0；建议/热门或已固定非零版本的 cursor 返回 503。不要用手工热门词伪装依赖恢复。
+- 每日确认过期清理有进展且最老未过期样本不超过批准窗口；积压时只提高有界批次/调度频率。物理回滚
+  按 migration `ROLLBACK.md` 先停写、保留词典审计并让短期样本安全到期。

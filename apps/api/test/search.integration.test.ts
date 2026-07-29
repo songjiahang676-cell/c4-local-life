@@ -206,6 +206,28 @@ integration("public search with OpenSearch", () => {
     });
   }
 
+  it("matches a reviewed synonym expansion while keeping OpenSearch derived", async () => {
+    const snapshotId = await store.openSnapshot(120);
+    const result = await store.search({
+      snapshotId,
+      snapshotAt: "2026-07-29T12:00:00.000Z",
+      criteria: {
+        q: "apt",
+        type: "RENTAL",
+        regionCode: "US-CA-ORANGE-IRVINE",
+        sort: "RELEVANCE",
+        limit: 10,
+      },
+      queryTerms: ["apt", "apartment"],
+      keepAliveSeconds: 120,
+      timeoutMilliseconds: 3_000,
+    });
+
+    expect(result.hits).toHaveLength(3);
+    expect(result.hits.every((hit) => hit.result.title.includes("apartment"))).toBe(true);
+    await store.closeSnapshot(snapshotId);
+  });
+
   it("executes geo filters, fixed facets, and PIT search_after without admitting later writes", async () => {
     const snapshotId = await store.openSnapshot(120);
     const request = {
