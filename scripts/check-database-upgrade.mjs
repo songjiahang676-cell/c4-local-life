@@ -257,6 +257,23 @@ try {
             AND column_name IN ('listing_id', 'sort_order')
        ) AS binding_columns`,
   );
+  const listingSubmissionStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.moderation_evaluations') AS evaluations,
+       to_regclass('public.moderation_rule_hits') AS rule_hits,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'moderation_evaluations_actor_user_id_idempotency_key_key'
+       ) AS actor_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname IN ('moderation_evaluations_immutable', 'moderation_rule_hits_immutable')
+            AND NOT tgisinternal
+       ) AS immutable_triggers`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -290,7 +307,11 @@ try {
     !listingDraftStorage.rows[0].owner_idempotency ||
     !listingMediaBindingStorage.rows[0].binding_check ||
     !listingMediaBindingStorage.rows[0].binding_index ||
-    listingMediaBindingStorage.rows[0].binding_columns !== 2
+    listingMediaBindingStorage.rows[0].binding_columns !== 2 ||
+    listingSubmissionStorage.rows[0].evaluations !== "moderation_evaluations" ||
+    listingSubmissionStorage.rows[0].rule_hits !== "moderation_rule_hits" ||
+    !listingSubmissionStorage.rows[0].actor_idempotency ||
+    listingSubmissionStorage.rows[0].immutable_triggers !== 2
   ) {
     throw new Error("Latest migration did not preserve prior data and expected schema state");
   }
@@ -316,6 +337,7 @@ try {
       mediaProcessingStorage: true,
       listingDraftStorage: true,
       listingMediaBindingStorage: true,
+      listingSubmissionStorage: true,
     }),
   );
 } finally {

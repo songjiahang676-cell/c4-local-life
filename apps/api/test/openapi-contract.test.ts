@@ -252,7 +252,7 @@ describe("canonical OpenAPI contract", () => {
 
     expect(contract.openapi).toMatch(/^3\.1\./);
     expect(Object.keys(contract.paths)).toHaveLength(45);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(99);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(100);
     expect(operationIds).toHaveLength(54);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
@@ -322,7 +322,7 @@ describe("canonical OpenAPI contract", () => {
     expect(operation?.responses["403"]).toBeDefined();
   });
 
-  it("validates implemented listing draft create, owner-read, and update responses", async () => {
+  it("validates implemented listing draft create, owner-read, update, and submit responses", async () => {
     const issued = await sessions.issueSession(contractUserId, {});
     const cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
     const created = await server.inject({
@@ -362,6 +362,16 @@ describe("canonical OpenAPI contract", () => {
       },
       payload: { title: "Updated synthetic contract rental" },
     });
+    const submitted = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "contract-listing-submit-0001",
+        "if-match": '"listing-v2"',
+      },
+    });
     const createSchema =
       contract.paths["/listings"]?.post?.responses["201"]?.content?.["application/json"]?.schema;
     const readSchema =
@@ -371,15 +381,23 @@ describe("canonical OpenAPI contract", () => {
       contract.paths["/listings/{listingId}"]?.patch?.responses["200"]?.content?.[
         "application/json"
       ]?.schema;
+    const submitSchema =
+      contract.paths["/listings/{listingId}/submit"]?.post?.responses["202"]?.content?.[
+        "application/json"
+      ]?.schema;
 
     expect(created.statusCode).toBe(201);
     expect(read.statusCode).toBe(200);
     expect(updated.statusCode).toBe(200);
+    expect(submitted.statusCode).toBe(202);
     expect(ajv.validate(createSchema ?? false, created.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
     expect(ajv.validate(readSchema ?? false, read.json()), ajv.errorsText(ajv.errors)).toBe(true);
     expect(ajv.validate(updateSchema ?? false, updated.json()), ajv.errorsText(ajv.errors)).toBe(
+      true,
+    );
+    expect(ajv.validate(submitSchema ?? false, submitted.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
   });

@@ -33,3 +33,10 @@
 - 依赖、容器、IaC、SAST、secret scanning 和 DAST 纳入 CI/CD。
 
 完整威胁模型和控制要求见 `docs/14-security-privacy-compliance.md`。
+
+## 提交审核数据最小化
+
+Listing 提交要求 ACTIVE actor、对象级 owner/组织写权限、强 ETag 和幂等键。风险规则只把
+规则代码、版本、严重度和证据字段名写入不可变审核证据；匹配到的邮箱、电话、付款词或正文
+不会复制到命中记录、公开响应或日志。中高风险案件不能绕过后端授权，低风险自动通过仍保留
+版本化 evaluation、Audit 和 Outbox。

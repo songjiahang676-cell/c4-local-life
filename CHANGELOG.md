@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added versioned Listing submission risk rules, owner-scoped conditional/idempotent submission,
+  low-risk auto-publication, medium/high moderation queues, immutable rule-hit evidence, and
+  transactional Audit/Outbox state changes.
 - Added the bilingual/mobile Rental dynamic form, debounced account-scoped autosave recovery,
   strict same-origin Web BFF, owner-safe media status polling, and atomic READY media binding.
 - Added shared strict TypeScript, typed ESLint, and Prettier configuration for every workspace.

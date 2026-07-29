@@ -792,13 +792,27 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ListingId"
         - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "202":
           description: Listing entered automated/manual review workflow
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkflowTransitionResponse"
+                $ref: "#/components/schemas/ListingSubmissionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
         "422":
@@ -2683,6 +2697,46 @@ components:
               type: [string, "null"]
               pattern: "^[A-Z][A-Z0-9_]{2,63}$"
             updatedAt: { type: string, format: date-time }
+    ListingSubmissionResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required:
+            [
+              resourceId,
+              previousStatus,
+              currentStatus,
+              previousModerationStatus,
+              currentModerationStatus,
+              riskTier,
+              ruleSetVersion,
+              caseId,
+              occurredAt,
+              version,
+            ]
+          additionalProperties: false
+          properties:
+            resourceId: { type: string, format: uuid }
+            previousStatus:
+              $ref: "#/components/schemas/ContentStatus"
+            currentStatus:
+              $ref: "#/components/schemas/ContentStatus"
+            previousModerationStatus:
+              type: string
+              enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED]
+            currentModerationStatus:
+              type: string
+              enum: [NOT_REVIEWED, AUTO_APPROVED, PENDING_REVIEW, APPROVED, REJECTED, ESCALATED]
+            riskTier:
+              type: string
+              enum: [LOW, MEDIUM, HIGH]
+            ruleSetVersion: { type: integer, minimum: 1 }
+            occurredAt: { type: string, format: date-time }
+            caseId: { type: [string, "null"], format: uuid }
+            version: { type: integer, minimum: 1 }
     WorkflowTransitionResponse:
       type: object
       required: [data]

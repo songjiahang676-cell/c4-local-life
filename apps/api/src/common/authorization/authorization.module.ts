@@ -21,6 +21,7 @@ export function createPolicyService(): PolicyService {
   }
   policies.register(activeUserPolicyActions.listingDraftCreate, requireActiveActorPermissionPolicy);
   policies.register(activeUserPolicyActions.listingDraftUpdate, requireActiveActorPermissionPolicy);
+  policies.register(activeUserPolicyActions.listingSubmit, requireActiveActorPermissionPolicy);
   policies.register(
     listingObjectPolicyActions.draftRead,
     ownerOrOrganizationPolicy({
@@ -31,6 +32,13 @@ export function createPolicyService(): PolicyService {
   );
   policies.register(
     listingObjectPolicyActions.draftWrite,
+    ownerOrOrganizationPolicy({
+      allowOwner: true,
+      organizationRoles: ["OWNER", "ADMIN", "EDITOR"],
+    }),
+  );
+  policies.register(
+    listingObjectPolicyActions.submit,
     ownerOrOrganizationPolicy({
       allowOwner: true,
       organizationRoles: ["OWNER", "ADMIN", "EDITOR"],

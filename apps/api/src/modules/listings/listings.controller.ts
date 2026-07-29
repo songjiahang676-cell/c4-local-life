@@ -27,6 +27,7 @@ import {
   type ListListingsQuery,
   type ListingOwnerResponse,
   type ListingResponse,
+  type ListingSubmissionResponse,
   type UpdateListingInput,
 } from "@socal/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -83,6 +84,38 @@ export class ListingsController {
       void reply
         .header("ETag", listingEtag(response.data.version))
         .header("Location", `/v1/listings/${response.data.id}`);
+      return response;
+    } catch (error) {
+      this.#rethrow(error, reply);
+    }
+  }
+
+  @Post(":listingId/submit")
+  @HttpCode(202)
+  @RequirePolicy(activeUserPolicyActions.listingSubmit)
+  @Header("Cache-Control", "no-store")
+  async submit(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Param("listingId", new ParseUUIDPipe({ version: "4" })) listingId: string,
+    @Headers("if-match") rawIfMatch: string | undefined,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+  ): Promise<ListingSubmissionResponse> {
+    const expectedVersion = listingVersionFromEtag(rawIfMatch);
+    if (!expectedVersion) {
+      throw new BadRequestException("A valid If-Match Listing ETag is required");
+    }
+    const idempotencyKey = new SchemaValidationPipe(idempotencyKeySchema).transform(
+      rawIdempotencyKey,
+    );
+    try {
+      const response = await this.listings.submit(
+        this.contexts.require(request),
+        listingId,
+        expectedVersion,
+        idempotencyKey,
+      );
+      void reply.header("ETag", listingEtag(response.data.version));
       return response;
     } catch (error) {
       this.#rethrow(error, reply);

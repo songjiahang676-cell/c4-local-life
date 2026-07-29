@@ -97,4 +97,65 @@ describe("ListingsService", () => {
       service.update(ownerContext("PATCH"), created.data.id, 1, { title: "Stale title" }),
     ).rejects.toMatchObject({ currentVersion: 2 });
   });
+
+  it("auto-publishes a low-risk submission exactly once", async () => {
+    const { service, store } = createService();
+    const created = await service.create(ownerContext(), "create-draft-0003", createInput());
+    const submitted = await service.submit(
+      ownerContext(),
+      created.data.id,
+      1,
+      "submit-listing-0001",
+    );
+    const retried = await service.submit(ownerContext(), created.data.id, 1, "submit-listing-0001");
+
+    expect(submitted).toMatchObject({
+      data: {
+        resourceId: created.data.id,
+        previousStatus: "DRAFT",
+        currentStatus: "PUBLISHED",
+        previousModerationStatus: "NOT_REVIEWED",
+        currentModerationStatus: "AUTO_APPROVED",
+        riskTier: "LOW",
+        ruleSetVersion: 1,
+        caseId: null,
+        version: 3,
+      },
+    });
+    expect(retried).toEqual(submitted);
+    expect(store.auditActions).toEqual(["listing.draft.created", "listing.submission.evaluated"]);
+    expect(store.outboxEvents).toEqual([
+      "listing.draft.created",
+      "listing.submitted",
+      "listing.published",
+    ]);
+    await expect(
+      service.submit(ownerContext(), created.data.id, 3, "submit-listing-0001"),
+    ).rejects.toBeInstanceOf(ListingIdempotencyConflictError);
+  });
+
+  it("escalates a high-risk submission into a moderation case", async () => {
+    const { service } = createService();
+    const created = await service.create(
+      ownerContext(),
+      "create-draft-0004",
+      createInput("Gift card required before viewing"),
+    );
+    const submitted = await service.submit(
+      ownerContext(),
+      created.data.id,
+      1,
+      "submit-listing-0002",
+    );
+
+    expect(submitted).toMatchObject({
+      data: {
+        currentStatus: "SUBMITTED",
+        currentModerationStatus: "ESCALATED",
+        riskTier: "HIGH",
+        caseId: "77777777-7777-4777-8777-777777777777",
+        version: 3,
+      },
+    });
+  });
 });

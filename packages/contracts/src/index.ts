@@ -14,6 +14,7 @@ export type PublicListingView = components["schemas"]["PublicListingView"];
 export type ListingOwnerView = components["schemas"]["ListingOwnerView"];
 export type ListingResponse = components["schemas"]["ListingResponse"];
 export type ListingOwnerResponse = components["schemas"]["ListingOwnerResponse"];
+export type ListingSubmissionResponse = components["schemas"]["ListingSubmissionResponse"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ProblemDetails = components["schemas"]["ProblemDetails"];

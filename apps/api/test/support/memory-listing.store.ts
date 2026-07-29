@@ -6,11 +6,17 @@ import type {
   ListingDraftReferences,
   ListingDraftWriteFields,
   ListingStore,
+  FindListingSubmissionRetryInput,
+  FindListingSubmissionRetryResult,
+  ListingSubmissionCandidate,
+  ListingSubmissionProjection,
   OwnerListingProjection,
   PublicListingProjection,
   ResolveListingDraftReferencesInput,
   UpdateListingDraftInput,
   UpdateListingDraftResult,
+  SubmitListingInput,
+  SubmitListingResult,
 } from "../../src/modules/listings/listing.store";
 import { MemoryTaxonomyStore } from "./memory-taxonomy.store";
 
@@ -70,6 +76,10 @@ export function createMemoryListingTaxonomyStore(): MemoryTaxonomyStore {
           categoryId: memoryListingCategoryId,
           version: 1,
           fields: [],
+          publicationPolicy: {
+            defaultLifetimeDays: 30,
+            manualReviewRequired: false,
+          },
         },
         contentHash: "0".repeat(64),
         basedOnVersion: null,
@@ -197,6 +207,10 @@ export class MemoryListingStore implements ListingStore {
   readonly #rows = new Map<string, OwnerListingProjection>();
   readonly #publicRows = new Map<string, PublicListingProjection>();
   readonly #idempotency = new Map<string, { hash: string; listingId: string }>();
+  readonly #submissionIdempotency = new Map<
+    string,
+    { hash: string; submission: ListingSubmissionProjection }
+  >();
   readonly #organizationReaders = new Map<string, Set<string>>();
   readonly #organizationWriters = new Map<string, Set<string>>();
   readonly #readyMedia = new Set<string>();
@@ -308,6 +322,104 @@ export class MemoryListingStore implements ListingStore {
   }): Promise<OwnerListingProjection | null> {
     const row = this.#rows.get(input.listingId);
     return Promise.resolve(row && this.#canRead(input.actorUserId, row) ? cloneOwner(row) : null);
+  }
+
+  findSubmissionRetry(
+    input: FindListingSubmissionRetryInput,
+  ): Promise<FindListingSubmissionRetryResult> {
+    const evidence = this.#submissionIdempotency.get(
+      `${input.actorUserId}:${input.idempotencyKey}`,
+    );
+    if (!evidence) return Promise.resolve({ kind: "missing" });
+    return Promise.resolve(
+      evidence.hash === input.requestHash
+        ? { kind: "exact_retry", submission: structuredClone(evidence.submission) }
+        : { kind: "conflict" },
+    );
+  }
+
+  findSubmissionCandidate(input: {
+    actorUserId: string;
+    listingId: string;
+  }): Promise<ListingSubmissionCandidate | null> {
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canWrite(input.actorUserId, row)) return Promise.resolve(null);
+    return Promise.resolve({
+      id: row.id,
+      type: row.type,
+      ownerId: row.ownerId,
+      organizationId: row.organizationId,
+      status: row.status,
+      moderationStatus: row.moderationStatus,
+      title: row.title,
+      summary: row.summary,
+      body: row.body,
+      priceAmount: row.price?.amount ?? null,
+      priceUnit: row.price?.unit ?? null,
+      formSchemaDefinition: {
+        categoryId: row.category.id,
+        version: row.formSchemaVersion,
+        fields: [],
+        publicationPolicy: {
+          defaultLifetimeDays: 30,
+          manualReviewRequired: false,
+        },
+      },
+      actorCreatedAt: new Date("2025-01-01T00:00:00.000Z"),
+      publishedAt: row.publishedAt,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      version: row.version,
+    });
+  }
+
+  submit(input: SubmitListingInput): Promise<SubmitListingResult> {
+    const key = `${input.actorUserId}:${input.idempotencyKey}`;
+    const evidence = this.#submissionIdempotency.get(key);
+    if (evidence) {
+      return Promise.resolve(
+        evidence.hash === input.requestHash
+          ? { kind: "exact_retry", submission: structuredClone(evidence.submission) }
+          : { kind: "idempotency_conflict" },
+      );
+    }
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canWrite(input.actorUserId, row)) {
+      return Promise.resolve({ kind: "not_found" });
+    }
+    if (row.version !== input.expectedVersion) {
+      return Promise.resolve({ kind: "version_conflict", currentVersion: row.version });
+    }
+    if (row.status !== "DRAFT" || row.moderationStatus !== "NOT_REVIEWED") {
+      return Promise.resolve({ kind: "state_conflict", currentVersion: row.version });
+    }
+    const updated: OwnerListingProjection = {
+      ...row,
+      status: input.decision.contentStatus,
+      moderationStatus: input.decision.moderationStatus,
+      publishedAt: input.decision.publishedAt,
+      expiresAt: input.decision.expiresAt,
+      updatedAt: input.occurredAt,
+      version: input.decision.resultVersion,
+    };
+    this.#rows.set(updated.id, updated);
+    const submission = {
+      resourceId: row.id,
+      previousStatus: "DRAFT" as const,
+      currentStatus: input.decision.contentStatus,
+      previousModerationStatus: "NOT_REVIEWED" as const,
+      currentModerationStatus: input.decision.moderationStatus,
+      riskTier: input.riskTier,
+      ruleSetVersion: input.ruleSetVersion,
+      caseId: input.riskTier === "LOW" ? null : "77777777-7777-4777-8777-777777777777",
+      occurredAt: input.occurredAt,
+      version: input.decision.resultVersion,
+    };
+    this.#submissionIdempotency.set(key, { hash: input.requestHash, submission });
+    this.auditActions.push("listing.submission.evaluated");
+    this.outboxEvents.push(...input.decision.transitions.map((event) => event.eventType));
+    return Promise.resolve({ kind: "submitted", submission: structuredClone(submission) });
   }
 
   #canRead(actorUserId: string, row: OwnerListingProjection): boolean {

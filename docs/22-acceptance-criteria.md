@@ -77,6 +77,12 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
 提交、审核、发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
 
+`MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
+版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
+Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
+规则阈值或内部输入。公开列表/详情、人工审核动作、删除和过期仍由 LIST-005/ADMIN-002 等后续
+切片完成，因此 22.4 尚不能整体标记完成。
+
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
 决定 bucket/key；普通媒体路径拒绝 SVG/HTML 和验证文档；原始对象在 READY 前没有公共 URL。

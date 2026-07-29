@@ -884,6 +884,14 @@ Gate 0 CI 同时执行两类迁移保护：
 - OpenSearch、Redis 不作为备份事实源；定义全量重建任务。
 - 每季度做恢复演练，验证不仅能恢复数据库，还能重新索引、重放任务并恢复应用密钥依赖。
 
+### MOD-001 审核证据模型
+
+`moderation_evaluations` 以 Listing + 提交版本唯一，并以 actor +
+`Idempotency-Key` 唯一；保存规则集版本、风险层、输入哈希和最终状态/版本。
+`moderation_rule_hits` 只保存稳定规则代码、规则版本、严重度和证据字段名。
+两表由数据库触发器阻止 UPDATE/DELETE。中高风险 evaluation 与
+`moderation_cases` 一对一；Listing 状态、evaluation、case、Audit 和 Outbox 在同一事务提交。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1355,6 +1363,14 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
 数据库模型和内部领域对象不从 OpenAPI 生成；它们通过显式 application mapping 隔离，避免把
 私有字段意外暴露为公共响应。
 
+## 8.15 Listing 提交契约
+
+`POST /listings/{listingId}/submit` 无请求体，必须携带强 Listing ETag 的 `If-Match` 和
+16–128 字符的 `Idempotency-Key`。成功固定返回 202、`no-store`、新 ETag，以及前后内容/
+审核状态、风险层、规则集版本、可空 caseId、发生时间和资源版本。响应不公开命中规则、
+阈值或输入摘要。相同 actor/key/Listing 版本返回原结果；同 key 不同请求返回 409。
+owner 范围外统一 404，受限账户 403，缺少/错误前置条件 400。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -1690,6 +1706,19 @@ PUBLISHED
 ## 11.10 审计与隐私
 
 审计日志包含 who/what/when/target/reason/requestId/before-after hash，不保存超过必要范围的敏感原文。验证材料和举报证据独立授权、加密、定期清理。任何导出有水印/审计/时限和最小字段。
+
+## 11.11 MOD-001 已实现的提交风险基线
+
+`POST /listings/{listingId}/submit` 要求 ACTIVE actor、当前 owner 或组织
+OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集固定为
+`listing-submission` v1；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式
+以及平台外付款诱导。低风险按提交时绑定的历史表单发布策略自动发布；中风险创建普通审核案件；
+高风险进入优先队列并标记 `ESCALATED`。
+
+一次事务同时写 Listing 状态/版本、不可变 `ModerationEvaluation`、仅含规则代码/版本/证据字段名
+的 `ModerationRuleHit`、可选 `ModerationCase`、最小 Audit 和逐状态 Outbox。命中原文、阈值、
+手机号、邮箱和风险输入不进入公开响应或日志；输入仅保存 canonical SHA-256。后续调整规则必须
+增加规则集/规则版本，不能改写历史证据。
 
 ---
 
@@ -2140,6 +2169,14 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 ## 14.13 事件响应
 
 建立 Sev0–Sev3 分级、值班、证据保全、密钥旋转、用户/监管通知决策和事后复盘。不得为了“清理”而删除审计证据；也不得无限保存无关 PII。详见 `docs/20-operations-runbook.md`。
+
+## 14.14 提交审核证据最小化
+
+`MOD-001` 的提交风险控制在授权后的应用层执行，并在 repository 事务内再次验证 ACTIVE actor、
+当前组织写角色、DRAFT/NOT_REVIEWED 状态和版本。规则命中证据不保存匹配原文，只保存规则代码、
+版本、严重度和字段名；公开响应仅返回 LOW/MEDIUM/HIGH 与规则集版本。数据库将 evaluation/hit
+设为不可变，避免审核历史被覆盖；Audit/Outbox payload 不包含正文、attributes、联系信息、
+Idempotency-Key 或请求哈希。
 
 ---
 
@@ -2667,6 +2704,15 @@ pnpm test:e2e:ci
 `public` 和 `.next/static`，因此两条路径都先运行 `scripts/prepare-standalone-runtime.mjs`。
 HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`；CI 即使失败也上传报告。
 
+## 18.16 MOD-001 验证增量
+
+- 纯规则测试覆盖低/中/高风险、规则顺序、规则版本和无原文证据。
+- HTTP/契约测试覆盖强 ETag、幂等重试/冲突、owner/组织对象授权、guest/受限/外部用户和
+  `no-store` 安全响应。
+- PostgreSQL 集成测试覆盖一次事务内的状态、evaluation/hits、case、Audit/Outbox，以及
+  evaluation/hit 不可变触发器。
+- 空库重放、上一发布基线升级和数据库负例必须识别提交审核表、唯一约束、状态一致性与触发器。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -2981,6 +3027,12 @@ publisher/故障测试必须通过。
 Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
 提交、审核、发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
+
+`MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
+版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
+Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
+规则阈值或内部输入。公开列表/详情、人工审核动作、删除和过期仍由 LIST-005/ADMIN-002 等后续
+切片完成，因此 22.4 尚不能整体标记完成。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3823,6 +3875,11 @@ apps/api/src/modules/listings/
 ```
 
 不过不要为了目录形式引入过多样板；当模块小、规则简单时可合并文件，但依赖方向不变。
+
+`MOD-001` 保持该依赖方向：`moderation-risk.ts` 是无 I/O 的版本化规则模块，
+`ListingsService.submit` 负责 Policy、历史表单策略和领域状态转换，
+`ListingSubmissionRepository` 只负责 PostgreSQL 范围复核、幂等锁与原子证据持久化。
+Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 
 ## 30.4 生成与手写边界
 

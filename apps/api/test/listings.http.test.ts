@@ -1,6 +1,11 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { parseApiEnvironment } from "@socal/config";
-import type { CreateListingInput, ListingOwnerResponse, ProblemDetails } from "@socal/contracts";
+import type {
+  CreateListingInput,
+  ListingOwnerResponse,
+  ListingSubmissionResponse,
+  ProblemDetails,
+} from "@socal/contracts";
 import { createObservabilityRuntime } from "@socal/observability";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -261,6 +266,91 @@ describe("listing draft HTTP boundary", () => {
     });
     expect(stale.statusCode).toBe(409);
     expect(stale.headers.etag).toBe('"listing-v2"');
+  });
+
+  it("submits a low-risk draft with owner authorization and exact retry safety", async () => {
+    const created = await server.inject({
+      method: "POST",
+      url: "/v1/listings",
+      headers: mutationHeaders(ownerId, "listing-create-submit-0001"),
+      payload: draftPayload("Low-risk submission boundary"),
+    });
+    const listingId = created.json<ListingOwnerResponse>().data.id;
+    const missingPrecondition = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: mutationHeaders(ownerId, "listing-submit-boundary-0001"),
+    });
+    const outsider = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        ...mutationHeaders(outsiderId, "listing-submit-boundary-0002"),
+        "if-match": '"listing-v1"',
+      },
+    });
+    const guest = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        origin: environment.PUBLIC_WEB_URL,
+        "idempotency-key": "listing-submit-boundary-0003",
+        "if-match": '"listing-v1"',
+      },
+    });
+    const restricted = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: {
+        ...mutationHeaders(limitedId, "listing-submit-boundary-0004"),
+        "if-match": '"listing-v1"',
+      },
+    });
+    const headers = {
+      ...mutationHeaders(ownerId, "listing-submit-boundary-0001"),
+      "if-match": '"listing-v1"',
+    };
+    const submitted = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers,
+    });
+    const retried = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers,
+    });
+    const response = submitted.json<ListingSubmissionResponse>();
+    const changedRetry = await server.inject({
+      method: "POST",
+      url: `/v1/listings/${listingId}/submit`,
+      headers: { ...headers, "if-match": '"listing-v3"' },
+    });
+
+    expect(missingPrecondition.statusCode).toBe(400);
+    expect(outsider.statusCode).toBe(404);
+    expect(guest.statusCode).toBe(401);
+    expect(restricted.statusCode).toBe(403);
+    expect(submitted.statusCode).toBe(202);
+    expect(submitted.headers.etag).toBe('"listing-v3"');
+    expect(submitted.headers["cache-control"]).toBe("no-store");
+    expect(response).toMatchObject({
+      data: {
+        resourceId: listingId,
+        previousStatus: "DRAFT",
+        currentStatus: "PUBLISHED",
+        previousModerationStatus: "NOT_REVIEWED",
+        currentModerationStatus: "AUTO_APPROVED",
+        riskTier: "LOW",
+        ruleSetVersion: 1,
+        caseId: null,
+        version: 3,
+      },
+    });
+    expect(JSON.stringify(response)).not.toMatch(/ruleCode|evidence|inputHash|requestHash/i);
+    expect(retried.statusCode).toBe(202);
+    expect(retried.json()).toEqual(response);
+    expect(changedRetry.statusCode).toBe(409);
   });
 
   it("binds only registered READY media and supports ordered removal on autosave", async () => {

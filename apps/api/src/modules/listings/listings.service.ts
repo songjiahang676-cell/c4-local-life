@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import type {
   CreateListingInput,
+  ListingSubmissionResponse,
   ListingOwnerResponse,
   ListingOwnerView,
   ListingResponse,
@@ -9,6 +10,7 @@ import type {
   PublicListingView,
   UpdateListingInput,
 } from "@socal/contracts";
+import { categoryFormSchemaSchema } from "@socal/contracts";
 import {
   activeUserPolicyActions,
   listingObjectPolicyActions,
@@ -19,14 +21,19 @@ import { CategoryFormSchemaNotFoundError, TaxonomyService } from "../taxonomy/ta
 import {
   createDraftListing,
   ListingDomainError,
+  transitionListing,
+  type ListingAggregate,
   type ListingDetail,
   type ListingPrice,
   type ListingType,
 } from "./listing-domain";
+import { evaluateListingSubmissionRisk } from "./moderation-risk";
 import {
   LISTING_STORE,
   type ListingDraftJsonValue,
   type ListingDraftWriteFields,
+  type ListingSubmissionProjection,
+  type ListingSubmissionTransitionEvidence,
   type ListingStore,
   type OwnerListingProjection,
   type PublicListingProjection,
@@ -120,6 +127,19 @@ function normalizedAmount(price: Money | null | undefined): string | null {
   if (!price?.amount) return null;
   const minor = toMinorAmount(price.amount);
   return `${minor / 100n}.${(minor % 100n).toString().padStart(2, "0")}`;
+}
+
+function candidatePrice(input: {
+  priceAmount: string | null;
+  priceUnit: ListingPrice["unit"] | null;
+}): ListingPrice | null {
+  if (input.priceAmount === null && input.priceUnit === null) return null;
+  if (input.priceUnit === null) throw new ListingValidationError();
+  return {
+    amountMinor: input.priceAmount === null ? null : toMinorAmount(input.priceAmount),
+    currency: "USD",
+    unit: input.priceUnit,
+  };
 }
 
 function emptyDetail(type: ListingType): ListingDetail {
@@ -484,6 +504,176 @@ export class ListingsService {
       throw new ListingVersionConflictError(result.currentVersion);
     }
     throw new ListingStateConflictError();
+  }
+
+  async submit(
+    context: PolicyRequestContext,
+    listingId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+  ): Promise<ListingSubmissionResponse> {
+    await this.policies.require({
+      action: activeUserPolicyActions.listingSubmit,
+      context,
+    });
+    const actorUserId = authenticatedUserId(context);
+    const hash = requestHash({ listingId, expectedVersion });
+    const retry = await this.store.findSubmissionRetry({
+      actorUserId,
+      idempotencyKey,
+      requestHash: hash,
+    });
+    if (retry.kind === "conflict") throw new ListingIdempotencyConflictError();
+    if (retry.kind === "exact_retry") {
+      return { data: this.#submissionResponse(retry.submission) };
+    }
+
+    const candidate = await this.store.findSubmissionCandidate({ actorUserId, listingId });
+    if (!candidate) throw new ListingNotFoundError();
+    await this.policies.require({
+      action: listingObjectPolicyActions.submit,
+      context,
+      resource: {
+        type: "listing",
+        id: candidate.id,
+        ownerUserId: candidate.organizationId ? null : candidate.ownerId,
+        organizationId: candidate.organizationId,
+        state: candidate.status,
+        deleted: false,
+      },
+    });
+    if (candidate.version !== expectedVersion) {
+      throw new ListingVersionConflictError(candidate.version);
+    }
+    if (candidate.status !== "DRAFT" || candidate.moderationStatus !== "NOT_REVIEWED") {
+      throw new ListingStateConflictError();
+    }
+
+    const parsedForm = categoryFormSchemaSchema.safeParse(candidate.formSchemaDefinition);
+    if (!parsedForm.success) throw new ListingValidationError();
+    const occurredAt = new Date();
+    const risk = evaluateListingSubmissionRisk({
+      title: candidate.title,
+      summary: candidate.summary,
+      body: candidate.body,
+      accountCreatedAt: candidate.actorCreatedAt,
+      occurredAt,
+      publicationPolicy: parsedForm.data.publicationPolicy ?? {},
+    });
+    const aggregate: ListingAggregate = {
+      id: candidate.id,
+      type: candidate.type,
+      status: candidate.status,
+      moderationStatus: candidate.moderationStatus,
+      detail: emptyDetail(candidate.type),
+      price: candidatePrice(candidate),
+      publishedAt: candidate.publishedAt,
+      expiresAt: candidate.expiresAt,
+      deletedAt: null,
+      createdAt: candidate.createdAt,
+      updatedAt: candidate.updatedAt,
+      version: candidate.version,
+    };
+
+    let submitted;
+    try {
+      submitted = transitionListing(aggregate, {
+        kind: "SUBMIT",
+        actorId: actorUserId,
+        expectedVersion,
+        occurredAt,
+        reasonCode: "RISK_EVALUATED",
+      });
+    } catch (error) {
+      if (error instanceof ListingDomainError) throw new ListingStateConflictError();
+      throw error;
+    }
+    const transitions: ListingSubmissionTransitionEvidence[] = [
+      {
+        eventType: "listing.submitted" as const,
+        ...submitted.event,
+        aggregateVersion: submitted.event.currentVersion,
+      },
+    ];
+    let finalListing = submitted.listing;
+    if (risk.riskTier === "LOW") {
+      if (!risk.defaultLifetimeDays) throw new ListingValidationError();
+      const approved = transitionListing(finalListing, {
+        kind: "AUTO_APPROVE",
+        actorId: actorUserId,
+        expectedVersion: finalListing.version,
+        occurredAt,
+        reasonCode: "LOW_RISK_AUTO_APPROVED",
+        lifetimeDays: risk.defaultLifetimeDays,
+      });
+      finalListing = approved.listing;
+      transitions.push({
+        eventType: "listing.published",
+        ...approved.event,
+        aggregateVersion: approved.event.currentVersion,
+      });
+    } else if (risk.riskTier === "HIGH") {
+      const escalated = transitionListing(finalListing, {
+        kind: "ESCALATE",
+        actorId: actorUserId,
+        expectedVersion: finalListing.version,
+        occurredAt,
+        reasonCode: "HIGH_RISK_ESCALATED",
+      });
+      finalListing = escalated.listing;
+      transitions.push({
+        eventType: "listing.moderation.escalated",
+        ...escalated.event,
+        aggregateVersion: escalated.event.currentVersion,
+      });
+    }
+    const inputHash = requestHash({
+      listingId: candidate.id,
+      listingVersion: candidate.version,
+      title: candidate.title,
+      summary: candidate.summary,
+      body: candidate.body,
+      actorCreatedAt: candidate.actorCreatedAt.toISOString(),
+      formSchema: parsedForm.data,
+    });
+    const result = await this.store.submit({
+      actorUserId,
+      listingId,
+      expectedVersion,
+      idempotencyKey,
+      requestHash: hash,
+      requestId: context.requestId,
+      occurredAt,
+      inputHash,
+      ruleSetKey: risk.ruleSetKey,
+      ruleSetVersion: risk.ruleSetVersion,
+      riskTier: risk.riskTier,
+      hits: risk.hits,
+      decision: {
+        contentStatus: finalListing.status,
+        moderationStatus: finalListing.moderationStatus,
+        publishedAt: finalListing.publishedAt,
+        expiresAt: finalListing.expiresAt,
+        resultVersion: finalListing.version,
+        transitions,
+      },
+    });
+    if (result.kind === "submitted" || result.kind === "exact_retry") {
+      return { data: this.#submissionResponse(result.submission) };
+    }
+    if (result.kind === "idempotency_conflict") throw new ListingIdempotencyConflictError();
+    if (result.kind === "version_conflict" || result.kind === "time_conflict") {
+      throw new ListingVersionConflictError(result.currentVersion);
+    }
+    if (result.kind === "state_conflict") throw new ListingStateConflictError();
+    throw new ListingNotFoundError();
+  }
+
+  #submissionResponse(input: ListingSubmissionProjection): ListingSubmissionResponse["data"] {
+    return {
+      ...input,
+      occurredAt: input.occurredAt.toISOString(),
+    };
   }
 
   async #validateAttributes(
