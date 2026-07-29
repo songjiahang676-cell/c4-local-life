@@ -133,3 +133,14 @@ OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险�
 - Listing、Case、不可变 Action、Audit 与 Outbox 原子提交。批准发布、要求修改返回草稿、拒绝暂停、
   升级保持提交并提高优先级；Controller 不直接访问 Prisma。
 - 工作台支持中文/英文、移动布局、可见 focus，以及 J/K/方向键切换、R 刷新和 Alt+A 聚焦动作。
+
+## 11.13 LIST-005 公开、归档、删除与过期
+
+- 低风险自动批准或人工批准后，公开详情/列表只读取当前有效安全投影；过期、归档、删除、未批准、
+  taxonomy/主体停用的内容立即从 PostgreSQL 公开读消失。
+- Rental 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
+  跨筛选复用返回通用 400。
+- Owner/组织 Writer 使用强 ETag 将 PUBLISHED 归档；同一目标状态重试返回当前版本且不重复写。
+  DELETE 是软删除并对同一 owner 重试保持 204。
+- Worker 有界轮询到期 Rental，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
+  和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。

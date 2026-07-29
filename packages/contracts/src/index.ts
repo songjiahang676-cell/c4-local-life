@@ -11,6 +11,8 @@ export type Money = components["schemas"]["Money"];
 export type CreateListingInput = components["schemas"]["CreateListingRequest"];
 export type UpdateListingInput = components["schemas"]["UpdateListingRequest"];
 export type PublicListingView = components["schemas"]["PublicListingView"];
+export type PublicListingSummaryView = components["schemas"]["PublicListingSummaryView"];
+export type ListingCollection = components["schemas"]["ListingCollection"];
 export type ListingOwnerView = components["schemas"]["ListingOwnerView"];
 export type ListingResponse = components["schemas"]["ListingResponse"];
 export type ListingOwnerResponse = components["schemas"]["ListingOwnerResponse"];
@@ -322,12 +324,11 @@ export const listingSearchSchema: z.ZodType<ListingSearchInput> = z
 
 export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
   .object({
-    type: listingTypeSchema.optional(),
+    type: z.literal("RENTAL").default("RENTAL"),
     categoryId: z.uuid().optional(),
-    regionCode: z.string().optional(),
-    status: contentStatusSchema.optional(),
-    cursor: z.string().optional(),
-    limit: z.coerce.number().int().min(1).max(100).optional(),
+    regionCode: z.string().trim().min(2).max(80).optional(),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
   })
   .strict();
 

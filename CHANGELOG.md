@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added the complete public Rental lifecycle: approved-only safe list/detail projections, signed
+  filter-bound compound cursors, conditional idempotent archive/soft-delete, transactional
+  Audit/Outbox evidence, and a bounded `SKIP LOCKED` expiry Worker with metrics.
 - Added the bilingual, keyboard-efficient Listing moderation workbench with priority/SLA queue,
   immutable redacted submission snapshots, first-submission diffs, rule/media/publisher evidence,
   current moderator-role and MFA enforcement, recent-auth actions, strong ETags, actor-scoped

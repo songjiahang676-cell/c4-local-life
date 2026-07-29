@@ -99,34 +99,36 @@ Admin 的同源 BFF 只代理代码内 allowlist 的认证、Admin Session 与 M
 
 ## Worker 配置
 
-| 变量                        | 必需 | 用途                                                         |
-| --------------------------- | ---- | ------------------------------------------------------------ |
-| `DATABASE_URL`              | 是   | PostgreSQL/Outbox 连接串                                     |
-| `DATABASE_POOL_MAX`         | 否   | Worker 数据库连接池上限，默认 10                             |
-| `REDIS_URL`                 | 是   | BullMQ 队列连接                                              |
-| `WORKER_CONCURRENCY`        | 否   | Worker 消费并发数，范围 1–100，默认 5                        |
-| `WORKER_HEALTH_PORT`        | 否   | Worker 健康检查端口，默认 4001                               |
-| `OUTBOX_QUEUE_NAME`         | 否   | 目标队列，默认 `platform-events`                             |
-| `OUTBOX_BATCH_SIZE`         | 否   | 单次领取上限，默认 25、最大 500                              |
-| `OUTBOX_LEASE_SECONDS`      | 否   | claim 租约，默认 60 秒                                       |
-| `OUTBOX_MAX_ATTEMPTS`       | 否   | 发布最大领取次数，默认 10                                    |
-| `OUTBOX_POLL_INTERVAL_MS`   | 否   | 空闲/轮询间隔，默认 1000ms                                   |
-| `OUTBOX_RETRY_BASE_SECONDS` | 否   | 指数退避基数，默认 5 秒                                      |
-| `OUTBOX_RETRY_MAX_SECONDS`  | 否   | 最大退避，默认 900 秒且不得小于基数                          |
-| `OUTBOX_MAX_PAYLOAD_BYTES`  | 否   | versioned queue envelope 上限，默认 128 KiB、最大 1 MiB      |
-| `OUTBOX_JOB_ATTEMPTS`       | 否   | BullMQ 消费失败重试次数，默认 8；消费者仍必须按 eventId 幂等 |
-| `S3_ENDPOINT`               | 否   | 本地 MinIO/兼容对象存储地址；AWS 留空                        |
-| `S3_REGION`                 | 否   | 对象存储区域，默认 `us-west-2`                               |
-| `S3_QUARANTINE_BUCKET`      | 否   | Worker 只读的私有原始对象 bucket                             |
-| `S3_MEDIA_BUCKET`           | 否   | Worker 写入安全 WebP 变体的私有 bucket                       |
-| `S3_ACCESS_KEY`             | 否   | 本地静态 access key；与 secret 成对，生产优先任务角色        |
-| `S3_SECRET_KEY`             | 否   | 本地静态 secret key；与 access key 成对                      |
-| `S3_FORCE_PATH_STYLE`       | 否   | MinIO path-style 开关                                        |
-| `CLAMAV_HOST`               | 否   | clamd 主机，Compose 默认 `clamav`                            |
-| `CLAMAV_PORT`               | 否   | clamd INSTREAM 端口，默认 3310                               |
-| `CLAMAV_TIMEOUT_MS`         | 否   | 单次扫描超时，默认 30000、最大 120000 ms                     |
-| `MEDIA_PROCESS_MAX_BYTES`   | 否   | Worker 原始读取硬上限，默认 20 MiB                           |
-| `MEDIA_IMAGE_MAX_PIXELS`    | 否   | 解码像素上限，默认 40MP                                      |
+| 变量                              | 必需 | 用途                                                         |
+| --------------------------------- | ---- | ------------------------------------------------------------ |
+| `DATABASE_URL`                    | 是   | PostgreSQL/Outbox 连接串                                     |
+| `DATABASE_POOL_MAX`               | 否   | Worker 数据库连接池上限，默认 10                             |
+| `REDIS_URL`                       | 是   | BullMQ 队列连接                                              |
+| `WORKER_CONCURRENCY`              | 否   | Worker 消费并发数，范围 1–100，默认 5                        |
+| `WORKER_HEALTH_PORT`              | 否   | Worker 健康检查端口，默认 4001                               |
+| `LISTING_EXPIRY_BATCH_SIZE`       | 否   | 单次 Rental 过期转换上限，默认 50、最大 500                  |
+| `LISTING_EXPIRY_POLL_INTERVAL_MS` | 否   | Rental 过期轮询间隔，默认 30000ms、最大 3600000ms            |
+| `OUTBOX_QUEUE_NAME`               | 否   | 目标队列，默认 `platform-events`                             |
+| `OUTBOX_BATCH_SIZE`               | 否   | 单次领取上限，默认 25、最大 500                              |
+| `OUTBOX_LEASE_SECONDS`            | 否   | claim 租约，默认 60 秒                                       |
+| `OUTBOX_MAX_ATTEMPTS`             | 否   | 发布最大领取次数，默认 10                                    |
+| `OUTBOX_POLL_INTERVAL_MS`         | 否   | 空闲/轮询间隔，默认 1000ms                                   |
+| `OUTBOX_RETRY_BASE_SECONDS`       | 否   | 指数退避基数，默认 5 秒                                      |
+| `OUTBOX_RETRY_MAX_SECONDS`        | 否   | 最大退避，默认 900 秒且不得小于基数                          |
+| `OUTBOX_MAX_PAYLOAD_BYTES`        | 否   | versioned queue envelope 上限，默认 128 KiB、最大 1 MiB      |
+| `OUTBOX_JOB_ATTEMPTS`             | 否   | BullMQ 消费失败重试次数，默认 8；消费者仍必须按 eventId 幂等 |
+| `S3_ENDPOINT`                     | 否   | 本地 MinIO/兼容对象存储地址；AWS 留空                        |
+| `S3_REGION`                       | 否   | 对象存储区域，默认 `us-west-2`                               |
+| `S3_QUARANTINE_BUCKET`            | 否   | Worker 只读的私有原始对象 bucket                             |
+| `S3_MEDIA_BUCKET`                 | 否   | Worker 写入安全 WebP 变体的私有 bucket                       |
+| `S3_ACCESS_KEY`                   | 否   | 本地静态 access key；与 secret 成对，生产优先任务角色        |
+| `S3_SECRET_KEY`                   | 否   | 本地静态 secret key；与 access key 成对                      |
+| `S3_FORCE_PATH_STYLE`             | 否   | MinIO path-style 开关                                        |
+| `CLAMAV_HOST`                     | 否   | clamd 主机，Compose 默认 `clamav`                            |
+| `CLAMAV_PORT`                     | 否   | clamd INSTREAM 端口，默认 3310                               |
+| `CLAMAV_TIMEOUT_MS`               | 否   | 单次扫描超时，默认 30000、最大 120000 ms                     |
+| `MEDIA_PROCESS_MAX_BYTES`         | 否   | Worker 原始读取硬上限，默认 20 MiB                           |
+| `MEDIA_IMAGE_MAX_PIXELS`          | 否   | 解码像素上限，默认 40MP                                      |
 
 ## 安全规则
 

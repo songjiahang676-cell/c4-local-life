@@ -3,6 +3,7 @@ import { Queue, UnrecoverableError, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import { parseWorkerEnvironment, RuntimeConfigError, runtimeConfigSummary } from "@socal/config";
 import { MediaAssetRepository } from "@socal/database/media";
+import { ListingRepository } from "@socal/database/listing";
 import { OutboxEventRepository } from "@socal/database/outbox";
 import {
   createObservabilityRuntime,
@@ -11,6 +12,7 @@ import {
 } from "@socal/observability";
 import { workerLiveness, workerReadiness } from "./health-status";
 import { runObservedJob } from "./job-observability";
+import { ListingExpiryDispatcher } from "./listing/listing-expiry-dispatcher";
 import { ClamAvScanner } from "./media/clamav-scanner";
 import { MediaProcessingHandler, PermanentMediaProcessingError } from "./media/media-processing";
 import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
@@ -60,6 +62,10 @@ const mediaRepository = new MediaAssetRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
+const listingRepository = new ListingRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
 const mediaStorage = new S3MediaProcessingStorage(environment);
 const mediaProcessing = new MediaProcessingHandler(
   mediaRepository,
@@ -91,6 +97,14 @@ const outboxDispatcher = new OutboxDispatcher({
     pollIntervalMilliseconds: environment.OUTBOX_POLL_INTERVAL_MS,
     retryBaseSeconds: environment.OUTBOX_RETRY_BASE_SECONDS,
     retryMaximumSeconds: environment.OUTBOX_RETRY_MAX_SECONDS,
+  },
+});
+const listingExpiryDispatcher = new ListingExpiryDispatcher({
+  repository: listingRepository,
+  observability: runtimeState.observability,
+  configuration: {
+    batchSize: environment.LISTING_EXPIRY_BATCH_SIZE,
+    pollIntervalMilliseconds: environment.LISTING_EXPIRY_POLL_INTERVAL_MS,
   },
 });
 
@@ -178,6 +192,7 @@ healthServer.listen(environment.WORKER_HEALTH_PORT, "0.0.0.0");
 
 async function shutdown(signal: string): Promise<void> {
   logEvent("worker.shutdown.started", { signal });
+  await listingExpiryDispatcher.stop();
   await outboxDispatcher.stop();
   await new Promise<void>((resolve, reject) => {
     healthServer.close((error) => (error ? reject(error) : resolve()));
@@ -186,6 +201,7 @@ async function shutdown(signal: string): Promise<void> {
   await outboxQueue.close();
   mediaStorage.close();
   await mediaRepository.close();
+  await listingRepository.close();
   await outboxRepository.close();
   await connection.quit();
   await shutdownTracing();
@@ -196,10 +212,12 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 outboxDispatcher.start();
+listingExpiryDispatcher.start();
 logEvent("worker.started", {
   concurrency: environment.WORKER_CONCURRENCY,
   healthPort: environment.WORKER_HEALTH_PORT,
   outboxBatchSize: environment.OUTBOX_BATCH_SIZE,
+  listingExpiryBatchSize: environment.LISTING_EXPIRY_BATCH_SIZE,
   queue: environment.OUTBOX_QUEUE_NAME,
   ...runtimeConfigSummary(environment),
 });

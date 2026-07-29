@@ -14,6 +14,10 @@ import {
 import {
   ListingRepository,
   type OwnerListingProjection,
+  type OwnerListingTransitionInput,
+  type OwnerListingTransitionResult,
+  type PublicListingListInput,
+  type PublicListingListResult,
   type PublicListingProjection,
   type PublicListingReadInput,
   type ScopedListingReadInput,
@@ -65,12 +69,20 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     return this.#drafts.updateDraft(input);
   }
 
+  listPublic(input: PublicListingListInput): Promise<PublicListingListResult> {
+    return this.#listings.listPublic(input);
+  }
+
   findPublicById(input: PublicListingReadInput): Promise<PublicListingProjection | null> {
     return this.#listings.findPublicById(input);
   }
 
   findByIdForOwner(input: ScopedListingReadInput): Promise<OwnerListingProjection | null> {
     return this.#listings.findByIdForOwner(input);
+  }
+
+  transitionOwner(input: OwnerListingTransitionInput): Promise<OwnerListingTransitionResult> {
+    return this.#listings.transitionOwner(input);
   }
 
   findSubmissionRetry(

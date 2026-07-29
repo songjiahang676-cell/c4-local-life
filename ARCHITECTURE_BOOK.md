@@ -904,6 +904,18 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
 
+### LIST-005 公共生命周期持久化
+
+Rental 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
+PUBLISHED + AUTO_APPROVED/APPROVED、未到期、未删除、active taxonomy 与可公开主体。新增部分索引
+`listings_rental_expiry_due_idx(expires_at,id)` 只覆盖可过期 Rental；它是可重建索引，不是第二份
+数据。
+
+Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner 或组织 OWNER/ADMIN/EDITOR、
+状态、时间和 version。成功更新与 `AuditLog`、`OutboxEvent` 同事务；DELETE 写 `deleted_at` 而不物理
+级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
+Rental 只产生一次 `listing.expired` 审计和事件。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1757,6 +1769,17 @@ OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险�
   升级保持提交并提高优先级；Controller 不直接访问 Prisma。
 - 工作台支持中文/英文、移动布局、可见 focus，以及 J/K/方向键切换、R 刷新和 Alt+A 聚焦动作。
 
+## 11.13 LIST-005 公开、归档、删除与过期
+
+- 低风险自动批准或人工批准后，公开详情/列表只读取当前有效安全投影；过期、归档、删除、未批准、
+  taxonomy/主体停用的内容立即从 PostgreSQL 公开读消失。
+- Rental 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
+  跨筛选复用返回通用 400。
+- Owner/组织 Writer 使用强 ETag 将 PUBLISHED 归档；同一目标状态重试返回当前版本且不重复写。
+  DELETE 是软删除并对同一 owner 重试保持 204。
+- Worker 有界轮询到期 Rental，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
+  和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。
+
 ---
 
 <!-- source: docs\12-monetization-payments-ads.md -->
@@ -2227,6 +2250,17 @@ Idempotency-Key 或请求哈希。
   evaluation/hits 仍保持不可变。
 - CSRF/代理扩大：写动作要求可信 Admin Origin；Admin 同源 BFF 使用精确 method/path 和 UUID
   allowlist，未知/方法混淆路径失败关闭。
+
+## 14.16 公共 Listing 生命周期威胁与缓解
+
+- 枚举/PII 泄露：公开列表和详情使用专用 projection；列表不返回 body、精确点位、contactMode、
+  mediaIds 或审核字段，非公开状态统一 404。
+- cursor 篡改/重放：HMAC 使用域分隔并绑定 type/category/region；签名定长比较，非法 cursor 返回
+  通用 400，不回显 payload。
+- 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
+  ETag；外部用户得到通用 404，受限账号 403。
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
+  version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
 ---
 
@@ -2776,6 +2810,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 空库 baseline 要求 18 个 migration 和 31 个约束负例；upgrade 合成一条旧审核案件，证明新迁移
   自动生成不含动态 attributes/坐标的快照。
 
+## 18.18 LIST-005 验证增量
+
+- HTTP/契约测试覆盖安全 Rental 摘要、公开详情、稳定双字段分页、cursor 篡改/筛选绑定、缓存头、
+  guest/受限/外部用户、强 ETag、归档和幂等软删除。
+- PostgreSQL 集成测试覆盖公开状态/审核/期限/taxonomy/主体过滤，owner/组织写授权，archive/delete
+  状态与版本，以及每次转换的单一 Audit/Outbox。
+- 过期测试先执行到期批次再重复执行，要求第二次为零并保留一组 SYSTEM Audit/Outbox；Worker 单元
+  测试验证批次/间隔配置、idle/expired 指标和无资源标识日志。
+- 空库 baseline 要求 19 个 migration、31 个约束负例和过期部分索引；上一发布基线升级必须保留哨兵。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3089,19 +3133,27 @@ publisher/故障测试必须通过。
 `LIST-003` 已验收其中的草稿创建、owner/组织读取与编辑、动态字段服务端校验、强 ETag/409、最小
 Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动动态表单、900ms 防抖自动保存、
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
-提交、审核、发布、删除和过期仍由后续 LIST/MOD 切片完成，不能因本项通过而标记整个 22.4 完成。
+Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；其余
+四个垂直类型仍须复用并验收同一闭环，不能因 Rental 通过而标记整个 22.4 完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
-规则阈值或内部输入。公开列表/详情、人工审核动作、删除和过期仍由 LIST-005/ADMIN-002 等后续
-切片完成，因此 22.4 尚不能整体标记完成。
+规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
+`LIST-005`/`ADMIN-002` 验收；其余垂直类型与搜索派生状态仍待后续切片。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
-覆盖。公开列表/详情、重新提交的历史 revision diff、通知、删除和过期仍由 LIST-005/NOTIF 等后续
-切片负责，因此整个 Listing 生命周期尚未完成。
+覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
+revision diff、通知、搜索索引消费和其余垂直类型仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+
+`LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
+安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选
+复用。公开详情继续省略精确坐标、联系方式和内部字段。Owner/组织 Writer 使用强 ETag 归档或软删除；
+归档与 DELETE 重试不重复写，状态、版本、最小 Audit 和 Outbox 在同一事务提交。Worker 通过有界批次和
+`FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
+读立即移除，搜索侧最终移除仍由后续索引消费者处理。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3971,6 +4023,11 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ADMIN-002` 延续相同边界：`ModerationController` 只做严格契约、Policy 和 HTTP 映射；
 `ModerationService` 管理签名 cursor、ETag、原因与 Listing 领域转换；数据库 adapter 复核 Session/
 角色并持久化。Admin React 组件只调用同源 BFF，不导入 Prisma 或数据库模型。
+
+`LIST-005` 使用同一模块化单体边界：`ListingsController` 只解析严格 query、ETag 和 Problem Details；
+`ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
+公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
+`ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
 
 ## 30.4 生成与手写边界
 

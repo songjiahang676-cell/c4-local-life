@@ -220,6 +220,8 @@ const workerEnvironmentSchema = commonServerSchema
     REDIS_URL: z.string().url(),
     WORKER_CONCURRENCY: positiveInteger(5, 100),
     WORKER_HEALTH_PORT: positiveInteger(4001, 65_535),
+    LISTING_EXPIRY_BATCH_SIZE: positiveInteger(50, 500),
+    LISTING_EXPIRY_POLL_INTERVAL_MS: positiveInteger(30_000, 3_600_000),
     OUTBOX_QUEUE_NAME: z
       .string()
       .regex(/^[a-z][a-z0-9-]{0,62}$/)

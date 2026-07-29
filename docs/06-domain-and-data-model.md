@@ -257,3 +257,15 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 批准/要求修改/拒绝/升级在一个事务内更新 Listing 与 Case version，追加 ModerationAction、
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
+
+### LIST-005 公共生命周期持久化
+
+Rental 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
+PUBLISHED + AUTO_APPROVED/APPROVED、未到期、未删除、active taxonomy 与可公开主体。新增部分索引
+`listings_rental_expiry_due_idx(expires_at,id)` 只覆盖可过期 Rental；它是可重建索引，不是第二份
+数据。
+
+Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner 或组织 OWNER/ADMIN/EDITOR、
+状态、时间和 version。成功更新与 `AuditLog`、`OutboxEvent` 同事务；DELETE 写 `deleted_at` 而不物理
+级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
+Rental 只产生一次 `listing.expired` 审计和事件。

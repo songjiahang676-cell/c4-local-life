@@ -649,23 +649,25 @@ paths:
         - name: type
           in: query
           schema:
-            $ref: "#/components/schemas/ListingType"
+            type: string
+            const: RENTAL
+            default: RENTAL
         - name: categoryId
           in: query
           schema: { type: string, format: uuid }
         - name: regionCode
           in: query
           schema: { type: string }
-        - name: status
-          in: query
-          description: Non-public status filters require ownership or operator permissions
-          schema:
-            $ref: "#/components/schemas/ContentStatus"
         - $ref: "#/components/parameters/Cursor"
-        - $ref: "#/components/parameters/Limit"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         "200":
-          description: Cursor-paginated listings
+          description: Stable cursor-paginated public Rental summaries
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "public, max-age=30" }
           content:
             application/json:
               schema:
@@ -781,9 +783,23 @@ paths:
       operationId: deleteListing
       parameters:
         - $ref: "#/components/parameters/ListingId"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Listing soft-deleted and removed from search
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /listings/{listingId}/submit:
     post:
       tags: [Listings]
@@ -817,6 +833,39 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+  /listings/{listingId}/archive:
+    put:
+      tags: [Listings]
+      summary: Archive an owned published listing
+      description: |
+        Idempotent resource-state operation. A current strong Listing ETag is required so a
+        concurrent moderation, expiry or owner action cannot be silently overwritten.
+      operationId: archiveListing
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Listing archived and removed from public reads
+          headers:
+            ETag:
+              schema: { type: string, pattern: '^"listing-v[1-9]\d{0,9}"$' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingOwnerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /listings/{listingId}/renew:
     post:
       tags: [Listings]
@@ -2633,16 +2682,77 @@ components:
           uniqueItems: true
           items: { type: string, format: uuid }
         contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
+    PublicListingSummaryView:
+      type: object
+      required:
+        [
+          id,
+          type,
+          status,
+          locale,
+          title,
+          slug,
+          summary,
+          price,
+          region,
+          category,
+          owner,
+          organization,
+          location,
+          attributes,
+          featured,
+          featuredUntil,
+          publishedAt,
+          expiresAt,
+          updatedAt,
+          version,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, const: RENTAL }
+        status: { type: string, const: PUBLISHED }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, maxLength: 120 }
+        slug: { type: string }
+        summary: { type: [string, "null"], maxLength: 240 }
+        price:
+          oneOf:
+            - $ref: "#/components/schemas/Money"
+            - type: "null"
+        region:
+          $ref: "#/components/schemas/ListingRegionView"
+        category:
+          $ref: "#/components/schemas/ListingCategoryView"
+        owner:
+          $ref: "#/components/schemas/ListingOwnerSummaryView"
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/ListingOrganizationSummaryView"
+            - type: "null"
+        location:
+          $ref: "#/components/schemas/ListingLocationView"
+        attributes:
+          type: object
+          additionalProperties: true
+        featured: { type: boolean }
+        featuredUntil: { type: [string, "null"], format: date-time }
+        publishedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
     ListingCollection:
       type: object
-      required: [data, page]
+      required: [data, page, generatedAt]
+      additionalProperties: false
       properties:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/Listing"
+            $ref: "#/components/schemas/PublicListingSummaryView"
         page:
           $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
     SearchResponse:
       type: object
       required: [data, page, facets, tookMs]

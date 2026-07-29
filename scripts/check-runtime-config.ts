@@ -59,6 +59,8 @@ const workerEnvironment = parseWorkerEnvironment({
 });
 assert.equal(workerEnvironment.WORKER_CONCURRENCY, 7);
 assert.equal(workerEnvironment.OUTBOX_BATCH_SIZE, 25);
+assert.equal(workerEnvironment.LISTING_EXPIRY_BATCH_SIZE, 50);
+assert.equal(workerEnvironment.LISTING_EXPIRY_POLL_INTERVAL_MS, 30_000);
 assert.equal(workerEnvironment.OUTBOX_MAX_ATTEMPTS, 10);
 assert.equal(workerEnvironment.S3_MEDIA_BUCKET, "socal-media-processed-local");
 assert.equal(workerEnvironment.CLAMAV_HOST, "clamav");

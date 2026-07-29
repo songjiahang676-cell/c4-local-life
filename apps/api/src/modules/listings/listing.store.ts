@@ -12,6 +12,11 @@ import type {
 } from "@socal/database/listing-draft";
 import type {
   OwnerListingProjection,
+  OwnerListingTransitionInput,
+  OwnerListingTransitionResult,
+  PublicListingCursor,
+  PublicListingListInput,
+  PublicListingListResult,
   PublicListingProjection,
   PublicListingReadInput,
   ScopedListingReadInput,
@@ -37,8 +42,10 @@ export type ListingStore = {
   ): Promise<FindListingDraftCreateRetryResult>;
   createDraft(input: CreateListingDraftInput): Promise<CreateListingDraftResult>;
   updateDraft(input: UpdateListingDraftInput): Promise<UpdateListingDraftResult>;
+  listPublic(input: PublicListingListInput): Promise<PublicListingListResult>;
   findPublicById(input: PublicListingReadInput): Promise<PublicListingProjection | null>;
   findByIdForOwner(input: ScopedListingReadInput): Promise<OwnerListingProjection | null>;
+  transitionOwner(input: OwnerListingTransitionInput): Promise<OwnerListingTransitionResult>;
   findSubmissionRetry(
     input: FindListingSubmissionRetryInput,
   ): Promise<FindListingSubmissionRetryResult>;
@@ -58,6 +65,11 @@ export type {
   ListingDraftReferences,
   ListingDraftWriteFields,
   OwnerListingProjection,
+  OwnerListingTransitionInput,
+  OwnerListingTransitionResult,
+  PublicListingCursor,
+  PublicListingListInput,
+  PublicListingListResult,
   PublicListingProjection,
   ResolveListingDraftReferencesInput,
   UpdateListingDraftInput,

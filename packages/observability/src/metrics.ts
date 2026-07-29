@@ -13,6 +13,7 @@ type WorkerObservation = {
 
 type OutboxDispatchOutcome = "published" | "retry" | "failed" | "stale";
 type MediaProcessingOutcome = "ready" | "rejected" | "stale";
+type ListingExpiryOutcome = "expired" | "idle";
 
 type Histogram = {
   count: number;
@@ -81,6 +82,9 @@ export class MetricsRegistry {
   readonly #workerDurations = new Map<string, Histogram>();
   readonly #outboxDispatches = new Map<OutboxDispatchOutcome, number>();
   readonly #mediaProcessing = new Map<MediaProcessingOutcome, number>();
+  readonly #listingExpiryPolls = new Map<ListingExpiryOutcome, number>();
+  #listingsExpired = 0;
+  #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
   #outboxPollFailures = 0;
 
@@ -129,6 +133,17 @@ export class MetricsRegistry {
 
   mediaProcessing(outcome: MediaProcessingOutcome): void {
     this.#mediaProcessing.set(outcome, (this.#mediaProcessing.get(outcome) ?? 0) + 1);
+  }
+
+  observeListingExpiry(expiredCount: number): void {
+    const count = Number.isInteger(expiredCount) && expiredCount > 0 ? expiredCount : 0;
+    const outcome: ListingExpiryOutcome = count > 0 ? "expired" : "idle";
+    this.#listingExpiryPolls.set(outcome, (this.#listingExpiryPolls.get(outcome) ?? 0) + 1);
+    this.#listingsExpired += count;
+  }
+
+  listingExpiryPollFailed(): void {
+    this.#listingExpiryPollFailures += 1;
   }
 
   renderPrometheus(): string {
@@ -186,6 +201,21 @@ export class MetricsRegistry {
     for (const [outcome, value] of [...this.#mediaProcessing].sort()) {
       lines.push(`socal_media_processing_total${labels({ outcome })} ${value}`);
     }
+    lines.push(
+      "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",
+      "# TYPE socal_listing_expiry_polls_total counter",
+    );
+    for (const [outcome, value] of [...this.#listingExpiryPolls].sort()) {
+      lines.push(`socal_listing_expiry_polls_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_listings_expired_total Rental Listings transitioned to expired.",
+      "# TYPE socal_listings_expired_total counter",
+      `socal_listings_expired_total ${this.#listingsExpired}`,
+      "# HELP socal_listing_expiry_poll_failures_total Listing expiry polling failures.",
+      "# TYPE socal_listing_expiry_poll_failures_total counter",
+      `socal_listing_expiry_poll_failures_total ${this.#listingExpiryPollFailures}`,
+    );
     return `${lines.join("\n")}\n`;
   }
 

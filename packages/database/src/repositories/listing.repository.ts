@@ -2,15 +2,16 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { z } from "zod";
 import {
   ContentStatus,
+  MembershipRole,
   ModerationStatus,
   PlatformRole,
+  Prisma,
   PrismaClient,
   UserStatus,
   type Category,
   type ContactMode,
   type ListingType,
   type PriceUnit,
-  type Prisma,
   type RegionType,
   type VerificationStatus,
 } from "../../generated/prisma/client";
@@ -162,14 +163,66 @@ export type PublicListingReadInput = {
   now: Date;
 };
 
+export type PublicListingCursor = {
+  publishedAt: Date;
+  id: string;
+};
+
+export type PublicListingListInput = {
+  type: "RENTAL";
+  categoryId?: string;
+  regionCode?: string;
+  cursor?: PublicListingCursor;
+  limit: number;
+  now: Date;
+};
+
+export type PublicListingListResult = {
+  items: PublicListingProjection[];
+  nextCursor: PublicListingCursor | null;
+};
+
 export type ScopedListingReadInput = {
   actorUserId: string;
   listingId: string;
   now: Date;
 };
 
+export type OwnerListingTransitionInput = {
+  actorUserId: string;
+  listingId: string;
+  expectedVersion: number;
+  kind: "ARCHIVE" | "DELETE";
+  requestId: string;
+  occurredAt: Date;
+};
+
+export type OwnerListingTransitionResult =
+  | { kind: "transitioned"; version: number }
+  | { kind: "already_archived"; version: number }
+  | { kind: "already_deleted" }
+  | {
+      kind:
+        "actor_unavailable" | "not_found" | "state_conflict" | "time_conflict" | "version_conflict";
+      currentVersion?: number;
+    };
+
+export type ExpireDueListingsInput = {
+  now: Date;
+  limit: number;
+};
+
+export type ExpireDueListingsResult = {
+  expiredCount: number;
+};
+
 const publicActorStatuses = [UserStatus.ACTIVE, UserStatus.LIMITED] as const;
 const moderationRoles = [PlatformRole.MODERATOR, PlatformRole.SENIOR_MODERATOR] as const;
+const organizationListingWriterRoles = [
+  MembershipRole.OWNER,
+  MembershipRole.ADMIN,
+  MembershipRole.EDITOR,
+] as const;
 const attributeVisibilitySchema = z
   .object({
     fields: z
@@ -415,6 +468,73 @@ function scopeMatches(
   );
 }
 
+function publicListingWhere(now: Date): Prisma.ListingWhereInput {
+  return {
+    status: ContentStatus.PUBLISHED,
+    moderationStatus: {
+      in: [ModerationStatus.AUTO_APPROVED, ModerationStatus.APPROVED],
+    },
+    publishedAt: { not: null, lte: now },
+    expiresAt: { gt: now },
+    deletedAt: null,
+    category: { is: { isActive: true } },
+    region: { is: { isActive: true } },
+    owner: {
+      is: {
+        status: { in: [...publicActorStatuses] },
+        deletedAt: null,
+        profile: { isNot: null },
+      },
+    },
+    OR: [
+      { organizationId: null },
+      {
+        organization: {
+          is: {
+            status: { in: [...publicActorStatuses] },
+            deletedAt: null,
+          },
+        },
+      },
+    ],
+  };
+}
+
+async function lockListing(
+  transaction: Prisma.TransactionClient,
+  listingId: string,
+): Promise<boolean> {
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`SELECT "id" FROM "listings" WHERE "id" = ${listingId}::uuid FOR UPDATE`,
+  );
+  return rows.length === 1;
+}
+
+async function activeListingWriter(
+  transaction: Prisma.TransactionClient,
+  actorUserId: string,
+  ownerId: string,
+  organizationId: string | null,
+): Promise<"active" | "actor_unavailable" | "unauthorized"> {
+  const actor = await transaction.user.findFirst({
+    where: { id: actorUserId, status: UserStatus.ACTIVE, deletedAt: null },
+    select: { id: true },
+  });
+  if (!actor) return "actor_unavailable";
+  if (!organizationId) return ownerId === actorUserId ? "active" : "unauthorized";
+  const membership = await transaction.organizationMembership.findFirst({
+    where: {
+      organizationId,
+      userId: actorUserId,
+      role: { in: [...organizationListingWriterRoles] },
+      organization: { status: UserStatus.ACTIVE, deletedAt: null },
+      user: { status: UserStatus.ACTIVE, deletedAt: null },
+    },
+    select: { userId: true },
+  });
+  return membership ? "active" : "unauthorized";
+}
+
 export class ListingRepository {
   readonly #client: ListingClient;
   readonly #ownedClient: PrismaClient | null;
@@ -436,54 +556,56 @@ export class ListingRepository {
   async findPublicById(input: PublicListingReadInput): Promise<PublicListingProjection | null> {
     const row = await this.#client.listing.findFirst({
       where: {
+        ...publicListingWhere(input.now),
         id: input.listingId,
-        status: ContentStatus.PUBLISHED,
-        moderationStatus: {
-          in: [ModerationStatus.AUTO_APPROVED, ModerationStatus.APPROVED],
-        },
-        publishedAt: { not: null, lte: input.now },
-        expiresAt: { gt: input.now },
-        deletedAt: null,
-        category: { is: { isActive: true } },
-        region: { is: { isActive: true } },
-        owner: {
-          is: {
-            status: { in: [...publicActorStatuses] },
-            deletedAt: null,
-            profile: { isNot: null },
-          },
-        },
-        OR: [
-          { organizationId: null },
-          {
-            organization: {
-              is: {
-                status: { in: [...publicActorStatuses] },
-                deletedAt: null,
-              },
-            },
-          },
-        ],
       },
       select: publicListingSelect,
     });
-    if (!row || row.status !== ContentStatus.PUBLISHED || !row.publishedAt || !row.expiresAt) {
-      return null;
+    return row ? this.#toPublicProjection(row, input.now) : null;
+  }
+
+  async listPublic(input: PublicListingListInput): Promise<PublicListingListResult> {
+    const rows = await this.#client.listing.findMany({
+      where: {
+        AND: [
+          publicListingWhere(input.now),
+          {
+            type: input.type,
+            ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+            ...(input.regionCode ? { region: { is: { code: input.regionCode } } } : {}),
+          },
+          ...(input.cursor
+            ? [
+                {
+                  OR: [
+                    { publishedAt: { lt: input.cursor.publishedAt } },
+                    {
+                      publishedAt: input.cursor.publishedAt,
+                      id: { lt: input.cursor.id },
+                    },
+                  ],
+                } satisfies Prisma.ListingWhereInput,
+              ]
+            : []),
+        ],
+      },
+      orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+      select: publicListingSelect,
+    });
+    const pageRows = rows.slice(0, input.limit);
+    const items: PublicListingProjection[] = [];
+    for (const row of pageRows) {
+      const projection = await this.#toPublicProjection(row, input.now);
+      if (projection) items.push(projection);
     }
-    const attributes = await this.#projectAttributes(
-      row.category.id,
-      row.formSchemaVersion,
-      row.attributes,
-      new Set(["PUBLIC"]),
-    );
-    const base = mapBase(row, attributes);
-    if (!base) return null;
+    const last = pageRows.at(-1);
     return {
-      ...base,
-      status: ContentStatus.PUBLISHED,
-      featured: row.isFeatured && (row.featuredUntil === null || row.featuredUntil > input.now),
-      publishedAt: row.publishedAt,
-      expiresAt: row.expiresAt,
+      items,
+      nextCursor:
+        rows.length > input.limit && last?.publishedAt
+          ? { publishedAt: last.publishedAt, id: last.id }
+          : null,
     };
   }
 
@@ -559,6 +681,206 @@ export class ListingRepository {
       mediaIds: row.uploadedMedia.map((asset) => asset.id),
       isFeatured: row.isFeatured,
     };
+  }
+
+  transitionOwner(input: OwnerListingTransitionInput): Promise<OwnerListingTransitionResult> {
+    return this.#inTransaction(async (transaction) => {
+      if (!(await lockListing(transaction, input.listingId))) return { kind: "not_found" };
+      const current = await transaction.listing.findUnique({
+        where: { id: input.listingId },
+        select: {
+          id: true,
+          type: true,
+          ownerId: true,
+          organizationId: true,
+          status: true,
+          moderationStatus: true,
+          updatedAt: true,
+          deletedAt: true,
+          version: true,
+        },
+      });
+      if (!current) return { kind: "not_found" };
+      const access = await activeListingWriter(
+        transaction,
+        input.actorUserId,
+        current.ownerId,
+        current.organizationId,
+      );
+      if (access === "actor_unavailable") return { kind: "actor_unavailable" };
+      if (access === "unauthorized") return { kind: "not_found" };
+      if (
+        input.kind === "DELETE" &&
+        current.status === ContentStatus.DELETED &&
+        current.deletedAt
+      ) {
+        return { kind: "already_deleted" };
+      }
+      if (
+        input.kind === "ARCHIVE" &&
+        current.status === ContentStatus.ARCHIVED &&
+        (input.expectedVersion === current.version || input.expectedVersion === current.version - 1)
+      ) {
+        return { kind: "already_archived", version: current.version };
+      }
+      if (current.deletedAt) return { kind: "not_found" };
+      if (current.version !== input.expectedVersion) {
+        return { kind: "version_conflict", currentVersion: current.version };
+      }
+      if (input.occurredAt < current.updatedAt) {
+        return { kind: "time_conflict", currentVersion: current.version };
+      }
+      if (
+        (input.kind === "ARCHIVE" && current.status !== ContentStatus.PUBLISHED) ||
+        (input.kind === "DELETE" && current.status === ContentStatus.DELETED)
+      ) {
+        return { kind: "state_conflict", currentVersion: current.version };
+      }
+
+      const nextStatus = input.kind === "ARCHIVE" ? ContentStatus.ARCHIVED : ContentStatus.DELETED;
+      const nextVersion = current.version + 1;
+      const changed = await transaction.listing.updateMany({
+        where: {
+          id: current.id,
+          version: current.version,
+          status: current.status,
+          moderationStatus: current.moderationStatus,
+          deletedAt: null,
+        },
+        data: {
+          status: nextStatus,
+          deletedAt: input.kind === "DELETE" ? input.occurredAt : null,
+          updatedAt: input.occurredAt,
+          version: nextVersion,
+        },
+      });
+      if (changed.count !== 1)
+        throw new Error("Locked Listing changed during lifecycle transition");
+
+      const eventType = input.kind === "ARCHIVE" ? "listing.archived" : "listing.deleted";
+      const reasonCode = input.kind === "ARCHIVE" ? "OWNER_ARCHIVED" : "OWNER_DELETED";
+      const eventPayload = {
+        schemaVersion: 1,
+        aggregateVersion: nextVersion,
+        listingId: current.id,
+        type: current.type,
+        previousStatus: current.status,
+        currentStatus: nextStatus,
+        previousModerationStatus: current.moderationStatus,
+        currentModerationStatus: current.moderationStatus,
+        reasonCode,
+      } satisfies Prisma.InputJsonObject;
+      await transaction.auditLog.create({
+        data: {
+          actorId: input.actorUserId,
+          actorType: "USER",
+          action: eventType,
+          targetType: "LISTING",
+          targetId: current.id,
+          requestId: input.requestId,
+          metadata: eventPayload,
+          createdAt: input.occurredAt,
+        },
+      });
+      await transaction.outboxEvent.create({
+        data: {
+          aggregateType: "LISTING",
+          aggregateId: current.id,
+          eventType,
+          payload: eventPayload,
+          createdAt: input.occurredAt,
+        },
+      });
+      return { kind: "transitioned", version: nextVersion };
+    });
+  }
+
+  expireDue(input: ExpireDueListingsInput): Promise<ExpireDueListingsResult> {
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 500) {
+      return Promise.reject(new TypeError("Expiry batch limit must be between 1 and 500"));
+    }
+    if (!Number.isFinite(input.now.getTime())) {
+      return Promise.reject(new TypeError("Expiry time must be finite"));
+    }
+    return this.#inTransaction(async (transaction) => {
+      const due = await transaction.$queryRaw<
+        Array<{
+          id: string;
+          type: ListingType;
+          moderationStatus: ModerationStatus;
+          version: number;
+        }>
+      >(Prisma.sql`
+        SELECT
+          "id",
+          "type",
+          "moderation_status" AS "moderationStatus",
+          "version"
+        FROM "listings"
+        WHERE
+          "type" = 'RENTAL'::"ListingType"
+          AND "status" = 'PUBLISHED'::"ContentStatus"
+          AND "moderation_status" IN (
+            'AUTO_APPROVED'::"ModerationStatus",
+            'APPROVED'::"ModerationStatus"
+          )
+          AND "expires_at" <= ${input.now}
+          AND "deleted_at" IS NULL
+        ORDER BY "expires_at" ASC, "id" ASC
+        LIMIT ${input.limit}
+        FOR UPDATE SKIP LOCKED
+      `);
+      for (const listing of due) {
+        const nextVersion = listing.version + 1;
+        const changed = await transaction.listing.updateMany({
+          where: {
+            id: listing.id,
+            status: ContentStatus.PUBLISHED,
+            moderationStatus: listing.moderationStatus,
+            expiresAt: { lte: input.now },
+            deletedAt: null,
+            version: listing.version,
+          },
+          data: {
+            status: ContentStatus.EXPIRED,
+            updatedAt: input.now,
+            version: nextVersion,
+          },
+        });
+        if (changed.count !== 1) throw new Error("Locked Listing changed during expiry");
+        const payload = {
+          schemaVersion: 1,
+          aggregateVersion: nextVersion,
+          listingId: listing.id,
+          type: listing.type,
+          previousStatus: ContentStatus.PUBLISHED,
+          currentStatus: ContentStatus.EXPIRED,
+          previousModerationStatus: listing.moderationStatus,
+          currentModerationStatus: listing.moderationStatus,
+          reasonCode: "PUBLICATION_WINDOW_ENDED",
+        } satisfies Prisma.InputJsonObject;
+        await transaction.auditLog.create({
+          data: {
+            actorType: "SYSTEM",
+            action: "listing.expired",
+            targetType: "LISTING",
+            targetId: listing.id,
+            metadata: payload,
+            createdAt: input.now,
+          },
+        });
+        await transaction.outboxEvent.create({
+          data: {
+            aggregateType: "LISTING",
+            aggregateId: listing.id,
+            eventType: "listing.expired",
+            payload,
+            createdAt: input.now,
+          },
+        });
+      }
+      return { expiredCount: due.length };
+    });
   }
 
   async findByIdForModerator(
@@ -642,6 +964,15 @@ export class ListingRepository {
     return this.#ownedClient?.$disconnect() ?? Promise.resolve();
   }
 
+  #inTransaction<T>(operation: (transaction: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    if (this.#ownedClient) {
+      return this.#ownedClient.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      });
+    }
+    return operation(this.#client as Prisma.TransactionClient);
+  }
+
   async #projectAttributes(
     categoryId: string,
     version: number,
@@ -657,5 +988,29 @@ export class ListingRepository {
       select: { definition: true },
     });
     return projectAttributes(attributes, schema?.definition ?? null, allowedVisibilities);
+  }
+
+  async #toPublicProjection(
+    row: SelectedPublicListing,
+    now: Date,
+  ): Promise<PublicListingProjection | null> {
+    if (row.status !== ContentStatus.PUBLISHED || !row.publishedAt || !row.expiresAt) {
+      return null;
+    }
+    const attributes = await this.#projectAttributes(
+      row.category.id,
+      row.formSchemaVersion,
+      row.attributes,
+      new Set(["PUBLIC"]),
+    );
+    const base = mapBase(row, attributes);
+    if (!base) return null;
+    return {
+      ...base,
+      status: ContentStatus.PUBLISHED,
+      featured: row.isFeatured && (row.featuredUntil === null || row.featuredUntil > now),
+      publishedAt: row.publishedAt,
+      expiresAt: row.expiresAt,
+    };
   }
 }

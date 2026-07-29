@@ -184,3 +184,13 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   J/K/方向键与 Alt+A；BFF 测试覆盖精确 allowlist 和 method confusion。
 - 空库 baseline 要求 18 个 migration 和 31 个约束负例；upgrade 合成一条旧审核案件，证明新迁移
   自动生成不含动态 attributes/坐标的快照。
+
+## 18.18 LIST-005 验证增量
+
+- HTTP/契约测试覆盖安全 Rental 摘要、公开详情、稳定双字段分页、cursor 篡改/筛选绑定、缓存头、
+  guest/受限/外部用户、强 ETag、归档和幂等软删除。
+- PostgreSQL 集成测试覆盖公开状态/审核/期限/taxonomy/主体过滤，owner/组织写授权，archive/delete
+  状态与版本，以及每次转换的单一 Audit/Outbox。
+- 过期测试先执行到期批次再重复执行，要求第二次为零并保留一组 SYSTEM Audit/Outbox；Worker 单元
+  测试验证批次/间隔配置、idle/expired 指标和无资源标识日志。
+- 空库 baseline 要求 19 个 migration、31 个约束负例和过期部分索引；上一发布基线升级必须保留哨兵。
