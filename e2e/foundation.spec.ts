@@ -902,6 +902,68 @@ test("completes Transfer, Secondhand, and Service forms through save and submiss
   }
 });
 
+test("renders a private capability-scoped account shell without indexing or overflow", async ({
+  page,
+}) => {
+  await page.route("**/v1/auth/session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          user: {
+            id: "10000000-0000-4000-8000-000000000080",
+            displayName: "Synthetic Account Owner",
+            avatarUrl: null,
+            locale: "en-US",
+            status: "ACTIVE",
+            verificationBadges: [],
+          },
+          expiresAt: "2099-07-30T01:00:00.000Z",
+          permissions: ["account:listings:read", "listing:draft:create"],
+          platformRoles: [],
+          organizations: [
+            {
+              id: "20000000-0000-4000-8000-000000000080",
+              type: "MERCHANT",
+              displayName: "Synthetic Merchant",
+              slug: "synthetic-merchant",
+              role: "OWNER",
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  const response = await page.goto("/en-US/account");
+
+  expect(response?.ok()).toBe(true);
+  expect(response?.headers()["cache-control"]).toContain("no-store");
+  await expect(page).toHaveTitle(/Account Center/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Welcome, Synthetic Account Owner" }),
+  ).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Account center navigation" });
+  await expect(navigation.getByRole("link", { name: "My listings" })).toHaveAttribute(
+    "href",
+    "/en-US/account/listings",
+  );
+  await expect(navigation.getByRole("link", { name: "Post a listing" })).toHaveAttribute(
+    "href",
+    "/en-US/post/rental/new",
+  );
+  await expect(navigation.getByRole("link", { name: "Notifications" })).toHaveCount(0);
+  await expect(page.getByText("Synthetic Merchant")).toBeVisible();
+  await expect(page.getByText("Merchant · Owner")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    /noindex.*nofollow|nofollow.*noindex/,
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("renders the private listing-management sign-in boundary without indexing or overflow", async ({
   page,
 }) => {
@@ -954,8 +1016,15 @@ test("renders and updates the private bilingual notification center", async ({ p
       contentType: "application/json",
       body: JSON.stringify({
         data: {
-          user: { id: userId, displayName: "Synthetic E2E Owner", avatarUrl: null },
-          expiresAt: "2026-07-30T01:00:00.000Z",
+          user: {
+            id: userId,
+            displayName: "Synthetic E2E Owner",
+            avatarUrl: null,
+            locale: "zh-Hans",
+            status: "ACTIVE",
+            verificationBadges: [],
+          },
+          expiresAt: "2099-07-30T01:00:00.000Z",
           permissions: ["notification:read", "notification:update"],
           platformRoles: [],
           organizations: [],

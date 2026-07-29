@@ -286,3 +286,13 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 可观测性测试只接受 confirmed/false_positive 固定标签，并验证首次人工复核按候选数计数、精确
   动作重试不计数。空库、上一发布升级、完整质量、运行时、生产 Chromium 和托管真实服务门禁仍必须
   全部执行并如实记录。
+
+## 18.26 WEB-004 账户壳验证增量
+
+- 解析器单测覆盖有效 Session、重复/非法 capability、未知平台角色、越界组织和过期响应的失败关闭。
+- 组件测试证明账户总览、Listing 管理和通知中心共享一次 no-store Session 读取；能力缺失不显示入口，
+  focus 后 401 清空导航，网络失败有显式重试且不保留旧权限。
+- 生产 Chromium 桌面/移动验证 `/en-US/account` 的 capability 导航、组织枚举本地化、
+  noindex/no-store 和无横向溢出，并回归子页 guest 与双语通知路径。
+- 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构语义和托管真实服务/四镜像门禁继续执行；
+  本任务不修改 OpenAPI、Prisma 或 migration。

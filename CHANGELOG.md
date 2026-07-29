@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a bilingual private account overview and shared capability-aware account shell with one
+  bounded in-memory no-store Session snapshot, focus/visibility/expiry revalidation, fail-closed
+  invalidation, localized minimal organization summaries, and responsive accessible navigation
+  that exposes only implemented server-advertised capabilities while leaving API authorization
+  authoritative.
 - Added versioned, bounded Listing duplicate detection for pg_trgm text, deterministic media dHash
   and domain-separated contact fingerprints, with dry-run/enforcement modes, immutable candidate
   evidence, minimal bilingual moderator review, and idempotent confirmed/false-positive metrics.

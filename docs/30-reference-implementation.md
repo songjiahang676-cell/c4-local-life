@@ -171,3 +171,11 @@ Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing
 ## 30.5 未完成即不能声称完成的事项
 
 本包没有替代：真实品牌资产/版权、用户研究、法律意见、生产云资源、provider 账号、真实测试数据、安全渗透、依赖安装后的完整构建、性能实测和运营团队。Codex 应把这些作为明确 Gate，而不是用占位值默认为已解决。
+
+## 30.6 WEB-004 账户壳实现
+
+`apps/web/src/components/account-shell.tsx` 是账户页面唯一 Session/能力内存边界，负责严格解析、
+并发去重、15 秒可见重验与失效关闭；`account-overview.tsx` 只呈现服务端允许且已经实现的账户入口及
+最小组织摘要。`/[locale]/account/layout.tsx` 组合 Provider/Shell，使 Listing 管理与通知中心不再
+分别请求或持久化 Session。所有业务数据仍从各自同源 BFF/API 读取，Web 不导入 Prisma、不自行授予
+权限，也不新增服务、数据库、契约或架构边界。

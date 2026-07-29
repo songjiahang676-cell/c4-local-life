@@ -395,3 +395,11 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
   不得重复记录人工反馈指标。
 - OpenAPI、生成 TypeScript、严格 Zod、API 映射和 Admin 双语界面同时更新；没有新增服务、API
   范式或版本边界。
+
+## 8.22 WEB-004 账户会话消费契约
+
+`WEB-004` 不新增或修改公共 API、OpenAPI schema、Prisma model 或 migration。Web 继续消费既有
+`GET /auth/session` 的 `SessionResponse`，并在客户端边界严格校验 UUID、ISO 到期时间、有界去重
+permission/role、用户状态及最多 50 个最小组织摘要。`permissions` 只决定已实现导航是否出现；
+页面数据继续调用各自 no-store owner API，任何 mutation 继续使用服务端 Policy、对象授权、并发和
+幂等契约。401 表示未登录；其他失败或 malformed payload 不降级为匿名假数据，也不保留旧能力。

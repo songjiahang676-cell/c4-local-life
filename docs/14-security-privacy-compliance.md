@@ -370,3 +370,14 @@ Idempotency-Key 或请求哈希。
 - 资源消耗/枚举：查询只看同类型、过去一年，媒体/联系方式输入均有上限，结果最多 10 条并使用参数化
   SQL。候选排序和内部匹配不会返回给发布者，因此不能作为枚举 oracle；生产阈值调整必须新增版本并
   先 dry-run 观察人工误杀率。
+
+## 14.24 WEB-004 账户能力缓存威胁和缓解
+
+- 旧权限/账号切换：Session 只在当前组件树内存中保存，禁止 localStorage/sessionStorage/URL；
+  focus、pageshow、重新可见、15 秒窗口和绝对到期重验，401/过期立即清空。
+- 恶意或损坏响应：客户端严格限制 UUID、时间、权限/角色数量与格式、组织数量/字段；任何非 2xx、
+  malformed、重复或越界响应失败关闭且不渲染旧入口。
+- 前端权限绕过：导航能力只是 UX hint；所有页面数据和写操作继续由 API 当前 Actor、Policy 和对象
+  Repository 授权。隐藏入口既不授权，也不泄露未知资源存在性。
+- PII/共享缓存：壳只消费安全 UserSummary 和 OrganizationSummary，不读取联系方式、地址或 token；
+  页面与 BFF no-store，错误状态和日志不包含 Session payload。

@@ -4,20 +4,19 @@
 
 ## 当前 Gate
 
-- Gate：G2 Listings / Moderation
-- 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
-- 进度：15/16 个 G2 任务、45/101 个总任务完成
-- 风险：`LIST-009` 已由 PR #30 受保护合并且最终 main 门禁通过；`MOD-003` 的文本/图片/联系方式
-  重复候选、版本化阈值、dry-run、不可变人工反馈和误杀指标已通过完整本地质量、真实 PostgreSQL、
-  运行时和生产 Chromium；PR #31 首轮受保护 Linux 真实服务、16/16 E2E 与四镜像门禁已通过，正在
-  固化 evidence-head；生产阈值校准、HMAC 密钥轮换/保留清理、Beta 量级查询计划和数据库加密配置
+- Gate：G2 Listings / Moderation（本地实现完成，最终托管退出验证中）
+- 目标：完成账户中心共享壳的受保护托管验证并关闭 Gate 2，再按序进入 G3 Search / Web / SEO
+- 进度：16/16 个 G2 任务、46/101 个总任务完成
+- 风险：`MOD-003` 已由 PR #31 受保护合并且 merged-main 门禁通过；`WEB-004` 已通过完整本地质量、
+  真实 PostgreSQL 与生产 Chromium 18/18，正在等待受保护 Linux 真实服务、四镜像、evidence-head、
+  合并和 merged-main 复验。生产重复阈值校准、HMAC 密钥轮换/保留清理、Beta 查询计划及数据库加密
   仍需运营/法律/基础设施确认
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target  | Status               | Notes                                                              |
-| ------- | -------------------- | ---------- | ------- | -------------------- | ------------------------------------------------------------------ |
-| MOD-003 | @songjiahang676-cell | 2026-07-29 | pending | evidence-head checks | 文本/图片/联系方式候选、阈值版本、dry-run、不可变人工反馈/误杀指标 |
+| Task    | Owner                | Started    | Target  | Status                  | Notes                                                         |
+| ------- | -------------------- | ---------- | ------- | ----------------------- | ------------------------------------------------------------- |
+| WEB-004 | @songjiahang676-cell | 2026-07-29 | pending | protected hosted checks | 共享 no-store Session、能力导航、主动失效、双语/移动/错误状态 |
 
 ## Gate Evidence
 
@@ -186,6 +185,12 @@
 | MOD-003 runtime/browser         | API runtime + Chromium desktop/mobile | 67 paths / 153 schemas；16/16 production E2E passed                        | 2026-07-29 |
 | MOD-003 architecture            | `scripts/check-architecture.sh`       | 101 tasks；57 models；67 paths；153 schemas；36 JSON files passed          | 2026-07-29 |
 | MOD-003 protected checks        | PR #31 / run `30468335925`            | 375 real-service tests；Linux 16/16 E2E and four non-root images passed    | 2026-07-29 |
+| MOD-003 evidence-head checks    | PR #31 / run `30469588802`            | fixture clock fix；quality、Linux E2E and four non-root images passed      | 2026-07-29 |
+| MOD-003 protected merge         | PR #31 / merge `cdd3c53`              | protected squash merge completed                                           | 2026-07-29 |
+| MOD-003 final main quality      | GitHub Actions run `30470203397`      | merged-head quality and four non-root images passed                        | 2026-07-29 |
+| WEB-004 local quality           | `pnpm ci:quality`                     | 85 files；378 passed / 2 skips；9 checks；8 builds passed                  | 2026-07-29 |
+| WEB-004 runtime/browser         | production Chromium desktop/mobile    | private capability shell and existing journeys；18/18 E2E passed           | 2026-07-29 |
+| WEB-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI passed；101 tasks / 57 models / 67 paths / 153 schemas passed  | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -196,7 +201,8 @@
   `30443279395` 受保护合并；`LIST-007` 已由 PR #27 / final main run `30447479457` 受保护合并；
   `MOD-002` 已由 PR #28 / final main run `30452750250` 受保护合并；`LIST-008` 已由 PR #29 /
   final main run `30458526726` 受保护合并；`LIST-009` 已由 PR #30 / final main run
-  `30463612335` 受保护合并；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `MOD-003`。
+  `30463612335` 受保护合并；`MOD-003` 已由 PR #31 / final main run `30470203397` 受保护合并为
+  `cdd3c53`；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-004`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。

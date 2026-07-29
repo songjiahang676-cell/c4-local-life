@@ -80,6 +80,11 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 - 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
 - `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助、`listing:draft:create` 和 `media:upload:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿和媒体上传 intent POST 已由各自 Policy 动作强制执行。
 
+`WEB-004` 的 Web 账户壳不把上述展示能力持久化。一个 React Provider 在当前页面生命周期内共享
+Session，限制并发刷新，并在 15 秒可见窗口、focus、pageshow、visibilitychange 和绝对过期点重新
+读取；401、过期、网络失败和 malformed payload 都清除旧能力。前端不能合并旧/新账号能力、推导
+平台管理员入口或把隐藏导航当作授权；个人/组织 API 继续按当前数据库 Actor 和对象范围失败关闭。
+
 `ADMIN-001` 将平台角色与组织角色分开持久化到 `platform_role_assignments`。每条授权保留 reason、
 grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
 未过期授权，不把客户端 claims 当作事实。`admin:console:access` 只授予 ACTIVE 且至少有一个有效平台

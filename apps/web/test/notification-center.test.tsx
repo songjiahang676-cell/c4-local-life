@@ -6,6 +6,7 @@ import {
   NotificationCenter,
   parseNotificationCollection,
 } from "../src/components/notification-center";
+import { AccountSessionProvider } from "../src/components/account-shell";
 
 const notification = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -30,6 +31,31 @@ const collection = {
   generatedAt: "2026-07-29T01:01:00.000Z",
 } as const satisfies NotificationCollection;
 
+const accountSession = {
+  data: {
+    user: {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      displayName: "Synthetic Notification Owner",
+      avatarUrl: null,
+      locale: "zh-Hans",
+      status: "ACTIVE",
+      verificationBadges: [],
+    },
+    expiresAt: "2099-07-30T01:00:00.000Z",
+    permissions: ["notification:read", "notification:update"],
+    platformRoles: [],
+    organizations: [],
+  },
+};
+
+function renderNotificationCenter(locale: "zh-Hans" | "en-US" = "en-US") {
+  return render(
+    <AccountSessionProvider>
+      <NotificationCenter locale={locale} />
+    </AccountSessionProvider>,
+  );
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -40,7 +66,7 @@ describe("notification center", () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<NotificationCenter locale="en-US" />);
+    renderNotificationCenter();
 
     expect(
       await screen.findByRole("heading", { name: "Sign in to view notifications" }),
@@ -56,7 +82,7 @@ describe("notification center", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: { user: { id: "user" } } }), {
+        new Response(JSON.stringify(accountSession), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
@@ -84,7 +110,7 @@ describe("notification center", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<NotificationCenter locale="zh-Hans" />);
+    renderNotificationCenter("zh-Hans");
 
     expect(await screen.findByRole("heading", { name: "信息已发布" })).toBeVisible();
     expect(screen.getByText("1 条未读")).toBeVisible();

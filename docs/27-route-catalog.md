@@ -56,6 +56,11 @@
 复用账号/locale/vertical 隔离恢复、动态 schema、READY 媒体绑定、强并发控制和幂等提交审核动作。
 账号内草稿编辑路由由 `LIST-009` 使用，必须先从 owner API 读取精确 DRAFT 与 ETag；`type` 查询参数只
 选择已实现的表单视图，不能用于推导 owner、授权或 Listing 类型事实。
+
+`/[locale]/account` 已由 `WEB-004` 实现为 noindex/no-store 私有总览与共享账户壳。壳只呈现
+Session capability 对应且已实现的 `listings`、`notifications` 和发布入口；其余目录路由继续由各自
+Backlog 任务落地，不能以空链接或静态占位宣称完成。总览与子页共享短效内存 Session，但最终授权仍由
+各 API 当前 Actor/对象 Policy 决定。
 | `/[locale]/account/organizations` | 组织与成员 |
 | `/[locale]/account/profile` | 资料 |
 | `/[locale]/account/verification` | 验证 |

@@ -878,4 +878,26 @@ Observability: Added only `socal_moderation_duplicate_reviews_total{outcome="con
 
 Docs: Updated domain/data、API/integrations、moderation workflow、security/privacy、observability、testing matrix、acceptance criteria、retention、Admin console、reference implementation、migration recovery、Gate checklist/status、Backlog、README、SECURITY、changelog、generated architecture book and this worklog
 
-Known gaps: Production thresholds and false-positive rate cannot be calibrated without reviewed Beta traffic and must remain versioned/dry-run first；HMAC key rotation and retention deletion require an operator/legal-approved rebuild/dual-read plan；Beta-volume EXPLAIN evidence and production database encryption remain later performance/infrastructure gates；the Prisma PostgreSQL adapter still emits its documented `pg@9` future-deprecation warning under parallel integration tests；evidence-head checks、protected merge and final main evidence remain pending
+Known gaps: Production thresholds and false-positive rate cannot be calibrated without reviewed Beta traffic and must remain versioned/dry-run first；HMAC key rotation and retention deletion require an operator/legal-approved rebuild/dual-read plan；Beta-volume EXPLAIN evidence and production database encryption remain later performance/infrastructure gates；the Prisma PostgreSQL adapter still emits its documented `pg@9` future-deprecation warning under parallel integration tests；PR #31 evidence-head run `30469588802`、protected merge `cdd3c53` and final main run `30470203397` subsequently passed
+
+## WEB-004 — 账户中心壳与权限缓存策略
+
+Task: WEB-004 账户中心壳与权限缓存策略
+
+Changed: Added `apps/web/src/components/account-shell.tsx` as the single account Session/capability boundary、`account-overview.tsx` and the bilingual `/[locale]/account` page；wrapped all account children in the shared Provider/Shell；removed duplicate Session fetching from Listing management and notifications；added responsive accessible styles、strict parser/component tests and production Chromium coverage
+
+Contracts: OpenAPI、generated contracts and public API unchanged；the Web parser consumes the existing `SessionResponse` and fails closed on malformed、duplicated、unbounded or expired data
+
+Migrations: None；Prisma/schema/database facts unchanged；rollback removes the account overview/shared wrapper and restores per-page Session reads，with no persistent data to recover
+
+Security: Session/capabilities exist only in component-tree memory and every fetch is `no-store`；visible pages revalidate at most every 15 seconds plus focus、pageshow、visibility restoration and absolute expiry；401、expired、non-2xx、network or invalid payload clears prior capabilities；no Web Storage/URL/log persistence；navigation is only a UI hint and API Policy/object authorization remains authoritative；minimal organization summaries exclude contact data
+
+Tests run: Target Web typecheck and lint passed；3 targeted Web files / 11 tests passed；production Web build passed and emitted dynamic account routes；production standalone Chromium desktop/mobile passed 18/18 including capability-scoped account navigation、localized organization summary、noindex/no-store and overflow；PostgreSQL-enabled root `pnpm ci:quality` passed workflow/governance/config/container/seed/migration/OpenAPI/format/Prisma checks、9 typechecks、9 lints、85 test files with 83 passed / 2 service skips and 378/380 tests passed、8 production builds and 72.78% statements / 76.50% lines；API runtime RED/trace/OpenAPI check passed；architecture checker passed 101 tasks / 57 Prisma models / 67 OpenAPI paths / 153 schemas / 36 JSON files
+
+Not run: Local Redis and ClamAV integrations remain explicitly skipped because those services are not installed on this Windows host；local Docker image build/health smoke is unavailable because Docker CLI is not installed；protected Linux real-service and four-image checks are pending
+
+Observability: No new metrics or high-cardinality logs；existing HTTP RED metrics cover `/auth/session` and account BFF requests，while focus/expiry refresh failures remain bounded UI states without Session payload logging
+
+Docs: Updated information architecture、roles/permissions、system cache strategy、API consumption boundary、UI system、security/privacy、testing、acceptance criteria、route catalog、reference implementation、Gate checklist/status、Backlog、README、SECURITY、changelog、generated architecture book and this worklog
+
+Known gaps: Message、favorite、orders、wallet、profile/security/privacy and later organization-management pages remain owned by their Backlog tasks and intentionally have no placeholder navigation；cross-tab immediate invalidation is not implemented because no safe server push contract exists，so visible staleness is bounded to 15 seconds and every API action reauthorizes；protected hosted checks、evidence-head、merge and final main evidence remain pending；the Prisma PostgreSQL adapter still emits its documented `pg@9` future-deprecation warning under parallel integration tests

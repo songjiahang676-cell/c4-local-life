@@ -408,6 +408,14 @@
 `/[locale]/account/listings/[listingId]/edit?type=...` 继续编辑并从 owner API 加载精确资源与强
 ETag，不从 URL 推导 owner。加载、空态、错误、未登录和会话不可用均有中英文独立状态。
 
+`WEB-004` 将 `/[locale]/account` 实现为所有私有账户页面共享的能力壳。壳只在内存中保存一份
+`GET /auth/session` 快照，以 `cache: no-store` 首次读取，并在页面重新聚焦、恢复可见、BFCache
+恢复、会话到期及可见状态下每 15 秒重新验证。401、过期、异常或不符合契约的响应都会立即清空能力并
+失败关闭；不写入 localStorage、sessionStorage、URL 或共享缓存。导航只显示当前服务端
+`permissions` 对应且已实现的入口，未实现的订单、钱包、消息等能力不以占位链接出现；这些能力只用于
+减少无效入口，最终 API 仍逐请求授权。总览只显示安全用户摘要、到期时间和最小组织摘要，并覆盖
+中英文、受限账号、loading、guest、服务不可用与显式重试状态。
+
 ## 3.5 多角色后台入口
 
 设计图底部的“平台后台入口”在真实产品中不应把所有入口公开展示给未授权用户。登录后根据权限显示：用户中心、商家后台、师傅后台、供应商后台、广告主后台、审核/运营后台、客服、财务。后台路径与公开站分域或独立应用，并执行后端权限校验。
@@ -605,6 +613,11 @@ API 应用层的统一实现位于 `apps/api/src/common/authorization/`：
 - `PolicyService` 返回内部 allow/deny 与稳定原因码；HTTP 边界只向未登录用户返回通用 401，向其他拒绝返回通用 403，不泄露资源、角色或组织是否存在。
 - 对象级规则必须使用 Repository 已按 actor/tenant 约束取得的最小资源上下文（owner、organization、state、deleted），不得把客户端提交的 owner/org 当作授权事实。`ownerOrOrganizationPolicy` 是组合规则，不替代 Repository 的 scoped query。
 - `/auth/session` 的 `permissions` 只用于客户端减少无效入口；服务端每次请求仍重新构建 Actor 并执行 Policy，客户端不得提交或覆盖权限。当前 ACTIVE 用户获得账户自助、`listing:draft:create` 和 `media:upload:create` 能力，LIMITED 用户仅保留账户资料/会话自助能力；Listing 草稿和媒体上传 intent POST 已由各自 Policy 动作强制执行。
+
+`WEB-004` 的 Web 账户壳不把上述展示能力持久化。一个 React Provider 在当前页面生命周期内共享
+Session，限制并发刷新，并在 15 秒可见窗口、focus、pageshow、visibilitychange 和绝对过期点重新
+读取；401、过期、网络失败和 malformed payload 都清除旧能力。前端不能合并旧/新账号能力、推导
+平台管理员入口或把隐藏导航当作授权；个人/组织 API 继续按当前数据库 Actor 和对象范围失败关闭。
 
 `ADMIN-001` 将平台角色与组织角色分开持久化到 `platform_role_assignments`。每条授权保留 reason、
 grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Repository 在每次请求只读取未撤销、
@@ -1162,6 +1175,11 @@ SCANNING + Outbox；Worker 消费 `media.upload.completed`，重新验证对象�
 
 不得缓存完整私密联系方式到共享公开缓存；缓存 key 必须包含语言、城市、授权范围等维度。
 
+`WEB-004` 具体化会话/权限行：Web 账户布局只保留组件树生命周期内的一份内存快照，所有网络读取都用
+`no-store`，并在页面可见时最多 15 秒陈旧；focus、pageshow、重新可见和绝对过期均触发重验。
+并发刷新合并为一个请求。401、过期、非 2xx、网络错误或越界/异常 JSON 立即丢弃快照并隐藏能力入口；
+没有跨标签、持久化或共享代理缓存，因此账号切换不会继承上一账号导航。
+
 ## 7.7 可用性与降级
 
 - OpenSearch 不可用：详情、账户和发布仍可用；搜索返回服务降级提示，可对有限数据使用 PostgreSQL fallback。
@@ -1584,11 +1602,20 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 - 现有 `GET /admin/moderation/listings/{caseId}` 的 `duplicateCandidates` 最多 10 条，只暴露候选
   Listing ID/版本/类型/标题/状态、阈值版本、DRY_RUN/ENFORCE、MEDIUM/HIGH 与 TEXT/IMAGE/CONTACT
   信号。契约不暴露原始联系方式、HMAC、对象 key、相似分值、Hamming 距离或阈值数值。
-- `DUPLICATE_CONTENT` 是 `REQUEST_CHANGES|REJECT` 的稳定原因；批准仍使用
-  `CONTENT_POLICY_COMPLIANT`。动作继续要求当前 MFA moderator、recent step-up、强 ETag 和
-  actor-scoped `Idempotency-Key`，精确重试不得重复记录人工反馈指标。
+- `DUPLICATE_CONTENT` 仅在案件已有重复候选时才是 `REQUEST_CHANGES|REJECT` 的稳定原因；没有
+  候选证据时服务层与 repository 均 fail closed。批准仍使用 `CONTENT_POLICY_COMPLIANT`。动作继续
+  要求当前 MFA moderator、recent step-up、强 ETag 和 actor-scoped `Idempotency-Key`，精确重试
+  不得重复记录人工反馈指标。
 - OpenAPI、生成 TypeScript、严格 Zod、API 映射和 Admin 双语界面同时更新；没有新增服务、API
   范式或版本边界。
+
+## 8.22 WEB-004 账户会话消费契约
+
+`WEB-004` 不新增或修改公共 API、OpenAPI schema、Prisma model 或 migration。Web 继续消费既有
+`GET /auth/session` 的 `SessionResponse`，并在客户端边界严格校验 UUID、ISO 到期时间、有界去重
+permission/role、用户状态及最多 50 个最小组织摘要。`permissions` 只决定已实现导航是否出现；
+页面数据继续调用各自 no-store owner API，任何 mutation 继续使用服务端 Policy、对象授权、并发和
+幂等契约。401 表示未登录；其他失败或 malformed payload 不降级为匿名假数据，也不保留旧能力。
 
 ---
 
@@ -1836,6 +1863,14 @@ URL 或持久客户端缓存。
 媒体规则；服务器资源优先于设备恢复副本。被审核下架的 SUSPENDED 内容不展示删除动作，以保留申诉
 入口。页面、BFF 与 API 都 no-store，metadata noindex/nofollow，公开爬虫不能获得标题或状态列表。
 
+## 10.12 账户中心共享壳
+
+账户总览和子页共享同一个双语响应式壳：身份区只显示安全 display name、受限状态和组织数量，导航按
+服务端能力生成并保持可见焦点；桌面为紧凑横向导航，窄屏改为两列/单列触控目标。总览用明确卡片进入
+“我的信息”“通知”“发布信息”，只显示已实现能力，不用禁用占位项制造虚假完整度。组织列表将内部
+类型/角色枚举映射为中英文用户文案，不显示联系方式。loading、未登录、Session 不可用、重试、受限
+账号和无组织均有独立可访问状态；私有页面始终 noindex/no-store。
+
 ---
 
 <!-- source: docs\11-content-workflows-and-moderation.md -->
@@ -2063,10 +2098,11 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   达到任一执行阈值追加 `POSSIBLE_DUPLICATE` 中风险规则并进入人工审核，不自动定罪或删除。
 - 每次 evaluation 冻结阈值版本、候选版本与内部证据。Admin 只显示候选摘要、模式、置信级别和
   TEXT/IMAGE/CONTACT 信号，不显示分值、阈值、联系方式指纹或媒体对象 key。
-- 审核员以 `DUPLICATE_CONTENT` 要求修改/拒绝时将未复核候选一次性标记 CONFIRMED；以
-  `CONTENT_POLICY_COMPLIANT` 批准时标记 FALSE_POSITIVE。数据库阻止复核结果二次改写；精确动作重试
-  不重复指标。误杀率以 `false_positive / (false_positive + confirmed)` 的人工复核样本计算，
-  未复核 dry-run 候选不能假装成质量结论。
+- 审核员只能在案件已有候选证据时以 `DUPLICATE_CONTENT` 要求修改/拒绝，并将未复核候选一次性标记
+  CONFIRMED；没有候选时服务层与 repository 均拒绝该原因。以 `CONTENT_POLICY_COMPLIANT` 批准时标记
+  FALSE_POSITIVE。数据库阻止复核结果二次改写；精确动作重试不重复指标。误杀率以
+  `false_positive / (false_positive + confirmed)` 的人工复核样本计算，未复核 dry-run 候选不能
+  假装成质量结论。
 - 提交/重大编辑事务同时写 evaluation、候选、联系方式指纹、revision、Case/Audit/Outbox；失败整笔
   回滚。媒体 hash 在既有 Worker 生命周期生成，队列重复执行仍由媒体版本和状态幂等边界收敛。
 
@@ -2648,10 +2684,22 @@ Idempotency-Key 或请求哈希。
   API 不返回候选。Admin 契约移除内部数值、对象 key、指纹和候选 owner，稳定原因也不泄露原始证据。
 - 证据篡改/反馈投毒：候选绑定 evaluation、Listing/候选版本和阈值版本，数据库限制取值并禁止证据
   更新/删除；人工复核结果只能从 UNREVIEWED 写入一次。动作仍要求 recent MFA、强 ETag、幂等键和
-  事务内角色复核，精确重试不重复样本。
+  事务内角色复核；没有候选证据时，服务层和 repository 均拒绝 `DUPLICATE_CONTENT`，精确重试不
+  重复样本。
 - 资源消耗/枚举：查询只看同类型、过去一年，媒体/联系方式输入均有上限，结果最多 10 条并使用参数化
   SQL。候选排序和内部匹配不会返回给发布者，因此不能作为枚举 oracle；生产阈值调整必须新增版本并
   先 dry-run 观察人工误杀率。
+
+## 14.24 WEB-004 账户能力缓存威胁和缓解
+
+- 旧权限/账号切换：Session 只在当前组件树内存中保存，禁止 localStorage/sessionStorage/URL；
+  focus、pageshow、重新可见、15 秒窗口和绝对到期重验，401/过期立即清空。
+- 恶意或损坏响应：客户端严格限制 UUID、时间、权限/角色数量与格式、组织数量/字段；任何非 2xx、
+  malformed、重复或越界响应失败关闭且不渲染旧入口。
+- 前端权限绕过：导航能力只是 UX hint；所有页面数据和写操作继续由 API 当前 Actor、Policy 和对象
+  Repository 授权。隐藏入口既不授权，也不泄露未知资源存在性。
+- PII/共享缓存：壳只消费安全 UserSummary 和 OrganizationSummary，不读取联系方式、地址或 token；
+  页面与 BFF no-store，错误状态和日志不包含 Session payload。
 
 ---
 
@@ -3312,6 +3360,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   动作重试不计数。空库、上一发布升级、完整质量、运行时、生产 Chromium 和托管真实服务门禁仍必须
   全部执行并如实记录。
 
+## 18.26 WEB-004 账户壳验证增量
+
+- 解析器单测覆盖有效 Session、重复/非法 capability、未知平台角色、越界组织和过期响应的失败关闭。
+- 组件测试证明账户总览、Listing 管理和通知中心共享一次 no-store Session 读取；能力缺失不显示入口，
+  focus 后 401 清空导航，网络失败有显式重试且不保留旧权限。
+- 生产 Chromium 桌面/移动验证 `/en-US/account` 的 capability 导航、组织枚举本地化、
+  noindex/no-store 和无横向溢出，并回归子页 guest 与双语通知路径。
+- 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构语义和托管真实服务/四镜像门禁继续执行；
+  本任务不修改 OpenAPI、Prisma 或 migration。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3786,6 +3844,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   阈值版本解释误杀率，不伪造生产准确率。
 - OpenAPI、生成契约、Prisma/migration、回滚说明、真实 PostgreSQL、完整质量、生产浏览器和托管
   保护门禁全部通过后方可标记完成。
+
+## 22.12 WEB-004 账户中心壳验收
+
+- `/[locale]/account` 与现有账户子页共享一份 no-store 内存 Session；并发读取去重，15 秒可见窗口、
+  focus、pageshow、visibilitychange 和绝对到期会重新验证。
+- 401、过期、网络/服务错误和 malformed/越界 payload 都清空旧能力并失败关闭；Session/permission
+  不进入 Web Storage、URL、公开缓存、日志或错误文本。
+- 导航只显示服务端返回且当前已实现的能力；缺少通知/发布/信息读取能力时对应入口不存在，受限账号、
+  guest、loading、unavailable、retry 与无组织状态均有中英文可访问界面。
+- 用户/组织只使用安全摘要并本地化角色/类型；服务端仍对每个资源与 mutation 独立授权。
+- 私有页 noindex/no-store、桌面/移动无横向溢出、键盘焦点、组件回归和生产 Chromium 门禁通过；
+  OpenAPI/Prisma/migration 无变化并明确记录。
 
 ---
 
@@ -4275,6 +4345,11 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 复用账号/locale/vertical 隔离恢复、动态 schema、READY 媒体绑定、强并发控制和幂等提交审核动作。
 账号内草稿编辑路由由 `LIST-009` 使用，必须先从 owner API 读取精确 DRAFT 与 ETag；`type` 查询参数只
 选择已实现的表单视图，不能用于推导 owner、授权或 Listing 类型事实。
+
+`/[locale]/account` 已由 `WEB-004` 实现为 noindex/no-store 私有总览与共享账户壳。壳只呈现
+Session capability 对应且已实现的 `listings`、`notifications` 和发布入口；其余目录路由继续由各自
+Backlog 任务落地，不能以空链接或静态占位宣称完成。总览与子页共享短效内存 Session，但最终授权仍由
+各 API 当前 Actor/对象 Policy 决定。
 | `/[locale]/account/organizations` | 组织与成员 |
 | `/[locale]/account/profile` | 资料 |
 | `/[locale]/account/verification` | 验证 |
@@ -4446,7 +4521,8 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 
 Listing 案件详情增加最多 10 条候选摘要，按稳定列表展示候选类型、标题、状态、阈值版本、
 DRY_RUN/ENFORCE、MEDIUM/HIGH 和 TEXT/IMAGE/CONTACT 信号。UI 不计算阈值、不拉取候选 owner/联系方式/
-图片、不显示内部相似分值或对象 key。审核员可使用稳定 `DUPLICATE_CONTENT` 原因要求修改或拒绝；
+图片、不显示内部相似分值或对象 key。仅当案件已有候选时，审核员可使用稳定
+`DUPLICATE_CONTENT` 原因要求修改或拒绝；没有候选时界面隐藏该选项，服务端仍独立拒绝伪造原因。
 批准继续使用 `CONTENT_POLICY_COMPLIANT`。所有读取、键盘/焦点、中英移动布局、MFA/recent-auth、
 ETag、幂等、no-store 与通用错误边界沿用 ADMIN-002，不新增前端权限推断。
 
@@ -4722,3 +4798,11 @@ Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing
 ## 30.5 未完成即不能声称完成的事项
 
 本包没有替代：真实品牌资产/版权、用户研究、法律意见、生产云资源、provider 账号、真实测试数据、安全渗透、依赖安装后的完整构建、性能实测和运营团队。Codex 应把这些作为明确 Gate，而不是用占位值默认为已解决。
+
+## 30.6 WEB-004 账户壳实现
+
+`apps/web/src/components/account-shell.tsx` 是账户页面唯一 Session/能力内存边界，负责严格解析、
+并发去重、15 秒可见重验与失效关闭；`account-overview.tsx` 只呈现服务端允许且已经实现的账户入口及
+最小组织摘要。`/[locale]/account/layout.tsx` 组合 Provider/Shell，使 Listing 管理与通知中心不再
+分别请求或持久化 Session。所有业务数据仍从各自同源 BFF/API 读取，Web 不导入 Prisma、不自行授予
+权限，也不新增服务、数据库、契约或架构边界。
