@@ -29,7 +29,10 @@ import {
   type ListingRevisionReasonCode,
   type ListingRevisionSnapshot,
 } from "./listing-revision";
-import type { ListingSubmissionRuleHitInput } from "./listing-submission.repository";
+import type {
+  ListingSubmissionRuleHitInput,
+  ModerationDuplicateCandidateInput,
+} from "./listing-submission.repository";
 
 export type {
   ListingRevisionDiffEntry,
@@ -99,6 +102,8 @@ export type RevisePublishedListingInput = ListingDraftWriteFields & {
   ruleSetVersion: number;
   riskTier: ModerationRiskTier;
   hits: readonly ListingSubmissionRuleHitInput[];
+  contactFingerprints: readonly string[];
+  duplicateCandidates: readonly ModerationDuplicateCandidateInput[];
 };
 
 export type RevisePublishedListingResult =
@@ -409,6 +414,24 @@ export class ListingRevisionRepository {
               evidenceKey: hit.evidenceKey,
             })),
           },
+          duplicateCandidates: {
+            create: input.duplicateCandidates.map((candidate) => ({
+              candidateListingId: candidate.candidateListingId,
+              candidateListingVersion: candidate.candidateListingVersion,
+              candidateType: candidate.candidateType,
+              candidateTitle: candidate.candidateTitle,
+              candidateStatus: candidate.candidateStatus,
+              thresholdVersion: candidate.thresholdVersion,
+              mode: candidate.mode,
+              confidence: candidate.confidence,
+              matchedSignals: [...candidate.matchedSignals],
+              titleScore: candidate.titleScore,
+              bodyScore: candidate.bodyScore,
+              imageDistance: candidate.imageDistance,
+              contactMatchCount: candidate.contactMatchCount,
+              createdAt: input.occurredAt,
+            })),
+          },
         },
         select: { id: true },
       });
@@ -438,6 +461,18 @@ export class ListingRevisionRepository {
         },
         select: { id: true },
       });
+      await transaction.listingContactFingerprint.deleteMany({
+        where: { listingId: input.listingId },
+      });
+      if (input.contactFingerprints.length > 0) {
+        await transaction.listingContactFingerprint.createMany({
+          data: [...new Set(input.contactFingerprints)].map((fingerprint) => ({
+            listingId: input.listingId,
+            fingerprint,
+            createdAt: input.occurredAt,
+          })),
+        });
+      }
 
       const changed = await transaction.listing.updateMany({
         where: {

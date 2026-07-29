@@ -1,6 +1,8 @@
 import { type DynamicModule, Module, type Provider } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
+import type { MetricsRegistry } from "@socal/observability";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { API_METRICS } from "../../common/api-metrics.token";
 import { AdminSessionController } from "./admin-session.controller";
 import { AdminSessionService } from "./admin-session.service";
 import { DatabaseModerationStore } from "./database-moderation.store";
@@ -18,6 +20,7 @@ export class AdminModule {
     environment: ApiEnvironment,
     mfaStore?: MfaStore,
     moderationStore?: ModerationStore,
+    metrics?: MetricsRegistry,
   ): DynamicModule {
     const storeProviders: Provider[] = mfaStore
       ? [{ provide: MFA_STORE, useValue: mfaStore }]
@@ -33,6 +36,7 @@ export class AdminModule {
       controllers: [AdminSessionController, MfaController, ModerationController],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
+        ...(metrics ? [{ provide: API_METRICS, useValue: metrics }] : []),
         ...storeProviders,
         ...moderationStoreProviders,
         AdminSessionService,

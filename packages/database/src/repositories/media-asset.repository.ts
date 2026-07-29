@@ -119,6 +119,7 @@ export type FinalizeMediaProcessingInput = {
   detectedMimeType: string;
   width: number;
   height: number;
+  perceptualHash: string;
   variants: readonly MediaProcessedVariantInput[];
 };
 
@@ -465,6 +466,9 @@ export class MediaAssetRepository {
     input: FinalizeMediaProcessingInput,
   ): Promise<MediaProcessingMutationResult> {
     assertCompleteVariantSet(input.variants);
+    if (!/^[0-9a-f]{16}$/.test(input.perceptualHash)) {
+      throw new Error("Media perceptual hash must be a lowercase 64-bit hex value");
+    }
     return this.#transaction(async (transaction) => {
       await this.#lockAsset(transaction, input.id);
       const asset = await transaction.mediaAsset.findUnique({
@@ -511,6 +515,7 @@ export class MediaAssetRepository {
           detectedMimeType: input.detectedMimeType,
           width: input.width,
           height: input.height,
+          perceptualHash: input.perceptualHash,
           processedAt: input.now,
           rejectionCode: null,
           lifecycleVersion: { increment: 1 },

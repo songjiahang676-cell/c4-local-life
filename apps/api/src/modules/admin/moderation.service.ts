@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
+import type { MetricsRegistry } from "@socal/observability";
 import type {
   ListModerationCasesQuery,
   ModerationActionRequest,
@@ -16,6 +17,7 @@ import {
   type ModerationCaseListItem,
 } from "@socal/database/moderation-case";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
+import { API_METRICS } from "../../common/api-metrics.token";
 import type { PolicyRequestContext } from "../../common/authorization/policy";
 import {
   type ListingAggregate,
@@ -92,6 +94,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const reasonOptions = [
   { code: "CONTENT_POLICY_COMPLIANT", actions: ["APPROVE"] },
   { code: "NEEDS_CLARIFICATION", actions: ["REQUEST_CHANGES"] },
+  { code: "DUPLICATE_CONTENT", actions: ["REQUEST_CHANGES", "REJECT"] },
   { code: "PROHIBITED_CONTENT", actions: ["REJECT"] },
   { code: "EXTERNAL_PAYMENT_RISK", actions: ["REJECT"] },
   { code: "ESCALATE_SENIOR_REVIEW", actions: ["ESCALATE"] },
@@ -276,6 +279,7 @@ export class ModerationService {
   constructor(
     @Inject(API_ENVIRONMENT) private readonly environment: ApiEnvironment,
     @Inject(MODERATION_STORE) private readonly store: ModerationStore,
+    @Optional() @Inject(API_METRICS) private readonly metrics?: MetricsRegistry,
   ) {
     this.#cursorSecret = environment.SESSION_SECRET.reveal();
   }
@@ -339,9 +343,12 @@ export class ModerationService {
           ...media,
           updatedAt: media.updatedAt.toISOString(),
         })),
+        duplicateCandidates: detail.duplicateCandidates,
         publisherHistory: detail.publisherHistory,
         availableActions: availableActions(detail),
-        reasonOptions: [...reasonOptions],
+        reasonOptions: reasonOptions.filter(
+          (option) => option.code !== "DUPLICATE_CONTENT" || detail.duplicateCandidates.length > 0,
+        ),
         generatedAt: now.toISOString(),
         source: "POSTGRESQL",
       },
@@ -358,6 +365,9 @@ export class ModerationService {
   ): Promise<ModerationActionResponse> {
     const actor = actorIdentity(context);
     const detail = await this.#getDetail(context, caseId, now);
+    if (input.reasonCode === "DUPLICATE_CONTENT" && detail.duplicateCandidates.length === 0) {
+      throw new ModerationValidationError();
+    }
     let nextListing: {
       status: ListingAggregate["status"];
       moderationStatus: ListingAggregate["moderationStatus"];
@@ -412,6 +422,12 @@ export class ModerationService {
       occurredAt: now,
       nextListing,
     });
+    if (result.kind === "committed" && result.duplicateReview) {
+      this.metrics?.moderationDuplicateReview(
+        result.duplicateReview.outcome === "CONFIRMED" ? "confirmed" : "false_positive",
+        result.duplicateReview.candidateCount,
+      );
+    }
     if (result.kind === "actor_unavailable") throw new ModerationAccessDeniedError();
     if (result.kind === "idempotency_conflict") {
       throw new ModerationIdempotencyConflictError();

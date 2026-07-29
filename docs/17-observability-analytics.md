@@ -113,3 +113,10 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 ## 17.10 当前实施基线
 
 `OBS-001` 的结构日志、Prometheus RED/Worker 指标、W3C Trace 传播、OTLP 导出接口和 PII 脱敏测试记录在 [`observability-baseline.md`](./observability-baseline.md)。Dashboard、SLO、告警、Collector 部署和正式采样策略属于 `OBS-002`/发布 Gate，不在本基础切片中伪造完成。
+
+## 17.11 MOD-003 人工反馈指标
+
+`socal_moderation_duplicate_reviews_total{outcome}` 只允许 `confirmed|false_positive` 两个固定标签，
+按一次写定的候选数累加。精确幂等重试不增加计数；Listing ID、候选 ID、标题、分值、联系方式、图片
+hash、阈值值和审核员均不得成为标签。运行期误杀率只使用已人工复核样本，必须同时展示样本量、阈值
+版本和观察窗口；未复核 dry-run 命中只作为离线候选量，不可混入质量分母或宣称生产准确率。

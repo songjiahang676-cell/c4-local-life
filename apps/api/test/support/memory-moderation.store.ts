@@ -96,6 +96,7 @@ export function buildModerationDetail(
       rejectedCount: 0,
       suspendedCount: 0,
     },
+    duplicateCandidates: [],
     listing: {
       id: memoryModerationListingId,
       type: "RENTAL",
@@ -180,6 +181,19 @@ export class MemoryModerationStore implements ModerationStore {
       requestHash: input.requestHash,
       action: projection,
     });
-    return Promise.resolve({ kind: "committed", action: projection });
+    const candidateCount = this.detail.duplicateCandidates.length;
+    const duplicateReview =
+      candidateCount > 0 &&
+      (input.reasonCode === "DUPLICATE_CONTENT" ||
+        (input.action === "APPROVE" && input.reasonCode === "CONTENT_POLICY_COMPLIANT"))
+        ? {
+            outcome:
+              input.reasonCode === "DUPLICATE_CONTENT"
+                ? ("CONFIRMED" as const)
+                : ("FALSE_POSITIVE" as const),
+            candidateCount,
+          }
+        : null;
+    return Promise.resolve({ kind: "committed", action: projection, duplicateReview });
   }
 }

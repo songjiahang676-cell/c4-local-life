@@ -83,6 +83,7 @@ describe("observability primitives", () => {
     });
     runtime.metrics.mediaProcessing("ready");
     runtime.metrics.notificationEvent("created");
+    runtime.metrics.moderationDuplicateReview("false_positive", 2);
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -93,6 +94,9 @@ describe("observability primitives", () => {
     );
     expect(metrics).toContain('socal_media_processing_total{outcome="ready"} 1');
     expect(metrics).toContain('socal_notification_events_total{outcome="created"} 1');
+    expect(metrics).toContain(
+      'socal_moderation_duplicate_reviews_total{outcome="false_positive"} 2',
+    );
     expect(metrics).not.toContain("person@example.com");
   });
 });

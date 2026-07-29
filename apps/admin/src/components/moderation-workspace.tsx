@@ -40,6 +40,28 @@ const copy = {
     firstSubmission: "首次提交；无历史发布快照，字段均标记为新增。",
     rules: "规则证据",
     noRules: "没有规则命中。",
+    duplicates: "相似候选",
+    noDuplicates: "未发现相似候选。",
+    thresholdVersion: (version: number) => `阈值版本 ${version}`,
+    listingTypes: {
+      RENTAL: "房屋出租",
+      JOB: "招聘求职",
+      TRANSFER: "生意转让",
+      SECONDHAND: "二手交易",
+      SERVICE: "生活服务",
+    },
+    listingStatuses: {
+      DRAFT: "草稿",
+      SUBMITTED: "已提交",
+      PUBLISHED: "已发布",
+      ARCHIVED: "已归档",
+      EXPIRED: "已过期",
+      SUSPENDED: "已暂停",
+      DELETED: "已删除",
+    },
+    duplicateModes: { DRY_RUN: "仅观察", ENFORCE: "送人工审核" },
+    duplicateConfidence: { MEDIUM: "中等置信", HIGH: "高置信" },
+    duplicateSignals: { TEXT: "文本", IMAGE: "图片", CONTACT: "联系方式" },
     publisher: "发布者历史摘要",
     accountAge: "账号年龄（天）",
     submitted: "已提交 Listing",
@@ -67,6 +89,7 @@ const copy = {
     },
     reasons: {
       CONTENT_POLICY_COMPLIANT: "符合内容政策",
+      DUPLICATE_CONTENT: "确认重复内容",
       NEEDS_CLARIFICATION: "需要补充或澄清",
       PROHIBITED_CONTENT: "禁止内容",
       EXTERNAL_PAYMENT_RISK: "平台外付款风险",
@@ -92,6 +115,28 @@ const copy = {
     firstSubmission: "First submission; no earlier published snapshot, so every field is added.",
     rules: "Rule evidence",
     noRules: "No rule hit.",
+    duplicates: "Similar candidates",
+    noDuplicates: "No similar candidate found.",
+    thresholdVersion: (version: number) => `Threshold version ${version}`,
+    listingTypes: {
+      RENTAL: "Rental",
+      JOB: "Job",
+      TRANSFER: "Business transfer",
+      SECONDHAND: "Secondhand",
+      SERVICE: "Service",
+    },
+    listingStatuses: {
+      DRAFT: "Draft",
+      SUBMITTED: "Submitted",
+      PUBLISHED: "Published",
+      ARCHIVED: "Archived",
+      EXPIRED: "Expired",
+      SUSPENDED: "Suspended",
+      DELETED: "Deleted",
+    },
+    duplicateModes: { DRY_RUN: "Observation only", ENFORCE: "Human review" },
+    duplicateConfidence: { MEDIUM: "Medium confidence", HIGH: "High confidence" },
+    duplicateSignals: { TEXT: "Text", IMAGE: "Image", CONTACT: "Contact" },
     publisher: "Publisher history summary",
     accountAge: "Account age (days)",
     submitted: "Submitted listings",
@@ -120,6 +165,7 @@ const copy = {
     },
     reasons: {
       CONTENT_POLICY_COMPLIANT: "Content policy compliant",
+      DUPLICATE_CONTENT: "Confirmed duplicate content",
       NEEDS_CLARIFICATION: "Needs clarification",
       PROHIBITED_CONTENT: "Prohibited content",
       EXTERNAL_PAYMENT_RISK: "Off-platform payment risk",
@@ -492,6 +538,29 @@ export function ModerationWorkspace({ locale, canAct }: { locale: Locale; canAct
                       <dd>{detail.publisherHistory.suspendedCount}</dd>
                     </div>
                   </dl>
+                </section>
+                <section aria-labelledby="duplicates-title">
+                  <h3 id="duplicates-title">{text.duplicates}</h3>
+                  {detail.duplicateCandidates.length === 0 ? <p>{text.noDuplicates}</p> : null}
+                  <ul>
+                    {detail.duplicateCandidates.map((candidate) => (
+                      <li key={candidate.candidateListingId}>
+                        <strong>{candidate.candidateTitle}</strong>
+                        <span>
+                          {text.listingTypes[candidate.candidateType]} ·{" "}
+                          {text.listingStatuses[candidate.candidateStatus]} ·{" "}
+                          {text.duplicateConfidence[candidate.confidence]} ·{" "}
+                          {text.duplicateModes[candidate.mode]} ·{" "}
+                          {text.thresholdVersion(candidate.thresholdVersion)}
+                        </span>
+                        <span>
+                          {candidate.matchedSignals
+                            .map((signal) => text.duplicateSignals[signal])
+                            .join(" + ")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </section>
                 <section aria-labelledby="media-title">
                   <h3 id="media-title">{text.media}</h3>

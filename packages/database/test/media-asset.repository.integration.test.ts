@@ -420,6 +420,7 @@ integration("MediaAssetRepository with PostgreSQL", () => {
           detectedMimeType: "image/jpeg",
           width: 1920,
           height: 1080,
+          perceptualHash: "0123456789abcdef",
           variants: variants.slice(0, 2),
         }),
       ).rejects.toThrow("one THUMBNAIL, CARD, and FULL variant");
@@ -431,6 +432,7 @@ integration("MediaAssetRepository with PostgreSQL", () => {
         detectedMimeType: "image/jpeg",
         width: 1920,
         height: 1080,
+        perceptualHash: "0123456789abcdef",
         variants,
       });
       const duplicate = await repository.finalizeProcessing({
@@ -441,6 +443,7 @@ integration("MediaAssetRepository with PostgreSQL", () => {
         detectedMimeType: "image/jpeg",
         width: 1920,
         height: 1080,
+        perceptualHash: "0123456789abcdef",
         variants: variants.map((variant) => ({ ...variant, id: randomUUID() })),
       });
 
@@ -452,6 +455,7 @@ integration("MediaAssetRepository with PostgreSQL", () => {
         status: MediaStatus.READY,
         lifecycleVersion: 2,
         detectedMimeType: "image/jpeg",
+        perceptualHash: "0123456789abcdef",
         rejectionCode: null,
       });
       await expect(

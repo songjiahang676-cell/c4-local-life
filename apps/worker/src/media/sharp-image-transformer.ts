@@ -12,6 +12,21 @@ const specifications = [
   { kind: "FULL", width: 1920, quality: 84 },
 ] as const;
 
+function differenceHash(pixels: Buffer): string {
+  if (pixels.byteLength !== 72) {
+    throw new PermanentMediaProcessingError("IMAGE_DECODE_FAILED");
+  }
+  let hash = 0n;
+  for (let row = 0; row < 8; row += 1) {
+    for (let column = 0; column < 8; column += 1) {
+      hash <<= 1n;
+      const offset = row * 9 + column;
+      if ((pixels[offset] ?? 0) > (pixels[offset + 1] ?? 0)) hash |= 1n;
+    }
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
 export class SharpImageTransformer implements ImageTransformer {
   constructor(private readonly maximumPixels: number) {}
 
@@ -29,6 +44,15 @@ export class SharpImageTransformer implements ImageTransformer {
         throw new PermanentMediaProcessingError("IMAGE_DECODE_FAILED");
       }
 
+      const perceptualPixels = await sharp(input, {
+        failOn: "error",
+        limitInputPixels: this.maximumPixels,
+      })
+        .rotate()
+        .grayscale()
+        .resize(9, 8, { fit: "fill" })
+        .raw()
+        .toBuffer();
       const variants: TransformedMediaVariant[] = [];
       for (const specification of specifications) {
         const output = await sharp(input, {
@@ -59,6 +83,7 @@ export class SharpImageTransformer implements ImageTransformer {
       return {
         width: full.width,
         height: full.height,
+        perceptualHash: differenceHash(perceptualPixels),
         variants,
       };
     } catch (error: unknown) {

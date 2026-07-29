@@ -80,6 +80,7 @@ function transformer(): ImageTransformer {
       Promise.resolve({
         width: 6,
         height: 4,
+        perceptualHash: "0123456789abcdef",
         variants: [
           {
             kind: "THUMBNAIL",
@@ -159,6 +160,7 @@ describe("MediaProcessingHandler", () => {
       detectedMimeType: "image/jpeg",
       width: 6,
       height: 4,
+      perceptualHash: "0123456789abcdef",
     });
     expect(fixture.store.finalized[0]?.variants).toHaveLength(3);
     expect(fixture.store.rejected).toHaveLength(0);

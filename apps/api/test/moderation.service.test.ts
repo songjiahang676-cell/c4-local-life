@@ -1,8 +1,13 @@
 import { parseApiEnvironment } from "@socal/config";
 import type { ListModerationCasesInput } from "@socal/database/moderation-case";
+import { MetricsRegistry } from "@socal/observability";
 import { describe, expect, it } from "vitest";
 import type { PolicyRequestContext } from "../src/common/authorization/policy";
-import { ModerationCursorError, ModerationService } from "../src/modules/admin/moderation.service";
+import {
+  ModerationCursorError,
+  ModerationService,
+  ModerationValidationError,
+} from "../src/modules/admin/moderation.service";
 import type { ModerationStore } from "../src/modules/admin/moderation.store";
 import {
   buildModerationDetail,
@@ -115,6 +120,95 @@ describe("ModerationService cursor boundary", () => {
 });
 
 describe("ModerationService action outcomes", () => {
+  it("counts human false-positive feedback once while exact retries remain metric-idempotent", async () => {
+    const detail = buildModerationDetail();
+    detail.duplicateCandidates = [
+      {
+        candidateListingId: "40000000-0000-4000-8000-000000000099",
+        candidateListingVersion: 2,
+        candidateType: "RENTAL",
+        candidateTitle: "Earlier synthetic candidate",
+        candidateStatus: "PUBLISHED",
+        thresholdVersion: 1,
+        mode: "ENFORCE",
+        confidence: "HIGH",
+        matchedSignals: ["TEXT"],
+      },
+    ];
+    const store = new MemoryModerationStore(detail);
+    const metrics = new MetricsRegistry();
+    const service = new ModerationService(environment, store, metrics);
+    const input = { action: "APPROVE" as const, reasonCode: "CONTENT_POLICY_COMPLIANT" as const };
+
+    await service.act(
+      context(),
+      memoryModerationCaseId,
+      1,
+      "moderation-false-positive-key",
+      input,
+      new Date("2026-07-29T03:00:00.000Z"),
+    );
+    await service.act(
+      context(),
+      memoryModerationCaseId,
+      1,
+      "moderation-false-positive-key",
+      input,
+      new Date("2026-07-29T03:00:00.000Z"),
+    );
+
+    expect(metrics.renderPrometheus()).toContain(
+      'socal_moderation_duplicate_reviews_total{outcome="false_positive"} 1',
+    );
+  });
+
+  it("counts confirmed duplicate candidates under the bounded outcome label", async () => {
+    const detail = buildModerationDetail();
+    detail.duplicateCandidates = [
+      {
+        candidateListingId: "40000000-0000-4000-8000-000000000098",
+        candidateListingVersion: 3,
+        candidateType: "RENTAL",
+        candidateTitle: "Confirmed synthetic candidate",
+        candidateStatus: "PUBLISHED",
+        thresholdVersion: 1,
+        mode: "ENFORCE",
+        confidence: "HIGH",
+        matchedSignals: ["IMAGE", "CONTACT"],
+      },
+    ];
+    const metrics = new MetricsRegistry();
+    const service = new ModerationService(environment, new MemoryModerationStore(detail), metrics);
+
+    await service.act(
+      context(),
+      memoryModerationCaseId,
+      1,
+      "moderation-confirmed-duplicate-key",
+      { action: "REJECT", reasonCode: "DUPLICATE_CONTENT" },
+      new Date("2026-07-29T03:00:00.000Z"),
+    );
+
+    expect(metrics.renderPrometheus()).toContain(
+      'socal_moderation_duplicate_reviews_total{outcome="confirmed"} 1',
+    );
+  });
+
+  it("rejects a duplicate-content decision when the case has no duplicate evidence", async () => {
+    const service = new ModerationService(environment, new MemoryModerationStore());
+
+    await expect(
+      service.act(
+        context(),
+        memoryModerationCaseId,
+        1,
+        "moderation-duplicate-without-evidence-key",
+        { action: "REJECT", reasonCode: "DUPLICATE_CONTENT" },
+        new Date("2026-07-29T03:00:00.000Z"),
+      ),
+    ).rejects.toBeInstanceOf(ModerationValidationError);
+  });
+
   it.each([
     {
       action: "APPROVE" as const,

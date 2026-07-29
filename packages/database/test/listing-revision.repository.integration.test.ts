@@ -181,6 +181,8 @@ function revisionInput(
     ruleSetVersion: 3,
     riskTier: ModerationRiskTier.LOW,
     hits: [],
+    contactFingerprints: [],
+    duplicateCandidates: [],
   };
 }
 

@@ -52,6 +52,21 @@ describe("moderation contracts", () => {
       }).success,
     ).toBe(false);
     expect(
+      moderationActionRequestSchema.parse({
+        action: "REQUEST_CHANGES",
+        reasonCode: "DUPLICATE_CONTENT",
+      }),
+    ).toEqual({
+      action: "REQUEST_CHANGES",
+      reasonCode: "DUPLICATE_CONTENT",
+    });
+    expect(
+      moderationActionRequestSchema.safeParse({
+        action: "APPROVE",
+        reasonCode: "DUPLICATE_CONTENT",
+      }).success,
+    ).toBe(false);
+    expect(
       moderationActionRequestSchema.safeParse({
         action: "REJECT",
         reasonCode: "PROHIBITED_CONTENT",

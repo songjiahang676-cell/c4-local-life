@@ -116,3 +116,12 @@
   客户端 409 后重新加载当前案件，不静默覆盖另一审核员的决定。
 - 中文/英文与移动布局共用语义结构；队列可用 J/K/方向键切换，R 刷新，Alt+A 聚焦动作，状态/错误
   使用 live region，focus 保持可见。
+
+## 28.11 MOD-003 重复候选工作台增量
+
+Listing 案件详情增加最多 10 条候选摘要，按稳定列表展示候选类型、标题、状态、阈值版本、
+DRY_RUN/ENFORCE、MEDIUM/HIGH 和 TEXT/IMAGE/CONTACT 信号。UI 不计算阈值、不拉取候选 owner/联系方式/
+图片、不显示内部相似分值或对象 key。仅当案件已有候选时，审核员可使用稳定
+`DUPLICATE_CONTENT` 原因要求修改或拒绝；没有候选时界面隐藏该选项，服务端仍独立拒绝伪造原因。
+批准继续使用 `CONTENT_POLICY_COMPLIANT`。所有读取、键盘/焦点、中英移动布局、MFA/recent-auth、
+ETag、幂等、no-store 与通用错误边界沿用 ADMIN-002，不新增前端权限推断。

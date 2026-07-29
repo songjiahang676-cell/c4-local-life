@@ -103,6 +103,19 @@ function detail(item: ModerationCase): ModerationCaseDetailResponse {
         },
       ],
       media: [],
+      duplicateCandidates: [
+        {
+          candidateListingId: "66666666-6666-4666-8666-666666666666",
+          candidateListingVersion: 2,
+          candidateType: "RENTAL",
+          candidateTitle: "Synthetic similar rental",
+          candidateStatus: "PUBLISHED",
+          thresholdVersion: 1,
+          mode: "ENFORCE",
+          confidence: "HIGH",
+          matchedSignals: ["TEXT", "IMAGE"],
+        },
+      ],
       publisherHistory: {
         accountAgeDays: 40,
         submittedCount: 1,
@@ -114,6 +127,7 @@ function detail(item: ModerationCase): ModerationCaseDetailResponse {
       reasonOptions: [
         { code: "CONTENT_POLICY_COMPLIANT", actions: ["APPROVE"] },
         { code: "NEEDS_CLARIFICATION", actions: ["REQUEST_CHANGES"] },
+        { code: "DUPLICATE_CONTENT", actions: ["REQUEST_CHANGES", "REJECT"] },
         { code: "PROHIBITED_CONTENT", actions: ["REJECT"] },
         { code: "EXTERNAL_PAYMENT_RISK", actions: ["REJECT"] },
       ],
@@ -149,6 +163,11 @@ describe("ModerationWorkspace", () => {
 
     expect(await screen.findByRole("heading", { name: "Submission snapshot" })).toBeInTheDocument();
     expect(screen.getByText("Sensitive contact fields redacted")).toBeInTheDocument();
+    expect(screen.getByText("Synthetic similar rental")).toBeInTheDocument();
+    expect(screen.getByText("Text + Image")).toBeInTheDocument();
+    expect(
+      screen.getByText("Rental · Published · High confidence · Human review · Threshold version 1"),
+    ).toBeInTheDocument();
     expect(document.querySelector("footer")).toHaveTextContent("Source of truth: POSTGRESQL");
     fireEvent.keyDown(window, { key: "j" });
     expect(

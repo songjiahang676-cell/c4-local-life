@@ -16,6 +16,7 @@ type MediaProcessingOutcome = "ready" | "rejected" | "stale";
 type ListingExpiryOutcome = "expired" | "idle";
 type NotificationEventOutcome =
   "created" | "duplicate" | "ignored" | "recipient_unavailable" | "failed";
+type ModerationDuplicateReviewOutcome = "confirmed" | "false_positive";
 
 type Histogram = {
   count: number;
@@ -86,6 +87,7 @@ export class MetricsRegistry {
   readonly #mediaProcessing = new Map<MediaProcessingOutcome, number>();
   readonly #listingExpiryPolls = new Map<ListingExpiryOutcome, number>();
   readonly #notificationEvents = new Map<NotificationEventOutcome, number>();
+  readonly #moderationDuplicateReviews = new Map<ModerationDuplicateReviewOutcome, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -140,6 +142,11 @@ export class MetricsRegistry {
 
   notificationEvent(outcome: NotificationEventOutcome): void {
     this.#notificationEvents.set(outcome, (this.#notificationEvents.get(outcome) ?? 0) + 1);
+  }
+
+  moderationDuplicateReview(outcome: ModerationDuplicateReviewOutcome, count = 1): void {
+    if (!Number.isInteger(count) || count < 1 || count > 10) return;
+    increment(this.#moderationDuplicateReviews, outcome, count);
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -214,6 +221,13 @@ export class MetricsRegistry {
     );
     for (const [outcome, value] of [...this.#notificationEvents].sort()) {
       lines.push(`socal_notification_events_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_moderation_duplicate_reviews_total Human-reviewed duplicate candidates by bounded outcome.",
+      "# TYPE socal_moderation_duplicate_reviews_total counter",
+    );
+    for (const [outcome, value] of [...this.#moderationDuplicateReviews].sort()) {
+      lines.push(`socal_moderation_duplicate_reviews_total${labels({ outcome })} ${value}`);
     }
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",

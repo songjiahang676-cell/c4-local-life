@@ -109,6 +109,8 @@ function lowRiskInput(fixture: { actorUserId: string; listingId: string }): Subm
     ruleSetVersion: 1,
     riskTier: ModerationRiskTier.LOW,
     hits: [],
+    contactFingerprints: [],
+    duplicateCandidates: [],
     decision: {
       contentStatus: ContentStatus.PUBLISHED,
       moderationStatus: ModerationStatus.AUTO_APPROVED,
@@ -401,6 +403,169 @@ integration("ListingSubmissionRepository with PostgreSQL", () => {
       expect(revisions[1]?.diff).toEqual(
         expect.arrayContaining([expect.objectContaining({ field: "title", kind: "CHANGED" })]),
       );
+    });
+  });
+
+  it("finds bounded text/contact candidates and stores versioned duplicate evidence", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const candidateListingId = randomUUID();
+      const contactFingerprint = "9".repeat(64);
+      await transaction.listing.create({
+        data: {
+          id: candidateListingId,
+          type: ListingType.RENTAL,
+          ownerId: fixture.actorUserId,
+          categoryId: fixture.categoryId,
+          regionId: fixture.regionId,
+          status: ContentStatus.PUBLISHED,
+          moderationStatus: ModerationStatus.AUTO_APPROVED,
+          locale: "zh-Hans",
+          title: "Synthetic submission integration listing",
+          slug: `duplicate-candidate-${candidateListingId}`,
+          body: "Synthetic repository content, never a real advertisement.",
+          publishedAt: new Date("2026-07-19T00:00:00.000Z"),
+          expiresAt: new Date("2026-08-19T00:00:00.000Z"),
+          createdAt: new Date("2026-07-19T00:00:00.000Z"),
+          updatedAt: new Date("2026-07-19T00:00:00.000Z"),
+          contactFingerprints: {
+            create: { fingerprint: contactFingerprint },
+          },
+        },
+      });
+      const repository = new ListingSubmissionRepository(transaction);
+      const matches = await repository.findDuplicateCandidates({
+        listingId: fixture.listingId,
+        listingType: ListingType.RENTAL,
+        title: "Synthetic submission integration listing",
+        body: "Synthetic repository content, never a real advertisement.",
+        contactFingerprints: [contactFingerprint],
+        mediaPerceptualHashes: [],
+        occurredAt,
+        lookbackDays: 365,
+        titleCandidateThreshold: 0.62,
+        bodyCandidateThreshold: 0.72,
+        imageCandidateDistance: 10,
+        limit: 10,
+      });
+      const distance = await transaction.$queryRaw<Array<{ distance: number }>>`
+        SELECT socal_hamming_distance_hex64(
+          '0000000000000000',
+          '0000000000000003'
+        ) AS "distance"
+      `;
+
+      expect(matches).toEqual([
+        expect.objectContaining({
+          listingId: candidateListingId,
+          titleScore: 1,
+          bodyScore: 1,
+          contactMatchCount: 1,
+        }),
+      ]);
+      expect(distance).toEqual([{ distance: 2 }]);
+      await expect(
+        repository.findDuplicateCandidates({
+          listingId: fixture.listingId,
+          listingType: ListingType.RENTAL,
+          title: "Synthetic bounded candidate",
+          body: "Synthetic bounded candidate body.",
+          contactFingerprints: Array.from({ length: 21 }, (_, index) =>
+            index.toString(16).padStart(64, "0"),
+          ),
+          mediaPerceptualHashes: [],
+          occurredAt,
+          lookbackDays: 365,
+          titleCandidateThreshold: 0.62,
+          bodyCandidateThreshold: 0.72,
+          imageCandidateDistance: 10,
+          limit: 10,
+        }),
+      ).rejects.toThrow("outside its bounded policy");
+      await expect(
+        repository.findDuplicateCandidates({
+          listingId: fixture.listingId,
+          listingType: ListingType.RENTAL,
+          title: "Synthetic malformed hash candidate",
+          body: "Synthetic malformed hash candidate body.",
+          contactFingerprints: [],
+          mediaPerceptualHashes: ["not-a-perceptual-hash"],
+          occurredAt,
+          lookbackDays: 365,
+          titleCandidateThreshold: 0.62,
+          bodyCandidateThreshold: 0.72,
+          imageCandidateDistance: 10,
+          limit: 10,
+        }),
+      ).rejects.toThrow("outside its bounded policy");
+
+      const base = lowRiskInput(fixture);
+      const submitted = await repository.submit({
+        ...base,
+        idempotencyKey: "repository-submit-duplicate-0001",
+        riskTier: ModerationRiskTier.MEDIUM,
+        hits: [
+          {
+            ruleCode: "POSSIBLE_DUPLICATE",
+            ruleVersion: 1,
+            severity: ModerationRiskTier.MEDIUM,
+            evidenceKey: "duplicate_candidates",
+          },
+        ],
+        contactFingerprints: [contactFingerprint],
+        duplicateCandidates: [
+          {
+            candidateListingId,
+            candidateListingVersion: matches[0]!.listingVersion,
+            candidateType: ListingType.RENTAL,
+            candidateTitle: matches[0]!.title,
+            candidateStatus: matches[0]!.status,
+            thresholdVersion: 1,
+            mode: "ENFORCE",
+            confidence: "HIGH",
+            matchedSignals: ["TEXT", "CONTACT"],
+            titleScore: matches[0]!.titleScore,
+            bodyScore: matches[0]!.bodyScore,
+            imageDistance: null,
+            contactMatchCount: 1,
+          },
+        ],
+        decision: {
+          contentStatus: ContentStatus.SUBMITTED,
+          moderationStatus: ModerationStatus.PENDING_REVIEW,
+          publishedAt: null,
+          expiresAt: null,
+          resultVersion: 2,
+          transitions: [base.decision.transitions[0]!],
+        },
+      });
+      const evidence = await transaction.moderationDuplicateCandidate.findFirstOrThrow({
+        where: { evaluation: { listingId: fixture.listingId } },
+      });
+
+      expect(submitted).toMatchObject({
+        kind: "submitted",
+        submission: {
+          currentStatus: ContentStatus.SUBMITTED,
+          currentModerationStatus: ModerationStatus.PENDING_REVIEW,
+          riskTier: ModerationRiskTier.MEDIUM,
+        },
+      });
+      expect(evidence).toMatchObject({
+        candidateListingId,
+        thresholdVersion: 1,
+        mode: "ENFORCE",
+        confidence: "HIGH",
+        matchedSignals: ["TEXT", "CONTACT"],
+        reviewOutcome: "UNREVIEWED",
+      });
+      await expect(
+        transaction.listingContactFingerprint.findMany({
+          where: { listingId: fixture.listingId },
+          select: { fingerprint: true },
+        }),
+      ).resolves.toEqual([{ fingerprint: contactFingerprint }]);
+      expect(JSON.stringify(evidence)).not.toContain("example.invalid");
     });
   });
 });

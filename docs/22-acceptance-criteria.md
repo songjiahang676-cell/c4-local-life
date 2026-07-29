@@ -212,3 +212,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 删除/归档精确重试不重复 Audit/Outbox；SUSPENDED 不显示删除动作，受限账号可读但不能批量写。
 - 中英文、移动/桌面、键盘、触控、loading/empty/error/guest/部分失败、删除确认、noindex/no-store
   和草稿精确编辑入口均有自动化验证；OpenAPI、生成类型、Zod、BFF 和实现一致。
+
+## 22.11 MOD-003 重复检测验收
+
+- 同类型一年窗口内能产生文本、图片和联系方式候选，输入/结果有界；跨类型、过期窗口、自身和
+  DELETED 不进入候选。
+- 阈值集有稳定版本；低阈值候选为 DRY_RUN 且不改变 LOW 决策，达到执行阈值才追加中风险
+  `POSSIBLE_DUPLICATE` 并送人工审核，系统绝不自动定罪或删除。
+- 原始联系方式不持久化到检测表，Admin/API/日志/指标/Audit/Outbox 不暴露联系方式指纹、相似数值、
+  阈值、媒体 object key 或候选 owner。
+- 候选证据绑定 evaluation/Listing 版本并不可更新或删除，人工复核结果一次写定；批准记录
+  FALSE_POSITIVE，重复原因记录 CONFIRMED，精确幂等重试不重复统计。
+- `socal_moderation_duplicate_reviews_total` 仅有 confirmed/false_positive 固定标签；测试以样本量和
+  阈值版本解释误杀率，不伪造生产准确率。
+- OpenAPI、生成契约、Prisma/migration、回滚说明、真实 PostgreSQL、完整质量、生产浏览器和托管
+  保护门禁全部通过后方可标记完成。

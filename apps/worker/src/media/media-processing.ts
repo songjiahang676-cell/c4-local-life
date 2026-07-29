@@ -31,6 +31,7 @@ export type TransformedMediaVariant = {
 export type ImageTransformation = {
   width: number;
   height: number;
+  perceptualHash: string;
   variants: readonly TransformedMediaVariant[];
 };
 
@@ -190,6 +191,7 @@ export class MediaProcessingHandler {
         detectedMimeType,
         width: transformed.width,
         height: transformed.height,
+        perceptualHash: transformed.perceptualHash,
         variants,
       });
       this.configuration.onOutcome(result === "updated" ? "ready" : "stale");

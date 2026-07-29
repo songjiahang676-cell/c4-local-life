@@ -339,6 +339,21 @@ risk/rule and publication-window coherence; a trigger rejects revision updates a
   application while retaining additive history and columns. Do not drop audit/revision evidence;
   exceptional stopped-writer physical recovery is documented in the migration-local `ROLLBACK.md`.
 
+## `20260730070000_listing_duplicate_detection`
+
+Adds nullable deterministic media perceptual hashes, domain-separated contact-fingerprint evidence,
+a bounded `(type, created_at)` Listing candidate index, a validated 64-bit Hamming-distance function
+and immutable moderation duplicate candidates with threshold/mode/confidence/signal provenance.
+Candidate identity and internal evidence cannot be updated or deleted; the first human review
+outcome is also one-way. No raw contact value is stored in the new tables.
+
+- Roll forward: deploy before enabling duplicate lookup; verify fresh migration, the media READY and
+  soft-delete lifecycle, parameterized pg_trgm/fingerprint/Hamming candidates, transaction rollback,
+  minimal moderator projections, one-way review outcomes and bounded metrics.
+- Rollback: disable lookup/writes and retain candidate/review evidence. The nullable hash and additive
+  tables do not break previous readers. Exceptional pre-production physical removal requires stopped
+  writers and an evidence export as documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

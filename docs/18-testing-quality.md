@@ -271,3 +271,18 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   负断言，并验证既有 owner/organization 状态索引足够，不为 UI 新增事实表。
 - Web 单元测试覆盖 guest、正常列表与部分批量失败；BFF 测试锁定两个精确 method/path。
   Chromium 桌面/移动生产回归覆盖英文未登录边界、no-store/noindex、登录入口和无横向溢出。
+
+## 18.25 MOD-003 重复检测验证增量
+
+- 纯函数测试覆盖 PHONE/EMAIL 规范化、domain-separated 指纹去重、候选/执行阈值边界、三种信号、
+  多信号置信度、NaN/越界分值收敛和 dry-run 不提升风险。
+- Worker 测试验证相同规范化像素生成稳定 16 位小写 dHash，READY 写入携带 hash，失败/旧生命周期
+  不能完成；Repository 测试验证非法 hash 和软删除状态约束。
+- 真实 PostgreSQL 测试覆盖同类型一年窗口、文本 pg_trgm、联系方式精确指纹、图片 Hamming 距离、
+  最多 10 条排序、原始 PII 不持久化、候选与联系方式在提交事务内写入，以及候选证据/人工结果的
+  UPDATE/DELETE 篡改负例。
+- API/契约/Admin 测试验证 ENFORCE 提升到人工审核、DRY_RUN 不改变低风险决定、详情只暴露最小候选
+  字段、`DUPLICATE_CONTENT` 原因耦合、中英界面与数值/指纹/object-key 不泄漏。
+- 可观测性测试只接受 confirmed/false_positive 固定标签，并验证首次人工复核按候选数计数、精确
+  动作重试不计数。空库、上一发布升级、完整质量、运行时、生产 Chromium 和托管真实服务门禁仍必须
+  全部执行并如实记录。

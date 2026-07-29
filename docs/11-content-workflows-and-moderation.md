@@ -210,3 +210,21 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   状态检查。成功项独立提交，未知/无权、陈旧版本和非法状态返回有界结果，不扩大事务或权限范围。
 - DELETE 的目标状态重试保持幂等且不重复 Audit/Outbox；ARCHIVE 对已归档精确重试收敛。SUSPENDED
   内容不向界面提供删除动作，申诉仍通过既有独立流程处理。
+
+## 11.17 MOD-003 重复文本、图片与联系方式
+
+- `listing-duplicate` 阈值集版本 1 固定 365 天同类型候选窗口和最多 10 条结果。文本候选使用
+  pg_trgm；图片使用 Worker 生成的 64-bit dHash 与 Hamming 距离；PHONE/EMAIL 仅以历史表单字段识别、
+  规范化后做域分离 HMAC 精确匹配。
+- 候选阈值为 title 0.62、body 0.72、图片距离 10；执行阈值为 title 0.90、body 0.92、图片距离
+  4，联系方式精确匹配直接执行。候选阈值与执行阈值之间只保存 `DRY_RUN` 证据，不影响发布结果；
+  达到任一执行阈值追加 `POSSIBLE_DUPLICATE` 中风险规则并进入人工审核，不自动定罪或删除。
+- 每次 evaluation 冻结阈值版本、候选版本与内部证据。Admin 只显示候选摘要、模式、置信级别和
+  TEXT/IMAGE/CONTACT 信号，不显示分值、阈值、联系方式指纹或媒体对象 key。
+- 审核员只能在案件已有候选证据时以 `DUPLICATE_CONTENT` 要求修改/拒绝，并将未复核候选一次性标记
+  CONFIRMED；没有候选时服务层与 repository 均拒绝该原因。以 `CONTENT_POLICY_COMPLIANT` 批准时标记
+  FALSE_POSITIVE。数据库阻止复核结果二次改写；精确动作重试不重复指标。误杀率以
+  `false_positive / (false_positive + confirmed)` 的人工复核样本计算，未复核 dry-run 候选不能
+  假装成质量结论。
+- 提交/重大编辑事务同时写 evaluation、候选、联系方式指纹、revision、Case/Audit/Outbox；失败整笔
+  回滚。媒体 hash 在既有 Worker 生命周期生成，队列重复执行仍由媒体版本和状态幂等边界收敛。

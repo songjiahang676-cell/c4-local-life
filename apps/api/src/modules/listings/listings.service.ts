@@ -43,6 +43,11 @@ import {
   type ListingPrice,
   type ListingType,
 } from "./listing-domain";
+import {
+  classifyDuplicateCandidates,
+  contactFingerprints,
+  listingDuplicatePolicy,
+} from "./duplicate-detection";
 import { evaluateListingSubmissionRisk } from "./moderation-risk";
 import {
   LISTING_STORE,
@@ -921,6 +926,41 @@ export class ListingsService {
     this.#cursorSecret = environment.SESSION_SECRET.reveal();
   }
 
+  async #detectDuplicates(input: {
+    listingId: string;
+    listingType: ListingType;
+    title: string;
+    body: string;
+    attributes: unknown;
+    formSchemaDefinition: unknown;
+    mediaPerceptualHashes: readonly string[];
+    occurredAt: Date;
+  }): Promise<ReturnType<typeof classifyDuplicateCandidates> & { contactFingerprints: string[] }> {
+    const fingerprints = contactFingerprints({
+      attributes: input.attributes,
+      formSchemaDefinition: input.formSchemaDefinition,
+      secret: this.#cursorSecret,
+    });
+    const matches = await this.store.findDuplicateCandidates({
+      listingId: input.listingId,
+      listingType: input.listingType,
+      title: input.title,
+      body: input.body,
+      contactFingerprints: fingerprints,
+      mediaPerceptualHashes: input.mediaPerceptualHashes,
+      occurredAt: input.occurredAt,
+      lookbackDays: listingDuplicatePolicy.lookbackDays,
+      titleCandidateThreshold: listingDuplicatePolicy.thresholds.titleCandidate,
+      bodyCandidateThreshold: listingDuplicatePolicy.thresholds.bodyCandidate,
+      imageCandidateDistance: listingDuplicatePolicy.thresholds.imageCandidateDistance,
+      limit: listingDuplicatePolicy.maximumCandidates,
+    });
+    return {
+      ...classifyDuplicateCandidates(matches),
+      contactFingerprints: fingerprints,
+    };
+  }
+
   async list(query: ListListingsQuery, now = new Date()): Promise<ListingCollection> {
     const normalized = {
       type: query.type ?? "RENTAL",
@@ -1294,6 +1334,21 @@ export class ListingsService {
       if (changes.diff.length === 0) {
         throw new ListingValidationError({ body: ["patch does not change the Listing"] });
       }
+      const mediaPerceptualHashes = await this.store.findMediaPerceptualHashes({
+        actorUserId,
+        listingId,
+        mediaIds: fields.mediaIds,
+      });
+      const duplicateDetection = await this.#detectDuplicates({
+        listingId,
+        listingType: current.type,
+        title: fields.title,
+        body: fields.body,
+        attributes: fields.attributes,
+        formSchemaDefinition: form.definition,
+        mediaPerceptualHashes,
+        occurredAt: now,
+      });
       const risk = evaluateListingSubmissionRisk({
         listingType: current.type,
         title: fields.title,
@@ -1302,6 +1357,7 @@ export class ListingsService {
         accountCreatedAt: candidate.actorCreatedAt,
         occurredAt: now,
         publicationPolicy: form.definition.publicationPolicy ?? {},
+        enforcedDuplicateCandidateCount: duplicateDetection.enforcedCandidateCount,
       });
       const riskReasons: ListingRevisionReasonCode[] =
         risk.riskTier === "LOW" ? [] : ["MODERATION_RISK_SIGNAL"];
@@ -1327,11 +1383,17 @@ export class ListingsService {
           expectedVersion,
           snapshot: after,
           formSchema: form.definition,
+          duplicateThresholdVersion: listingDuplicatePolicy.version,
+          duplicateCandidateIds: duplicateDetection.candidates.map(
+            (duplicate) => duplicate.candidateListingId,
+          ),
         }),
         ruleSetKey: risk.ruleSetKey,
         ruleSetVersion: risk.ruleSetVersion,
         riskTier: risk.riskTier,
         hits: risk.hits,
+        contactFingerprints: duplicateDetection.contactFingerprints,
+        duplicateCandidates: duplicateDetection.candidates,
       });
       if (result.kind === "revised" || result.kind === "exact_retry") {
         return { data: toOwnerView(result.listing) };
@@ -1522,6 +1584,16 @@ export class ListingsService {
     const parsedForm = categoryFormSchemaSchema.safeParse(candidate.formSchemaDefinition);
     if (!parsedForm.success) throw new ListingValidationError();
     const occurredAt = new Date();
+    const duplicateDetection = await this.#detectDuplicates({
+      listingId,
+      listingType: candidate.type,
+      title: candidate.title,
+      body: candidate.body,
+      attributes: candidate.attributes,
+      formSchemaDefinition: parsedForm.data,
+      mediaPerceptualHashes: candidate.mediaPerceptualHashes,
+      occurredAt,
+    });
     const risk = evaluateListingSubmissionRisk({
       listingType: candidate.type,
       title: candidate.title,
@@ -1530,6 +1602,7 @@ export class ListingsService {
       accountCreatedAt: candidate.actorCreatedAt,
       occurredAt,
       publicationPolicy: parsedForm.data.publicationPolicy ?? {},
+      enforcedDuplicateCandidateCount: duplicateDetection.enforcedCandidateCount,
     });
     const aggregate: ListingAggregate = {
       id: candidate.id,
@@ -1607,6 +1680,10 @@ export class ListingsService {
       body: candidate.body,
       actorCreatedAt: candidate.actorCreatedAt.toISOString(),
       formSchema: parsedForm.data,
+      duplicateThresholdVersion: listingDuplicatePolicy.version,
+      duplicateCandidateIds: duplicateDetection.candidates.map(
+        (duplicate) => duplicate.candidateListingId,
+      ),
     });
     const result = await this.store.submit({
       actorUserId,
@@ -1621,6 +1698,8 @@ export class ListingsService {
       ruleSetVersion: risk.ruleSetVersion,
       riskTier: risk.riskTier,
       hits: risk.hits,
+      contactFingerprints: duplicateDetection.contactFingerprints,
+      duplicateCandidates: duplicateDetection.candidates,
       decision: {
         contentStatus: finalListing.status,
         moderationStatus: finalListing.moderationStatus,

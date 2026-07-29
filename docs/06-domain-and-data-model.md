@@ -340,3 +340,20 @@ ARCHIVED/EXPIRED/SUSPENDED 也归入已归档，DELETED 永不返回。
 和边界。计数和列表共享相同 actor/组织可见谓词；组织读取角色可以查看管理摘要，所有写操作仍由对象
 级生命周期 Policy 与 Repository 版本条件独立复核。批量端点只是最多 20 次有界应用层编排，不创建
 跨 Listing 大事务，也不改变既有 Audit/Outbox 与软删除幂等模型。
+
+### MOD-003 重复候选证据
+
+`media_assets.perceptual_hash` 保存 Worker 在解码、纠正方向和去元数据后计算的 64-bit dHash；只有
+READY 或已经软删除的媒体可保留合法小写十六进制值。`listing_contact_fingerprints` 只保存按历史
+表单 schema 识别并规范化的 PHONE/EMAIL 域分离 HMAC，不保存原始联系方式。Listing 每次提交或已发布
+编辑时在同一事务替换自己的当前联系方式指纹，指纹只用于候选匹配。
+
+`moderation_duplicate_candidates` 关联精确 moderation evaluation 和候选 Listing，冻结候选版本、
+类型、标题、状态、阈值版本、DRY_RUN/ENFORCE 模式、置信级别、命中信号与内部数值证据。每个
+evaluation/candidate 只有一行；数据库 check 约束有界分值、Hamming 距离和信号集合，触发器禁止修改
+候选身份/证据或删除，并使第一次人工复核结果不可二次改写。候选与审核历史属于 PostgreSQL canonical
+证据；媒体 hash 可以从 canonical 对象重新生成，但人工判定不能从派生索引恢复。
+
+候选查询固定为同一 Listing type、过去 365 天、排除自身与 DELETED，使用 pg_trgm 标题/正文相似度、
+联系方式指纹精确匹配和图片 Hamming 距离，最多返回 10 条。`(type,created_at DESC)`、指纹反向索引及
+候选审核索引支持有界访问；OpenSearch 不参与审核写事务，也不是重复证据事实源。

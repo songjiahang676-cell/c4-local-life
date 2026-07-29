@@ -774,6 +774,8 @@ model Listing {
   conversations         Conversation[]
   moderationEvaluations ModerationEvaluation[]
   revisions             ListingRevision[]
+  contactFingerprints   ListingContactFingerprint[]
+  duplicateCandidates   ModerationDuplicateCandidate[] @relation("DuplicateCandidateListing")
 
   @@unique([type, slug])
   @@unique([ownerId, createIdempotencyKey])
@@ -782,6 +784,7 @@ model Listing {
   @@index([regionId, status, publishedAt(sort: Desc)])
   @@index([ownerId, status, createdAt(sort: Desc)])
   @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)], map: "listings_type_created_at_idx")
   @@index([geoPoint], map: "listings_geo_point_gist", type: Gist)
   @@index([type, regionId, publishedAt(sort: Desc)], map: "listings_published_partial", where: raw("((status = 'PUBLISHED'::\"ContentStatus\") AND (deleted_at IS NULL))"))
   @@index([expiresAt, id], map: "listings_rental_expiry_due_idx", where: raw("((type = 'RENTAL'::\"ListingType\") AND (status = 'PUBLISHED'::\"ContentStatus\") AND (moderation_status = ANY (ARRAY['AUTO_APPROVED'::\"ModerationStatus\", 'APPROVED'::\"ModerationStatus\"])) AND (deleted_at IS NULL))"))
@@ -902,6 +905,7 @@ model MediaAsset {
   uploadedAt       DateTime?      @map("uploaded_at") @db.Timestamptz(6)
   scanStartedAt    DateTime?      @map("scan_started_at") @db.Timestamptz(6)
   processedAt      DateTime?      @map("processed_at") @db.Timestamptz(6)
+  perceptualHash   String?        @map("perceptual_hash") @db.Char(16)
   rejectionCode    String?        @map("rejection_code") @db.VarChar(64)
   lifecycleVersion Int            @default(0) @map("lifecycle_version")
   sortOrder        Int            @default(0) @map("sort_order")
@@ -1144,6 +1148,7 @@ model ModerationEvaluation {
   listing                Listing             @relation(fields: [listingId], references: [id], onDelete: Restrict)
   actor                  User                @relation("SubmissionEvaluationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
   ruleHits               ModerationRuleHit[]
+  duplicateCandidates    ModerationDuplicateCandidate[]
   moderationCase         ModerationCase?
   listingRevision        ListingRevision?
 
@@ -1201,6 +1206,46 @@ model ModerationRuleHit {
   @@unique([evaluationId, ruleCode])
   @@index([ruleCode, createdAt(sort: Desc)])
   @@map("moderation_rule_hits")
+}
+
+model ListingContactFingerprint {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  fingerprint String   @db.Char(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, fingerprint])
+  @@index([fingerprint, listingId])
+  @@map("listing_contact_fingerprints")
+}
+
+model ModerationDuplicateCandidate {
+  id                      String               @id @default(uuid()) @db.Uuid
+  evaluationId            String               @map("evaluation_id") @db.Uuid
+  candidateListingId      String               @map("candidate_listing_id") @db.Uuid
+  candidateListingVersion Int                  @map("candidate_listing_version")
+  candidateType           ListingType          @map("candidate_type")
+  candidateTitle          String               @map("candidate_title") @db.VarChar(120)
+  candidateStatus         ContentStatus        @map("candidate_status")
+  thresholdVersion        Int                  @map("threshold_version")
+  mode                    String               @db.VarChar(16)
+  confidence              String               @db.VarChar(16)
+  matchedSignals          String[]             @map("matched_signals") @db.VarChar(24)
+  titleScore              Float?               @map("title_score")
+  bodyScore               Float?               @map("body_score")
+  imageDistance           Int?                 @map("image_distance")
+  contactMatchCount       Int                  @default(0) @map("contact_match_count")
+  reviewOutcome           String               @default("UNREVIEWED") @map("review_outcome") @db.VarChar(24)
+  reviewedAt              DateTime?            @map("reviewed_at") @db.Timestamptz(6)
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  evaluation              ModerationEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+  candidateListing        Listing              @relation("DuplicateCandidateListing", fields: [candidateListingId], references: [id], onDelete: Restrict)
+
+  @@unique([evaluationId, candidateListingId])
+  @@index([candidateListingId, createdAt(sort: Desc)])
+  @@index([reviewOutcome, createdAt(sort: Desc)])
+  @@map("moderation_duplicate_candidates")
 }
 
 model ModerationAction {

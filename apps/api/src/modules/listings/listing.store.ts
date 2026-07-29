@@ -27,11 +27,13 @@ import type {
   ScopedListingReadInput,
 } from "@socal/database/listing";
 import type {
+  FindListingDuplicateCandidatesInput,
   FindListingSubmissionRetryInput,
   FindListingSubmissionRetryResult,
   ListingSubmissionCandidate,
   ListingSubmissionProjection,
   ListingSubmissionTransitionEvidence,
+  ListingDuplicateCandidateMatch,
   SubmitListingInput,
   SubmitListingResult,
 } from "@socal/database/listing-submission";
@@ -72,6 +74,14 @@ export type ListingStore = {
     actorUserId: string;
     listingId: string;
   }): Promise<ListingSubmissionCandidate | null>;
+  findDuplicateCandidates(
+    input: FindListingDuplicateCandidatesInput,
+  ): Promise<ListingDuplicateCandidateMatch[]>;
+  findMediaPerceptualHashes(input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  }): Promise<string[]>;
   submit(input: SubmitListingInput): Promise<SubmitListingResult>;
   findPublishedRevisionRetry(
     input: FindPublishedRevisionRetryInput,
@@ -107,6 +117,8 @@ export type {
   FindListingSubmissionRetryResult,
   ListingSubmissionCandidate,
   ListingSubmissionProjection,
+  FindListingDuplicateCandidatesInput,
+  ListingDuplicateCandidateMatch,
   ListingSubmissionTransitionEvidence,
   SubmitListingInput,
   SubmitListingResult,
