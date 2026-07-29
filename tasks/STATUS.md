@@ -136,6 +136,7 @@
 | ORG-002 local quality           | type/lint/test/build + static checks  | 78 files / 318 tests；2 service skips；9 typechecks/lints；8 builds passed | 2026-07-30 |
 | ORG-002 runtime/browser         | API runtime + Chromium desktop/mobile | canonical contract and private notification flow；10/10 E2E passed         | 2026-07-30 |
 | ORG-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks、53 models、57 paths、123 schemas、36 JSON files passed          | 2026-07-30 |
+| ORG-002 protected checks        | PR #25 / run `30438535063`            | 320 real-service tests、Linux build/E2E and four non-root images passed    | 2026-07-30 |
 
 ## Decisions / Blocks
 
