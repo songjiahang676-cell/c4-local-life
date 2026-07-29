@@ -552,8 +552,35 @@ export interface paths {
         readonly delete: operations["deleteListing"];
         readonly options?: never;
         readonly head?: never;
-        /** Update an owned listing */
+        /**
+         * Update an owned listing
+         * @description Updates a draft or a currently published Listing with strong optimistic concurrency.
+         *     Published edits require Idempotency-Key. A low-risk minor text edit remains public;
+         *     material category, region, price, contact, location, media, structured-field or risky-text
+         *     changes enter review and disappear from public reads until a moderator decides them.
+         */
         readonly patch: operations["updateListing"];
+        readonly trace?: never;
+    };
+    readonly "/listings/{listingId}/revisions": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List immutable revision evidence for an owned listing
+         * @description Returns a no-store owner/organization-writer projection with stable review reasons and a
+         *     redacted before/after diff. Immutable normalized snapshots and hashes remain server-side.
+         */
+        readonly get: operations["listListingRevisions"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/listings/{listingId}/submit": {
@@ -1830,6 +1857,7 @@ export interface components {
             readonly publishedAt: string | null;
             /** Format: date-time */
             readonly expiresAt: string | null;
+            readonly latestRevision: components["schemas"]["ListingRevisionView"] | null;
             /** Format: date-time */
             readonly createdAt: string;
             /** Format: date-time */
@@ -1944,6 +1972,42 @@ export interface components {
             readonly mediaIds?: readonly string[];
             /** @enum {string} */
             readonly contactMode?: "IN_APP" | "PHONE_REVEAL" | "EMAIL_REVEAL";
+        };
+        /** @enum {string} */
+        readonly ListingRevisionClassification: "SUBMISSION" | "MINOR_EDIT" | "MAJOR_EDIT";
+        /** @enum {string} */
+        readonly ListingRevisionReasonCode: "INITIAL_SUBMISSION" | "RESUBMISSION" | "TITLE_MATERIAL_CHANGE" | "SUMMARY_MATERIAL_CHANGE" | "BODY_MATERIAL_CHANGE" | "CATEGORY_CHANGED" | "REGION_CHANGED" | "PRICE_CHANGED" | "CONTACT_MODE_CHANGED" | "LOCATION_CHANGED" | "ATTRIBUTES_CHANGED" | "MEDIA_CHANGED" | "LOCALE_CHANGED" | "MODERATION_RISK_SIGNAL" | "MINOR_TEXT_EDIT";
+        /** @enum {string} */
+        readonly ListingRevisionReviewState: "NOT_REQUIRED" | "PENDING" | "ESCALATED" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+        readonly ListingRevisionDiffEntry: {
+            /** @enum {string} */
+            readonly field: "locale" | "title" | "summary" | "body" | "price" | "category" | "region" | "location" | "contactMode" | "attributes" | "mediaIds";
+            /** @enum {string} */
+            readonly kind: "ADDED" | "REMOVED" | "CHANGED";
+            readonly before: unknown;
+            readonly after: unknown;
+        };
+        readonly ListingRevisionView: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly revisionNumber: number;
+            readonly baseListingVersion: number;
+            readonly resultListingVersion: number;
+            readonly classification: components["schemas"]["ListingRevisionClassification"];
+            readonly reasonCodes: readonly components["schemas"]["ListingRevisionReasonCode"][];
+            readonly reviewState: components["schemas"]["ListingRevisionReviewState"];
+            /** @enum {string} */
+            readonly riskTier: "LOW" | "MEDIUM" | "HIGH";
+            readonly ruleSetVersion: number;
+            readonly diff: readonly components["schemas"]["ListingRevisionDiffEntry"][];
+            /** Format: date-time */
+            readonly createdAt: string;
+        };
+        readonly ListingRevisionCollection: {
+            readonly data: readonly components["schemas"]["ListingRevisionView"][];
+            readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
         };
         readonly PublicListingSummaryView: {
             /** Format: uuid */
@@ -2427,6 +2491,19 @@ export interface components {
             readonly defaultLifetimeDays: number;
             /** @constant */
             readonly sensitiveFieldsRedacted: true;
+            readonly previous: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly revision: {
+                /** Format: uuid */
+                readonly id: string;
+                readonly classification: components["schemas"]["ListingRevisionClassification"];
+                readonly reasonCodes: readonly components["schemas"]["ListingRevisionReasonCode"][];
+                /** Format: date-time */
+                readonly originalPublishedAt: string | null;
+                /** Format: date-time */
+                readonly originalExpiresAt: string | null;
+            } | null;
             /** Format: date-time */
             readonly capturedAt: string;
         };
@@ -3744,6 +3821,8 @@ export interface operations {
             readonly header: {
                 /** @description Strong ETag returned with the current resource version. */
                 readonly "If-Match": components["parameters"]["IfMatch"];
+                /** @description Required for published edits; actor-scoped exact retries return the original revision. */
+                readonly "Idempotency-Key"?: string;
             };
             readonly path: {
                 readonly listingId: components["parameters"]["ListingId"];
@@ -3774,6 +3853,36 @@ export interface operations {
             readonly 404: components["responses"]["NotFound"];
             readonly 409: components["responses"]["Conflict"];
             readonly 422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    readonly listListingRevisions: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly listingId: components["parameters"]["ListingId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Stable newest-first Listing revision history */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ListingRevisionCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly submitListing: {

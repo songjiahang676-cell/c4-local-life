@@ -62,6 +62,7 @@ try {
     "20260730030000_job_vertical_baseline",
     "20260730040000_remaining_verticals_baseline",
     "20260730050000_report_appeal_workflow",
+    "20260730060000_listing_revision_workflow",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -99,6 +100,7 @@ try {
             to_regclass('public.moderation_rule_hits') AS moderation_rule_hits,
             to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots,
             to_regclass('public.moderation_appeals') AS moderation_appeals,
+            to_regclass('public.listing_revisions') AS listing_revisions,
             to_regclass('public.notification_templates') AS notification_templates`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
@@ -568,6 +570,45 @@ try {
     listingSubmissionStorage.rows[0]?.immutable_triggers !== 2
   ) {
     throw new Error("Listing submission evidence or immutability controls are missing");
+  }
+
+  const listingRevisionStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'listing_revisions_actor_user_id_idempotency_key_key'
+       ) AS actor_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'moderation_evaluations'
+            AND column_name IN ('previous_content_status', 'previous_moderation_status')
+            AND is_nullable = 'NO'
+       ) AS previous_state_columns,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname = 'listing_revisions_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_triggers,
+       (
+         SELECT count(*)::integer
+           FROM pg_constraint
+          WHERE connamespace = 'public'::regnamespace
+            AND conrelid = 'listing_revisions'::regclass
+            AND contype = 'c'
+       ) AS evidence_checks`,
+  );
+  if (
+    !listingRevisionStorage.rows[0]?.actor_idempotency ||
+    listingRevisionStorage.rows[0]?.previous_state_columns !== 2 ||
+    listingRevisionStorage.rows[0]?.immutable_triggers !== 1 ||
+    listingRevisionStorage.rows[0]?.evidence_checks !== 9
+  ) {
+    throw new Error("Listing revision evidence or immutability controls are missing");
   }
 
   const moderationWorkbenchStorage = await client.query(
@@ -1611,6 +1652,7 @@ try {
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
+      listingRevisionStorage: true,
       trustSafetyStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,

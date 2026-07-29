@@ -425,6 +425,30 @@ try {
             )
        ) AS workbench_columns`,
   );
+  const listingRevisionStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.listing_revisions') AS revisions,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'listing_revisions_actor_user_id_idempotency_key_key'
+       ) AS actor_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'moderation_evaluations'
+            AND column_name IN ('previous_content_status', 'previous_moderation_status')
+            AND is_nullable = 'NO'
+       ) AS previous_state_columns,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname = 'listing_revisions_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_triggers`,
+  );
   const listingPublicLifecycleStorage = await upgrade.query(
     `SELECT
        (
@@ -589,6 +613,10 @@ try {
     !moderationWorkbenchStorage.rows[0].action_idempotency ||
     moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
     moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
+    listingRevisionStorage.rows[0].revisions !== "listing_revisions" ||
+    !listingRevisionStorage.rows[0].actor_idempotency ||
+    listingRevisionStorage.rows[0].previous_state_columns !== 2 ||
+    listingRevisionStorage.rows[0].immutable_triggers !== 1 ||
     listingPublicLifecycleStorage.rows[0].expiry_indexes !== 5 ||
     listingPublicLifecycleStorage.rows[0].detail_checks !== 7 ||
     notificationStorage.rows[0].templates !== "notification_templates" ||
@@ -637,6 +665,7 @@ try {
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
+      listingRevisionStorage: true,
       listingPublicLifecycleStorage: true,
       trustSafetyStorage: true,
       notificationStorage: true,

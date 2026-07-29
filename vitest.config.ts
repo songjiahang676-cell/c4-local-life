@@ -67,6 +67,12 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/listing-revision": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/listing-revision.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/moderation-case": fileURLToPath(
         new URL(
           "./packages/database/src/repositories/moderation-case.repository.ts",

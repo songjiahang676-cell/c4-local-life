@@ -985,10 +985,20 @@ paths:
     patch:
       tags: [Listings]
       summary: Update an owned listing
+      description: |
+        Updates a draft or a currently published Listing with strong optimistic concurrency.
+        Published edits require Idempotency-Key. A low-risk minor text edit remains public;
+        material category, region, price, contact, location, media, structured-field or risky-text
+        changes enter review and disappear from public reads until a moderator decides them.
       operationId: updateListing
       parameters:
         - $ref: "#/components/parameters/ListingId"
         - $ref: "#/components/parameters/IfMatch"
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Required for published edits; actor-scoped exact retries return the original revision.
+          schema: { type: string, minLength: 8, maxLength: 128 }
       requestBody:
         required: true
         content:
@@ -1043,6 +1053,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /listings/{listingId}/revisions:
+    get:
+      tags: [Listings]
+      summary: List immutable revision evidence for an owned listing
+      description: |
+        Returns a no-store owner/organization-writer projection with stable review reasons and a
+        redacted before/after diff. Immutable normalized snapshots and hashes remain server-side.
+      operationId: listListingRevisions
+      parameters:
+        - $ref: "#/components/parameters/ListingId"
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Stable newest-first Listing revision history
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListingRevisionCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /listings/{listingId}/submit:
     post:
       tags: [Listings]
@@ -3194,6 +3236,7 @@ components:
           featuredUntil,
           publishedAt,
           expiresAt,
+          latestRevision,
           createdAt,
           updatedAt,
           version,
@@ -3244,6 +3287,10 @@ components:
         featuredUntil: { type: [string, "null"], format: date-time }
         publishedAt: { type: [string, "null"], format: date-time }
         expiresAt: { type: [string, "null"], format: date-time }
+        latestRevision:
+          oneOf:
+            - $ref: "#/components/schemas/ListingRevisionView"
+            - type: "null"
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         version: { type: integer, minimum: 1 }
@@ -3405,6 +3452,112 @@ components:
           uniqueItems: true
           items: { type: string, format: uuid }
         contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
+    ListingRevisionClassification:
+      type: string
+      enum: [SUBMISSION, MINOR_EDIT, MAJOR_EDIT]
+    ListingRevisionReasonCode:
+      type: string
+      enum:
+        [
+          INITIAL_SUBMISSION,
+          RESUBMISSION,
+          TITLE_MATERIAL_CHANGE,
+          SUMMARY_MATERIAL_CHANGE,
+          BODY_MATERIAL_CHANGE,
+          CATEGORY_CHANGED,
+          REGION_CHANGED,
+          PRICE_CHANGED,
+          CONTACT_MODE_CHANGED,
+          LOCATION_CHANGED,
+          ATTRIBUTES_CHANGED,
+          MEDIA_CHANGED,
+          LOCALE_CHANGED,
+          MODERATION_RISK_SIGNAL,
+          MINOR_TEXT_EDIT,
+        ]
+    ListingRevisionReviewState:
+      type: string
+      enum: [NOT_REQUIRED, PENDING, ESCALATED, APPROVED, CHANGES_REQUESTED, REJECTED]
+    ListingRevisionDiffEntry:
+      type: object
+      required: [field, kind, before, after]
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+          enum:
+            [
+              locale,
+              title,
+              summary,
+              body,
+              price,
+              category,
+              region,
+              location,
+              contactMode,
+              attributes,
+              mediaIds,
+            ]
+        kind: { type: string, enum: [ADDED, REMOVED, CHANGED] }
+        before: {}
+        after: {}
+    ListingRevisionView:
+      type: object
+      required:
+        [
+          id,
+          revisionNumber,
+          baseListingVersion,
+          resultListingVersion,
+          classification,
+          reasonCodes,
+          reviewState,
+          riskTier,
+          ruleSetVersion,
+          diff,
+          createdAt,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        baseListingVersion: { type: integer, minimum: 1 }
+        resultListingVersion: { type: integer, minimum: 2 }
+        classification:
+          $ref: "#/components/schemas/ListingRevisionClassification"
+        reasonCodes:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ListingRevisionReasonCode"
+        reviewState:
+          $ref: "#/components/schemas/ListingRevisionReviewState"
+        riskTier:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+        ruleSetVersion: { type: integer, minimum: 1 }
+        diff:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ListingRevisionDiffEntry"
+        createdAt: { type: string, format: date-time }
+    ListingRevisionCollection:
+      type: object
+      required: [data, page, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListingRevisionView"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
     PublicListingSummaryView:
       type: object
       required:
@@ -4071,6 +4224,8 @@ components:
           formSchemaVersion,
           defaultLifetimeDays,
           sensitiveFieldsRedacted,
+          previous,
+          revision,
           capturedAt,
         ]
       properties:
@@ -4103,6 +4258,30 @@ components:
         formSchemaVersion: { type: integer, minimum: 1 }
         defaultLifetimeDays: { type: integer, minimum: 1, maximum: 365 }
         sensitiveFieldsRedacted: { type: boolean, const: true }
+        previous:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        revision:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [id, classification, reasonCodes, originalPublishedAt, originalExpiresAt]
+              properties:
+                id: { type: string, format: uuid }
+                classification:
+                  $ref: "#/components/schemas/ListingRevisionClassification"
+                reasonCodes:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  uniqueItems: true
+                  items:
+                    $ref: "#/components/schemas/ListingRevisionReasonCode"
+                originalPublishedAt: { type: [string, "null"], format: date-time }
+                originalExpiresAt: { type: [string, "null"], format: date-time }
+            - type: "null"
         capturedAt: { type: string, format: date-time }
     ModerationDiffEntry:
       type: object

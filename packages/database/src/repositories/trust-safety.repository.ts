@@ -517,6 +517,8 @@ function parseSnapshot(value: Prisma.JsonValue): ModerationListingSnapshot | nul
     defaultLifetimeDays: snapshot.defaultLifetimeDays,
     sensitiveFieldsRedacted: true,
     capturedAt: snapshot.capturedAt,
+    previous: null,
+    revision: null,
   };
 }
 

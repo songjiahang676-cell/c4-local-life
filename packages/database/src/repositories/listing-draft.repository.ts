@@ -189,7 +189,7 @@ async function lockListing(
   return rows.length === 1;
 }
 
-async function activeActor(
+export async function activeListingActor(
   transaction: Prisma.TransactionClient,
   actorUserId: string,
 ): Promise<boolean> {
@@ -204,7 +204,7 @@ async function activeActor(
   return actor !== null;
 }
 
-async function activeOrganizationWriter(
+export async function activeListingOrganizationWriter(
   transaction: Prisma.TransactionClient,
   actorUserId: string,
   organizationId: string,
@@ -232,7 +232,7 @@ async function activeOrganizationWriter(
   return organization !== null;
 }
 
-async function referencesRemainValid(
+export async function listingReferencesRemainValid(
   transaction: Prisma.TransactionClient,
   type: ListingType,
   fields: Pick<ListingDraftWriteFields, "categoryId" | "formSchemaVersion" | "regionId">,
@@ -260,7 +260,7 @@ async function referencesRemainValid(
   return Boolean(category && region && formSchema);
 }
 
-async function validateReadyMediaBindings(
+export async function validateReadyListingMediaBindings(
   transaction: Prisma.TransactionClient,
   input: {
     actorUserId: string;
@@ -312,7 +312,7 @@ async function validateReadyMediaBindings(
   return true;
 }
 
-async function applyMediaBindings(
+export async function applyListingMediaBindings(
   transaction: Prisma.TransactionClient,
   input: {
     actorUserId: string;
@@ -344,7 +344,7 @@ async function applyMediaBindings(
   }
 }
 
-function listingData(
+export function listingWriteData(
   fields: ListingDraftWriteFields,
 ): Pick<
   Prisma.ListingUncheckedCreateInput,
@@ -385,7 +385,7 @@ function listingData(
   };
 }
 
-async function applyVerticalDetails(
+export async function applyListingVerticalDetails(
   transaction: Prisma.TransactionClient,
   listingId: string,
   fields: Pick<
@@ -439,7 +439,7 @@ async function applyVerticalDetails(
   }
 }
 
-function verticalDetailsMatchListingType(
+export function listingVerticalDetailsMatchType(
   type: ListingType,
   fields: Pick<
     ListingDraftWriteFields,
@@ -581,12 +581,16 @@ export class ListingDraftRepository {
   createDraft(input: CreateListingDraftInput): Promise<CreateListingDraftResult> {
     return this.#inTransaction(async (transaction) => {
       await lockIdempotencyKey(transaction, input.actorUserId, input.idempotencyKey);
-      if (!(await activeActor(transaction, input.actorUserId))) {
+      if (!(await activeListingActor(transaction, input.actorUserId))) {
         return { kind: "actor_unavailable" };
       }
       if (
         input.organizationId &&
-        !(await activeOrganizationWriter(transaction, input.actorUserId, input.organizationId))
+        !(await activeListingOrganizationWriter(
+          transaction,
+          input.actorUserId,
+          input.organizationId,
+        ))
       ) {
         return { kind: "invalid_organization" };
       }
@@ -617,13 +621,13 @@ export class ListingDraftRepository {
       }
 
       if (
-        !verticalDetailsMatchListingType(input.type, input) ||
-        !(await referencesRemainValid(transaction, input.type, input))
+        !listingVerticalDetailsMatchType(input.type, input) ||
+        !(await listingReferencesRemainValid(transaction, input.type, input))
       ) {
         return { kind: "invalid_reference" };
       }
       if (
-        !(await validateReadyMediaBindings(transaction, {
+        !(await validateReadyListingMediaBindings(transaction, {
           actorUserId: input.actorUserId,
           listingId: input.id,
           mediaIds: input.mediaIds,
@@ -633,7 +637,7 @@ export class ListingDraftRepository {
       }
       await transaction.listing.create({
         data: {
-          ...listingData(input),
+          ...listingWriteData(input),
           id: input.id,
           type: input.type,
           ownerId: input.actorUserId,
@@ -647,8 +651,8 @@ export class ListingDraftRepository {
         },
         select: { id: true },
       });
-      await applyVerticalDetails(transaction, input.id, input);
-      await applyMediaBindings(transaction, {
+      await applyListingVerticalDetails(transaction, input.id, input);
+      await applyListingMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.id,
         mediaIds: input.mediaIds,
@@ -689,9 +693,15 @@ export class ListingDraftRepository {
         },
       });
       if (!current || current.deletedAt !== null) return { kind: "not_found" };
-      if (!(await activeActor(transaction, input.actorUserId))) return { kind: "not_found" };
+      if (!(await activeListingActor(transaction, input.actorUserId))) {
+        return { kind: "not_found" };
+      }
       const authorized = current.organizationId
-        ? await activeOrganizationWriter(transaction, input.actorUserId, current.organizationId)
+        ? await activeListingOrganizationWriter(
+            transaction,
+            input.actorUserId,
+            current.organizationId,
+          )
         : current.ownerId === input.actorUserId;
       if (!authorized) return { kind: "not_found" };
       if (current.version !== input.expectedVersion) {
@@ -704,13 +714,13 @@ export class ListingDraftRepository {
         return { kind: "time_conflict", currentVersion: current.version };
       }
       if (
-        !verticalDetailsMatchListingType(current.type, input) ||
-        !(await referencesRemainValid(transaction, current.type, input))
+        !listingVerticalDetailsMatchType(current.type, input) ||
+        !(await listingReferencesRemainValid(transaction, current.type, input))
       ) {
         return { kind: "invalid_reference" };
       }
       if (
-        !(await validateReadyMediaBindings(transaction, {
+        !(await validateReadyListingMediaBindings(transaction, {
           actorUserId: input.actorUserId,
           listingId: input.listingId,
           mediaIds: input.mediaIds,
@@ -727,7 +737,7 @@ export class ListingDraftRepository {
           deletedAt: null,
         },
         data: {
-          ...listingData(input),
+          ...listingWriteData(input),
           version: { increment: 1 },
           updatedAt: input.occurredAt,
         },
@@ -735,8 +745,8 @@ export class ListingDraftRepository {
       if (updated.count !== 1) {
         return { kind: "version_conflict", currentVersion: current.version };
       }
-      await applyVerticalDetails(transaction, input.listingId, input);
-      await applyMediaBindings(transaction, {
+      await applyListingVerticalDetails(transaction, input.listingId, input);
+      await applyListingMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.listingId,
         mediaIds: input.mediaIds,

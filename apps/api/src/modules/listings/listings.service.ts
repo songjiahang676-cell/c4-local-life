@@ -3,9 +3,14 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
 import type {
   CreateListingInput,
+  Category,
   ListingCollection,
   ListListingsQuery,
   ListingSubmissionResponse,
+  ListingRevisionCollection,
+  ListingRevisionView,
+  ListListingRevisionsQuery,
+  Region,
   ListingOwnerResponse,
   ListingOwnerView,
   ListingResponse,
@@ -37,6 +42,10 @@ import {
   LISTING_STORE,
   type ListingDraftJsonValue,
   type ListingDraftWriteFields,
+  type ListingRevisionCursor,
+  type ListingRevisionDiffEntry,
+  type ListingRevisionReasonCode,
+  type ListingRevisionSnapshot,
   type ListingSubmissionProjection,
   type ListingSubmissionTransitionEvidence,
   type ListingStore,
@@ -116,6 +125,13 @@ type PublicListingCursorPayload = {
   id: string;
 };
 
+type ListingRevisionCursorPayload = {
+  version: 1;
+  listingId: string;
+  createdAt: string;
+  id: string;
+};
+
 const locationPrecisions = ["CITY", "NEIGHBORHOOD", "APPROXIMATE", "EXACT"] as const;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -142,6 +158,13 @@ function requestHash(value: unknown): string {
 function cursorSignature(secret: string, encoded: string): string {
   return createHmac("sha256", secret)
     .update("socal-public-listing-page-cursor-v3\0", "utf8")
+    .update(encoded, "utf8")
+    .digest("base64url");
+}
+
+function revisionCursorSignature(secret: string, encoded: string): string {
+  return createHmac("sha256", secret)
+    .update("socal-listing-revision-cursor-v1\0", "utf8")
     .update(encoded, "utf8")
     .digest("base64url");
 }
@@ -560,6 +583,17 @@ function toOwnerView(listing: OwnerListingProjection): ListingOwnerView {
     isFeatured: listing.isFeatured,
     publishedAt: listing.publishedAt?.toISOString() ?? null,
     expiresAt: listing.expiresAt?.toISOString() ?? null,
+    latestRevision: listing.latestRevision ? toRevisionView(listing.latestRevision) : null,
+  };
+}
+
+function toRevisionView(
+  revision: NonNullable<OwnerListingProjection["latestRevision"]>,
+): ListingRevisionView {
+  return {
+    ...revision,
+    diff: revision.diff,
+    createdAt: revision.createdAt.toISOString(),
   };
 }
 
@@ -626,6 +660,158 @@ function buildWriteFields(input: {
   };
 }
 
+function revisionJsonEqual(left: unknown, right: unknown): boolean {
+  return canonicalize(left) === canonicalize(right);
+}
+
+function withinEditDistance(left: string, right: string, maximum: number): boolean {
+  if (Math.abs(left.length - right.length) > maximum) return false;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = Array<number>(right.length + 1).fill(maximum + 1);
+    current[0] = leftIndex;
+    const start = Math.max(1, leftIndex - maximum);
+    const end = Math.min(right.length, leftIndex + maximum);
+    for (let rightIndex = start; rightIndex <= end; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        (previous[rightIndex] ?? maximum + 1) + 1,
+        (current[rightIndex - 1] ?? maximum + 1) + 1,
+        (previous[rightIndex - 1] ?? maximum + 1) +
+          (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+  return (previous[right.length] ?? maximum + 1) <= maximum;
+}
+
+function normalizedRevisionText(value: string | null): string {
+  return (value ?? "").normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function minorTextChange(before: string | null, after: string | null, field: string): boolean {
+  const left = normalizedRevisionText(before);
+  const right = normalizedRevisionText(after);
+  if (left === right) return true;
+  const longest = Math.max(left.length, right.length);
+  const maximum =
+    field === "body"
+      ? Math.min(20, Math.max(2, Math.ceil(longest * 0.02)))
+      : field === "summary"
+        ? Math.min(6, Math.max(2, Math.ceil(longest * 0.04)))
+        : Math.min(3, Math.max(1, Math.ceil(longest * 0.04)));
+  return withinEditDistance(left, right, maximum);
+}
+
+function safeRevisionAttributes(
+  attributes: Record<string, ListingDraftJsonValue>,
+): Record<string, ListingDraftJsonValue> {
+  return Object.fromEntries(
+    Object.entries(attributes).filter(
+      ([key]) => !/(phone|email|contact|address|latitude|longitude)/iu.test(key),
+    ),
+  );
+}
+
+function changedAttributeKeys(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): string[] {
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((key) => !revisionJsonEqual(before[key], after[key]))
+    .sort();
+}
+
+function revisionDiff(
+  before: ListingRevisionSnapshot,
+  after: ListingRevisionSnapshot,
+  changedRawAttributeKeys?: readonly string[],
+): {
+  diff: ListingRevisionDiffEntry[];
+  materialReasons: ListingRevisionReasonCode[];
+  changedTextFields: Array<"title" | "summary" | "body">;
+} {
+  const diff: ListingRevisionDiffEntry[] = [];
+  const materialReasons: ListingRevisionReasonCode[] = [];
+  const changedTextFields: Array<"title" | "summary" | "body"> = [];
+  const add = (
+    field: ListingRevisionDiffEntry["field"],
+    beforeValue: ListingRevisionDiffEntry["before"],
+    afterValue: ListingRevisionDiffEntry["after"],
+  ): void => {
+    if (revisionJsonEqual(beforeValue, afterValue)) return;
+    diff.push({
+      field,
+      kind: beforeValue === null ? "ADDED" : afterValue === null ? "REMOVED" : "CHANGED",
+      before: beforeValue,
+      after: afterValue,
+    });
+  };
+  add("locale", before.locale, after.locale);
+  if (before.locale !== after.locale) materialReasons.push("LOCALE_CHANGED");
+  for (const field of ["title", "summary", "body"] as const) {
+    if (before[field] === after[field]) continue;
+    changedTextFields.push(field);
+    add(field, before[field], after[field]);
+    if (!minorTextChange(before[field], after[field], field)) {
+      materialReasons.push(
+        field === "title"
+          ? "TITLE_MATERIAL_CHANGE"
+          : field === "summary"
+            ? "SUMMARY_MATERIAL_CHANGE"
+            : "BODY_MATERIAL_CHANGE",
+      );
+    }
+  }
+  add("price", before.price, after.price);
+  if (!revisionJsonEqual(before.price, after.price)) materialReasons.push("PRICE_CHANGED");
+  add("category", before.category, after.category);
+  if (before.category.id !== after.category.id) materialReasons.push("CATEGORY_CHANGED");
+  add("region", before.region, after.region);
+  if (before.region.id !== after.region.id) materialReasons.push("REGION_CHANGED");
+  add("location", before.location, after.location);
+  if (!revisionJsonEqual(before.location, after.location)) {
+    materialReasons.push("LOCATION_CHANGED");
+  }
+  add("contactMode", before.contactMode, after.contactMode);
+  if (before.contactMode !== after.contactMode) materialReasons.push("CONTACT_MODE_CHANGED");
+  const attributeKeys = [
+    ...(changedRawAttributeKeys ?? changedAttributeKeys(before.attributes, after.attributes)),
+  ];
+  if (attributeKeys.length > 0) {
+    diff.push({
+      field: "attributes",
+      kind: "CHANGED",
+      before: { changedKeys: attributeKeys },
+      after: { changedKeys: attributeKeys },
+    });
+    materialReasons.push("ATTRIBUTES_CHANGED");
+  }
+  if (!revisionJsonEqual(before.mediaIds, after.mediaIds)) {
+    add("mediaIds", before.mediaIds, after.mediaIds);
+    materialReasons.push("MEDIA_CHANGED");
+  }
+  return { diff, materialReasons, changedTextFields };
+}
+
+function findCategory(nodes: readonly Category[], id: string): Category | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const nested = findCategory(node.children ?? [], id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function findRegion(nodes: readonly Region[], id: string): Region | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const nested = findRegion(node.children ?? [], id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 export function listingEtag(version: number): string {
   return `"listing-v${version}"`;
 }
@@ -673,6 +859,48 @@ export class ListingsService {
         hasMore: result.nextCursor !== null,
         nextCursor: result.nextCursor
           ? this.#encodePublicCursor(normalized, result.nextCursor)
+          : null,
+      },
+      generatedAt: now.toISOString(),
+    };
+  }
+
+  async listRevisions(
+    context: PolicyRequestContext,
+    listingId: string,
+    query: ListListingRevisionsQuery,
+    now = new Date(),
+  ): Promise<ListingRevisionCollection> {
+    const actorUserId = authenticatedUserId(context);
+    const listing = await this.store.findByIdForOwner({ actorUserId, listingId, now });
+    if (!listing) throw new ListingNotFoundError();
+    await this.policies.require({
+      action: listingObjectPolicyActions.draftRead,
+      context,
+      resource: {
+        type: "listing",
+        id: listing.id,
+        ownerUserId: listing.organizationId ? null : listing.ownerId,
+        organizationId: listing.organizationId,
+        state: listing.status,
+        deleted: false,
+      },
+    });
+    const cursor = query.cursor ? this.#decodeRevisionCursor(query.cursor, listingId) : undefined;
+    const result = await this.store.listRevisions({
+      actorUserId,
+      listingId,
+      ...(cursor ? { cursor } : {}),
+      limit: query.limit ?? 20,
+      now,
+    });
+    if (result.kind === "not_found") throw new ListingNotFoundError();
+    return {
+      data: result.items.map(toRevisionView),
+      page: {
+        hasMore: result.nextCursor !== null,
+        nextCursor: result.nextCursor
+          ? this.#encodeRevisionCursor(listingId, result.nextCursor)
           : null,
       },
       generatedAt: now.toISOString(),
@@ -788,6 +1016,7 @@ export class ListingsService {
     listingId: string,
     expectedVersion: number,
     input: UpdateListingInput,
+    idempotencyKey?: string,
   ): Promise<ListingOwnerResponse> {
     await this.policies.require({
       action: activeUserPolicyActions.listingDraftUpdate,
@@ -795,6 +1024,17 @@ export class ListingsService {
     });
     const actorUserId = authenticatedUserId(context);
     const now = new Date();
+    const hash = requestHash({ listingId, expectedVersion, input });
+    if (idempotencyKey) {
+      const retry = await this.store.findPublishedRevisionRetry({
+        actorUserId,
+        idempotencyKey,
+        requestHash: hash,
+        now,
+      });
+      if (retry.kind === "conflict") throw new ListingIdempotencyConflictError();
+      if (retry.kind === "exact_retry") return { data: toOwnerView(retry.listing) };
+    }
     const current = await this.store.findByIdForOwner({ actorUserId, listingId, now });
     if (!current) throw new ListingNotFoundError();
     await this.policies.require({
@@ -812,7 +1052,14 @@ export class ListingsService {
     if (current.version !== expectedVersion) {
       throw new ListingVersionConflictError(current.version);
     }
-    if (current.status !== "DRAFT") throw new ListingStateConflictError();
+    if (current.status !== "DRAFT" && current.status !== "PUBLISHED") {
+      throw new ListingStateConflictError();
+    }
+    if (current.status === "PUBLISHED" && !idempotencyKey) {
+      throw new ListingValidationError({
+        idempotencyKey: ["is required for published edits"],
+      });
+    }
     const categoryChanged =
       input.categoryId !== undefined && input.categoryId !== current.category.id;
     const references = await this.store.resolveReferences({
@@ -837,6 +1084,148 @@ export class ListingsService {
       details,
       slug: current.slug,
     });
+    if (current.status === "PUBLISHED") {
+      const candidate = await this.store.findSubmissionCandidate({ actorUserId, listingId });
+      if (!candidate) throw new ListingNotFoundError();
+      const form = await this.taxonomy.getPublishedFormSchema(references.categoryId, {
+        version: references.formSchemaVersion,
+      });
+      const categories = await this.taxonomy.listCategories({
+        activeOnly: true,
+        vertical: current.type,
+      });
+      const regions = await this.taxonomy.listRegions({ activeOnly: true });
+      const category = findCategory(categories.data, references.categoryId);
+      const region = findRegion(regions.data, references.regionId);
+      if (!category || !region) throw new ListingValidationError();
+      const defaultLifetimeDays = form.definition.publicationPolicy?.defaultLifetimeDays ?? 30;
+      const before: ListingRevisionSnapshot = {
+        locale: current.locale as "zh-Hans" | "en-US",
+        title: current.title,
+        summary: current.summary,
+        body: current.body,
+        price: current.price
+          ? {
+              amount: current.price.amount,
+              currency: "USD",
+              unit: current.price.unit ?? "FIXED",
+            }
+          : null,
+        category: {
+          id: current.category.id,
+          code: current.category.slug,
+          nameZhHans: current.category.nameZhHans,
+          nameEn: current.category.nameEn,
+        },
+        region: {
+          id: current.region.id,
+          code: current.region.code,
+          nameZhHans: current.region.nameZhHans,
+          nameEn: current.region.nameEn,
+        },
+        location: { precision: locationPrecision(current.location.precision) },
+        contactMode: current.contactMode,
+        attributes: safeRevisionAttributes(cloneAttributes(current.attributes)),
+        mediaIds: [...current.mediaIds],
+        formSchemaVersion: current.formSchemaVersion,
+        defaultLifetimeDays,
+      };
+      const after: ListingRevisionSnapshot = {
+        locale: fields.locale as "zh-Hans" | "en-US",
+        title: fields.title,
+        summary: fields.summary,
+        body: fields.body,
+        price: fields.priceUnit
+          ? {
+              amount: fields.priceAmount,
+              currency: "USD",
+              unit: fields.priceUnit,
+            }
+          : null,
+        category: {
+          id: category.id,
+          code: category.slug,
+          nameZhHans: category.name["zh-Hans"],
+          nameEn: category.name["en-US"],
+        },
+        region: {
+          id: region.id,
+          code: region.code,
+          nameZhHans: region.name["zh-Hans"],
+          nameEn: region.name["en-US"],
+        },
+        location: { precision: locationPrecision(fields.locationPrecision) },
+        contactMode: fields.contactMode,
+        attributes: safeRevisionAttributes(fields.attributes),
+        mediaIds: [...fields.mediaIds],
+        formSchemaVersion: references.formSchemaVersion,
+        defaultLifetimeDays,
+      };
+      const changes = revisionDiff(
+        before,
+        after,
+        changedAttributeKeys(cloneAttributes(current.attributes), fields.attributes),
+      );
+      if (changes.diff.length === 0) {
+        throw new ListingValidationError({ body: ["patch does not change the Listing"] });
+      }
+      const risk = evaluateListingSubmissionRisk({
+        listingType: current.type,
+        title: fields.title,
+        summary: fields.summary,
+        body: fields.body,
+        accountCreatedAt: candidate.actorCreatedAt,
+        occurredAt: now,
+        publicationPolicy: form.definition.publicationPolicy ?? {},
+      });
+      const riskReasons: ListingRevisionReasonCode[] =
+        risk.riskTier === "LOW" ? [] : ["MODERATION_RISK_SIGNAL"];
+      const major = changes.materialReasons.length > 0 || riskReasons.length > 0;
+      const reasonCodes: ListingRevisionReasonCode[] = major
+        ? [...new Set([...changes.materialReasons, ...riskReasons])]
+        : ["MINOR_TEXT_EDIT"];
+      const result = await this.store.revisePublished({
+        ...fields,
+        actorUserId,
+        listingId,
+        expectedVersion,
+        idempotencyKey: idempotencyKey as string,
+        requestHash: hash,
+        requestId: context.requestId,
+        occurredAt: now,
+        classification: major ? "MAJOR_EDIT" : "MINOR_EDIT",
+        reasonCodes,
+        snapshot: after,
+        diff: changes.diff,
+        inputHash: requestHash({
+          listingId,
+          expectedVersion,
+          snapshot: after,
+          formSchema: form.definition,
+        }),
+        ruleSetKey: risk.ruleSetKey,
+        ruleSetVersion: risk.ruleSetVersion,
+        riskTier: risk.riskTier,
+        hits: risk.hits,
+      });
+      if (result.kind === "revised" || result.kind === "exact_retry") {
+        return { data: toOwnerView(result.listing) };
+      }
+      if (result.kind === "idempotency_conflict") {
+        throw new ListingIdempotencyConflictError();
+      }
+      if (result.kind === "not_found") throw new ListingNotFoundError();
+      if (result.kind === "invalid_media") {
+        throw new ListingValidationError({
+          mediaIds: ["must contain only owner-scoped READY listing images"],
+        });
+      }
+      if (result.kind === "invalid_reference") throw new ListingValidationError();
+      if (result.kind === "version_conflict" || result.kind === "time_conflict") {
+        throw new ListingVersionConflictError(result.currentVersion);
+      }
+      throw new ListingStateConflictError();
+    }
     const result = await this.store.updateDraft({
       ...fields,
       actorUserId,
@@ -931,7 +1320,10 @@ export class ListingsService {
     if (candidate.version !== expectedVersion) {
       throw new ListingVersionConflictError(candidate.version);
     }
-    if (candidate.status !== "DRAFT" || candidate.moderationStatus !== "NOT_REVIEWED") {
+    if (
+      candidate.status !== "DRAFT" ||
+      (candidate.moderationStatus !== "NOT_REVIEWED" && candidate.moderationStatus !== "REJECTED")
+    ) {
       throw new ListingStateConflictError();
     }
 
@@ -1208,6 +1600,50 @@ export class ListingsService {
     };
     const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
     return `${encoded}.${cursorSignature(this.#cursorSecret, encoded)}`;
+  }
+
+  #encodeRevisionCursor(listingId: string, cursor: ListingRevisionCursor): string {
+    const payload: ListingRevisionCursorPayload = {
+      version: 1,
+      listingId,
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id,
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+    return `${encoded}.${revisionCursorSignature(this.#cursorSecret, encoded)}`;
+  }
+
+  #decodeRevisionCursor(value: string, listingId: string): ListingRevisionCursor {
+    const [encoded, signature, extra] = value.split(".");
+    if (!encoded || !signature || extra || encoded.length > 1_024) {
+      throw new ListingCursorError();
+    }
+    const expected = revisionCursorSignature(this.#cursorSecret, encoded);
+    if (!signaturesMatch(expected, signature)) throw new ListingCursorError();
+    let payload: unknown;
+    try {
+      payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    } catch {
+      throw new ListingCursorError();
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new ListingCursorError();
+    }
+    const candidate = payload as Partial<ListingRevisionCursorPayload>;
+    if (
+      candidate.version !== 1 ||
+      candidate.listingId !== listingId ||
+      typeof candidate.createdAt !== "string" ||
+      typeof candidate.id !== "string" ||
+      !uuidPattern.test(candidate.id)
+    ) {
+      throw new ListingCursorError();
+    }
+    const createdAt = new Date(candidate.createdAt);
+    if (!Number.isFinite(createdAt.getTime()) || createdAt.toISOString() !== candidate.createdAt) {
+      throw new ListingCursorError();
+    }
+    return { createdAt, id: candidate.id };
   }
 
   #decodePublicCursor(value: string, query: NormalizedPublicListingQuery): PublicListingCursor {

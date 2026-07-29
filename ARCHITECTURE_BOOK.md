@@ -861,7 +861,10 @@ exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避�
 回滚追加新版本；`listings.form_schema_version` 固定旧草稿的校验事实源，`category_fields` 只是当前
 发布版本的可重建查询投影。后续仍应增加以下历史能力：
 
-- `listing_revisions`：提交/发布/重大编辑时保存规范化快照、diff、actor、风险结果。
+`LIST-008` 已增加 `listing_revisions`：提交、重新提交和已发布编辑保存规范化脱敏快照、字段级 diff、
+actor、风险结果、稳定原因、审核关联与原发布期限；数据库触发器阻止 UPDATE/DELETE，应用只追加新
+版本。后续仍应增加：
+
 - `moderation_rule_hits`：规则版本、输入摘要和结果。
 - `payment_webhook_receipts`：原始事件引用、签名校验结果、处理状态。
 - 首页编排、同义词和规则的专用版本表（分类表单不再使用泛化 `config_versions`）。
@@ -941,6 +944,25 @@ Listing 只产生一次 `listing.expired` 审计和事件。
 Transfer/Secondhand/Service 明细与对应 Listing 在创建/更新事务内 upsert，并删除不属于当前类型的
 其他垂直明细。数据库 check 分别约束转让核心字段、二手成色/交付数组和服务半径/可用时间；应用层
 在进入 Repository 前继续执行价格单位、政策确认和有界业务规则，形成双层失败关闭。
+
+### LIST-008 不可变修订与复审证据
+
+`listing_revisions` 以 `(listing_id, revision_number)` 唯一，保存产生该修订的 Listing version、
+`SUBMISSION|MINOR_EDIT|MAJOR_EDIT` 分类、稳定原因码、规范化脱敏快照及 SHA-256、字段级 diff 及
+SHA-256、风险层/规则集、actor/session、可选 evaluation、幂等键/请求摘要和原发布/到期时间。
+数据库 check 约束哈希、版本、风险/规则配对、actor/session 与期限一致性，并由触发器阻止
+UPDATE/DELETE；两年保留策略见 `docs/24-data-retention.md`。
+
+首次提交和被要求修改后的重新提交均在 submission 事务追加修订；重新提交必须与上一修订存在有效
+差异，审核快照记录 `previous` 与 revision metadata，使 Admin diff 使用真实前后版本。已发布编辑在
+Listing 行锁内分类：小型 title/summary/body 文字修正保持 `PUBLISHED` 与现有审核/期限；分类、地区、
+价格、联系方式、精确位置、attributes、媒体、locale 或新的风险信号成为重大编辑，转回
+`SUBMITTED/PENDING_REVIEW|ESCALATED` 并从公共查询立即消失。重大编辑的新 evaluation、rule hits、
+case/snapshot、revision、Audit 与 Outbox 同事务提交。
+
+人工批准重大编辑使用修订中保存的原始 publication window，而不是审批时间重新计算。窗口已过期时
+结果为 `EXPIRED`；未过期时恢复原 `published_at/expires_at`。审批事务同时核对 Case、Listing、
+evaluation 和 revision 的版本，旧事件或陈旧 Case 不能覆盖更新的 Listing。
 
 ### NOTIF-001 站内通知投影
 
@@ -1490,6 +1512,19 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
   每个动作只接受配套原因码。失效角色、跨资源、原审核员复核、陈旧版本、键冲突和非法状态均返回
   通用 Problem Details，不暴露内部存在性或规则阈值。
 
+## 8.19 Listing 修订与重大编辑契约
+
+- `GET /listings/{listingId}/revisions` 是 owner/组织读取角色专用、`no-store` 的 cursor collection；
+  返回 revision number、分类、稳定原因、脱敏字段级 diff、风险/规则版本、审核状态、actor 和发生时间，
+  不返回完整 snapshot、哈希、session、幂等证据或私有值。未知/跨 owner/已删除 Listing 统一 404。
+- `ListingOwnerView.latestRevision` 返回可空的最近 revision 摘要，使 owner 在草稿详情响应中看到重大
+  编辑为什么重审；公共 `PublicListingView` 不增加审核历史。
+- 对 `PUBLISHED` Listing 的 `PATCH /listings/{listingId}` 必须同时携带强 `If-Match` 和
+  `Idempotency-Key`。精确重试返回原 revision/result；同 key 不同 request 返回 409。minor edit
+  仍返回公开 owner view；major edit 返回新的 SUBMITTED/PENDING_REVIEW 或 ESCALATED 状态。
+- 这些都是 `/v1` 向后兼容增量：草稿 PATCH 的既有客户端无需幂等键，新增 collection/schema 与
+  nullable owner 字段不改变公共响应。OpenAPI 与生成 TypeScript 是唯一 REST 契约事实源。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -1870,8 +1905,8 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
 
 - 队列按 priority 降序、createdAt/UUID 升序稳定分页；高风险 15 分钟、普通提交 4 小时的计划 SLA
   在响应和双语界面明确展示。cursor 与 actor/筛选 HMAC 绑定，limit 最大 50。
-- 每个案件读取提交事务生成的不可变脱敏快照。当前仅存在首次提交历史，因此 diff 明确把字段标记为
-  ADDED；后续 `listing_revisions` 上线后可在不改变当前契约的情况下增加 previous published diff。
+- 每个案件读取提交事务生成的不可变脱敏快照。`LIST-008` 将当前与上一不可变 revision 一并绑定，
+  初次提交显示 ADDED，重新提交与重大编辑显示真实字段级前后 diff，不从可变 Listing 当前行反推历史。
 - 详情同时展示非 LOW 规则代码/版本/严重度/字段名、媒体扫描结果和发布者状态聚合；不展示规则阈值、
   命中原文、联系方式、精确坐标、原始对象 key 或请求 hash。
 - 审核员可批准、要求修改、拒绝或升级，动作与稳定原因码绑定。读取要求 MFA + 当前
@@ -1915,6 +1950,20 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   同事务提交。
 - SLA 响应字段以举报 24 小时、申诉 3 个 UTC 工作日计算；节假日日历、人员班次、恶意举报信誉和
   审核质量仪表盘分别由运营配置与 `MOD-004` 完成，当前不会自动定罪或因新账号自动忽略证据。
+
+## 11.15 LIST-008 修订、diff 与重大编辑复审
+
+- 首次提交、要求修改后的重新提交及所有已发布编辑都会追加不可变 `listing_revisions`；快照使用公开/
+  审核安全字段，diff 对私有 attributes 只记录变化的 key，不复制联系方式、地址或敏感值。
+- Owner 通过 `GET /listings/{listingId}/revisions` 查看按 revision/UUID 稳定分页的历史、分类、
+  原因、风险、审核状态和脱敏 diff；cursor 与 actor、Listing 和 limit 绑定，跨账号/篡改失败关闭。
+- 已发布 `PATCH` 继续要求强 ETag，并额外要求 actor-scoped `Idempotency-Key`。有界的小型文字修正为
+  `MINOR_EDIT`，保留 `PUBLISHED`、审核状态和原到期时间；分类、区域、价格、联系方式、位置、媒体、
+  attributes、locale 或风险信号变化为 `MAJOR_EDIT`。
+- 重大编辑即时转回 `SUBMITTED/PENDING_REVIEW`，高风险进入 `ESCALATED`；低风险重大变化也提升到
+  至少中风险人工复核。新 revision、evaluation/hits、case/snapshot、Audit 和 Outbox 原子提交。
+- 重大编辑获批只能恢复 revision 保存的原发布时间与到期时间；到期则转为 `EXPIRED`，不能借编辑免费
+  续期。Case ETag、Listing version、revision/evaluation 关联和事务行锁共同阻止旧审核覆盖新内容。
 
 ---
 
@@ -2453,6 +2502,21 @@ Idempotency-Key 或请求哈希。
 - 申诉利益冲突/覆盖：仅 Owner 可对 30 天内的下架动作申诉一次；原审核员在 Service 和 Repository
   两层拒绝，独立审核员的维持/恢复使用 Listing/Case 行锁与版本检查，结果、Audit、不可变 Action、
   Outbox 和状态在同一事务提交。
+
+## 14.21 LIST-008 修订历史与重大编辑威胁和缓解
+
+- 历史/对象枚举：revision collection 只对 ACTIVE Owner 或当前组织读取角色开放；未知、跨 owner 和
+  已删除资源统一 404，响应强制 `no-store`，签名 cursor 绑定 actor、Listing、limit 和排序边界。
+- PII 历史扩散：revision snapshot 只保存审核所需规范化字段；联系方式、精确位置和 owner-only/未知
+  attributes 不进入快照。attributes diff 仅显示变化 key，API 不返回 snapshot/request/diff hash、
+  session、幂等键或内部规则阈值。
+- 以微调绕过复审：价格、分类、区域、联系方式、位置、媒体、动态字段、locale 或任何新风险命中均
+  保守归为重大编辑；只有有界的 title/summary/body 文字距离可归为 minor，Repository 独立复核状态、
+  版本和 publication window。
+- 重放/并发覆盖：发布后 PATCH 要求强 ETag 和 actor-scoped 幂等键；advisory lock、Listing 行锁、
+  request hash、revision 唯一键及 Case/version 检查使精确重试收敛、键冲突失败、旧审核不能覆盖新版本。
+- 免费续期/证据篡改：重大编辑保存原 `published_at/expires_at`，审批只恢复该窗口，已过期则进入
+  EXPIRED；数据库触发器禁止 revision UPDATE/DELETE，修订、审核、Audit 和 Outbox 原子追加。
 
 ---
 
@@ -3065,6 +3129,20 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 空库 baseline 要求 24 个 migration、40 条已发布双语 Listing 模板、8 个举报/申诉 check 和 42 个
   数据库负例；上一发行版升级必须回填遗留 Report 的幂等证据并保留既有 Listing/审核哨兵。
 
+## 18.23 LIST-008 修订与重大编辑验证增量
+
+- 纯规则/API 测试覆盖发布后缺少幂等键、精确重试、强 ETag、文字 typo minor、价格/分类/区域/联系/
+  位置/媒体/attributes/locale/risk major、跨 owner 404、签名分页 cursor 和响应敏感字段负断言。
+- PostgreSQL 集成覆盖初次提交 revision、被要求修改后 resubmit diff、minor 保持公开及原期限、
+  major 进入人工审核并从公共读移除、低风险提升、Case previous snapshot、owner-only 分页和并发重试。
+- 数据库负例必须证明 revision UPDATE/DELETE 均被不可变触发器阻止，并验证版本/哈希/风险/actor/
+  publication-window check；baseline/upgrade 同时要求表、索引、触发器和旧数据 sentinel 存活。
+- 审核测试使用 previous revision 生成真实 diff；批准重大编辑保留原 `published_at/expires_at`，
+  审批时已到期则直接 EXPIRED，陈旧 Case/Listing version 不能覆盖较新修订或产生免费续期。
+- OpenAPI/生成类型/HTTP 测试覆盖 owner revision collection、`ListingOwnerView.latestRevision`、
+  `no-store`、Problem Details 和 BFF 精确 allowlist；全量质量门禁继续运行格式、类型、lint、单元/
+  集成、生产构建、运行时和 Chromium 桌面/移动回归。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3390,8 +3468,8 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
 `LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
 `LIST-007` 已继续完成 Transfer/Secondhand/Service 的 schema、明细持久化、政策确认、双语移动提交、
-安全公开读取和过期。五类垂直基线均已验收；revision/重大编辑复审、账户管理和搜索派生状态仍由
-后续任务完成，因此整个 22.4 尚不能标记完成。
+安全公开读取和过期。`LIST-008` 已验收不可变 revision、真实前后 diff、owner 原因和重大编辑复审；
+账户管理和搜索派生状态仍由后续任务完成，因此整个 22.4 尚不能标记完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
@@ -3405,8 +3483,8 @@ Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复�
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
 覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；Listing
-举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成。重新提交的历史 revision diff 和搜索索引
-消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+举报、下架、独立审核员申诉和恢复已由 `MOD-002` 完成；重新提交和重大编辑的历史 revision diff
+已由 `LIST-008` 完成。搜索索引消费仍由后续 Gate 3 切片负责，因此整个 Listing 生命周期尚未完成。
 
 `MOD-002` 已验收 Listing 举报/申诉切片：ACTIVE actor、同源、幂等键、每账号小时配额和活动目标
 唯一约束保护接收；并发同目标举报只写一条 Report/脱敏快照/案件/Audit。公共 receipt 和 MFA
@@ -3437,6 +3515,13 @@ OWNER_ONLY 财务免责声明并始终人工审核；Secondhand 要求成色、�
 upsert 且类型严格耦合，数据库约束阻止应用旁路。五类公共 list/detail、签名 cursor、归档/软删除和
 到期处理统一；v3 禁售品规则只保留字段级证据。三个中英文 noindex 发布页复用账号/locale/vertical
 隔离恢复、READY 图片、强 ETag 和幂等提交，桌面/移动 E2E 覆盖三类填写、保存与提交。
+
+`LIST-008` 已验收修订与重大编辑：首次/重新提交和已发布编辑都追加数据库不可变、哈希绑定的规范化
+脱敏 snapshot/diff；Owner 私有 collection 使用 actor/Listing 绑定的签名 cursor 并显示稳定分类、
+原因、风险和审核状态。小型文字修正保留公开状态与原期限；价格、分类、区域、联系、位置、媒体、
+attributes、locale 或风险信号变化立即重新人工审核并从公开读消失。revision/evaluation/case/Audit/
+Outbox 原子提交，精确重试不重复写；批准只恢复原 publication window，已到期直接 EXPIRED，旧案件或
+旧事件不能覆盖较新版本。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
@@ -3680,7 +3765,7 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 | 会话 token          | 到期/撤销后 30 天内元数据 | 删除 token hash        | 安全调查最小化      |
 | OTP                 | 10 分钟有效               | 24 小时内删除/聚合     | 不记录明文          |
 | Listing 当前快照    | 活跃+过期窗口             | 2–3 年后归档/去标识    | 类别政策可不同      |
-| Listing revisions   | 2 年                      | 聚合/删除              | 审核与争议          |
+| Listing revisions   | 2 年                      | 聚合/到期清理          | 审核与争议          |
 | 公共媒体            | 资源期间+删除缓冲         | 30–90 天清理           | S3 version 生命周期 |
 | 身份/执照原件       | 验证所需+最短周期         | 30–90 天或法律批准期限 | 结论与到期可更久    |
 | Messages            | 12–24 个月                | 删除/去标识            | 用户设置与举报 hold |
@@ -3702,6 +3787,10 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 `AUTH-003` 的设备管理投影只读取活跃 session UUID、清理后的 User-Agent、创建/最近活动/有效期；
 不返回 token、token hash 或 IP hash。撤销和到期后的 metadata 仍按上表 30 天上限清理，不能因为用户
 界面不再显示就无限保留。用户状态或软删除变化会即时标记全部会话已撤销，物理删除仍由保留任务完成。
+
+`LIST-008` 的 `listing_revisions` 在两年窗口内为数据库不可变审计证据，业务 API 不提供单条更新或
+删除。到期清理必须由后续保留策略任务按批次、legal hold 和 Audit 证据执行；用户编辑、归档、软删除
+或普通应用回滚都不得顺带物理删除 revision。
 
 ## 24.3 账户删除编排
 
@@ -4375,6 +4464,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingDraftRepository` 在同一事务 upsert 匹配明细并清理错配明细；公共读与过期仍走共享
 `ListingRepository`。Web 五类发布页复用同一个 schema-driven 组件，但保持路由、本地恢复 key 和
 动态字段按 vertical 隔离。
+
+`LIST-008` 继续保持模块化单体依赖方向：Controller 只解析 `If-Match`、幂等键与 cursor；
+`ListingsService` 负责 owner Policy、脱敏 diff、minor/major 保守分类和风险规则；
+`ListingRevisionRepository` 在 PostgreSQL 行锁内重新授权并原子追加 revision/evaluation/case/
+snapshot/Audit/Outbox。人工审核仍由 `ModerationService` 发出领域命令，Repository 独立校验 revision
+保存的原 publication window，Controller 和 Web BFF 都不导入 Prisma。
 
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的

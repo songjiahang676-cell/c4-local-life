@@ -216,6 +216,12 @@ enum ModerationRiskTier {
   HIGH
 }
 
+enum ListingRevisionClassification {
+  SUBMISSION
+  MINOR_EDIT
+  MAJOR_EDIT
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -317,6 +323,7 @@ model User {
   ownerTransfersSent         OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferFrom")
   ownerTransfersReceived     OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferTo")
   listings                   Listing[]
+  listingRevisions           ListingRevision[]           @relation("ListingRevisionActor")
   favorites                  Favorite[]
   participants               ConversationParticipant[]
   messages                   Message[]                   @relation("MessageSender")
@@ -766,6 +773,7 @@ model Listing {
   favorites             Favorite[]
   conversations         Conversation[]
   moderationEvaluations ModerationEvaluation[]
+  revisions             ListingRevision[]
 
   @@unique([type, slug])
   @@unique([ownerId, createIdempotencyKey])
@@ -1128,6 +1136,8 @@ model ModerationEvaluation {
   requestHash            String              @map("request_hash") @db.Char(64)
   resultContentStatus    ContentStatus       @map("result_content_status")
   resultModerationStatus ModerationStatus    @map("result_moderation_status")
+  previousContentStatus  ContentStatus       @default(DRAFT) @map("previous_content_status")
+  previousModerationStatus ModerationStatus  @default(NOT_REVIEWED) @map("previous_moderation_status")
   resultListingVersion   Int                 @map("result_listing_version")
   occurredAt             DateTime            @map("occurred_at") @db.Timestamptz(6)
   createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1135,12 +1145,47 @@ model ModerationEvaluation {
   actor                  User                @relation("SubmissionEvaluationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
   ruleHits               ModerationRuleHit[]
   moderationCase         ModerationCase?
+  listingRevision        ListingRevision?
 
   @@unique([actorUserId, idempotencyKey])
   @@unique([listingId, listingVersion])
   @@index([listingId, createdAt(sort: Desc)])
   @@index([riskTier, createdAt(sort: Desc)])
   @@map("moderation_evaluations")
+}
+
+model ListingRevision {
+  id                    String                        @id @default(uuid()) @db.Uuid
+  listingId             String                        @map("listing_id") @db.Uuid
+  actorUserId           String                        @map("actor_user_id") @db.Uuid
+  evaluationId          String?                       @unique @map("evaluation_id") @db.Uuid
+  revisionNumber        Int                           @map("revision_number")
+  baseListingVersion    Int                           @map("base_listing_version")
+  resultListingVersion  Int                           @map("result_listing_version")
+  classification        ListingRevisionClassification
+  reasonCodes           String[]                      @map("reason_codes") @db.VarChar(80)
+  snapshot              Json
+  snapshotHash          String                        @map("snapshot_hash") @db.Char(64)
+  diff                  Json
+  diffHash              String                        @map("diff_hash") @db.Char(64)
+  riskTier              ModerationRiskTier            @map("risk_tier")
+  ruleSetKey            String                        @map("rule_set_key") @db.VarChar(80)
+  ruleSetVersion        Int                           @map("rule_set_version")
+  idempotencyKey        String                        @map("idempotency_key") @db.VarChar(128)
+  requestHash           String                        @map("request_hash") @db.Char(64)
+  originalPublishedAt   DateTime?                     @map("original_published_at") @db.Timestamptz(6)
+  originalExpiresAt     DateTime?                     @map("original_expires_at") @db.Timestamptz(6)
+  createdAt             DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  listing               Listing                       @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  actor                 User                          @relation("ListingRevisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  evaluation            ModerationEvaluation?         @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+
+  @@unique([actorUserId, idempotencyKey])
+  @@unique([listingId, revisionNumber])
+  @@unique([listingId, resultListingVersion])
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([classification, createdAt(sort: Desc)])
+  @@map("listing_revisions")
 }
 
 model ModerationRuleHit {

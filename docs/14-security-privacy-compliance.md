@@ -324,3 +324,18 @@ Idempotency-Key 或请求哈希。
 - 申诉利益冲突/覆盖：仅 Owner 可对 30 天内的下架动作申诉一次；原审核员在 Service 和 Repository
   两层拒绝，独立审核员的维持/恢复使用 Listing/Case 行锁与版本检查，结果、Audit、不可变 Action、
   Outbox 和状态在同一事务提交。
+
+## 14.21 LIST-008 修订历史与重大编辑威胁和缓解
+
+- 历史/对象枚举：revision collection 只对 ACTIVE Owner 或当前组织读取角色开放；未知、跨 owner 和
+  已删除资源统一 404，响应强制 `no-store`，签名 cursor 绑定 actor、Listing、limit 和排序边界。
+- PII 历史扩散：revision snapshot 只保存审核所需规范化字段；联系方式、精确位置和 owner-only/未知
+  attributes 不进入快照。attributes diff 仅显示变化 key，API 不返回 snapshot/request/diff hash、
+  session、幂等键或内部规则阈值。
+- 以微调绕过复审：价格、分类、区域、联系方式、位置、媒体、动态字段、locale 或任何新风险命中均
+  保守归为重大编辑；只有有界的 title/summary/body 文字距离可归为 minor，Repository 独立复核状态、
+  版本和 publication window。
+- 重放/并发覆盖：发布后 PATCH 要求强 ETag 和 actor-scoped 幂等键；advisory lock、Listing 行锁、
+  request hash、revision 唯一键及 Case/version 检查使精确重试收敛、键冲突失败、旧审核不能覆盖新版本。
+- 免费续期/证据篡改：重大编辑保存原 `published_at/expires_at`，审批只恢复该窗口，已过期则进入
+  EXPIRED；数据库触发器禁止 revision UPDATE/DELETE，修订、审核、Audit 和 Outbox 原子追加。

@@ -296,6 +296,7 @@ describe("rental draft model", () => {
       featuredUntil: null,
       publishedAt: null,
       expiresAt: null,
+      latestRevision: null,
       createdAt: "2026-07-29T01:00:00.000Z",
       updatedAt: "2026-07-29T01:00:00.000Z",
       version: 1,

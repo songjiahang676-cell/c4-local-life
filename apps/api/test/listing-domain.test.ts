@@ -197,6 +197,46 @@ describe("Listing domain", () => {
     );
   });
 
+  it("approves a major revision without granting a fresh publication window", () => {
+    const originalPublishedAt = new Date("2026-07-20T00:00:00.000Z");
+    const originalExpiresAt = new Date("2026-08-19T00:00:00.000Z");
+    const submittedRevision: ListingAggregate = {
+      ...submit(),
+      createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-29T00:00:00.000Z"),
+    };
+    const approved = transitionListing(submittedRevision, {
+      kind: "MODERATOR_APPROVE_REVISION",
+      actorId,
+      expectedVersion: submittedRevision.version,
+      occurredAt: new Date("2026-07-30T00:00:00.000Z"),
+      reasonCode: "CONTENT_POLICY_COMPLIANT",
+      originalPublishedAt,
+      originalExpiresAt,
+    }).listing;
+    expect(approved).toMatchObject({
+      status: "PUBLISHED",
+      moderationStatus: "APPROVED",
+      publishedAt: originalPublishedAt,
+      expiresAt: originalExpiresAt,
+    });
+
+    const expired = transitionListing(submittedRevision, {
+      kind: "MODERATOR_APPROVE_REVISION",
+      actorId,
+      expectedVersion: submittedRevision.version,
+      occurredAt: originalExpiresAt,
+      reasonCode: "CONTENT_POLICY_COMPLIANT",
+      originalPublishedAt,
+      originalExpiresAt,
+    }).listing;
+    expect(expired).toMatchObject({
+      status: "EXPIRED",
+      publishedAt: originalPublishedAt,
+      expiresAt: originalExpiresAt,
+    });
+  });
+
   it("expires at the policy instant, archives by owner action, and preserves publication evidence", () => {
     const published = publish();
     expectDomainError(

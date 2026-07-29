@@ -76,6 +76,8 @@ export function buildModerationDetail(
       formSchemaVersion: 1,
       defaultLifetimeDays: 30,
       sensitiveFieldsRedacted: true,
+      previous: null,
+      revision: null,
       capturedAt: createdAt.toISOString(),
     },
     rules: [

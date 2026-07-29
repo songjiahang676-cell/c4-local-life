@@ -11,6 +11,7 @@ import {
   type ListingType,
   type PriceUnit,
 } from "../../generated/prisma/client";
+import { type ListingRevisionDiffEntry, type ListingRevisionSnapshot } from "./listing-revision";
 
 export type ListingSubmissionRepositoryOptions = {
   connectionString: string;
@@ -136,7 +137,7 @@ function canonicalJson(value: unknown): string {
 function safeSnapshotAttributes(
   attributes: Prisma.JsonValue,
   definition: Prisma.JsonValue,
-): Prisma.InputJsonObject {
+): Record<string, Prisma.JsonValue> {
   if (
     !attributes ||
     Array.isArray(attributes) ||
@@ -166,7 +167,9 @@ function safeSnapshotAttributes(
       return [key];
     }),
   );
-  return Object.fromEntries(Object.entries(attributes).filter(([key]) => allowed.has(key)));
+  return Object.fromEntries(
+    Object.entries(attributes).filter(([key]) => allowed.has(key)),
+  ) as Record<string, Prisma.JsonValue>;
 }
 
 function defaultLifetimeDays(definition: Prisma.JsonValue): number {
@@ -177,6 +180,49 @@ function defaultLifetimeDays(definition: Prisma.JsonValue): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 365
     ? value
     : 30;
+}
+
+const revisionSnapshotFields = [
+  "locale",
+  "title",
+  "summary",
+  "body",
+  "price",
+  "category",
+  "region",
+  "location",
+  "contactMode",
+  "attributes",
+  "mediaIds",
+] as const;
+
+function snapshotDiff(
+  previous: Prisma.JsonValue | null,
+  current: ListingRevisionSnapshot,
+): ListingRevisionDiffEntry[] {
+  const previousObject =
+    previous && !Array.isArray(previous) && typeof previous === "object" ? previous : null;
+  const entries: ListingRevisionDiffEntry[] = [];
+  for (const field of revisionSnapshotFields) {
+    const before = previousObject?.[field] ?? null;
+    const after = current[field] as Prisma.JsonValue;
+    if (canonicalJson(before) === canonicalJson(after)) continue;
+    entries.push({
+      field,
+      kind: before === null ? "ADDED" : after === null ? "REMOVED" : "CHANGED",
+      before,
+      after,
+    });
+  }
+  return entries;
+}
+
+function asJsonObject(value: object): Prisma.InputJsonObject {
+  return value as Prisma.InputJsonObject;
+}
+
+function asJsonArray(value: readonly object[]): Prisma.InputJsonArray {
+  return [...value] as Prisma.InputJsonArray;
 }
 
 function isRepositoryOptions(
@@ -234,12 +280,14 @@ function projectionFromEvaluation(input: {
   resultListingVersion: number;
   occurredAt: Date;
   moderationCase: { id: string } | null;
+  previousContentStatus: ContentStatus;
+  previousModerationStatus: ModerationStatus;
 }): ListingSubmissionProjection {
   return {
     resourceId: input.listingId,
-    previousStatus: ContentStatus.DRAFT,
+    previousStatus: input.previousContentStatus,
     currentStatus: input.resultContentStatus,
-    previousModerationStatus: ModerationStatus.NOT_REVIEWED,
+    previousModerationStatus: input.previousModerationStatus,
     currentModerationStatus: input.resultModerationStatus,
     riskTier: input.riskTier,
     ruleSetVersion: input.ruleSetVersion,
@@ -268,6 +316,8 @@ async function findRetry(
       resultContentStatus: true,
       resultModerationStatus: true,
       resultListingVersion: true,
+      previousContentStatus: true,
+      previousModerationStatus: true,
       occurredAt: true,
       moderationCase: { select: { id: true } },
     },
@@ -429,6 +479,11 @@ export class ListingSubmissionRepository {
             select: { id: true },
             orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
           },
+          revisions: {
+            orderBy: [{ revisionNumber: "desc" }],
+            take: 1,
+            select: { revisionNumber: true, snapshot: true },
+          },
         },
       });
       if (!current || current.deletedAt !== null) return { kind: "not_found" };
@@ -441,12 +496,61 @@ export class ListingSubmissionRepository {
       }
       if (
         current.status !== ContentStatus.DRAFT ||
-        current.moderationStatus !== ModerationStatus.NOT_REVIEWED
+        (current.moderationStatus !== ModerationStatus.NOT_REVIEWED &&
+          current.moderationStatus !== ModerationStatus.REJECTED)
       ) {
         return { kind: "state_conflict", currentVersion: current.version };
       }
       if (input.occurredAt < current.updatedAt) {
         return { kind: "time_conflict", currentVersion: current.version };
+      }
+
+      const formSchema = await transaction.categoryFormSchemaVersion.findUniqueOrThrow({
+        where: {
+          categoryId_version: {
+            categoryId: current.categoryId,
+            version: current.formSchemaVersion,
+          },
+        },
+        select: { definition: true },
+      });
+      const snapshot: ListingRevisionSnapshot = {
+        locale: current.locale as "zh-Hans" | "en-US",
+        title: current.title,
+        summary: current.summary,
+        body: current.body,
+        price: current.priceUnit
+          ? {
+              amount: current.priceAmount?.toFixed(2) ?? null,
+              currency: "USD",
+              unit: current.priceUnit,
+            }
+          : null,
+        attributes: safeSnapshotAttributes(current.attributes, formSchema.definition),
+        contactMode: current.contactMode,
+        location: {
+          precision: current.locationPrecision as ListingRevisionSnapshot["location"]["precision"],
+        },
+        mediaIds: current.uploadedMedia.map((media) => media.id),
+        category: {
+          id: current.category.id,
+          code: current.category.slug,
+          nameZhHans: current.category.nameZhHans,
+          nameEn: current.category.nameEn,
+        },
+        region: {
+          id: current.region.id,
+          code: current.region.code,
+          nameZhHans: current.region.nameZhHans,
+          nameEn: current.region.nameEn,
+        },
+        formSchemaVersion: current.formSchemaVersion,
+        defaultLifetimeDays: defaultLifetimeDays(formSchema.definition),
+      };
+      const diff = snapshotDiff(current.revisions[0]?.snapshot ?? null, snapshot);
+      const resubmission = current.moderationStatus === ModerationStatus.REJECTED;
+      if (resubmission && diff.length === 0) {
+        return { kind: "state_conflict", currentVersion: current.version };
       }
 
       const evaluation = await transaction.moderationEvaluation.create({
@@ -462,6 +566,8 @@ export class ListingSubmissionRepository {
           requestHash: input.requestHash,
           resultContentStatus: input.decision.contentStatus,
           resultModerationStatus: input.decision.moderationStatus,
+          previousContentStatus: current.status,
+          previousModerationStatus: current.moderationStatus,
           resultListingVersion: input.decision.resultVersion,
           occurredAt: input.occurredAt,
           ruleHits: {
@@ -475,12 +581,37 @@ export class ListingSubmissionRepository {
         },
         select: { id: true },
       });
+      const revision = await transaction.listingRevision.create({
+        data: {
+          listingId: input.listingId,
+          actorUserId: input.actorUserId,
+          evaluationId: evaluation.id,
+          revisionNumber: (current.revisions[0]?.revisionNumber ?? 0) + 1,
+          baseListingVersion: input.expectedVersion,
+          resultListingVersion: input.decision.resultVersion,
+          classification: "SUBMISSION",
+          reasonCodes: [resubmission ? "RESUBMISSION" : "INITIAL_SUBMISSION"],
+          snapshot: asJsonObject(snapshot),
+          snapshotHash: createHash("sha256").update(canonicalJson(snapshot)).digest("hex"),
+          diff: asJsonArray(diff),
+          diffHash: createHash("sha256").update(canonicalJson(diff)).digest("hex"),
+          riskTier: input.riskTier,
+          ruleSetKey: input.ruleSetKey,
+          ruleSetVersion: input.ruleSetVersion,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          originalPublishedAt: null,
+          originalExpiresAt: null,
+          createdAt: input.occurredAt,
+        },
+        select: { id: true },
+      });
       const changed = await transaction.listing.updateMany({
         where: {
           id: input.listingId,
           version: input.expectedVersion,
           status: ContentStatus.DRAFT,
-          moderationStatus: ModerationStatus.NOT_REVIEWED,
+          moderationStatus: current.moderationStatus,
           deletedAt: null,
         },
         data: {
@@ -512,16 +643,7 @@ export class ListingSubmissionRepository {
               select: { id: true },
             });
       if (moderationCase) {
-        const formSchema = await transaction.categoryFormSchemaVersion.findUniqueOrThrow({
-          where: {
-            categoryId_version: {
-              categoryId: current.categoryId,
-              version: current.formSchemaVersion,
-            },
-          },
-          select: { definition: true },
-        });
-        const snapshot = {
+        const caseSnapshot = {
           listingId: current.id,
           listingVersion: input.decision.resultVersion,
           type: current.type,
@@ -556,13 +678,19 @@ export class ListingSubmissionRepository {
           defaultLifetimeDays: defaultLifetimeDays(formSchema.definition),
           sensitiveFieldsRedacted: true,
           capturedAt: input.occurredAt.toISOString(),
+          previous: current.revisions[0]?.snapshot ?? null,
+          revision: {
+            id: revision.id,
+            classification: "SUBMISSION",
+            reasonCodes: [resubmission ? "RESUBMISSION" : "INITIAL_SUBMISSION"],
+          },
         } satisfies Prisma.InputJsonObject;
         await transaction.moderationCaseSnapshot.create({
           data: {
             caseId: moderationCase.id,
             listingVersion: input.decision.resultVersion,
-            snapshot,
-            snapshotHash: createHash("sha256").update(canonicalJson(snapshot)).digest("hex"),
+            snapshot: caseSnapshot,
+            snapshotHash: createHash("sha256").update(canonicalJson(caseSnapshot)).digest("hex"),
             capturedAt: input.occurredAt,
           },
         });
@@ -584,6 +712,8 @@ export class ListingSubmissionRepository {
             ruleCodes: input.hits.map((hit) => hit.ruleCode),
             resultVersion: input.decision.resultVersion,
             caseId: moderationCase?.id ?? null,
+            revisionId: revision.id,
+            revisionReason: resubmission ? "RESUBMISSION" : "INITIAL_SUBMISSION",
           },
         },
       });
@@ -604,6 +734,7 @@ export class ListingSubmissionRepository {
               currentModerationStatus: transition.currentModerationStatus,
               reasonCode: transition.reasonCode,
               evaluationId: evaluation.id,
+              revisionId: revision.id,
               ruleSetKey: input.ruleSetKey,
               ruleSetVersion: input.ruleSetVersion,
               riskTier: input.riskTier,
@@ -616,9 +747,9 @@ export class ListingSubmissionRepository {
         kind: "submitted",
         submission: {
           resourceId: input.listingId,
-          previousStatus: ContentStatus.DRAFT,
+          previousStatus: current.status,
           currentStatus: input.decision.contentStatus,
-          previousModerationStatus: ModerationStatus.NOT_REVIEWED,
+          previousModerationStatus: current.moderationStatus,
           currentModerationStatus: input.decision.moderationStatus,
           riskTier: input.riskTier,
           ruleSetVersion: input.ruleSetVersion,

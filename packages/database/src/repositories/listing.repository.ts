@@ -15,6 +15,11 @@ import {
   type RegionType,
   type VerificationStatus,
 } from "../../generated/prisma/client";
+import {
+  listingRevisionSelect,
+  mapListingRevision,
+  type ListingRevisionProjection,
+} from "./listing-revision";
 
 export type ListingRepositoryOptions = {
   connectionString: string;
@@ -117,6 +122,7 @@ export type OwnerListingProjection = {
   featuredUntil: Date | null;
   publishedAt: Date | null;
   expiresAt: Date | null;
+  latestRevision: ListingRevisionProjection | null;
   createdAt: Date;
   updatedAt: Date;
   version: number;
@@ -323,6 +329,11 @@ const ownerListingSelect = {
     where: { status: "READY", purpose: "LISTING_MEDIA", kind: "IMAGE" },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     select: { id: true },
+  },
+  revisions: {
+    orderBy: [{ revisionNumber: "desc" }],
+    take: 1,
+    select: listingRevisionSelect,
   },
 } satisfies Prisma.ListingSelect;
 
@@ -680,6 +691,7 @@ export class ListingRepository {
       contactMode: row.contactMode,
       mediaIds: row.uploadedMedia.map((asset) => asset.id),
       isFeatured: row.isFeatured,
+      latestRevision: row.revisions[0] ? mapListingRevision(row.revisions[0]) : null,
     };
   }
 

@@ -13,6 +13,7 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("POST", "listings")).toBe(true);
     expect(isAllowedWebApiPath("PATCH", `listings/${id}`)).toBe(true);
     expect(isAllowedWebApiPath("POST", `listings/${id}/submit`)).toBe(true);
+    expect(isAllowedWebApiPath("GET", `listings/${id}/revisions`)).toBe(true);
     expect(isAllowedWebApiPath("GET", `media/${id}`)).toBe(true);
     expect(isAllowedWebApiPath("POST", `media/${id}/complete`)).toBe(true);
     expect(isAllowedWebApiPath("POST", "auth/mfa/enrollment")).toBe(true);

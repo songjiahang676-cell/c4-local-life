@@ -33,6 +33,7 @@ Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证�
 - [x] Job 复用并验收完整状态链。
 - [x] Transfer/Secondhand/Service 复用并验收完整状态链。
 - [x] 审核、举报、申诉、审计和通知。
+- [x] 不可变 revision、真实 diff、owner 原因和重大编辑复审/原期限保护。
 - [x] 五类移动端中英文发布 E2E。
 
 ## G3 Search / Web / SEO

@@ -109,6 +109,11 @@ export type ListingTransitionCommand =
   | (TransitionMetadata & { kind: "SUBMIT" })
   | (TransitionMetadata & { kind: "AUTO_APPROVE"; lifetimeDays: number })
   | (TransitionMetadata & { kind: "MODERATOR_APPROVE"; lifetimeDays: number })
+  | (TransitionMetadata & {
+      kind: "MODERATOR_APPROVE_REVISION";
+      originalPublishedAt: Date;
+      originalExpiresAt: Date;
+    })
   | (TransitionMetadata & { kind: "ESCALATE" })
   | (TransitionMetadata & { kind: "REJECT_TO_DRAFT" })
   | (TransitionMetadata & { kind: "SUSPEND" })
@@ -408,6 +413,21 @@ export function transitionListing(
       next.moderationStatus = "APPROVED";
       next.publishedAt = new Date(command.occurredAt);
       next.expiresAt = addUtcDays(command.occurredAt, command.lifetimeDays);
+      break;
+    case "MODERATOR_APPROVE_REVISION":
+      if (
+        !isSubmittedReview(current) ||
+        !isFiniteDate(command.originalPublishedAt) ||
+        !isFiniteDate(command.originalExpiresAt) ||
+        command.originalPublishedAt < current.createdAt ||
+        command.originalExpiresAt <= command.originalPublishedAt
+      ) {
+        fail("INVALID_STATE_TRANSITION");
+      }
+      next.status = command.occurredAt >= command.originalExpiresAt ? "EXPIRED" : "PUBLISHED";
+      next.moderationStatus = "APPROVED";
+      next.publishedAt = new Date(command.originalPublishedAt);
+      next.expiresAt = new Date(command.originalExpiresAt);
       break;
     case "ESCALATE":
       if (current.status !== "SUBMITTED" || current.moderationStatus !== "PENDING_REVIEW") {

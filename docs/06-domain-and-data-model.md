@@ -206,7 +206,10 @@ exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避�
 回滚追加新版本；`listings.form_schema_version` 固定旧草稿的校验事实源，`category_fields` 只是当前
 发布版本的可重建查询投影。后续仍应增加以下历史能力：
 
-- `listing_revisions`：提交/发布/重大编辑时保存规范化快照、diff、actor、风险结果。
+`LIST-008` 已增加 `listing_revisions`：提交、重新提交和已发布编辑保存规范化脱敏快照、字段级 diff、
+actor、风险结果、稳定原因、审核关联与原发布期限；数据库触发器阻止 UPDATE/DELETE，应用只追加新
+版本。后续仍应增加：
+
 - `moderation_rule_hits`：规则版本、输入摘要和结果。
 - `payment_webhook_receipts`：原始事件引用、签名校验结果、处理状态。
 - 首页编排、同义词和规则的专用版本表（分类表单不再使用泛化 `config_versions`）。
@@ -286,6 +289,25 @@ Listing 只产生一次 `listing.expired` 审计和事件。
 Transfer/Secondhand/Service 明细与对应 Listing 在创建/更新事务内 upsert，并删除不属于当前类型的
 其他垂直明细。数据库 check 分别约束转让核心字段、二手成色/交付数组和服务半径/可用时间；应用层
 在进入 Repository 前继续执行价格单位、政策确认和有界业务规则，形成双层失败关闭。
+
+### LIST-008 不可变修订与复审证据
+
+`listing_revisions` 以 `(listing_id, revision_number)` 唯一，保存产生该修订的 Listing version、
+`SUBMISSION|MINOR_EDIT|MAJOR_EDIT` 分类、稳定原因码、规范化脱敏快照及 SHA-256、字段级 diff 及
+SHA-256、风险层/规则集、actor/session、可选 evaluation、幂等键/请求摘要和原发布/到期时间。
+数据库 check 约束哈希、版本、风险/规则配对、actor/session 与期限一致性，并由触发器阻止
+UPDATE/DELETE；两年保留策略见 `docs/24-data-retention.md`。
+
+首次提交和被要求修改后的重新提交均在 submission 事务追加修订；重新提交必须与上一修订存在有效
+差异，审核快照记录 `previous` 与 revision metadata，使 Admin diff 使用真实前后版本。已发布编辑在
+Listing 行锁内分类：小型 title/summary/body 文字修正保持 `PUBLISHED` 与现有审核/期限；分类、地区、
+价格、联系方式、精确位置、attributes、媒体、locale 或新的风险信号成为重大编辑，转回
+`SUBMITTED/PENDING_REVIEW|ESCALATED` 并从公共查询立即消失。重大编辑的新 evaluation、rule hits、
+case/snapshot、revision、Audit 与 Outbox 同事务提交。
+
+人工批准重大编辑使用修订中保存的原始 publication window，而不是审批时间重新计算。窗口已过期时
+结果为 `EXPIRED`；未过期时恢复原 `published_at/expires_at`。审批事务同时核对 Case、Listing、
+evaluation 和 revision 的版本，旧事件或陈旧 Case 不能覆盖更新的 Listing。
 
 ### NOTIF-001 站内通知投影
 
