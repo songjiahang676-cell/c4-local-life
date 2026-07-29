@@ -11,9 +11,9 @@
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status      | Notes                                                      |
-| -------- | -------------------- | ---------- | ----------------- | ----------- | ---------------------------------------------------------- |
-| LIST-004 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | 双语/移动 Rental 表单、自动保存恢复、上传状态与 READY 绑定 |
+| Task     | Owner                | Started    | Target            | Status       | Notes                                                      |
+| -------- | -------------------- | ---------- | ----------------- | ------------ | ---------------------------------------------------------- |
+| LIST-004 | @songjiahang676-cell | 2026-07-29 | protected task PR | hosted green | 双语/移动 Rental 表单、自动保存恢复、上传状态与 READY 绑定 |
 
 ## Gate Evidence
 
@@ -101,6 +101,7 @@
 | LIST-004 local quality          | `pnpm ci:quality`                  | 61 files / 235 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
 | LIST-004 browser/runtime        | Chromium desktop/mobile            | production build and 8/8 E2E passed                                       | 2026-07-29 |
 | LIST-004 architecture           | `scripts/check-architecture.sh`    | 101 tasks、47 models、45 paths、99 schemas passed                         | 2026-07-29 |
+| LIST-004 protected checks       | PR #20 / run `30414690267`         | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
 
 ## Decisions / Blocks
 
