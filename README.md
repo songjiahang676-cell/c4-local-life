@@ -165,9 +165,11 @@ Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非
 PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随后受保护合并为
 `d4abece`，Gate 1 实施主线完成。Backlog 中的 `ORG-002` 是 G1/P1，但显式依赖 Gate 2
 `NOTIF-001`；受限验证文件 `MEDIA-003` 属于 Gate 4，因此两者按依赖延后而不提前跨 Gate。
-当前进入 `LIST-001`：五类 Listing 共用纯领域状态机，严格校验 type-detail、最小货币单位价格、
-内容/审核双状态、乐观版本、1–365 天发布期限及非法转换；Repository、安全投影和 HTTP use case
-仍按 `LIST-002/003` 顺序实现。
+`LIST-001` 已由 PR #17 / final run `30408759770` 通过两项 required checks，并受保护合并为
+`c1709a7`。`LIST-002` 在此基础上提供真实 PostgreSQL public/owner/moderator 安全投影：公开内容在
+查询层过滤状态、审核、期限、taxonomy 与主体；owner/organization member 和当前 scoped moderator
+分别通过对象范围查询授权；动态 attributes 按精确历史 schema visibility 白名单过滤。API/OpenAPI
+尚未改变，HTTP use case 与乐观并发写入仍按 `LIST-003` 实现。
 
 ## 七、规划容量与服务目标
 

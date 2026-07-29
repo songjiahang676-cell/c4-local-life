@@ -21,6 +21,9 @@
       "organization": [
         "src/repositories/organization.repository.ts"
       ],
+      "listing": [
+        "src/repositories/listing.repository.ts"
+      ],
       "outbox": [
         "src/repositories/outbox-event.repository.ts"
       ],
@@ -58,6 +61,11 @@
       "types": "./src/repositories/organization.repository.ts",
       "require": "./dist/src/repositories/organization.repository.js",
       "default": "./dist/src/repositories/organization.repository.js"
+    },
+    "./listing": {
+      "types": "./src/repositories/listing.repository.ts",
+      "require": "./dist/src/repositories/listing.repository.js",
+      "default": "./dist/src/repositories/listing.repository.js"
     },
     "./outbox": {
       "types": "./src/repositories/outbox-event.repository.ts",

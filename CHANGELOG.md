@@ -41,6 +41,7 @@
 - Added a transactional PostgreSQL outbox dispatcher with atomic `SKIP LOCKED` claims, leases, bounded exponential retries, event-id BullMQ idempotency, terminal failure state, queue-envelope limits, graceful shutdown, oldest-age metrics, and real database/Redis integration coverage.
 - Added owner-verified media completion and a lifecycle-versioned processing Worker with bounded S3 reads, exact hash/magic-byte verification, real ClamAV streaming, Sharp decode/orientation/metadata stripping, three deterministic encrypted WebP variants, transactional READY/REJECTED Outbox events, and clean-signature hosted integration enforcement.
 - Added a pure five-type Listing domain model with discriminated detail invariants, integer-minor-unit price rules, separate content/moderation states, optimistic-versioned transitions, bounded publication expiry, and exhaustive illegal-transition tests.
+- Added PostgreSQL-backed public, owner and scoped-moderator Listing projections with query-bound object authorization, exact historical form-schema visibility filtering, fail-closed malformed JSON handling, and PII leakage integration tests.
 
 ## 0.1.0 — Architecture handoff package
 

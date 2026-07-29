@@ -21,8 +21,9 @@
 - NestJS + Fastify 启动、Swagger、全局验证和 Problem Details 异常过滤器。
 - Health 模块。
 - Listing HTTP 示例仍只说明 Controller/DTO/Service 边界；`LIST-001` 已增加纯领域状态机，覆盖五类
-  type-detail、价格、审核/内容双状态、版本和过期不变式。真实 repository、安全投影和 use case 接线
-  由 `LIST-002/003` 替换现有内存 Service。
+  type-detail、价格、审核/内容双状态、版本和过期不变式。`LIST-002` 已增加 PostgreSQL Repository
+  及 public/owner/moderator 显式安全投影，包含对象范围、当前审核角色 scope 和精确历史动态字段
+  visibility 过滤；`LIST-003` 再用这些边界替换现有内存 Service 并接入 HTTP/并发写事务。
 
 ### `apps/worker`
 
@@ -39,6 +40,8 @@
 - Prisma 7 配置和 client adapter。
 - 覆盖用户、组织、地区、分类、Listing、媒体、消息、商家/师傅、评价、审核、通知、订单、支付、积分、广告、Outbox 和审计的初始 Schema。
 - 安全的扩展引导迁移、需合并到首个建表迁移后的 PostGIS/trigram/约束 SQL，以及 fallback SQL。
+- Listing 的公开、owner 和 moderator 三类显式读取投影；对象授权条件及动态字段 visibility 在
+  Repository 边界失败关闭，不直接返回 Prisma 模型。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 

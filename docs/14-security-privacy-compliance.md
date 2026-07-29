@@ -84,6 +84,15 @@ Repository scoped query 返回的最小上下文。未知动作、重复注册�
 `POST /listings` 的参考实现也要求 `listing:draft:create`；未登录返回 401，LIMITED 账户返回不泄露原因的
 403，避免已有写端点在框架接入后继续绕过服务端权限。
 
+`LIST-002` 把 Listing 对象授权下沉到 Repository 查询：公开查询强制当前发布/审核/过期/删除及
+taxonomy/主体状态，owner 查询绑定直接所有权或当前 organization membership，审核投影只允许 ACTIVE
+且具有当前 `MODERATOR|SENIOR_MODERATOR` grant 的 actor，并要求受控 region/category scope 匹配。
+撤销、到期、错误角色、越界、损坏 scope、受限/暂停 actor 与不存在资源都失败关闭。三种投影各用
+显式 `select`，不会先取完整 Prisma 模型；邮箱、手机号、组织 legal name、token/IP、公开精确坐标和
+不属于当前角色的动态字段从查询边界即被排除。动态 JSON 按 Listing 保存的精确已发布 schema version
+做字段 visibility 白名单，未知属性或 schema 缺失时返回空对象，避免历史配置漂移和 JSON 注入字段
+造成横向泄漏。后续 Controller 仍须通过 API-004 Policy；Repository 不是前端隐藏或单独的全部授权层。
+
 `ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
 `INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，

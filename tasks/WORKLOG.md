@@ -571,3 +571,25 @@ Observability: No new runtime metric or log was added for this pure domain slice
 Docs: Updated domain/data、moderation workflow、testing matrix、reference implementation、Gate checklist/status、Backlog、README、changelog、architecture book and this worklog；documented that G1/P1 ORG-002 waits for explicit G2 NOTIF-001 and G4 MEDIA-003 owns restricted verification files
 
 Known gaps: LIST-002 must map Prisma records into this aggregate and implement owner/public/moderator safe projections；LIST-003 must run transitions with row/version predicates and atomically persist audit/Outbox evidence；dynamic form exact-version validation、media READY binding、authorization and RFC 9457 HTTP mapping remain later slices；publication lifetime and reason-code catalogs require operations/legal policy rather than being hard-coded here；protected merge is pending
+
+## LIST-002 — Listing repository 与安全投影
+
+Task: LIST-002 Listing repository 与安全投影
+
+Changed: Added a PostgreSQL-backed `ListingRepository` with separate typed public、owner and moderator reads；each path uses an explicit Prisma select and maps to a purpose-built projection rather than serializing a database model；public queries fail closed across content/moderation/publish/expiry/delete、taxonomy and publishing-principal state；owner queries bind direct ownership or current organization membership to the actor；moderator reads require a current unrevoked/unexpired MODERATOR or SENIOR_MODERATOR grant and matching region/category scope；all dynamic attributes are projected through the Listing's exact published form-schema version and unknown/malformed fields never escape
+
+Contracts: Public OpenAPI、generated HTTP contracts and JSON Schemas are unchanged；the new package exports are internal database/application contracts for LIST-003；public projections omit exact coordinates、contact mode、moderation/internal IDs and quality score；owner projections add owned management state and exact point but not moderator-only attributes or internal score；moderator projections add bounded internal state and all schema-authorized attributes but still omit raw account contact data、organization legal name and exact point
+
+Migrations: 无；Prisma Schema and all existing 14 migrations are unchanged，so no database rollback/roll-forward action is required；code rollback removes the repository export/implementation/tests before LIST-003 consumes it
+
+Security: Query-bound object authorization covers direct owner、current organization member and current scoped moderator；inactive/suspended actors、wrong/malformed/out-of-scope/revoked/expired roles and unknown resources fail closed；public visibility requires approved current content with active taxonomy and publishing principal；three explicit selects never retrieve user email/phone、organization legal name、token/IP or verification documents；exact historical visibility filtering returns an empty object when schema evidence is absent or malformed and drops injected unknown keys；fixtures serialize every projection to assert private values and precise coordinates do not leak；later Controllers must still combine this boundary with API-004 Policy and generic 404 mapping
+
+Tests run: `pnpm --filter @socal/database typecheck` passed；database lint passed；targeted real PostgreSQL run passed 18 files / 61 tests including four new projection groups；`pnpm ci:quality` passed workflow/governance/runtime/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、57 files / 215 tests with 2 explicit environment skips、8 production builds and 78.68% statements / 81.40% lines；API observability runtime passed；standalone Chromium desktop/mobile E2E passed 6/6；`scripts/check-architecture.sh` passed 101 tasks / 47 Prisma models / 44 OpenAPI paths / 89 schemas / 36 JSON files；PR #18 / run `30409724740` passed the protected real-service Linux quality、runtime/E2E and four non-root image checks
+
+Not run: Real Redis and ClamAV integrations were skipped locally because those services are unavailable and LIST-002 does not consume either；local Docker image smoke is unavailable because the host has no Docker CLI；PR #18 / run `30409724740` supplied the equivalent real services and passed Linux quality、E2E and all four non-root runtime images
+
+Observability: No new runtime log or metric is added for this read-only Repository slice；queries return only bounded typed data or null and do not log actor、Listing、attributes、PII or authorization scope；HTTP request outcome metrics remain a LIST-003 concern
+
+Docs: Updated domain/data、API projection、security/privacy、testing matrix、reference implementation、Gate checklist/status、Backlog、README、changelog、architecture book and this worklog
+
+Known gaps: LIST-003 must connect these projections to authenticated HTTP use cases、RFC 9457/generic 404 behavior、ETag/version writes and atomic domain/audit/Outbox transactions；LIST-004 owns READY media binding and dynamic form upload UX；moderation case snapshots/rule hits remain MOD-001；public list pagination/search/media DTOs are later planned slices；final head checks and protected merge are pending
