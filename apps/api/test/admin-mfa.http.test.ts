@@ -31,6 +31,7 @@ const environment = parseApiEnvironment({
 });
 
 const staffUserId = "10000000-0000-4000-8000-000000000071";
+const regularUserId = "10000000-0000-4000-8000-000000000072";
 const originHeaders = { origin: environment.PUBLIC_ADMIN_URL };
 
 function cookieFromSetCookie(value: string | string[] | undefined): string {
@@ -43,6 +44,7 @@ describe("Admin MFA HTTP boundary", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
   let cookie: string;
+  let regularCookie: string;
 
   beforeAll(async () => {
     const authStore = new MemoryAuthSessionStore();
@@ -54,6 +56,13 @@ describe("Admin MFA HTTP boundary", () => {
       }),
     );
     authStore.registerPlatformRole(staffUserId, "PLATFORM_ADMIN");
+    authStore.registerSubject(
+      buildActiveSubject({
+        id: regularUserId,
+        displayName: "Synthetic Organization Owner",
+        preferredLocale: "zh-Hans",
+      }),
+    );
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore: authStore,
@@ -64,10 +73,27 @@ describe("Admin MFA HTTP boundary", () => {
     await server.ready();
     const issued = await app.get(AuthSessionService).issueSession(staffUserId, {});
     cookie = `${environment.SESSION_COOKIE_NAME}=${issued.token}`;
+    const regular = await app.get(AuthSessionService).issueSession(regularUserId, {});
+    regularCookie = `${environment.SESSION_COOKIE_NAME}=${regular.token}`;
   });
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it("allows an active non-staff user to begin self-owned MFA enrollment", async () => {
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/auth/mfa/enrollment",
+      headers: {
+        cookie: regularCookie,
+        origin: environment.PUBLIC_WEB_URL,
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json<AdminMfaEnrollmentResponse>().data.secret).toMatch(/^[A-Z2-7]{32}$/);
   });
 
   it("enrolls TOTP, returns recovery codes once, elevates a short Admin session, and rejects replay", async () => {

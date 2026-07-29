@@ -47,9 +47,25 @@ const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
     new RegExp(`^listings/${uuid}$`),
     new RegExp(`^media/${uuid}$`),
   ],
-  POST: [/^listings$/, /^media\/uploads$/, new RegExp(`^media/${uuid}/complete$`)],
-  PATCH: [new RegExp(`^listings/${uuid}$`)],
-  PUT: [new RegExp(`^notifications/${uuid}/read$`)],
+  POST: [
+    /^auth\/mfa\/enrollment$/,
+    /^auth\/mfa\/enrollment\/verify$/,
+    /^auth\/mfa\/verify$/,
+    /^listings$/,
+    /^media\/uploads$/,
+    new RegExp(`^media/${uuid}/complete$`),
+    new RegExp(`^organizations/${uuid}/invitations$`),
+    new RegExp(`^organizations/${uuid}/owner-transfer$`),
+  ],
+  PATCH: [new RegExp(`^listings/${uuid}$`), new RegExp(`^organizations/${uuid}/members/${uuid}$`)],
+  PUT: [
+    new RegExp(`^notifications/${uuid}/read$`),
+    new RegExp(`^organization-invitations/${uuid}/accept$`),
+  ],
+  DELETE: [
+    new RegExp(`^organizations/${uuid}/invitations/${uuid}$`),
+    new RegExp(`^organizations/${uuid}/members/${uuid}$`),
+  ],
 };
 
 export function isAllowedWebApiPath(method: string, path: string): boolean {
@@ -126,3 +142,4 @@ export const GET = proxyApi;
 export const POST = proxyApi;
 export const PATCH = proxyApi;
 export const PUT = proxyApi;
+export const DELETE = proxyApi;

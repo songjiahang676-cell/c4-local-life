@@ -14,6 +14,12 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("PATCH", `listings/${id}`)).toBe(true);
     expect(isAllowedWebApiPath("GET", `media/${id}`)).toBe(true);
     expect(isAllowedWebApiPath("POST", `media/${id}/complete`)).toBe(true);
+    expect(isAllowedWebApiPath("POST", "auth/mfa/enrollment")).toBe(true);
+    expect(isAllowedWebApiPath("POST", `organizations/${id}/invitations`)).toBe(true);
+    expect(isAllowedWebApiPath("PUT", `organization-invitations/${id}/accept`)).toBe(true);
+    expect(isAllowedWebApiPath("PATCH", `organizations/${id}/members/${id}`)).toBe(true);
+    expect(isAllowedWebApiPath("DELETE", `organizations/${id}/members/${id}`)).toBe(true);
+    expect(isAllowedWebApiPath("POST", `organizations/${id}/owner-transfer`)).toBe(true);
   });
 
   it("fails closed for over-broad, malformed and method-confused routes", () => {

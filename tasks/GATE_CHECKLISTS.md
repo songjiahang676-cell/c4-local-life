@@ -16,8 +16,9 @@
 - [x] 普通媒体 upload quarantine、扫描、重编码和安全变体。
 
 Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证。`ORG-002` 虽在 Backlog
-标记为 G1/P1，但显式依赖 Gate 2 的 `NOTIF-001`，因此按依赖顺序延后；受限验证文件由
-`MEDIA-003`/Gate 4 完成，不能把它混入普通公开媒体的 Gate 1 边界。
+标记为 G1/P1，但显式依赖 Gate 2 的 `NOTIF-001`，因此按依赖顺序延后；该依赖已由 PR #24
+完成，`ORG-002` 的短效邀请、成员变更、至少一名 Owner 和 step-up 转移现已完成本地验证。
+受限验证文件由 `MEDIA-003`/Gate 4 完成，不能把它混入普通公开媒体的 Gate 1 边界。
 
 ## G2 Listings / Moderation
 

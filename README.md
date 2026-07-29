@@ -164,7 +164,7 @@ Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非
 
 PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随后受保护合并为
 `d4abece`，Gate 1 实施主线完成。Backlog 中的 `ORG-002` 是 G1/P1，但显式依赖 Gate 2
-`NOTIF-001`；该依赖现已完成，下一切片回补 `ORG-002` 后再继续 LIST-006。受限验证文件
+`NOTIF-001`；该依赖和 `ORG-002` 本地实现现已完成，受保护合并后继续 LIST-006。受限验证文件
 `MEDIA-003` 属于 Gate 4，仍按 Gate 顺序延后。
 `LIST-001` 已由 PR #17 / final run `30408759770` 通过两项 required checks，并受保护合并为
 `c1709a7`。`LIST-002` 在此基础上提供真实 PostgreSQL public/owner/moderator 安全投影：公开内容在
@@ -214,6 +214,12 @@ Listing ETag 幂等归档或软删除，状态/版本/Audit/Outbox 原子提交�
 联系方式。`GET /notifications` 使用绑定账号和未读筛选的 HMAC cursor，已读端点仅更新当前账号且可
 安全重试。Web 提供中英文、移动端、noindex 的通知中心与同源精确 allowlist BFF；外部邮件/SMS、偏好、
 退订和 provider 回执仍按边界留给 `NOTIF-002`。
+
+`ORG-002` 已闭合组织成员生命周期：Owner/Admin 可创建三天内有效、邮箱规范化且同一组织/收件人仅一
+条 pending 的邀请并撤销；被邀请账号只能接受自己的有效邀请，接受、角色变更和移除均以组织行锁、
+成员版本 ETag 和事务内 Audit/Outbox 防止竞态与重复证据。可延迟约束触发器在每次事务提交前保证活动
+组织至少一名 Owner；Owner 转移还要求当前 Owner、MFA-bound 会话和十分钟内 recent-auth，目标晋升
+与原 Owner 降级原子提交。邀请通知只保存资源 ID/版本，正文不包含邮箱或组织私密资料。
 
 ## 七、规划容量与服务目标
 

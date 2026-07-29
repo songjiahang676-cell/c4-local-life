@@ -268,3 +268,16 @@ Idempotency-Key 或请求哈希。
   ETag；外部用户得到通用 404，受限账号 403。
 - 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
+
+## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
+
+- 邀请枚举/PII：输入只允许 ACTIVE user UUID 和非 Owner 角色；响应、通知 payload、Audit/Outbox
+  metadata 不含邮箱、手机号或 token。跨组织、非受邀用户和撤销邀请统一按不可用资源处理。
+- 重复/并发接受：组织行和邀请行使用一致锁顺序；PENDING 部分唯一索引、状态约束和事务内
+  membership 写入使重复投递收敛，过期邀请惰性转为 EXPIRED。
+- 最后 Owner 丢失：通用角色/删除接口拒绝 Owner，数据库 deferred constraint trigger 独立于应用层
+  检查事务提交后的 Owner 数量；转移采用先提升目标、再降级 actor。
+- 权限提升/重放：Owner 转移要求当前数据库 membership、MFA 强度、recent-MFA 和精确幂等请求摘要；
+  普通用户的 `/auth/mfa/*` 只管理自身 credential 并原子旋转 Session，不赋予组织或平台角色。
+- Worker 重复/毒事件：邀请通知只接受版本 1 的最小 Outbox envelope，使用 eventId advisory lock 与
+  唯一通知键；无效 schema/template 进入永久失败，瞬时数据库失败保留队列重试。

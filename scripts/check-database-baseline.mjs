@@ -611,9 +611,45 @@ try {
     !notificationStorage.rows[0]?.source_event_idempotency ||
     !notificationStorage.rows[0]?.immutable_trigger ||
     notificationStorage.rows[0]?.projection_columns !== 10 ||
-    notificationStorage.rows[0]?.published_templates !== 16
+    Number(notificationStorage.rows[0]?.published_templates) < 18
   ) {
     throw new Error("In-app notification template or projection controls are missing");
+  }
+  const organizationMembershipLifecycle = await client.query(
+    `SELECT
+       to_regclass('public.organization_invitations')::text AS invitations,
+       to_regclass('public.organization_owner_transfers')::text AS owner_transfers,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'organization_memberships'
+            AND column_name IN ('updated_at', 'version')
+       ) AS membership_columns,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname IN (
+            'organizations_require_owner_after_insert',
+            'organization_memberships_require_owner_after_change'
+          )
+            AND NOT tgisinternal
+       ) AS owner_triggers,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'organization_invitations_one_pending_invitee_idx'
+       ) AS pending_invitation_index`,
+  );
+  if (
+    organizationMembershipLifecycle.rows[0]?.invitations !== "organization_invitations" ||
+    organizationMembershipLifecycle.rows[0]?.owner_transfers !== "organization_owner_transfers" ||
+    organizationMembershipLifecycle.rows[0]?.membership_columns !== 2 ||
+    organizationMembershipLifecycle.rows[0]?.owner_triggers !== 2 ||
+    !organizationMembershipLifecycle.rows[0]?.pending_invitation_index
+  ) {
+    throw new Error("Organization membership lifecycle controls are missing");
   }
 
   await client.query("BEGIN");
@@ -1288,6 +1324,7 @@ try {
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
       notificationStorage: true,
+      organizationMembershipLifecycle: true,
       negativeCases: 33,
     }),
   );

@@ -7,6 +7,7 @@ import { ListingRepository } from "@socal/database/listing";
 import {
   NotificationRepository,
   listingNotificationEventTypes,
+  organizationInvitationNotificationEventTypes,
 } from "@socal/database/notification";
 import { OutboxEventRepository } from "@socal/database/outbox";
 import {
@@ -21,6 +22,10 @@ import {
   ListingNotificationHandler,
   PermanentListingNotificationError,
 } from "./notification/listing-notification";
+import {
+  OrganizationInvitationNotificationHandler,
+  PermanentOrganizationInvitationNotificationError,
+} from "./notification/organization-invitation-notification";
 import { ClamAvScanner } from "./media/clamav-scanner";
 import { MediaProcessingHandler, PermanentMediaProcessingError } from "./media/media-processing";
 import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
@@ -122,6 +127,10 @@ const listingExpiryDispatcher = new ListingExpiryDispatcher({
 const listingNotification = new ListingNotificationHandler(notificationRepository, (outcome) =>
   runtimeState.observability?.metrics.notificationEvent(outcome),
 );
+const organizationInvitationNotification = new OrganizationInvitationNotificationHandler(
+  notificationRepository,
+  (outcome) => runtimeState.observability?.metrics.notificationEvent(outcome),
+);
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   runtimeState.observability?.logger.info(event, fields);
@@ -142,6 +151,11 @@ const handlers: Record<string, (job: Job) => Promise<void>> = {
   "listing.draft.created": () => Promise.resolve(),
   "listing.draft.updated": () => Promise.resolve(),
   "notification.dispatch": () => Promise.resolve(),
+  "organization.invitation.accepted": () => Promise.resolve(),
+  "organization.invitation.revoked": () => Promise.resolve(),
+  "organization.member.role.changed": () => Promise.resolve(),
+  "organization.membership.removed": () => Promise.resolve(),
+  "organization.owner.transferred": () => Promise.resolve(),
 };
 for (const eventType of listingNotificationEventTypes) {
   handlers[eventType] = async (job) => {
@@ -149,6 +163,18 @@ for (const eventType of listingNotificationEventTypes) {
       await listingNotification.handle(job.data, eventType);
     } catch (error: unknown) {
       if (error instanceof PermanentListingNotificationError) {
+        throw new UnrecoverableError(error.code);
+      }
+      throw error;
+    }
+  };
+}
+for (const eventType of organizationInvitationNotificationEventTypes) {
+  handlers[eventType] = async (job) => {
+    try {
+      await organizationInvitationNotification.handle(job.data);
+    } catch (error: unknown) {
+      if (error instanceof PermanentOrganizationInvitationNotificationError) {
         throw new UnrecoverableError(error.code);
       }
       throw error;

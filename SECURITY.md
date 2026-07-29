@@ -31,6 +31,10 @@
 - Listing 状态通知只从 canonical Listing owner/locale 投影，严格验证事件且以 eventId 锁和复合唯一键
   去重；模板发布后不可修改，变量仅含资源 ID/版本。通知列表和已读要求服务端账号 Policy，cursor 绑定
   账号/筛选，未知与跨账号 ID 统一 404；响应、BFF 和页面均 no-store/noindex，不记录正文或收件人。
+- 组织邀请只允许当前 Owner/Admin 创建或撤销，按组织/规范化邮箱限制一条 pending，并由短效过期时间
+  关闭旧链接；接受操作从当前会话推导账号并再次核对规范化邮箱。成员角色/移除要求强 ETag 并在组织锁
+  后复核权限；数据库 deferred trigger 保证事务提交时至少一名 Owner。Owner 转移仅允许当前 Owner，
+  还要求 MFA-bound 会话与十分钟内 recent-auth，目标晋升、原 Owner 降级、Audit/Outbox 原子写入。
 - 支付数据由支付服务商托管；平台不保存完整卡号和 CVC。
 - 密钥存入云 Secret Manager/KMS，禁止写入镜像、日志或仓库。
 - 依赖、容器、IaC、SAST、secret scanning 和 DAST 纳入 CI/CD。

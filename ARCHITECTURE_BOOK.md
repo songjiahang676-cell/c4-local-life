@@ -632,13 +632,22 @@ grant/revoke actor、时间、可选到期与 JSON-object scope；会话 Reposit
 | `organization:listings:write` | ✓     | ✓     | ✓      | —       | —       |
 | `organization:members:read`   | ✓     | ✓     | —      | —       | —       |
 | `organization:members:manage` | ✓     | ✓     | —      | —       | —       |
+| `organization:owner:transfer` | ✓¹    | —     | —      | —       | —       |
 | `organization:billing:manage` | ✓     | —     | —      | ✓       | —       |
 | `organization:analytics:read` | ✓     | ✓     | —      | ✓       | ✓       |
 
 `profile:edit` 只代表公开档案内容，不能修改 legal identity、状态或验证结论；这些字段必须走
-`profile:manage` 或后续专用审核动作。当前 API 只开放创建、成员范围详情以及 OWNER/ADMIN 的成员只读列表，
-没有提前实现 ORG-002 的邀请、移除、角色变更或 Owner 转移。每次对象授权使用 Repository 返回的当前
-membership 覆盖请求开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。
+`profile:manage` 或后续专用审核动作。每次对象授权使用 Repository 返回的当前 membership 覆盖请求
+开始时的角色快照；成员列表 SQL 同时限制 actor 为 OWNER/ADMIN，降低并发降权窗口。
+
+`ORG-002` 已把 `members:manage` 落到短效邀请、撤销、非 Owner 角色变更和移除。邀请只接受现有 ACTIVE
+用户 UUID，不通过请求或事件传播邮箱/手机号；同组织同受邀人最多一个 PENDING 邀请，接受操作绑定
+invitee user，跨用户和跨组织标识统一 404。Owner 角色不能通过通用成员接口赋予、修改或删除。
+
+¹ `organization:owner:transfer` 还要求当前 OWNER 的 MFA 强度 Session 和 recent-MFA 窗口。转移事务先
+提升目标成员再降级原 Owner，数据库延迟约束在组织创建、成员角色更新和删除的事务提交点保证始终至少
+一名 Owner；精确幂等重试返回原转移凭据。普通 ACTIVE 用户可通过 `/auth/mfa/*` 建立自有 TOTP
+step-up，MFA secret、恢复码和 Session token 不进入组织事件或审计 metadata。
 
 ---
 
@@ -923,6 +932,17 @@ UPDATE/DELETE。`notifications` 保存渲染快照及 `template_id/template_vers
 `source_event_id/aggregate_version`；同一事件对同一用户和 channel 只能产生一行。Worker 可以接收
 重复或乱序事件，但按事件发生时间生成通知并通过 advisory lock/唯一键收敛。读取只返回当前用户的
 IN_APP 投影，按 `(created_at DESC,id DESC)` 稳定分页；已读更新绑定 user，外部标识不会越权改变状态。
+
+### ORG-002 成员生命周期与 Owner 不变量
+
+`organization_invitations` 保存 actor/org 范围的幂等键与请求摘要、非 Owner 角色、到期时间和
+PENDING/ACCEPTED/REVOKED/EXPIRED 单向状态证据；部分唯一索引禁止同一组织和受邀人并存两个 PENDING
+邀请。接受在组织/邀请锁内写 membership、邀请状态、AuditLog 和 OutboxEvent。
+
+`organization_memberships.version/updated_at` 为角色变更提供强 ETag 并发控制。Owner 转移凭据写入
+`organization_owner_transfers`，包含 from/to、精确幂等摘要、结果角色与发生时间。两个 deferred
+constraint trigger 在事务结束时检查组织至少保留一名 Owner，使先提升后降级的转移可原子提交，同时
+拒绝直接删除或降级最后一名 Owner。
 
 ---
 
@@ -1383,7 +1403,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 49 个 path、113 个 schema、58 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 57 个 path、123 个 schema、67 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1421,6 +1441,22 @@ riskTier 和 cursor 均严格校验。cursor 使用 HMAC 并绑定 actor、队�
 `POST /admin/moderation/cases/{caseId}/actions` 要求 `If-Match`、`Idempotency-Key`、recent MFA 和
 APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试返回相同投影；同 key 不同请求、
 陈旧版本或并发处置返回 409。401/403/404 均使用通用 Problem Details，不暴露角色、案件或 PII。
+
+## 8.17 ORG-002 成员生命周期契约
+
+- `POST /organizations/{organizationId}/invitations` 要求 OWNER/ADMIN、严格非 Owner 角色和
+  `Idempotency-Key`；成功返回 201、Location 和短效邀请投影。
+- `PUT /organization-invitations/{invitationId}/accept` 只允许邀请绑定用户接受；过期返回 410，未知、
+  撤销或非本人统一 404。`DELETE /organizations/{organizationId}/invitations/{invitationId}` 由
+  OWNER/ADMIN 幂等撤销仍处于 PENDING 的邀请。
+- `PATCH /organizations/{organizationId}/members/{memberUserId}` 要求强 membership ETag；仅允许
+  ADMIN/EDITOR/BILLING/ANALYST，陈旧版本返回 409。同路径 DELETE 不能删除 self 或 Owner。
+- `POST /organizations/{organizationId}/owner-transfer` 要求 `Idempotency-Key`、当前 OWNER 和近期
+  MFA；响应是不可变 from/to/结果角色/时间凭据。所有写接口均 no-store、同源校验、Repository 再授权，
+  且不接受邮箱、手机号、Owner role 或客户端声明的组织角色。
+
+`/auth/mfa/enrollment`、`/auth/mfa/enrollment/verify` 和 `/auth/mfa/verify` 是普通 ACTIVE 用户的
+自有 TOTP step-up 别名；不会授予平台角色，仍复用一次性恢复码、重放保护、限频和 Session rotation。
 
 ---
 
@@ -1652,6 +1688,9 @@ Session 边界确认账号，再读取账号范围通知；提供未读总数、
 内容写入 URL、缓存或客户端持久存储。中文/英文文案不拼接翻译片段，时间以
 `America/Los_Angeles` 展示；加载、错误、空态和状态更新使用节制的 live region，控件保持可见焦点与
 至少 44px 触控目标。
+
+`ORG-002` 扩展通知资源为 `ORGANIZATION_INVITATION`；Web parser 只接受契约白名单资源类型并显示本地化
+“组织邀请”标签。接受/撤销仍通过受保护 API 完成，通知正文不拼接组织私有字段或联系方式。
 
 ---
 
@@ -2286,6 +2325,19 @@ Idempotency-Key 或请求哈希。
 - 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
+## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
+
+- 邀请枚举/PII：输入只允许 ACTIVE user UUID 和非 Owner 角色；响应、通知 payload、Audit/Outbox
+  metadata 不含邮箱、手机号或 token。跨组织、非受邀用户和撤销邀请统一按不可用资源处理。
+- 重复/并发接受：组织行和邀请行使用一致锁顺序；PENDING 部分唯一索引、状态约束和事务内
+  membership 写入使重复投递收敛，过期邀请惰性转为 EXPIRED。
+- 最后 Owner 丢失：通用角色/删除接口拒绝 Owner，数据库 deferred constraint trigger 独立于应用层
+  检查事务提交后的 Owner 数量；转移采用先提升目标、再降级 actor。
+- 权限提升/重放：Owner 转移要求当前数据库 membership、MFA 强度、recent-MFA 和精确幂等请求摘要；
+  普通用户的 `/auth/mfa/*` 只管理自身 credential 并原子旋转 Session，不赋予组织或平台角色。
+- Worker 重复/毒事件：邀请通知只接受版本 1 的最小 Outbox envelope，使用 eventId advisory lock 与
+  唯一通知键；无效 schema/template 进入永久失败，瞬时数据库失败保留队列重试。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -2859,6 +2911,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 空库 baseline 要求 20 个 migration、16 条已发布双语模板和 33 个数据库负例；上一发布升级保留哨兵，
   全量架构检查要求 49 paths、113 schemas 和 51 models。
 
+## 18.20 ORG-002 验证增量
+
+- HTTP/契约测试覆盖 OWNER/ADMIN 与错误角色、邀请精确重试/冲突、跨用户接受、撤销、强成员 ETag、
+  self/Owner 防删除、recent-MFA Owner 转移及普通 ACTIVE 用户 MFA enrollment。
+- PostgreSQL 集成覆盖邀请/接受/到期、角色版本冲突、Audit/Outbox 最小证据、转移精确重试，以及直接
+  删除最后 Owner 在 deferred constraint 提交点失败。
+- Worker/通知集成覆盖严格邀请 envelope、永久/瞬时错误、重复 eventId 收敛、双语模板、当前用户列表
+  与已读，同时断言不出现联系方式或组织私有名称。
+- 空库和上一基线升级检查要求 21 个 migration、18 条已发布双语模板、邀请/转移表、membership 版本、
+  PENDING 唯一索引和两个 Owner trigger；OpenAPI 规模同步为 57 paths、123 schemas。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3262,6 +3325,15 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 审核/客服/财务/广告运营培训并通过演练。
 - 灰度、Feature Flag、回滚、状态页/沟通模板准备完成。
 - 首页统计、商家、师傅、评价和广告均来自真实授权数据或隐藏。
+
+## 22.9 ORG-002 成员生命周期验收
+
+- OWNER/ADMIN 可对现有 ACTIVE 用户创建短效非 Owner 邀请；同 key 精确重试返回同一资源，不同输入
+  409，同受邀人并发 PENDING 邀请不重复。
+- 只有邀请绑定用户可接受；撤销、过期、跨用户和跨组织请求失败关闭，联系方式不进入响应、事件或日志。
+- 非 Owner 角色变更使用强 ETag；self、Owner 与最后 Owner 不能通过通用变更/删除接口移除。
+- Owner 转移要求当前 OWNER、近期 MFA 与幂等键，并在并发/失败/重试下始终至少保留一名 Owner。
+- 邀请创建事件生成可重复消费的双语站内通知；API、数据库、Worker、Web parser 和真实迁移验证通过。
 
 ---
 
@@ -4039,7 +4111,7 @@ Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、
 
 ### 契约与数据
 
-- `openapi/openapi.yaml`：当前 49 个 path、58 个 operation 和 113 个 schema 的 REST 契约。
+- `openapi/openapi.yaml`：当前 57 个 path、67 个 operation 和 123 个 schema 的 REST 契约。
 - `schemas/`：Listing 动态表单、首页编排、分析事件。
 - `seed/`：分类、地区、首页和示例 Listing。
 - `diagrams/`：系统/容器/部署/流程/ER Mermaid 图。
@@ -4097,6 +4169,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
 `NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。
+
+`ORG-002` 保持同样边界：`OrganizationsService` 执行 Policy、请求摘要与 DTO 映射；
+`OrganizationRepository` 独占行锁、membership/邀请/转移持久化和 Audit/Outbox 原子性；Controller
+不导入 Prisma。`OrganizationInvitationNotificationHandler` 只解析最小 envelope，
+`NotificationRepository` 从 canonical invitation/invitee 生成私有投影。Owner 转移的最终不变量由
+PostgreSQL deferred trigger 兜底，不依赖前端隐藏或单次队列执行假设。
 
 ## 30.4 生成与手写边界
 

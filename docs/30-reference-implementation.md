@@ -65,7 +65,7 @@ Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、
 
 ### 契约与数据
 
-- `openapi/openapi.yaml`：当前 49 个 path、58 个 operation 和 113 个 schema 的 REST 契约。
+- `openapi/openapi.yaml`：当前 57 个 path、67 个 operation 和 123 个 schema 的 REST 契约。
 - `schemas/`：Listing 动态表单、首页编排、分析事件。
 - `seed/`：分类、地区、首页和示例 Listing。
 - `diagrams/`：系统/容器/部署/流程/ER Mermaid 图。
@@ -123,6 +123,12 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
 `NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。
+
+`ORG-002` 保持同样边界：`OrganizationsService` 执行 Policy、请求摘要与 DTO 映射；
+`OrganizationRepository` 独占行锁、membership/邀请/转移持久化和 Audit/Outbox 原子性；Controller
+不导入 Prisma。`OrganizationInvitationNotificationHandler` 只解析最小 envelope，
+`NotificationRepository` 从 canonical invitation/invitee 生成私有投影。Owner 转移的最终不变量由
+PostgreSQL deferred trigger 兜底，不依赖前端隐藏或单次队列执行假设。
 
 ## 30.4 生成与手写边界
 

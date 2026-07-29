@@ -43,6 +43,13 @@ enum MembershipRole {
   ANALYST
 }
 
+enum OrganizationInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum PlatformRole {
   SUPPORT
   MODERATOR
@@ -297,6 +304,11 @@ model User {
   sessions                AuthSession[]
   otpChallenges           OtpChallenge[]
   memberships             OrganizationMembership[]
+  organizationInvitations OrganizationInvitation[]  @relation("OrganizationInvitationInvitee")
+  sentOrganizationInvites OrganizationInvitation[]  @relation("OrganizationInvitationInviter")
+  revokedOrganizationInvites OrganizationInvitation[] @relation("OrganizationInvitationRevoker")
+  ownerTransfersSent      OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferFrom")
+  ownerTransfersReceived  OrganizationOwnerTransfer[] @relation("OrganizationOwnerTransferTo")
   listings                Listing[]
   favorites               Favorite[]
   participants            ConversationParticipant[]
@@ -482,6 +494,8 @@ model Organization {
   updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt          DateTime?                @map("deleted_at") @db.Timestamptz(6)
   memberships        OrganizationMembership[]
+  invitations        OrganizationInvitation[]
+  ownerTransfers     OrganizationOwnerTransfer[]
   listings           Listing[]
   businessProfile    BusinessProfile?
   providerProfiles   ProviderProfile[]
@@ -497,12 +511,61 @@ model OrganizationMembership {
   userId         String         @map("user_id") @db.Uuid
   role           MembershipRole
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int            @default(1)
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([organizationId, userId])
   @@index([userId])
   @@map("organization_memberships")
+}
+
+model OrganizationInvitation {
+  id              String                       @id @default(uuid()) @db.Uuid
+  organizationId  String                       @map("organization_id") @db.Uuid
+  inviteeUserId   String                       @map("invitee_user_id") @db.Uuid
+  invitedById     String                       @map("invited_by_id") @db.Uuid
+  revokedById     String?                      @map("revoked_by_id") @db.Uuid
+  role            MembershipRole
+  status          OrganizationInvitationStatus @default(PENDING)
+  idempotencyKey  String                       @map("idempotency_key") @db.VarChar(128)
+  requestHash     String                       @map("request_hash") @db.Char(64)
+  expiresAt       DateTime                     @map("expires_at") @db.Timestamptz(6)
+  acceptedAt      DateTime?                    @map("accepted_at") @db.Timestamptz(6)
+  revokedAt       DateTime?                    @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  organization    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitee         User                         @relation("OrganizationInvitationInvitee", fields: [inviteeUserId], references: [id], onDelete: Restrict)
+  invitedBy       User                         @relation("OrganizationInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  revokedBy       User?                        @relation("OrganizationInvitationRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, invitedById, idempotencyKey])
+  @@index([inviteeUserId, status, expiresAt])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@index([organizationId, inviteeUserId, status])
+  @@map("organization_invitations")
+}
+
+model OrganizationOwnerTransfer {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  fromUserId      String           @map("from_user_id") @db.Uuid
+  toUserId        String           @map("to_user_id") @db.Uuid
+  idempotencyKey  String           @map("idempotency_key") @db.VarChar(128)
+  requestHash     String           @map("request_hash") @db.Char(64)
+  fromRoleAfter   MembershipRole   @default(ADMIN) @map("from_role_after")
+  toRoleAfter     MembershipRole   @default(OWNER) @map("to_role_after")
+  occurredAt      DateTime         @map("occurred_at") @db.Timestamptz(6)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fromUser        User             @relation("OrganizationOwnerTransferFrom", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUser          User             @relation("OrganizationOwnerTransferTo", fields: [toUserId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, fromUserId, idempotencyKey])
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@index([toUserId, occurredAt(sort: Desc)])
+  @@map("organization_owner_transfers")
 }
 
 model PlatformRoleAssignment {

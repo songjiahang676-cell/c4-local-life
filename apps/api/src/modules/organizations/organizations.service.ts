@@ -1,22 +1,31 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import type { ApiEnvironment } from "@socal/config";
 import type {
+  ChangeOrganizationMemberRoleRequest,
   CreateOrganizationRequest,
+  CreateOrganizationInvitationRequest,
   ListOrganizationMembersQuery,
   Organization,
+  OrganizationInvitationResponse,
   OrganizationMemberCollection,
+  OrganizationMemberResponse,
+  OrganizationOwnerTransferResponse,
+  TransferOrganizationOwnershipRequest,
 } from "@socal/contracts";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import {
   activeUserPolicyActions,
   organizationPolicyActions,
   PolicyService,
+  type PolicyResourceContext,
   type PolicyRequestContext,
 } from "../../common/authorization/policy";
 import {
   ORGANIZATION_STORE,
   type MemberOrganizationProjection,
+  type OrganizationInvitationProjection,
+  type OrganizationMemberPage,
   type OrganizationStore,
 } from "./organization.store";
 
@@ -47,6 +56,27 @@ export class InvalidOrganizationMemberCursorError extends Error {
   constructor() {
     super("Organization member cursor is invalid");
     this.name = "InvalidOrganizationMemberCursorError";
+  }
+}
+
+export class OrganizationInvitationConflictError extends Error {
+  constructor() {
+    super("Organization invitation conflicts with current state");
+    this.name = "OrganizationInvitationConflictError";
+  }
+}
+
+export class OrganizationInvitationExpiredError extends Error {
+  constructor() {
+    super("Organization invitation has expired");
+    this.name = "OrganizationInvitationExpiredError";
+  }
+}
+
+export class OrganizationMemberConflictError extends Error {
+  constructor() {
+    super("Organization member version or state conflicts");
+    this.name = "OrganizationMemberConflictError";
   }
 }
 
@@ -95,6 +125,71 @@ function authenticatedUserId(context: PolicyRequestContext): string {
   return context.actor.userId;
 }
 
+function canonicalize(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  const entries = Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalize(record[key])}`);
+  return `{${entries.join(",")}}`;
+}
+
+function requestHash(value: unknown): string {
+  return createHash("sha256").update(canonicalize(value), "utf8").digest("hex");
+}
+
+function organizationResource(organization: MemberOrganizationProjection): PolicyResourceContext {
+  return {
+    type: "organization",
+    id: organization.id,
+    organizationId: organization.id,
+    state: organization.status,
+    deleted: false,
+  };
+}
+
+function toMember(
+  member: OrganizationMemberPage["items"][number],
+): OrganizationMemberResponse["data"] {
+  return {
+    userId: member.userId,
+    displayName: member.displayName,
+    avatarUrl: member.avatarUrl,
+    role: member.role,
+    joinedAt: member.joinedAt.toISOString(),
+    updatedAt: member.updatedAt.toISOString(),
+    version: member.version,
+  };
+}
+
+function toInvitation(
+  invitation: OrganizationInvitationProjection,
+): OrganizationInvitationResponse {
+  return {
+    data: {
+      ...invitation,
+      expiresAt: invitation.expiresAt.toISOString(),
+      acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+      revokedAt: invitation.revokedAt?.toISOString() ?? null,
+      createdAt: invitation.createdAt.toISOString(),
+      updatedAt: invitation.updatedAt.toISOString(),
+    },
+  };
+}
+
+export function organizationMemberEtag(version: number): string {
+  return `"organization-member-${version}"`;
+}
+
+export function organizationMemberVersionFromEtag(value: string | undefined): number | null {
+  const match = /^"organization-member-([1-9][0-9]*)"$/.exec(value ?? "");
+  if (!match?.[1]) return null;
+  const version = Number(match[1]);
+  return Number.isSafeInteger(version) ? version : null;
+}
+
 function withCurrentMembership(
   context: PolicyRequestContext,
   organization: MemberOrganizationProjection,
@@ -119,6 +214,7 @@ function withCurrentMembership(
 @Injectable()
 export class OrganizationsService {
   readonly #cursorSecret: string;
+  readonly #invitationTtlSeconds: number;
 
   constructor(
     @Inject(API_ENVIRONMENT) environment: ApiEnvironment,
@@ -126,6 +222,7 @@ export class OrganizationsService {
     private readonly policies: PolicyService,
   ) {
     this.#cursorSecret = environment.SESSION_SECRET.reveal();
+    this.#invitationTtlSeconds = environment.ORGANIZATION_INVITATION_TTL_SECONDS;
   }
 
   async create(
@@ -156,13 +253,7 @@ export class OrganizationsService {
     await this.policies.require({
       action: organizationPolicyActions.profileRead,
       context: withCurrentMembership(context, organization),
-      resource: {
-        type: "organization",
-        id: organization.id,
-        organizationId: organization.id,
-        state: organization.status,
-        deleted: false,
-      },
+      resource: organizationResource(organization),
     });
     return toOrganization(organization);
   }
@@ -178,13 +269,7 @@ export class OrganizationsService {
     await this.policies.require({
       action: organizationPolicyActions.membersRead,
       context: withCurrentMembership(context, organization),
-      resource: {
-        type: "organization",
-        id: organization.id,
-        organizationId: organization.id,
-        state: organization.status,
-        deleted: false,
-      },
+      resource: organizationResource(organization),
     });
     const cursor = query.cursor
       ? this.#decodeCursor(query.cursor, actorUserId, organizationId)
@@ -196,13 +281,7 @@ export class OrganizationsService {
       ...(cursor ? { cursor } : {}),
     });
     return {
-      data: page.items.map((member) => ({
-        userId: member.userId,
-        displayName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        role: member.role,
-        joinedAt: member.joinedAt.toISOString(),
-      })),
+      data: page.items.map(toMember),
       pageInfo: {
         hasMore: page.nextCursor !== null,
         nextCursor: page.nextCursor
@@ -210,6 +289,203 @@ export class OrganizationsService {
           : null,
       },
     };
+  }
+
+  async createInvitation(
+    context: PolicyRequestContext,
+    organizationId: string,
+    idempotencyKey: string,
+    input: CreateOrganizationInvitationRequest,
+  ): Promise<OrganizationInvitationResponse> {
+    const actorUserId = authenticatedUserId(context);
+    const organization = await this.#requireManagedOrganization(
+      context,
+      actorUserId,
+      organizationId,
+    );
+    const now = new Date();
+    const result = await this.store.createInvitation({
+      actorUserId,
+      organizationId: organization.id,
+      inviteeUserId: input.inviteeUserId,
+      role: input.role,
+      idempotencyKey,
+      requestHash: requestHash(input),
+      requestId: context.requestId,
+      now,
+      expiresAt: new Date(now.getTime() + this.#invitationTtlSeconds * 1_000),
+    });
+    if (result.kind === "created" || result.kind === "existing") {
+      return toInvitation(result.invitation);
+    }
+    if (result.kind === "actor_forbidden" || result.kind === "invitee_unavailable") {
+      throw new OrganizationNotFoundError();
+    }
+    throw new OrganizationInvitationConflictError();
+  }
+
+  async acceptInvitation(
+    context: PolicyRequestContext,
+    invitationId: string,
+  ): Promise<OrganizationInvitationResponse> {
+    await this.policies.require({
+      action: activeUserPolicyActions.organizationInvitationAccept,
+      context,
+    });
+    const result = await this.store.acceptInvitation({
+      actorUserId: authenticatedUserId(context),
+      invitationId,
+      requestId: context.requestId,
+      now: new Date(),
+    });
+    if (result.kind === "accepted" || result.kind === "existing") {
+      return toInvitation(result.invitation);
+    }
+    if (result.kind === "expired") throw new OrganizationInvitationExpiredError();
+    if (result.kind === "member_conflict") throw new OrganizationInvitationConflictError();
+    throw new OrganizationNotFoundError();
+  }
+
+  async revokeInvitation(
+    context: PolicyRequestContext,
+    organizationId: string,
+    invitationId: string,
+  ): Promise<void> {
+    const actorUserId = authenticatedUserId(context);
+    await this.#requireManagedOrganization(context, actorUserId, organizationId);
+    const result = await this.store.revokeInvitation({
+      actorUserId,
+      organizationId,
+      invitationId,
+      requestId: context.requestId,
+      now: new Date(),
+    });
+    if (result.kind === "revoked" || result.kind === "existing") return;
+    if (result.kind === "conflict") throw new OrganizationInvitationConflictError();
+    throw new OrganizationNotFoundError();
+  }
+
+  async changeMemberRole(
+    context: PolicyRequestContext,
+    organizationId: string,
+    targetUserId: string,
+    expectedVersion: number,
+    input: ChangeOrganizationMemberRoleRequest,
+  ): Promise<OrganizationMemberResponse> {
+    const actorUserId = authenticatedUserId(context);
+    await this.#requireManagedOrganization(context, actorUserId, organizationId);
+    const result = await this.store.changeMemberRole({
+      actorUserId,
+      organizationId,
+      targetUserId,
+      role: input.role,
+      expectedVersion,
+      requestId: context.requestId,
+      now: new Date(),
+    });
+    if (result.kind === "updated") return { data: toMember(result.member) };
+    if (result.kind === "conflict") throw new OrganizationMemberConflictError();
+    throw new OrganizationNotFoundError();
+  }
+
+  async removeMember(
+    context: PolicyRequestContext,
+    organizationId: string,
+    targetUserId: string,
+    expectedVersion: number,
+  ): Promise<void> {
+    const actorUserId = authenticatedUserId(context);
+    await this.#requireManagedOrganization(context, actorUserId, organizationId);
+    const result = await this.store.removeMember({
+      actorUserId,
+      organizationId,
+      targetUserId,
+      expectedVersion,
+      requestId: context.requestId,
+      now: new Date(),
+    });
+    if (result.kind === "removed") return;
+    if (result.kind === "conflict") throw new OrganizationMemberConflictError();
+    throw new OrganizationNotFoundError();
+  }
+
+  async transferOwnership(
+    context: PolicyRequestContext,
+    organizationId: string,
+    idempotencyKey: string,
+    input: TransferOrganizationOwnershipRequest,
+  ): Promise<OrganizationOwnerTransferResponse> {
+    const actorUserId = authenticatedUserId(context);
+    const organization = await this.store.findByIdForMember(actorUserId, organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    const transferInput = {
+      actorUserId,
+      organizationId,
+      targetUserId: input.targetUserId,
+      idempotencyKey,
+      requestHash: requestHash(input),
+      requestId: context.requestId,
+      now: new Date(),
+    };
+    if (organization.role !== "OWNER") {
+      if (
+        context.actor.kind !== "authenticated" ||
+        context.actor.authenticationStrength !== "MFA" ||
+        !context.actor.recentMfa
+      ) {
+        await this.policies.require({
+          action: organizationPolicyActions.ownerTransfer,
+          context: withCurrentMembership(context, organization),
+          resource: organizationResource(organization),
+        });
+      }
+      const retry = await this.store.transferOwnership(transferInput);
+      if (retry.kind === "existing") {
+        return {
+          data: {
+            ...retry.transfer,
+            occurredAt: retry.transfer.occurredAt.toISOString(),
+          },
+        };
+      }
+      if (retry.kind === "idempotency_conflict") {
+        throw new OrganizationInvitationConflictError();
+      }
+      throw new OrganizationNotFoundError();
+    }
+    await this.policies.require({
+      action: organizationPolicyActions.ownerTransfer,
+      context: withCurrentMembership(context, organization),
+      resource: organizationResource(organization),
+    });
+    const result = await this.store.transferOwnership(transferInput);
+    if (result.kind === "transferred" || result.kind === "existing") {
+      return {
+        data: {
+          ...result.transfer,
+          occurredAt: result.transfer.occurredAt.toISOString(),
+        },
+      };
+    }
+    if (result.kind === "idempotency_conflict") {
+      throw new OrganizationInvitationConflictError();
+    }
+    throw new OrganizationNotFoundError();
+  }
+
+  async #requireManagedOrganization(
+    context: PolicyRequestContext,
+    actorUserId: string,
+    organizationId: string,
+  ): Promise<MemberOrganizationProjection> {
+    const organization = await this.store.findByIdForMember(actorUserId, organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    await this.policies.require({
+      action: organizationPolicyActions.membersManage,
+      context: withCurrentMembership(context, organization),
+      resource: organizationResource(organization),
+    });
+    return organization;
   }
 
   #encodeCursor(

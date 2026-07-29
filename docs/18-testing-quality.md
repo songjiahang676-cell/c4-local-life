@@ -207,3 +207,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   移动无横向溢出和 BFF method/path confusion。
 - 空库 baseline 要求 20 个 migration、16 条已发布双语模板和 33 个数据库负例；上一发布升级保留哨兵，
   全量架构检查要求 49 paths、113 schemas 和 51 models。
+
+## 18.20 ORG-002 验证增量
+
+- HTTP/契约测试覆盖 OWNER/ADMIN 与错误角色、邀请精确重试/冲突、跨用户接受、撤销、强成员 ETag、
+  self/Owner 防删除、recent-MFA Owner 转移及普通 ACTIVE 用户 MFA enrollment。
+- PostgreSQL 集成覆盖邀请/接受/到期、角色版本冲突、Audit/Outbox 最小证据、转移精确重试，以及直接
+  删除最后 Owner 在 deferred constraint 提交点失败。
+- Worker/通知集成覆盖严格邀请 envelope、永久/瞬时错误、重复 eventId 收敛、双语模板、当前用户列表
+  与已读，同时断言不出现联系方式或组织私有名称。
+- 空库和上一基线升级检查要求 21 个 migration、18 条已发布双语模板、邀请/转移表、membership 版本、
+  PENDING 唯一索引和两个 Owner trigger；OpenAPI 规模同步为 57 paths、123 schemas。

@@ -330,6 +330,110 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/organizations/{organizationId}/invitations": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Invite an existing active user to a managed organization
+         * @description Creates one short-lived non-Owner invitation with actor-scoped exact idempotency and emits a durable in-app notification event.
+         */
+        readonly post: operations["createOrganizationInvitation"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/organizations/{organizationId}/invitations/{invitationId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Revoke a pending organization invitation
+         * @description OWNER or ADMIN may idempotently revoke a still-pending invitation without revealing cross-organization identifiers.
+         */
+        readonly delete: operations["revokeOrganizationInvitation"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/organization-invitations/{invitationId}/accept": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        /**
+         * Accept the current user's organization invitation
+         * @description Atomically accepts one unexpired owned invitation and creates the membership; exact repeats return the accepted invitation.
+         */
+        readonly put: operations["acceptOrganizationInvitation"];
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/organizations/{organizationId}/members/{memberUserId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        /**
+         * Remove a non-Owner organization member
+         * @description OWNER or ADMIN may remove a non-Owner member. Self-removal and Owner removal fail closed.
+         */
+        readonly delete: operations["removeOrganizationMember"];
+        readonly options?: never;
+        readonly head?: never;
+        /**
+         * Change a non-Owner organization member role
+         * @description OWNER or ADMIN may change only non-Owner roles. Owner changes must use the recent-MFA transfer endpoint.
+         */
+        readonly patch: operations["changeOrganizationMemberRole"];
+        readonly trace?: never;
+    };
+    readonly "/organizations/{organizationId}/owner-transfer": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Transfer Owner responsibility to another current member
+         * @description Requires a current OWNER, a recent MFA step-up, and an Idempotency-Key. The target is promoted before the actor is demoted so the organization always retains an Owner.
+         */
+        readonly post: operations["transferOrganizationOwnership"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/regions": {
         readonly parameters: {
             readonly query?: never;
@@ -819,6 +923,60 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/auth/mfa/enrollment": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Begin TOTP enrollment for the current active user
+         * @description Creates a self-owned pending enrollment without requiring a platform staff role.
+         */
+        readonly post: operations["beginMfaEnrollment"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/auth/mfa/enrollment/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Verify and activate the current user's pending TOTP enrollment */
+        readonly post: operations["verifyMfaEnrollment"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/auth/mfa/verify": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /** Establish a recent MFA-bound session for the current user */
+        readonly post: operations["verifyMfa"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/admin/mfa/enrollment": {
         readonly parameters: {
             readonly query?: never;
@@ -1182,7 +1340,7 @@ export interface components {
         };
         readonly NotificationResource: {
             /** @enum {string} */
-            readonly type: "LISTING";
+            readonly type: "LISTING" | "ORGANIZATION_INVITATION";
             /** Format: uuid */
             readonly id: string;
         };
@@ -1273,10 +1431,75 @@ export interface components {
             readonly role: components["schemas"]["MembershipRole"];
             /** Format: date-time */
             readonly joinedAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+            readonly version: number;
+        };
+        readonly OrganizationMemberResponse: {
+            readonly data: components["schemas"]["OrganizationMember"];
         };
         readonly OrganizationMemberCollection: {
             readonly data: readonly components["schemas"]["OrganizationMember"][];
             readonly pageInfo: components["schemas"]["CursorPage"];
+        };
+        /** @enum {string} */
+        readonly NonOwnerMembershipRole: "ADMIN" | "EDITOR" | "BILLING" | "ANALYST";
+        /** @enum {string} */
+        readonly OrganizationInvitationStatus: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+        readonly CreateOrganizationInvitationRequest: {
+            /** Format: uuid */
+            readonly inviteeUserId: string;
+            readonly role: components["schemas"]["NonOwnerMembershipRole"];
+        };
+        readonly OrganizationInvitation: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly organizationId: string;
+            readonly organizationDisplayName: string;
+            /** Format: uuid */
+            readonly inviteeUserId: string;
+            readonly role: components["schemas"]["NonOwnerMembershipRole"];
+            readonly status: components["schemas"]["OrganizationInvitationStatus"];
+            /** Format: date-time */
+            readonly expiresAt: string;
+            /** Format: date-time */
+            readonly acceptedAt: string | null;
+            /** Format: date-time */
+            readonly revokedAt: string | null;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly updatedAt: string;
+        };
+        readonly OrganizationInvitationResponse: {
+            readonly data: components["schemas"]["OrganizationInvitation"];
+        };
+        readonly ChangeOrganizationMemberRoleRequest: {
+            readonly role: components["schemas"]["NonOwnerMembershipRole"];
+        };
+        readonly TransferOrganizationOwnershipRequest: {
+            /** Format: uuid */
+            readonly targetUserId: string;
+        };
+        readonly OrganizationOwnerTransfer: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly organizationId: string;
+            /** Format: uuid */
+            readonly fromUserId: string;
+            /** Format: uuid */
+            readonly toUserId: string;
+            /** @constant */
+            readonly fromRoleAfter: "ADMIN";
+            /** @constant */
+            readonly toRoleAfter: "OWNER";
+            /** Format: date-time */
+            readonly occurredAt: string;
+        };
+        readonly OrganizationOwnerTransferResponse: {
+            readonly data: components["schemas"]["OrganizationOwnerTransfer"];
         };
         /** @enum {string} */
         readonly RegionType: "COUNTRY" | "STATE" | "COUNTY" | "CITY" | "NEIGHBORHOOD" | "ZIP_CODE" | "REGION_GROUP";
@@ -2178,6 +2401,15 @@ export interface components {
                 readonly "application/problem+json": components["schemas"]["ProblemDetails"];
             };
         };
+        /** @description Resource existed but is no longer actionable */
+        readonly Gone: {
+            headers: {
+                readonly [name: string]: unknown;
+            };
+            content: {
+                readonly "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
         /** @description Business validation failed */
         readonly UnprocessableEntity: {
             headers: {
@@ -2215,6 +2447,8 @@ export interface components {
         readonly SessionId: string;
         readonly NotificationId: string;
         readonly OrganizationId: string;
+        readonly OrganizationInvitationId: string;
+        readonly OrganizationMemberUserId: string;
         readonly Cursor: string;
         readonly Limit: number;
         readonly IdempotencyKey: string;
@@ -2738,6 +2972,197 @@ export interface operations {
             readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
             readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly createOrganizationInvitation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateOrganizationInvitationRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Invitation created or exact retry returned */
+            readonly 201: {
+                headers: {
+                    readonly Location?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationInvitationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly revokeOrganizationInvitation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+                readonly invitationId: components["parameters"]["OrganizationInvitationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Invitation revoked or already revoked */
+            readonly 204: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly acceptOrganizationInvitation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invitationId: components["parameters"]["OrganizationInvitationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Invitation accepted or exact accepted state returned */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationInvitationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 410: components["responses"]["Gone"];
+        };
+    };
+    readonly removeOrganizationMember: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+                readonly memberUserId: components["parameters"]["OrganizationMemberUserId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Non-Owner member removed */
+            readonly 204: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly changeOrganizationMemberRole: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
+            };
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+                readonly memberUserId: components["parameters"]["OrganizationMemberUserId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ChangeOrganizationMemberRoleRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Member role updated */
+            readonly 200: {
+                headers: {
+                    /** @description Strong membership version ETag. */
+                    readonly ETag?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationMemberResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly transferOrganizationOwnership: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path: {
+                readonly organizationId: components["parameters"]["OrganizationId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["TransferOrganizationOwnershipRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Ownership transferred or exact transfer retry returned */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["OrganizationOwnerTransferResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+            readonly 409: components["responses"]["Conflict"];
         };
     };
     readonly listRegions: {
@@ -3664,6 +4089,90 @@ export interface operations {
             };
             readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly beginMfaEnrollment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Pending TOTP enrollment created */
+            readonly 201: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaEnrollmentResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly verifyMfaEnrollment: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AdminMfaEnrollmentVerifyRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description MFA credential activated and the session elevated */
+            readonly 200: {
+                headers: {
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaActivationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 429: components["responses"]["TooManyRequests"];
+        };
+    };
+    readonly verifyMfa: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AdminMfaVerifyRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description MFA verified and recent-auth window established */
+            readonly 200: {
+                headers: {
+                    readonly "Set-Cookie"?: string;
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminMfaVerificationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 429: components["responses"]["TooManyRequests"];
         };
     };
     readonly beginAdminMfaEnrollment: {

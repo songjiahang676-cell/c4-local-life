@@ -277,3 +277,14 @@ UPDATE/DELETE。`notifications` 保存渲染快照及 `template_id/template_vers
 `source_event_id/aggregate_version`；同一事件对同一用户和 channel 只能产生一行。Worker 可以接收
 重复或乱序事件，但按事件发生时间生成通知并通过 advisory lock/唯一键收敛。读取只返回当前用户的
 IN_APP 投影，按 `(created_at DESC,id DESC)` 稳定分页；已读更新绑定 user，外部标识不会越权改变状态。
+
+### ORG-002 成员生命周期与 Owner 不变量
+
+`organization_invitations` 保存 actor/org 范围的幂等键与请求摘要、非 Owner 角色、到期时间和
+PENDING/ACCEPTED/REVOKED/EXPIRED 单向状态证据；部分唯一索引禁止同一组织和受邀人并存两个 PENDING
+邀请。接受在组织/邀请锁内写 membership、邀请状态、AuditLog 和 OutboxEvent。
+
+`organization_memberships.version/updated_at` 为角色变更提供强 ETag 并发控制。Owner 转移凭据写入
+`organization_owner_transfers`，包含 from/to、精确幂等摘要、结果角色与发生时间。两个 deferred
+constraint trigger 在事务结束时检查组织至少保留一名 Owner，使先提升后降级的转移可原子提交，同时
+拒绝直接删除或降级最后一名 Owner。
