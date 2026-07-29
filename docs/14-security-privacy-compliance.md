@@ -93,6 +93,14 @@ taxonomy/主体状态，owner 查询绑定直接所有权或当前 organization 
 做字段 visibility 白名单，未知属性或 schema 缺失时返回空对象，避免历史配置漂移和 JSON 注入字段
 造成横向泄漏。后续 Controller 仍须通过 API-004 Policy；Repository 不是前端隐藏或单独的全部授权层。
 
+`LIST-003` 在 HTTP 与事务边界补齐双重授权：创建/更新先要求 ACTIVE actor permission，owner/org
+读取再用 Repository 当前 membership 查询并经对象 Policy；组织创建者被移出后不能靠 `owner_id`
+继续读取或写入。草稿对 guest/外部用户统一 404，能合法读取但角色只读的组织成员写入返回通用 403。
+创建幂等证据只保存受约束 key 和 SHA-256 canonical request hash，不保存 request body；数据库要求两列
+同时为空或同时为有效值，并用 `owner + key` 唯一索引与事务锁抵御重试竞态。更新使用行锁和
+version predicate；Audit/Outbox 只含 actor/Listing/type/status/version/requestId 等最小证据，不复制
+标题、正文、动态属性、精确坐标、联系方式或 provider 数据。
+
 `ORG-001` 的组织创建在同一事务内写 Organization 和初始 OWNER，避免半完成组织；普通用户不能创建
 `INTERNAL` 组织或提交 status、verification/role。对象读取先以 actor membership 约束 Repository；
 跨组织与未知 ID 返回相同通用 404。Policy 使用查询到的当前角色覆盖请求开始时的 membership 快照，

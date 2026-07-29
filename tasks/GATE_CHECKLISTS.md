@@ -23,6 +23,7 @@ Gate 1 的实施主线与 P0 退出条件已经由受保护 PR #3–#16 验证�
 
 - [x] 五类 Listing 共享状态机、type-detail、价格和过期不变式。
 - [x] Public/owner/moderator Repository 查询授权与最小字段投影。
+- [x] 草稿创建/owner 读取/组织角色更新、actor-scoped 幂等与强 ETag 并发控制。
 - [ ] 草稿/提交/审核/发布/编辑/过期完整。
 - [ ] 审核、举报、申诉、审计和通知。
 - [ ] 移动端中英文发布 E2E。

@@ -12,9 +12,15 @@ export const selfServicePolicyActions = {
 
 export const activeUserPolicyActions = {
   listingDraftCreate: "listing:draft:create",
+  listingDraftUpdate: "listing:draft:update",
   mediaUploadComplete: "media:upload:complete",
   mediaUploadCreate: "media:upload:create",
   organizationCreate: "organization:create",
+} as const;
+
+export const listingObjectPolicyActions = {
+  draftRead: "listing:draft:read",
+  draftWrite: "listing:draft:write",
 } as const;
 
 export const adminPolicyActions = {
@@ -45,6 +51,7 @@ export const accountSelfServicePermissions = [
 export const activeUserPermissions = [
   ...accountSelfServicePermissions,
   activeUserPolicyActions.listingDraftCreate,
+  activeUserPolicyActions.listingDraftUpdate,
   activeUserPolicyActions.mediaUploadComplete,
   activeUserPolicyActions.mediaUploadCreate,
   activeUserPolicyActions.organizationCreate,

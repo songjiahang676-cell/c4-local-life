@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { contentStatusSchema, createListingSchema, listingSearchSchema, moneySchema } from "../src";
+import {
+  contentStatusSchema,
+  createListingSchema,
+  listingSearchSchema,
+  moneySchema,
+  updateListingSchema,
+} from "../src";
 
 describe("listing contracts", () => {
   it("applies public creation defaults", () => {
@@ -19,8 +25,38 @@ describe("listing contracts", () => {
     });
   });
 
-  it("rejects money with more than two decimal places", () => {
+  it("enforces fixed versus non-fixed price semantics and decimal precision", () => {
     expect(moneySchema.safeParse({ amount: "12.345", currency: "USD" }).success).toBe(false);
+    expect(moneySchema.parse({ amount: "12.34", currency: "USD", unit: "FIXED" })).toMatchObject({
+      amount: "12.34",
+      unit: "FIXED",
+    });
+    expect(moneySchema.parse({ amount: null, currency: "USD", unit: "FREE" })).toMatchObject({
+      amount: null,
+      unit: "FREE",
+    });
+    expect(moneySchema.safeParse({ amount: "0", currency: "USD", unit: "MONTHLY" }).success).toBe(
+      false,
+    );
+    expect(moneySchema.safeParse({ amount: "1", currency: "USD", unit: "FREE" }).success).toBe(
+      false,
+    );
+  });
+
+  it("keeps draft patches strict, non-empty, and free of unsafe text controls", () => {
+    expect(updateListingSchema.parse({ summary: null })).toEqual({ summary: null });
+    expect(updateListingSchema.safeParse({}).success).toBe(false);
+    expect(updateListingSchema.safeParse({ unknown: true }).success).toBe(false);
+    expect(updateListingSchema.safeParse({ title: "Unsafe\u202etitle" }).success).toBe(false);
+    expect(
+      createListingSchema.safeParse({
+        type: "RENTAL",
+        categoryId: "11111111-1111-4111-8111-111111111111",
+        regionCode: "US-CA-LA",
+        title: "Safe synthetic title",
+        body: "A body with an unsupported\u0000control character.",
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps OpenAPI-derived defaults and nested location validation in one runtime schema", () => {

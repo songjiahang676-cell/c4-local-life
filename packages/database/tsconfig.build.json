@@ -15,6 +15,7 @@
     "src/repositories/otp-challenge.repository.ts",
     "src/repositories/organization.repository.ts",
     "src/repositories/listing.repository.ts",
+    "src/repositories/listing-draft.repository.ts",
     "src/repositories/outbox-event.repository.ts",
     "src/repositories/media-asset.repository.ts",
     "src/taxonomy.ts",

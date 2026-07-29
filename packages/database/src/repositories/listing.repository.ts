@@ -489,6 +489,7 @@ export class ListingRepository {
         OR: [
           {
             ownerId: input.actorUserId,
+            organizationId: null,
             owner: {
               is: {
                 status: { in: [...publicActorStatuses] },

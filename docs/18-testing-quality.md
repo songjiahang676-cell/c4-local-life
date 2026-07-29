@@ -43,6 +43,13 @@ taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization memb
 返回空 attributes，而不是原始 JSON。fixture 仅使用 `example.invalid` 与明确 synthetic 文本，并在
 事务回滚隔离中运行。
 
+`LIST-003` 增加三层写入测试。service/HTTP 层验证创建精确重试与 changed-payload 409、强 ETag、
+缺失/旧 `If-Match`、guest/outsider/limited、个人 owner 与组织五角色、未知 attributes、非空 media
+和 over-posting；真实 OpenAPI schema 验证 create/read/update 实际响应。PostgreSQL 层从全新空库
+验证 15 个 migration、22 个约束负例、配对幂等证据、并发同 key 只创建一行，以及两个版本相同的
+并发 PATCH 只成功一个；每次成功恰有一条 Audit 和一条 Outbox，序列化负例证明其中没有业务正文或
+PII。并行集成测试只按稳定 seed ID 断言 taxonomy，避免其他隔离 fixture 造成全表计数抖动。
+
 ## 18.4 授权测试
 
 为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。

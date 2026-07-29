@@ -55,8 +55,8 @@ Transfer 要价/租金/剩余租期、Secondhand 成色和 Service 半径都有�
 `PENDING_REVIEW|ESCALATED`，公开/过期/归档只能 `AUTO_APPROVED|APPROVED`，暂停态记录
 `REJECTED`。所有转换要求当前 `expectedVersion`、非倒退 UTC 时间、actor 和稳定原因码，成功后
 只生成新聚合与前后状态事件并递增版本；发布期限由调用方显式传入 1–365 天，过期动作不能早于
-`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；写事务仍由
-`LIST-003` 接入。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
+`expiresAt`。`LIST-002` 已由 `packages/database` 的 Listing Repository 接入只读持久化边界；
+`LIST-003` 已接入草稿创建与条件更新写事务。领域规则本身不直接操作 Prisma，也不自行决定运营发布期限。
 
 `LIST-002` 使用三套显式 Prisma `select` 和独立返回类型，而不是序列化完整 Listing。公开读取在 SQL
 条件中同时要求已发布、已批准、发布时间已到、尚未过期、未删除、有效地区/分类，以及可用 owner/
@@ -67,6 +67,13 @@ moderator 读取只接受当前未撤销、未过期且 region/category scope �
 绝不返回原始 JSON。公开投影不含精确坐标、联系方式、审核状态和内部评分；owner 可读取自己的精确点和
 审核状态但不含审核员字段；moderator 可读取受控内部状态和三层动态字段，但仍不读取邮箱、手机号、
 组织 legal name 或精确坐标。
+
+`LIST-003` 的草稿创建把 `owner + Idempotency-Key` 和 canonical request hash 保存为配对证据；同一
+actor/key 的精确重试返回原草稿，不同 payload 返回 409，事务级 advisory lock 防止并发重复插入。
+更新先锁定 Listing，再要求当前 `DRAFT`、当前个人 owner 或组织 `OWNER|ADMIN|EDITOR`、精确历史表单
+schema 和 `expectedVersion`；条件更新只允许一个并发请求成功。每次成功创建/更新在同一 PostgreSQL
+事务追加最小化 `AuditLog` 与版本化 Outbox，事件不含标题、正文、attributes、联系方式或幂等证据。
+组织 Listing 的创建者不享有永久旁路；移除 membership 后即失去 owner 投影视图和写权限。
 
 ### Organization 聚合
 

@@ -1,0 +1,48 @@
+import type {
+  CreateListingDraftInput,
+  CreateListingDraftResult,
+  FindListingDraftCreateRetryInput,
+  FindListingDraftCreateRetryResult,
+  ListingDraftJsonValue,
+  ListingDraftReferences,
+  ListingDraftWriteFields,
+  ResolveListingDraftReferencesInput,
+  UpdateListingDraftInput,
+  UpdateListingDraftResult,
+} from "@socal/database/listing-draft";
+import type {
+  OwnerListingProjection,
+  PublicListingProjection,
+  PublicListingReadInput,
+  ScopedListingReadInput,
+} from "@socal/database/listing";
+
+export const LISTING_STORE = Symbol("LISTING_STORE");
+
+export type ListingStore = {
+  resolveReferences(
+    input: ResolveListingDraftReferencesInput,
+  ): Promise<ListingDraftReferences | null>;
+  findCreateRetry(
+    input: FindListingDraftCreateRetryInput,
+  ): Promise<FindListingDraftCreateRetryResult>;
+  createDraft(input: CreateListingDraftInput): Promise<CreateListingDraftResult>;
+  updateDraft(input: UpdateListingDraftInput): Promise<UpdateListingDraftResult>;
+  findPublicById(input: PublicListingReadInput): Promise<PublicListingProjection | null>;
+  findByIdForOwner(input: ScopedListingReadInput): Promise<OwnerListingProjection | null>;
+};
+
+export type {
+  CreateListingDraftInput,
+  CreateListingDraftResult,
+  FindListingDraftCreateRetryInput,
+  FindListingDraftCreateRetryResult,
+  ListingDraftJsonValue,
+  ListingDraftReferences,
+  ListingDraftWriteFields,
+  OwnerListingProjection,
+  PublicListingProjection,
+  ResolveListingDraftReferencesInput,
+  UpdateListingDraftInput,
+  UpdateListingDraftResult,
+};

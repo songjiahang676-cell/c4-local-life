@@ -36,9 +36,18 @@ integration("TaxonomyRepository with PostgreSQL", () => {
       const la = await repository.listRegions({ activeOnly: true, query: "L.A." });
       const montereyPark = await repository.listRegions({ activeOnly: true, query: "MPK" });
       const traditional = await repository.listRegions({ activeOnly: true, query: "洛杉磯" });
+      const seededCodes = new Set([
+        seed.regions.country.code,
+        seed.regions.state.code,
+        ...seed.regions.metros.flatMap((metro) => [
+          metro.code,
+          ...metro.children.map((city) => city.code),
+        ]),
+      ]);
+      const seededRegions = all.filter((region) => seededCodes.has(region.code));
 
-      expect(all).toHaveLength(17);
-      expect(all.find((region) => region.code === "US-CA-SOCAL")).toMatchObject({
+      expect(seededRegions).toHaveLength(17);
+      expect(seededRegions.find((region) => region.code === "US-CA-SOCAL")).toMatchObject({
         type: "REGION_GROUP",
         nameZhHans: "南加州",
         nameEn: "Southern California",

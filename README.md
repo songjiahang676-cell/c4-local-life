@@ -168,8 +168,16 @@ PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随�
 `LIST-001` 已由 PR #17 / final run `30408759770` 通过两项 required checks，并受保护合并为
 `c1709a7`。`LIST-002` 在此基础上提供真实 PostgreSQL public/owner/moderator 安全投影：公开内容在
 查询层过滤状态、审核、期限、taxonomy 与主体；owner/organization member 和当前 scoped moderator
-分别通过对象范围查询授权；动态 attributes 按精确历史 schema visibility 白名单过滤。API/OpenAPI
-尚未改变，HTTP use case 与乐观并发写入仍按 `LIST-003` 实现。
+分别通过对象范围查询授权；动态 attributes 按精确历史 schema visibility 白名单过滤。PR #18 /
+final run `30410107716` 通过两项 required checks，并受保护合并为 `a8db956`。
+
+`LIST-003` 已在此基础上接入数据库草稿创建、owner/组织成员读取和条件更新：OpenAPI/运行时契约要求
+actor-scoped `Idempotency-Key`、强 ETag/`If-Match`，Repository 以事务锁和 version predicate 关闭
+创建/编辑竞态，并在成功事务中追加不含正文/PII 的 Audit 与 Outbox。15 个 migration 已从全新
+`socal_list003_empty` 空库重放；baseline 22 个负例、previous-baseline upgrade、64 项真实
+PostgreSQL 测试、全仓 61 个文件/226 项测试、8 个构建、运行时检查和 Chromium 6/6 smoke 本机通过。
+本机无 Redis/ClamAV 的 2 项服务集成明确跳过；PR #19 / run `30412033239` 已用真实服务通过
+Linux quality、浏览器和四镜像非 root 检查，证据提交的最终 head checks 与受保护合并仍待完成。
 
 ## 七、规划容量与服务目标
 

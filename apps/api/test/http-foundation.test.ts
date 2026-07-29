@@ -7,6 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApiApplication } from "../src/create-api-application";
 import { AuthSessionService } from "../src/modules/auth/auth-session.service";
 import { buildActiveSubject, MemoryAuthSessionStore } from "./support/memory-auth-session.store";
+import {
+  createMemoryListingTaxonomyStore,
+  MemoryListingStore,
+} from "./support/memory-listing.store";
 
 const environment = parseApiEnvironment({
   NODE_ENV: "test",
@@ -37,7 +41,7 @@ describe("HTTP foundation", () => {
   let app: NestFastifyApplication;
   let server: FastifyInstance;
   let observability: ObservabilityRuntime;
-  let mutationHeaders: { cookie: string; origin: string };
+  let mutationHeaders: { cookie: string; origin: string; "idempotency-key": string };
   let limitedMutationHeaders: { cookie: string; origin: string };
   const logRecords: string[] = [];
 
@@ -57,6 +61,8 @@ describe("HTTP foundation", () => {
       logger: false,
       observability,
       authSessionStore,
+      listingStore: new MemoryListingStore(),
+      taxonomyStore: createMemoryListingTaxonomyStore(),
     });
     await app.init();
     server = app.getHttpAdapter().getInstance();
@@ -65,6 +71,7 @@ describe("HTTP foundation", () => {
     mutationHeaders = {
       cookie: `${environment.SESSION_COOKIE_NAME}=${issued.token}`,
       origin: environment.PUBLIC_WEB_URL,
+      "idempotency-key": "foundation-create-listing-0001",
     };
     const limited = await app.get(AuthSessionService).issueSession(limitedUserId, {});
     limitedMutationHeaders = {

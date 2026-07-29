@@ -97,6 +97,12 @@ Prisma, OpenSearch, Redis, S3, Stripe adapters
 
 所有消费者以 `eventId` 或业务幂等键去重。
 
+`LIST-003` 的草稿写入已按此边界实现：Controller 只解析严格 DTO、会话、`Idempotency-Key` 和强
+`If-Match`；application service 组合 API-004 Policy、精确 taxonomy/form-schema 校验与 Listing
+领域价格不变式；database store/repository 才执行 actor/organization scoped query、行锁、版本条件、
+Listing/AuditLog/Outbox 原子事务。创建使用 actor-scoped advisory transaction lock，使两个同时到达的
+同 key 请求只产生一行和一组证据。OpenSearch、Redis 和 Worker 不参与草稿写入的成功判定。
+
 `EVT-001` 的 dispatcher 运行在现有 Worker 进程，不新增服务边界。它短事务领取有界批次，事务提交后
 才向配置的 BullMQ 队列写入 versioned envelope；jobId 固定为 eventId。成功/重试/终态失败使用 attempt
 版本条件更新，进程在入队后、确认前退出只会形成预期的安全重复。事件 payload 不进入结构日志或指标标签，

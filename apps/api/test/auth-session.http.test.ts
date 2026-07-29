@@ -93,6 +93,7 @@ describe("auth session HTTP boundary", () => {
         "account:sessions:read",
         "account:sessions:revoke",
         "listing:draft:create",
+        "listing:draft:update",
         "media:upload:complete",
         "media:upload:create",
         "organization:create",

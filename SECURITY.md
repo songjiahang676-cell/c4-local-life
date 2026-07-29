@@ -17,6 +17,9 @@
   IP、设备限频/锁定。恢复 token 只存哈希、冷却后单次消费，成功会撤销全部 Session、写审计和通知，
   不自动登录。OTP 限频、一次性消费并短时有效。
 - 全部资源执行后端对象级授权；前端显示控制不是授权。
+- Listing 草稿写入要求 ACTIVE actor、当前个人 owner 或组织写角色；组织创建者无永久旁路。创建以
+  owner 范围幂等键、canonical hash、唯一索引和事务锁防重复，更新以强 ETag、行锁和版本条件防覆盖；
+  成功写入在同一事务追加不含正文/attributes/PII 的 Audit 与 Outbox。
 - 上传采用认证/幂等/配额、短效校验和长度绑定的私有 quarantine 预签名；公开前必须完成 magic-byte、
   恶意文件扫描、图像解码重编码/去 EXIF，并通过独立无 Cookie 域名分发。完成端点以服务端 HEAD 闭合
   intent，Worker 对实际字节复算 hash、经真实 ClamAV INSTREAM 和 Sharp 像素上限处理，只写入三个
