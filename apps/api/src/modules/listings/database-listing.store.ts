@@ -26,9 +26,11 @@ import {
 } from "@socal/database/listing";
 import {
   ListingSubmissionRepository,
+  type FindListingDuplicateCandidatesInput,
   type FindListingSubmissionRetryInput,
   type FindListingSubmissionRetryResult,
   type ListingSubmissionCandidate,
+  type ListingDuplicateCandidateMatch,
   type SubmitListingInput,
   type SubmitListingResult,
 } from "@socal/database/listing-submission";
@@ -113,6 +115,20 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     listingId: string;
   }): Promise<ListingSubmissionCandidate | null> {
     return this.#submissions.findCandidate(input);
+  }
+
+  findDuplicateCandidates(
+    input: FindListingDuplicateCandidatesInput,
+  ): Promise<ListingDuplicateCandidateMatch[]> {
+    return this.#submissions.findDuplicateCandidates(input);
+  }
+
+  findMediaPerceptualHashes(input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#submissions.findMediaPerceptualHashes(input);
   }
 
   submit(input: SubmitListingInput): Promise<SubmitListingResult> {

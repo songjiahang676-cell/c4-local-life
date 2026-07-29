@@ -154,6 +154,12 @@ database adapter 独占 actor/session 复核、advisory/row lock、去重和 Rep
 Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing 事件投影，举报证据或举报者身份
 不会进入队列 payload。
 
+`MOD-003` 仍在 Listing/Moderation 模块化单体边界内：Worker 媒体 transformer 只产生确定性 dHash；
+`ListingsService` 从版本化表单定义提取联系方式、以域分离 HMAC 生成指纹、调用 Repository 有界候选
+查询并执行版本化阈值策略；Repository 独占 pg_trgm/Hamming/指纹 SQL 和 evaluation/candidate 持久化。
+`ModerationService` 只把人工动作映射为一次写定反馈并记录固定标签指标。Controller、Web/Admin 不
+导入 Prisma，OpenSearch/Redis 不参与 canonical 判定，也没有新增进程、队列或数据库。
+
 ## 30.4 生成与手写边界
 
 - Prisma client：生成，不手改。

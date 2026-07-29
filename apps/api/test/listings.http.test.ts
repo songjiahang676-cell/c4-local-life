@@ -346,7 +346,7 @@ describe("listing draft HTTP boundary", () => {
         previousModerationStatus: "NOT_REVIEWED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 3,
+        ruleSetVersion: 4,
         caseId: null,
         version: 3,
       },

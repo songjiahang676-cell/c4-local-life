@@ -381,3 +381,17 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
   行锁、Audit/Outbox 与目标状态幂等语义。只读组织角色和跨 owner 对象统一映射 NOT_FOUND。
 - 两个端点、生成 TypeScript、Zod 边界、API Controller、Web BFF allowlist 与契约测试同步更新；
   OpenAPI 仍是唯一 REST 事实源。
+
+## 8.21 MOD-003 重复候选契约
+
+- Listing 提交和已发布编辑不新增公共请求字段；服务端按已绑定 READY 媒体和历史表单 schema 自动
+  计算候选。候选结果属于审核证据，不返回 Owner 或公共 Listing API。
+- 现有 `GET /admin/moderation/listings/{caseId}` 的 `duplicateCandidates` 最多 10 条，只暴露候选
+  Listing ID/版本/类型/标题/状态、阈值版本、DRY_RUN/ENFORCE、MEDIUM/HIGH 与 TEXT/IMAGE/CONTACT
+  信号。契约不暴露原始联系方式、HMAC、对象 key、相似分值、Hamming 距离或阈值数值。
+- `DUPLICATE_CONTENT` 仅在案件已有重复候选时才是 `REQUEST_CHANGES|REJECT` 的稳定原因；没有
+  候选证据时服务层与 repository 均 fail closed。批准仍使用 `CONTENT_POLICY_COMPLIANT`。动作继续
+  要求当前 MFA moderator、recent step-up、强 ETag 和 actor-scoped `Idempotency-Key`，精确重试
+  不得重复记录人工反馈指标。
+- OpenAPI、生成 TypeScript、严格 Zod、API 映射和 Admin 双语界面同时更新；没有新增服务、API
+  范式或版本边界。

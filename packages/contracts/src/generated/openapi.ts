@@ -2593,6 +2593,20 @@ export interface components {
             /** Format: date-time */
             readonly updatedAt: string;
         };
+        readonly ModerationDuplicateCandidate: {
+            /** Format: uuid */
+            readonly candidateListingId: string;
+            readonly candidateListingVersion: number;
+            readonly candidateType: components["schemas"]["ListingType"];
+            readonly candidateTitle: string;
+            readonly candidateStatus: components["schemas"]["ContentStatus"];
+            readonly thresholdVersion: number;
+            /** @enum {string} */
+            readonly mode: "DRY_RUN" | "ENFORCE";
+            /** @enum {string} */
+            readonly confidence: "MEDIUM" | "HIGH";
+            readonly matchedSignals: readonly ("TEXT" | "IMAGE" | "CONTACT")[];
+        };
         readonly ModerationListingSnapshot: {
             /** Format: uuid */
             readonly listingId: string;
@@ -2643,7 +2657,7 @@ export interface components {
         };
         readonly ModerationReasonOption: {
             /** @enum {string} */
-            readonly code: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
+            readonly code: "CONTENT_POLICY_COMPLIANT" | "DUPLICATE_CONTENT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
             readonly actions: readonly ("APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE")[];
         };
         readonly ModerationCaseDetailResponse: {
@@ -2653,6 +2667,7 @@ export interface components {
                 readonly diff: readonly components["schemas"]["ModerationDiffEntry"][];
                 readonly rules: readonly components["schemas"]["ModerationRuleEvidence"][];
                 readonly media: readonly components["schemas"]["ModerationMediaEvidence"][];
+                readonly duplicateCandidates: readonly components["schemas"]["ModerationDuplicateCandidate"][];
                 readonly publisherHistory: {
                     readonly accountAgeDays: number;
                     readonly submittedCount: number;
@@ -2672,7 +2687,7 @@ export interface components {
             /** @enum {string} */
             readonly action: "APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE";
             /** @enum {string} */
-            readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
+            readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "DUPLICATE_CONTENT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
             readonly note?: string;
         };
         readonly ModerationActionResponse: {
@@ -2684,7 +2699,7 @@ export interface components {
                 /** @enum {string} */
                 readonly action: "APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE";
                 /** @enum {string} */
-                readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
+                readonly reasonCode: "CONTENT_POLICY_COMPLIANT" | "DUPLICATE_CONTENT" | "NEEDS_CLARIFICATION" | "PROHIBITED_CONTENT" | "EXTERNAL_PAYMENT_RISK" | "ESCALATE_SENIOR_REVIEW";
                 /** @enum {string} */
                 readonly previousCaseStatus: "OPEN" | "ASSIGNED" | "RESOLVED" | "APPEALED" | "CLOSED";
                 /** @enum {string} */

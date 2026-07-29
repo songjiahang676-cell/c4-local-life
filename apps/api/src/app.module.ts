@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import type { ApiEnvironment } from "@socal/config";
+import type { MetricsRegistry } from "@socal/observability";
 import { API_ENVIRONMENT } from "./common/api-environment.token";
 import { AuthorizationModule } from "./common/authorization/authorization.module";
 import { CsrfOriginGuard } from "./common/csrf-origin.guard";
@@ -45,6 +46,7 @@ export class AppModule {
     moderationStore?: ModerationStore,
     notificationStore?: NotificationStore,
     trustSafetyStore?: TrustSafetyStore,
+    metrics?: MetricsRegistry,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -58,7 +60,7 @@ export class AppModule {
           passwordStore,
           passwordNotificationGateway,
         ),
-        AdminModule.register(environment, mfaStore, moderationStore),
+        AdminModule.register(environment, mfaStore, moderationStore, metrics),
         HealthModule,
         ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),

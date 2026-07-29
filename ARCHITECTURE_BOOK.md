@@ -1003,6 +1003,23 @@ ARCHIVED/EXPIRED/SUSPENDED 也归入已归档，DELETED 永不返回。
 级生命周期 Policy 与 Repository 版本条件独立复核。批量端点只是最多 20 次有界应用层编排，不创建
 跨 Listing 大事务，也不改变既有 Audit/Outbox 与软删除幂等模型。
 
+### MOD-003 重复候选证据
+
+`media_assets.perceptual_hash` 保存 Worker 在解码、纠正方向和去元数据后计算的 64-bit dHash；只有
+READY 或已经软删除的媒体可保留合法小写十六进制值。`listing_contact_fingerprints` 只保存按历史
+表单 schema 识别并规范化的 PHONE/EMAIL 域分离 HMAC，不保存原始联系方式。Listing 每次提交或已发布
+编辑时在同一事务替换自己的当前联系方式指纹，指纹只用于候选匹配。
+
+`moderation_duplicate_candidates` 关联精确 moderation evaluation 和候选 Listing，冻结候选版本、
+类型、标题、状态、阈值版本、DRY_RUN/ENFORCE 模式、置信级别、命中信号与内部数值证据。每个
+evaluation/candidate 只有一行；数据库 check 约束有界分值、Hamming 距离和信号集合，触发器禁止修改
+候选身份/证据或删除，并使第一次人工复核结果不可二次改写。候选与审核历史属于 PostgreSQL canonical
+证据；媒体 hash 可以从 canonical 对象重新生成，但人工判定不能从派生索引恢复。
+
+候选查询固定为同一 Listing type、过去 365 天、排除自身与 DELETED，使用 pg_trgm 标题/正文相似度、
+联系方式指纹精确匹配和图片 Hamming 距离，最多返回 10 条。`(type,created_at DESC)`、指纹反向索引及
+候选审核索引支持有界访问；OpenSearch 不参与审核写事务，也不是重复证据事实源。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1560,6 +1577,19 @@ APPROVE/REQUEST_CHANGES/REJECT/ESCALATE 对应的标准原因码。精确重试�
 - 两个端点、生成 TypeScript、Zod 边界、API Controller、Web BFF allowlist 与契约测试同步更新；
   OpenAPI 仍是唯一 REST 事实源。
 
+## 8.21 MOD-003 重复候选契约
+
+- Listing 提交和已发布编辑不新增公共请求字段；服务端按已绑定 READY 媒体和历史表单 schema 自动
+  计算候选。候选结果属于审核证据，不返回 Owner 或公共 Listing API。
+- 现有 `GET /admin/moderation/listings/{caseId}` 的 `duplicateCandidates` 最多 10 条，只暴露候选
+  Listing ID/版本/类型/标题/状态、阈值版本、DRY_RUN/ENFORCE、MEDIUM/HIGH 与 TEXT/IMAGE/CONTACT
+  信号。契约不暴露原始联系方式、HMAC、对象 key、相似分值、Hamming 距离或阈值数值。
+- `DUPLICATE_CONTENT` 是 `REQUEST_CHANGES|REJECT` 的稳定原因；批准仍使用
+  `CONTENT_POLICY_COMPLIANT`。动作继续要求当前 MFA moderator、recent step-up、强 ETag 和
+  actor-scoped `Idempotency-Key`，精确重试不得重复记录人工反馈指标。
+- OpenAPI、生成 TypeScript、严格 Zod、API 映射和 Admin 双语界面同时更新；没有新增服务、API
+  范式或版本边界。
+
 ---
 
 <!-- source: docs\09-search-and-ranking.md -->
@@ -2022,6 +2052,23 @@ OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约
   状态检查。成功项独立提交，未知/无权、陈旧版本和非法状态返回有界结果，不扩大事务或权限范围。
 - DELETE 的目标状态重试保持幂等且不重复 Audit/Outbox；ARCHIVE 对已归档精确重试收敛。SUSPENDED
   内容不向界面提供删除动作，申诉仍通过既有独立流程处理。
+
+## 11.17 MOD-003 重复文本、图片与联系方式
+
+- `listing-duplicate` 阈值集版本 1 固定 365 天同类型候选窗口和最多 10 条结果。文本候选使用
+  pg_trgm；图片使用 Worker 生成的 64-bit dHash 与 Hamming 距离；PHONE/EMAIL 仅以历史表单字段识别、
+  规范化后做域分离 HMAC 精确匹配。
+- 候选阈值为 title 0.62、body 0.72、图片距离 10；执行阈值为 title 0.90、body 0.92、图片距离
+  4，联系方式精确匹配直接执行。候选阈值与执行阈值之间只保存 `DRY_RUN` 证据，不影响发布结果；
+  达到任一执行阈值追加 `POSSIBLE_DUPLICATE` 中风险规则并进入人工审核，不自动定罪或删除。
+- 每次 evaluation 冻结阈值版本、候选版本与内部证据。Admin 只显示候选摘要、模式、置信级别和
+  TEXT/IMAGE/CONTACT 信号，不显示分值、阈值、联系方式指纹或媒体对象 key。
+- 审核员以 `DUPLICATE_CONTENT` 要求修改/拒绝时将未复核候选一次性标记 CONFIRMED；以
+  `CONTENT_POLICY_COMPLIANT` 批准时标记 FALSE_POSITIVE。数据库阻止复核结果二次改写；精确动作重试
+  不重复指标。误杀率以 `false_positive / (false_positive + confirmed)` 的人工复核样本计算，
+  未复核 dry-run 候选不能假装成质量结论。
+- 提交/重大编辑事务同时写 evaluation、候选、联系方式指纹、revision、Case/Audit/Outbox；失败整笔
+  回滚。媒体 hash 在既有 Worker 生命周期生成，队列重复执行仍由媒体版本和状态幂等边界收敛。
 
 ---
 
@@ -2590,6 +2637,22 @@ Idempotency-Key 或请求哈希。
 - 误删/重放：界面要求删除确认并只允许选择 server-derived 动作；软删除和归档复用目标状态幂等、
   Audit/Outbox 去重与强 ETag。SUSPENDED 不向界面提供删除，以免破坏申诉路径。
 
+## 14.23 MOD-003 重复检测威胁和缓解
+
+- 联系方式扩散：只读取版本化表单中明确声明的 PHONE/EMAIL 字段；NFKC/邮箱或数字规范化后立即使用
+  域分离 HMAC，数据库不保存原值。指纹、原始联系方式和规范化值不进入 API、Audit、Outbox、日志、
+  指标或 Problem Details；同一密钥轮换必须按受控重建/双读计划执行，不能静默破坏历史匹配。
+- 图片/文本误杀：图片 hash 只用于候选召回，不是版权或身份结论；低阈值只 dry-run，高阈值也只把
+  Listing 送人工审核。没有自动下架、跨类型推断或以单一相似度作出处罚。
+- 候选对象泄漏：只有当前 MFA moderator 可在既有 no-store 案件详情读取最小候选快照；owner/公共
+  API 不返回候选。Admin 契约移除内部数值、对象 key、指纹和候选 owner，稳定原因也不泄露原始证据。
+- 证据篡改/反馈投毒：候选绑定 evaluation、Listing/候选版本和阈值版本，数据库限制取值并禁止证据
+  更新/删除；人工复核结果只能从 UNREVIEWED 写入一次。动作仍要求 recent MFA、强 ETag、幂等键和
+  事务内角色复核，精确重试不重复样本。
+- 资源消耗/枚举：查询只看同类型、过去一年，媒体/联系方式输入均有上限，结果最多 10 条并使用参数化
+  SQL。候选排序和内部匹配不会返回给发布者，因此不能作为枚举 oracle；生产阈值调整必须新增版本并
+  先 dry-run 观察人工误杀率。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -2949,6 +3012,13 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 
 `OBS-001` 的结构日志、Prometheus RED/Worker 指标、W3C Trace 传播、OTLP 导出接口和 PII 脱敏测试记录在 [`observability-baseline.md`](./docs/observability-baseline.md)。Dashboard、SLO、告警、Collector 部署和正式采样策略属于 `OBS-002`/发布 Gate，不在本基础切片中伪造完成。
 
+## 17.11 MOD-003 人工反馈指标
+
+`socal_moderation_duplicate_reviews_total{outcome}` 只允许 `confirmed|false_positive` 两个固定标签，
+按一次写定的候选数累加。精确幂等重试不增加计数；Listing ID、候选 ID、标题、分值、联系方式、图片
+hash、阈值值和审核员均不得成为标签。运行期误杀率只使用已人工复核样本，必须同时展示样本量、阈值
+版本和观察窗口；未复核 dry-run 命中只作为离线候选量，不可混入质量分母或宣称生产准确率。
+
 ---
 
 <!-- source: docs\18-testing-quality.md -->
@@ -3226,6 +3296,21 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   负断言，并验证既有 owner/organization 状态索引足够，不为 UI 新增事实表。
 - Web 单元测试覆盖 guest、正常列表与部分批量失败；BFF 测试锁定两个精确 method/path。
   Chromium 桌面/移动生产回归覆盖英文未登录边界、no-store/noindex、登录入口和无横向溢出。
+
+## 18.25 MOD-003 重复检测验证增量
+
+- 纯函数测试覆盖 PHONE/EMAIL 规范化、domain-separated 指纹去重、候选/执行阈值边界、三种信号、
+  多信号置信度、NaN/越界分值收敛和 dry-run 不提升风险。
+- Worker 测试验证相同规范化像素生成稳定 16 位小写 dHash，READY 写入携带 hash，失败/旧生命周期
+  不能完成；Repository 测试验证非法 hash 和软删除状态约束。
+- 真实 PostgreSQL 测试覆盖同类型一年窗口、文本 pg_trgm、联系方式精确指纹、图片 Hamming 距离、
+  最多 10 条排序、原始 PII 不持久化、候选与联系方式在提交事务内写入，以及候选证据/人工结果的
+  UPDATE/DELETE 篡改负例。
+- API/契约/Admin 测试验证 ENFORCE 提升到人工审核、DRY_RUN 不改变低风险决定、详情只暴露最小候选
+  字段、`DUPLICATE_CONTENT` 原因耦合、中英界面与数值/指纹/object-key 不泄漏。
+- 可观测性测试只接受 confirmed/false_positive 固定标签，并验证首次人工复核按候选数计数、精确
+  动作重试不计数。空库、上一发布升级、完整质量、运行时、生产 Chromium 和托管真实服务门禁仍必须
+  全部执行并如实记录。
 
 ---
 
@@ -3687,6 +3772,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 中英文、移动/桌面、键盘、触控、loading/empty/error/guest/部分失败、删除确认、noindex/no-store
   和草稿精确编辑入口均有自动化验证；OpenAPI、生成类型、Zod、BFF 和实现一致。
 
+## 22.11 MOD-003 重复检测验收
+
+- 同类型一年窗口内能产生文本、图片和联系方式候选，输入/结果有界；跨类型、过期窗口、自身和
+  DELETED 不进入候选。
+- 阈值集有稳定版本；低阈值候选为 DRY_RUN 且不改变 LOW 决策，达到执行阈值才追加中风险
+  `POSSIBLE_DUPLICATE` 并送人工审核，系统绝不自动定罪或删除。
+- 原始联系方式不持久化到检测表，Admin/API/日志/指标/Audit/Outbox 不暴露联系方式指纹、相似数值、
+  阈值、媒体 object key 或候选 owner。
+- 候选证据绑定 evaluation/Listing 版本并不可更新或删除，人工复核结果一次写定；批准记录
+  FALSE_POSITIVE，重复原因记录 CONFIRMED，精确幂等重试不重复统计。
+- `socal_moderation_duplicate_reviews_total` 仅有 confirmed/false_positive 固定标签；测试以样本量和
+  阈值版本解释误杀率，不伪造生产准确率。
+- OpenAPI、生成契约、Prisma/migration、回滚说明、真实 PostgreSQL、完整质量、生产浏览器和托管
+  保护门禁全部通过后方可标记完成。
+
 ---
 
 <!-- source: docs\23-content-taxonomy.md -->
@@ -3886,6 +3986,12 @@ Draft → Review → Preview → Publish → Observe → Rollback。分类合并
 `LIST-008` 的 `listing_revisions` 在两年窗口内为数据库不可变审计证据，业务 API 不提供单条更新或
 删除。到期清理必须由后续保留策略任务按批次、legal hold 和 Audit 证据执行；用户编辑、归档、软删除
 或普通应用回滚都不得顺带物理删除 revision。
+
+`MOD-003` 的重复候选及一次写定人工结果与关联审核证据使用同一两年审计窗口；普通应用回滚、Listing
+归档/软删除不得删除。联系方式 HMAC 属于可链接的敏感派生数据，只为活动 Listing 匹配保留；用户删除
+编排或法定期限到期时应先停止写入，再在 legal hold 检查后删除该 Listing 的指纹。媒体 dHash 随媒体
+生命周期清理并可从 canonical 对象重建。生产 HMAC 密钥轮换必须有版本化双读/重建计划，不能丢弃旧
+密钥后留下不可解释的混合指纹。
 
 ## 24.3 账户删除编排
 
@@ -4336,6 +4442,14 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 - 中文/英文与移动布局共用语义结构；队列可用 J/K/方向键切换，R 刷新，Alt+A 聚焦动作，状态/错误
   使用 live region，focus 保持可见。
 
+## 28.11 MOD-003 重复候选工作台增量
+
+Listing 案件详情增加最多 10 条候选摘要，按稳定列表展示候选类型、标题、状态、阈值版本、
+DRY_RUN/ENFORCE、MEDIUM/HIGH 和 TEXT/IMAGE/CONTACT 信号。UI 不计算阈值、不拉取候选 owner/联系方式/
+图片、不显示内部相似分值或对象 key。审核员可使用稳定 `DUPLICATE_CONTENT` 原因要求修改或拒绝；
+批准继续使用 `CONTENT_POLICY_COMPLIANT`。所有读取、键盘/焦点、中英移动布局、MFA/recent-auth、
+ETag、幂等、no-store 与通用错误边界沿用 ADMIN-002，不新增前端权限推断。
+
 ---
 
 <!-- source: docs\29-migration-and-launch.md -->
@@ -4590,6 +4704,12 @@ PostgreSQL deferred trigger 兜底，不依赖前端隐藏或单次队列执行�
 database adapter 独占 actor/session 复核、advisory/row lock、去重和 Report/Appeal/Case/Action/
 Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing 事件投影，举报证据或举报者身份
 不会进入队列 payload。
+
+`MOD-003` 仍在 Listing/Moderation 模块化单体边界内：Worker 媒体 transformer 只产生确定性 dHash；
+`ListingsService` 从版本化表单定义提取联系方式、以域分离 HMAC 生成指纹、调用 Repository 有界候选
+查询并执行版本化阈值策略；Repository 独占 pg_trgm/Hamming/指纹 SQL 和 evaluation/candidate 持久化。
+`ModerationService` 只把人工动作映射为一次写定反馈并记录固定标签指标。Controller、Web/Admin 不
+导入 Prisma，OpenSearch/Redis 不参与 canonical 判定，也没有新增进程、队列或数据库。
 
 ## 30.4 生成与手写边界
 

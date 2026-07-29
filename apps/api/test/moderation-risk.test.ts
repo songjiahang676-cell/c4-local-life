@@ -20,11 +20,11 @@ function baseline(): ListingSubmissionRiskInput {
   };
 }
 
-describe("listing submission risk rules v3", () => {
+describe("listing submission risk rules v4", () => {
   it("auto-approves an established account with a complete risk-based policy", () => {
     expect(evaluateListingSubmissionRisk(baseline())).toEqual({
       ruleSetKey: "listing-submission",
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
       riskTier: "LOW",
       hits: [],
       defaultLifetimeDays: 30,
@@ -49,6 +49,30 @@ describe("listing submission risk rules v3", () => {
     expect(JSON.stringify(result.hits)).not.toContain("test@example.invalid");
   });
 
+  it("queues enforced duplicate candidates while dry-run candidates remain non-blocking", () => {
+    const enforced = evaluateListingSubmissionRisk({
+      ...baseline(),
+      enforcedDuplicateCandidateCount: 1,
+    });
+    const dryRun = evaluateListingSubmissionRisk({
+      ...baseline(),
+      enforcedDuplicateCandidateCount: 0,
+    });
+
+    expect(enforced).toMatchObject({
+      riskTier: "MEDIUM",
+      hits: [
+        {
+          ruleCode: "POSSIBLE_DUPLICATE",
+          ruleVersion: 1,
+          severity: "MEDIUM",
+          evidenceKey: "duplicate_candidates",
+        },
+      ],
+    });
+    expect(dryRun.riskTier).toBe("LOW");
+  });
+
   it("escalates external-payment requests ahead of medium-risk hits", () => {
     const result = evaluateListingSubmissionRisk({
       ...baseline(),
@@ -56,7 +80,7 @@ describe("listing submission risk rules v3", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
       riskTier: "HIGH",
       hits: [
         {
@@ -77,7 +101,7 @@ describe("listing submission risk rules v3", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
       riskTier: "MEDIUM",
       hits: [
         {
@@ -99,7 +123,7 @@ describe("listing submission risk rules v3", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
       riskTier: "HIGH",
       hits: [
         {

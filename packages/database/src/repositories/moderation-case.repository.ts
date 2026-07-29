@@ -24,6 +24,7 @@ export type ModerationCaseRepositoryOptions = {
 export type ModerationActionKind = "APPROVE" | "REQUEST_CHANGES" | "REJECT" | "ESCALATE";
 export type ModerationReasonCode =
   | "CONTENT_POLICY_COMPLIANT"
+  | "DUPLICATE_CONTENT"
   | "NEEDS_CLARIFICATION"
   | "PROHIBITED_CONTENT"
   | "EXTERNAL_PAYMENT_RISK"
@@ -115,6 +116,18 @@ export type ModerationPublisherHistory = {
   suspendedCount: number;
 };
 
+export type ModerationDuplicateEvidence = {
+  candidateListingId: string;
+  candidateListingVersion: number;
+  candidateType: ListingType;
+  candidateTitle: string;
+  candidateStatus: ContentStatus;
+  thresholdVersion: number;
+  mode: "DRY_RUN" | "ENFORCE";
+  confidence: "MEDIUM" | "HIGH";
+  matchedSignals: ("TEXT" | "IMAGE" | "CONTACT")[];
+};
+
 export type ModerationListingAggregateProjection = {
   id: string;
   type: ListingType;
@@ -156,6 +169,7 @@ export type ModerationCaseDetail = {
   rules: ModerationRuleEvidence[];
   media: ModerationMediaEvidence[];
   publisherHistory: ModerationPublisherHistory;
+  duplicateCandidates: ModerationDuplicateEvidence[];
   listing: ModerationListingAggregateProjection;
 };
 
@@ -230,7 +244,15 @@ export type CommitModerationActionInput = {
 
 export type CommitModerationActionResult =
   | {
-      kind: "committed" | "exact_retry";
+      kind: "committed";
+      action: ModerationActionProjection;
+      duplicateReview: {
+        outcome: "CONFIRMED" | "FALSE_POSITIVE";
+        candidateCount: number;
+      } | null;
+    }
+  | {
+      kind: "exact_retry";
       action: ModerationActionProjection;
     }
   | {
@@ -249,8 +271,8 @@ type ModerationClient = PrismaClient | Prisma.TransactionClient;
 const moderatorRoles = [PlatformRole.MODERATOR, PlatformRole.SENIOR_MODERATOR] as const;
 const reasonByAction: Readonly<Record<ModerationActionKind, readonly ModerationReasonCode[]>> = {
   APPROVE: ["CONTENT_POLICY_COMPLIANT"],
-  REQUEST_CHANGES: ["NEEDS_CLARIFICATION"],
-  REJECT: ["PROHIBITED_CONTENT", "EXTERNAL_PAYMENT_RISK"],
+  REQUEST_CHANGES: ["NEEDS_CLARIFICATION", "DUPLICATE_CONTENT"],
+  REJECT: ["PROHIBITED_CONTENT", "EXTERNAL_PAYMENT_RISK", "DUPLICATE_CONTENT"],
   ESCALATE: ["ESCALATE_SENIOR_REVIEW"],
 };
 
@@ -783,6 +805,21 @@ export class ModerationCaseRepository {
               },
               orderBy: { ruleCode: "asc" },
             },
+            duplicateCandidates: {
+              select: {
+                candidateListingId: true,
+                candidateListingVersion: true,
+                candidateType: true,
+                candidateTitle: true,
+                candidateStatus: true,
+                thresholdVersion: true,
+                mode: true,
+                confidence: true,
+                matchedSignals: true,
+              },
+              orderBy: [{ mode: "desc" }, { confidence: "asc" }, { candidateListingId: "asc" }],
+              take: 10,
+            },
           },
         },
         snapshot: { select: { snapshot: true } },
@@ -877,6 +914,30 @@ export class ModerationCaseRepository {
           rejectedCount,
           suspendedCount,
         },
+        duplicateCandidates: row.evaluation.duplicateCandidates.flatMap((candidate) => {
+          if (
+            (candidate.mode !== "DRY_RUN" && candidate.mode !== "ENFORCE") ||
+            (candidate.confidence !== "MEDIUM" && candidate.confidence !== "HIGH") ||
+            candidate.matchedSignals.some(
+              (signal) => signal !== "TEXT" && signal !== "IMAGE" && signal !== "CONTACT",
+            )
+          ) {
+            return [];
+          }
+          return [
+            {
+              candidateListingId: candidate.candidateListingId,
+              candidateListingVersion: candidate.candidateListingVersion,
+              candidateType: candidate.candidateType,
+              candidateTitle: candidate.candidateTitle,
+              candidateStatus: candidate.candidateStatus,
+              thresholdVersion: candidate.thresholdVersion,
+              mode: candidate.mode,
+              confidence: candidate.confidence,
+              matchedSignals: candidate.matchedSignals as ("TEXT" | "IMAGE" | "CONTACT")[],
+            },
+          ];
+        }),
         listing: aggregate,
       },
     };
@@ -937,6 +998,11 @@ export class ModerationCaseRepository {
           updatedAt: true,
           evaluation: {
             select: {
+              id: true,
+              duplicateCandidates: {
+                where: { reviewOutcome: "UNREVIEWED" },
+                select: { id: true },
+              },
               listingRevision: {
                 select: {
                   classification: true,
@@ -1068,6 +1134,35 @@ export class ModerationCaseRepository {
         throw new Error("Locked moderation case changed during action");
       }
 
+      const duplicateReviewOutcome =
+        input.action === "APPROVE" && input.reasonCode === "CONTENT_POLICY_COMPLIANT"
+          ? "FALSE_POSITIVE"
+          : input.reasonCode === "DUPLICATE_CONTENT"
+            ? "CONFIRMED"
+            : null;
+      const duplicateCandidateIds =
+        duplicateReviewOutcome === null
+          ? []
+          : (currentCase.evaluation?.duplicateCandidates.map((candidate) => candidate.id) ?? []);
+      if (input.reasonCode === "DUPLICATE_CONTENT" && duplicateCandidateIds.length === 0) {
+        return { kind: "state_conflict", currentCaseVersion: currentCase.version };
+      }
+      if (duplicateReviewOutcome && duplicateCandidateIds.length > 0) {
+        const reviewed = await transaction.moderationDuplicateCandidate.updateMany({
+          where: {
+            id: { in: duplicateCandidateIds },
+            reviewOutcome: "UNREVIEWED",
+            reviewedAt: null,
+          },
+          data: {
+            reviewOutcome: duplicateReviewOutcome,
+            reviewedAt: input.occurredAt,
+          },
+        });
+        if (reviewed.count !== duplicateCandidateIds.length) {
+          throw new Error("Duplicate candidate review changed during moderation action");
+        }
+      }
       const metadata = {
         previousCaseStatus: currentCase.status,
         currentCaseStatus: nextCaseStatus,
@@ -1079,6 +1174,8 @@ export class ModerationCaseRepository {
         caseVersion: nextCaseVersion,
         previousListingVersion: listing.version,
         listingVersion: input.nextListing.version,
+        duplicateReviewOutcome,
+        duplicateCandidateCount: duplicateCandidateIds.length,
       } satisfies Prisma.InputJsonObject;
       const action = await transaction.moderationAction.create({
         data: {
@@ -1145,6 +1242,13 @@ export class ModerationCaseRepository {
       });
       return {
         kind: "committed",
+        duplicateReview:
+          duplicateReviewOutcome && duplicateCandidateIds.length > 0
+            ? {
+                outcome: duplicateReviewOutcome,
+                candidateCount: duplicateCandidateIds.length,
+              }
+            : null,
         action: {
           caseId: currentCase.id,
           actionId: action.id,

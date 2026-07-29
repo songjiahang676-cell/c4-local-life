@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added versioned, bounded Listing duplicate detection for pg_trgm text, deterministic media dHash
+  and domain-separated contact fingerprints, with dry-run/enforcement modes, immutable candidate
+  evidence, minimal bilingual moderator review, and idempotent confirmed/false-positive metrics.
 - Added a private bilingual Listing management center with draft/pending/published/archived
   buckets, expiry-aware counts, account-bound signed cursors, organization-aware reads, strong
   versioned archive/delete batches capped at 20, partial-failure feedback, noindex/no-store

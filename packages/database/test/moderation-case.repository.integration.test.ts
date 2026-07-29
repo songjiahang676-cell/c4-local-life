@@ -31,13 +31,19 @@ type Fixture = {
   unauthorizedUserId: string;
   unauthorizedSessionId: string;
   caseId: string;
+  candidateListingId: string;
   listingId: string;
   snapshotId: string;
 };
 
 async function createFixture(
   transaction: Prisma.TransactionClient,
-  options: { priority?: number; createdAt?: Date; title?: string } = {},
+  options: {
+    priority?: number;
+    createdAt?: Date;
+    title?: string;
+    includeDuplicateCandidate?: boolean;
+  } = {},
 ): Promise<Fixture> {
   const actorUserId = randomUUID();
   const unauthorizedUserId = randomUUID();
@@ -46,6 +52,7 @@ async function createFixture(
   const categoryId = randomUUID();
   const regionId = randomUUID();
   const listingId = randomUUID();
+  const candidateListingId = randomUUID();
   const evaluationId = randomUUID();
   const caseId = randomUUID();
   const snapshotId = randomUUID();
@@ -175,6 +182,26 @@ async function createFixture(
       },
     },
   });
+  await transaction.listing.create({
+    data: {
+      id: candidateListingId,
+      type: ListingType.RENTAL,
+      ownerId: unauthorizedUserId,
+      categoryId,
+      regionId,
+      status: ContentStatus.PUBLISHED,
+      moderationStatus: ModerationStatus.AUTO_APPROVED,
+      locale: "en-US",
+      title: "Earlier synthetic moderation rental",
+      slug: `moderation-candidate-${candidateListingId}`,
+      body: "Earlier synthetic moderation candidate.",
+      publishedAt: new Date("2026-07-20T00:00:00.000Z"),
+      expiresAt: new Date("2026-08-20T00:00:00.000Z"),
+      version: 2,
+      createdAt: new Date("2026-07-20T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-20T00:00:00.000Z"),
+    },
+  });
   await transaction.moderationEvaluation.create({
     data: {
       id: evaluationId,
@@ -199,6 +226,26 @@ async function createFixture(
           evidenceKey: "body",
         },
       },
+      ...(options.includeDuplicateCandidate === false
+        ? {}
+        : {
+            duplicateCandidates: {
+              create: {
+                candidateListingId,
+                candidateListingVersion: 2,
+                candidateType: ListingType.RENTAL,
+                candidateTitle: "Earlier synthetic moderation rental",
+                candidateStatus: ContentStatus.PUBLISHED,
+                thresholdVersion: 1,
+                mode: "ENFORCE",
+                confidence: "HIGH",
+                matchedSignals: ["TEXT", "CONTACT"],
+                titleScore: 0.96,
+                contactMatchCount: 1,
+                createdAt,
+              },
+            },
+          }),
     },
   });
   await transaction.moderationCase.create({
@@ -260,6 +307,7 @@ async function createFixture(
     unauthorizedUserId,
     unauthorizedSessionId,
     caseId,
+    candidateListingId,
     listingId,
     snapshotId,
   };
@@ -373,6 +421,15 @@ integration("ModerationCaseRepository with PostgreSQL", () => {
               evidenceKey: "body",
             },
           ],
+          duplicateCandidates: [
+            {
+              candidateListingId: high.candidateListingId,
+              thresholdVersion: 1,
+              mode: "ENFORCE",
+              confidence: "HIGH",
+              matchedSignals: ["TEXT", "CONTACT"],
+            },
+          ],
         },
       });
       if (detail.kind !== "found") throw new Error("Expected moderation case detail");
@@ -413,6 +470,10 @@ integration("ModerationCaseRepository with PostgreSQL", () => {
       });
       expect(committed).toMatchObject({
         kind: "committed",
+        duplicateReview: {
+          outcome: "FALSE_POSITIVE",
+          candidateCount: 1,
+        },
         action: {
           caseId: fixture.caseId,
           action: "APPROVE",
@@ -428,17 +489,21 @@ integration("ModerationCaseRepository with PostgreSQL", () => {
         action: committed.kind === "committed" ? committed.action : undefined,
       });
       expect(idempotencyConflict).toEqual({ kind: "idempotency_conflict" });
-      const [listing, moderationCase, actions, audits, events] = await Promise.all([
-        transaction.listing.findUniqueOrThrow({ where: { id: fixture.listingId } }),
-        transaction.moderationCase.findUniqueOrThrow({ where: { id: fixture.caseId } }),
-        transaction.moderationAction.findMany({ where: { caseId: fixture.caseId } }),
-        transaction.auditLog.findMany({
-          where: { targetId: fixture.caseId, action: "moderation.case.action.applied" },
-        }),
-        transaction.outboxEvent.findMany({
-          where: { aggregateId: fixture.listingId, eventType: "listing.published" },
-        }),
-      ]);
+      const [listing, moderationCase, actions, audits, events, duplicateEvidence] =
+        await Promise.all([
+          transaction.listing.findUniqueOrThrow({ where: { id: fixture.listingId } }),
+          transaction.moderationCase.findUniqueOrThrow({ where: { id: fixture.caseId } }),
+          transaction.moderationAction.findMany({ where: { caseId: fixture.caseId } }),
+          transaction.auditLog.findMany({
+            where: { targetId: fixture.caseId, action: "moderation.case.action.applied" },
+          }),
+          transaction.outboxEvent.findMany({
+            where: { aggregateId: fixture.listingId, eventType: "listing.published" },
+          }),
+          transaction.moderationDuplicateCandidate.findFirstOrThrow({
+            where: { evaluation: { moderationCase: { id: fixture.caseId } } },
+          }),
+        ]);
       expect(listing).toMatchObject({
         status: ContentStatus.PUBLISHED,
         moderationStatus: ModerationStatus.APPROVED,
@@ -452,8 +517,87 @@ integration("ModerationCaseRepository with PostgreSQL", () => {
       expect(actions).toHaveLength(1);
       expect(audits).toHaveLength(1);
       expect(events).toHaveLength(1);
+      expect(duplicateEvidence).toMatchObject({
+        reviewOutcome: "FALSE_POSITIVE",
+        reviewedAt: now,
+      });
       expect(JSON.stringify(audits[0]?.metadata)).not.toContain(input.note);
       expect(JSON.stringify(events[0]?.payload)).not.toContain(input.note);
+
+      await transaction.$executeRawUnsafe(`
+        DO $$
+        BEGIN
+          BEGIN
+            UPDATE "moderation_duplicate_candidates"
+            SET "review_outcome" = 'CONFIRMED'
+            WHERE "id" = '${duplicateEvidence.id}'::uuid;
+            RAISE EXCEPTION 'review immutability trigger did not reject mutation';
+          EXCEPTION
+            WHEN OTHERS THEN
+              IF SQLERRM NOT LIKE '%review outcome is immutable%' THEN
+                RAISE;
+              END IF;
+          END;
+        END
+        $$;
+      `);
+
+      const confirmedFixture = await createFixture(transaction, {
+        title: "Confirmed duplicate integration rental",
+      });
+      const confirmedInput: CommitModerationActionInput = {
+        ...actionInput(confirmedFixture),
+        action: "REJECT",
+        reasonCode: "DUPLICATE_CONTENT",
+        idempotencyKey: "moderation-confirmed-duplicate-0001",
+        requestHash: "c".repeat(64),
+        nextListing: {
+          status: ContentStatus.SUSPENDED,
+          moderationStatus: ModerationStatus.REJECTED,
+          publishedAt: null,
+          expiresAt: null,
+          version: 4,
+        },
+      };
+      await expect(repository.commit(confirmedInput)).resolves.toMatchObject({
+        kind: "committed",
+        duplicateReview: {
+          outcome: "CONFIRMED",
+          candidateCount: 1,
+        },
+      });
+      await expect(
+        transaction.moderationDuplicateCandidate.findFirstOrThrow({
+          where: {
+            evaluation: { moderationCase: { id: confirmedFixture.caseId } },
+          },
+          select: { reviewOutcome: true, reviewedAt: true },
+        }),
+      ).resolves.toEqual({
+        reviewOutcome: "CONFIRMED",
+        reviewedAt: now,
+      });
+
+      const noEvidenceFixture = await createFixture(transaction, {
+        title: "No duplicate evidence integration rental",
+        includeDuplicateCandidate: false,
+      });
+      await expect(
+        repository.commit({
+          ...actionInput(noEvidenceFixture),
+          action: "REJECT",
+          reasonCode: "DUPLICATE_CONTENT",
+          idempotencyKey: "moderation-duplicate-without-evidence-0001",
+          requestHash: "d".repeat(64),
+          nextListing: {
+            status: ContentStatus.SUSPENDED,
+            moderationStatus: ModerationStatus.REJECTED,
+            publishedAt: null,
+            expiresAt: null,
+            version: 4,
+          },
+        }),
+      ).resolves.toEqual({ kind: "state_conflict", currentCaseVersion: 1 });
 
       await transaction.$executeRawUnsafe(`
         DO $$

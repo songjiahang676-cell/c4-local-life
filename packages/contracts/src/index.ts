@@ -552,8 +552,8 @@ export const listModerationCasesQuerySchema: z.ZodType<ListModerationCasesQuery>
 
 const moderationReasonByAction = {
   APPROVE: ["CONTENT_POLICY_COMPLIANT"],
-  REQUEST_CHANGES: ["NEEDS_CLARIFICATION"],
-  REJECT: ["PROHIBITED_CONTENT", "EXTERNAL_PAYMENT_RISK"],
+  REQUEST_CHANGES: ["NEEDS_CLARIFICATION", "DUPLICATE_CONTENT"],
+  REJECT: ["PROHIBITED_CONTENT", "EXTERNAL_PAYMENT_RISK", "DUPLICATE_CONTENT"],
   ESCALATE: ["ESCALATE_SENIOR_REVIEW"],
 } as const;
 
@@ -574,6 +574,7 @@ export const moderationActionRequestSchema: z.ZodType<ModerationActionRequest> =
     action: z.enum(["APPROVE", "REQUEST_CHANGES", "REJECT", "ESCALATE"]),
     reasonCode: z.enum([
       "CONTENT_POLICY_COMPLIANT",
+      "DUPLICATE_CONTENT",
       "NEEDS_CLARIFICATION",
       "PROHIBITED_CONTENT",
       "EXTERNAL_PAYMENT_RISK",

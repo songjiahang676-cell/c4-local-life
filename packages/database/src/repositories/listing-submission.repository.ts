@@ -28,6 +28,8 @@ export type ListingSubmissionCandidate = {
   title: string;
   summary: string | null;
   body: string;
+  attributes: unknown;
+  mediaPerceptualHashes: string[];
   priceAmount: string | null;
   priceUnit: PriceUnit | null;
   formSchemaDefinition: unknown;
@@ -37,6 +39,50 @@ export type ListingSubmissionCandidate = {
   createdAt: Date;
   updatedAt: Date;
   version: number;
+};
+
+export type FindListingDuplicateCandidatesInput = {
+  listingId: string;
+  listingType: ListingType;
+  title: string;
+  body: string;
+  contactFingerprints: readonly string[];
+  mediaPerceptualHashes: readonly string[];
+  occurredAt: Date;
+  lookbackDays: number;
+  titleCandidateThreshold: number;
+  bodyCandidateThreshold: number;
+  imageCandidateDistance: number;
+  limit: number;
+};
+
+export type ListingDuplicateCandidateMatch = {
+  listingId: string;
+  listingVersion: number;
+  listingType: ListingType;
+  title: string;
+  status: ContentStatus;
+  publishedAt: Date | null;
+  titleScore: number;
+  bodyScore: number;
+  imageDistance: number | null;
+  contactMatchCount: number;
+};
+
+export type ModerationDuplicateCandidateInput = {
+  candidateListingId: string;
+  candidateListingVersion: number;
+  candidateType: ListingType;
+  candidateTitle: string;
+  candidateStatus: ContentStatus;
+  thresholdVersion: number;
+  mode: "DRY_RUN" | "ENFORCE";
+  confidence: "MEDIUM" | "HIGH";
+  matchedSignals: readonly ("TEXT" | "IMAGE" | "CONTACT")[];
+  titleScore: number | null;
+  bodyScore: number | null;
+  imageDistance: number | null;
+  contactMatchCount: number;
 };
 
 export type ListingSubmissionTransitionEvidence = {
@@ -78,6 +124,8 @@ export type SubmitListingInput = {
   ruleSetVersion: number;
   riskTier: ModerationRiskTier;
   hits: readonly ListingSubmissionRuleHitInput[];
+  contactFingerprints: readonly string[];
+  duplicateCandidates: readonly ModerationDuplicateCandidateInput[];
   decision: ListingSubmissionDecision;
 };
 
@@ -223,6 +271,12 @@ function asJsonObject(value: object): Prisma.InputJsonObject {
 
 function asJsonArray(value: readonly object[]): Prisma.InputJsonArray {
   return [...value] as Prisma.InputJsonArray;
+}
+
+function sqlTextArray(values: readonly string[]): Prisma.Sql {
+  return values.length === 0
+    ? Prisma.sql`ARRAY[]::text[]`
+    : Prisma.sql`ARRAY[${Prisma.join(values)}]::text[]`;
 }
 
 function isRepositoryOptions(
@@ -387,6 +441,7 @@ export class ListingSubmissionRepository {
         title: true,
         summary: true,
         body: true,
+        attributes: true,
         priceAmount: true,
         priceUnit: true,
         categoryId: true,
@@ -396,6 +451,11 @@ export class ListingSubmissionRepository {
         createdAt: true,
         updatedAt: true,
         version: true,
+        uploadedMedia: {
+          where: { status: "READY", perceptualHash: { not: null } },
+          select: { perceptualHash: true },
+          orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+        },
       },
     });
     if (!listing) return null;
@@ -419,6 +479,10 @@ export class ListingSubmissionRepository {
       title: listing.title,
       summary: listing.summary,
       body: listing.body,
+      attributes: listing.attributes,
+      mediaPerceptualHashes: listing.uploadedMedia.flatMap((media) =>
+        media.perceptualHash ? [media.perceptualHash] : [],
+      ),
       priceAmount: listing.priceAmount?.toFixed(2) ?? null,
       priceUnit: listing.priceUnit,
       formSchemaDefinition: formSchema.definition,
@@ -429,6 +493,103 @@ export class ListingSubmissionRepository {
       updatedAt: listing.updatedAt,
       version: listing.version,
     };
+  }
+
+  async findDuplicateCandidates(
+    input: FindListingDuplicateCandidatesInput,
+  ): Promise<ListingDuplicateCandidateMatch[]> {
+    if (
+      input.lookbackDays < 1 ||
+      input.lookbackDays > 3650 ||
+      input.limit < 1 ||
+      input.limit > 20 ||
+      input.titleCandidateThreshold < 0 ||
+      input.titleCandidateThreshold > 1 ||
+      input.bodyCandidateThreshold < 0 ||
+      input.bodyCandidateThreshold > 1 ||
+      input.imageCandidateDistance < 0 ||
+      input.imageCandidateDistance > 64 ||
+      input.contactFingerprints.length > 20 ||
+      input.mediaPerceptualHashes.length > 20 ||
+      input.contactFingerprints.some((fingerprint) => !/^[0-9a-f]{64}$/.test(fingerprint)) ||
+      input.mediaPerceptualHashes.some((hash) => !/^[0-9a-f]{16}$/.test(hash))
+    ) {
+      throw new Error("Duplicate candidate query is outside its bounded policy");
+    }
+    const earliest = new Date(input.occurredAt.getTime() - input.lookbackDays * 86_400_000);
+    const contactFingerprints = sqlTextArray(input.contactFingerprints);
+    const mediaPerceptualHashes = sqlTextArray(input.mediaPerceptualHashes);
+    return this.#client.$queryRaw<ListingDuplicateCandidateMatch[]>(Prisma.sql`
+      WITH duplicate_candidates AS (
+        SELECT
+          listing."id" AS "listingId",
+          listing."version" AS "listingVersion",
+          listing."type" AS "listingType",
+          listing."title",
+          listing."status",
+          listing."published_at" AS "publishedAt",
+          similarity(listing."title", ${input.title})::double precision AS "titleScore",
+          similarity(left(listing."body", 2000), left(${input.body}, 2000))::double precision
+            AS "bodyScore",
+          (
+            SELECT min(
+              socal_hamming_distance_hex64(media."perceptual_hash", requested_hash.value)
+            )::integer
+            FROM "media_assets" AS media
+            CROSS JOIN unnest(${mediaPerceptualHashes}) AS requested_hash(value)
+            WHERE media."listing_id" = listing."id"
+              AND media."status" = 'READY'::"MediaStatus"
+              AND media."perceptual_hash" IS NOT NULL
+          ) AS "imageDistance",
+          (
+            SELECT count(DISTINCT fingerprint."fingerprint")::integer
+            FROM "listing_contact_fingerprints" AS fingerprint
+            WHERE fingerprint."listing_id" = listing."id"
+              AND fingerprint."fingerprint" = ANY(${contactFingerprints})
+          ) AS "contactMatchCount"
+        FROM "listings" AS listing
+        WHERE listing."id" <> ${input.listingId}::uuid
+          AND listing."type" = ${input.listingType}::"ListingType"
+          AND listing."status" <> 'DELETED'::"ContentStatus"
+          AND listing."deleted_at" IS NULL
+          AND listing."created_at" >= ${earliest}
+          AND listing."created_at" <= ${input.occurredAt}
+      )
+      SELECT *
+      FROM duplicate_candidates
+      WHERE "titleScore" >= ${input.titleCandidateThreshold}
+        OR "bodyScore" >= ${input.bodyCandidateThreshold}
+        OR "imageDistance" <= ${input.imageCandidateDistance}
+        OR "contactMatchCount" > 0
+      ORDER BY
+        ("contactMatchCount" > 0) DESC,
+        "imageDistance" ASC NULLS LAST,
+        greatest("titleScore", "bodyScore") DESC,
+        "listingId" ASC
+      LIMIT ${input.limit}
+    `);
+  }
+
+  async findMediaPerceptualHashes(input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  }): Promise<string[]> {
+    if (input.mediaIds.length === 0) return [];
+    if (input.mediaIds.length > 20) {
+      throw new Error("Duplicate media fingerprint lookup is outside its bounded policy");
+    }
+    const media = await this.#client.mediaAsset.findMany({
+      where: {
+        id: { in: [...new Set(input.mediaIds)] },
+        status: "READY",
+        perceptualHash: { not: null },
+        OR: [{ ownerId: input.actorUserId }, { listingId: input.listingId }],
+      },
+      select: { perceptualHash: true },
+      orderBy: { id: "asc" },
+    });
+    return media.flatMap((asset) => (asset.perceptualHash ? [asset.perceptualHash] : []));
   }
 
   submit(input: SubmitListingInput): Promise<SubmitListingResult> {
@@ -578,6 +739,24 @@ export class ListingSubmissionRepository {
               evidenceKey: hit.evidenceKey,
             })),
           },
+          duplicateCandidates: {
+            create: input.duplicateCandidates.map((candidate) => ({
+              candidateListingId: candidate.candidateListingId,
+              candidateListingVersion: candidate.candidateListingVersion,
+              candidateType: candidate.candidateType,
+              candidateTitle: candidate.candidateTitle,
+              candidateStatus: candidate.candidateStatus,
+              thresholdVersion: candidate.thresholdVersion,
+              mode: candidate.mode,
+              confidence: candidate.confidence,
+              matchedSignals: [...candidate.matchedSignals],
+              titleScore: candidate.titleScore,
+              bodyScore: candidate.bodyScore,
+              imageDistance: candidate.imageDistance,
+              contactMatchCount: candidate.contactMatchCount,
+              createdAt: input.occurredAt,
+            })),
+          },
         },
         select: { id: true },
       });
@@ -606,6 +785,18 @@ export class ListingSubmissionRepository {
         },
         select: { id: true },
       });
+      await transaction.listingContactFingerprint.deleteMany({
+        where: { listingId: input.listingId },
+      });
+      if (input.contactFingerprints.length > 0) {
+        await transaction.listingContactFingerprint.createMany({
+          data: [...new Set(input.contactFingerprints)].map((fingerprint) => ({
+            listingId: input.listingId,
+            fingerprint,
+            createdAt: input.occurredAt,
+          })),
+        });
+      }
       const changed = await transaction.listing.updateMany({
         where: {
           id: input.listingId,

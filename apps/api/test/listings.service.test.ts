@@ -224,7 +224,7 @@ describe("ListingsService", () => {
         previousModerationStatus: "NOT_REVIEWED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 3,
+        ruleSetVersion: 4,
         caseId: null,
         version: 3,
       },
@@ -239,6 +239,45 @@ describe("ListingsService", () => {
     await expect(
       service.submit(ownerContext(), created.data.id, 3, "submit-listing-0001"),
     ).rejects.toBeInstanceOf(ListingIdempotencyConflictError);
+  });
+
+  it("routes an enforced duplicate candidate to review without exposing scores", async () => {
+    const { service, store } = createService();
+    const created = await service.create(
+      ownerContext(),
+      "create-duplicate-candidate-0001",
+      createInput(),
+    );
+    store.duplicateCandidateMatches = [
+      {
+        listingId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        listingVersion: 4,
+        listingType: "RENTAL",
+        title: "Earlier synthetic Irvine rental",
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-07-20T00:00:00.000Z"),
+        titleScore: 0.96,
+        bodyScore: 0.7,
+        imageDistance: null,
+        contactMatchCount: 0,
+      },
+    ];
+
+    const submitted = await service.submit(
+      ownerContext(),
+      created.data.id,
+      1,
+      "submit-duplicate-candidate-0001",
+    );
+
+    expect(submitted.data).toMatchObject({
+      currentStatus: "SUBMITTED",
+      currentModerationStatus: "PENDING_REVIEW",
+      riskTier: "MEDIUM",
+      ruleSetVersion: 4,
+      caseId: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(submitted.data).not.toHaveProperty("duplicateCandidates");
   });
 
   it("routes a sensitive attribute-only published edit to review without retaining its value", async () => {
@@ -357,7 +396,7 @@ describe("ListingsService", () => {
       currentStatus: "PUBLISHED",
       currentModerationStatus: "AUTO_APPROVED",
       riskTier: "LOW",
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
     });
 
     const publicPage = await service.list({ type: "JOB", limit: 20 });
@@ -399,7 +438,7 @@ describe("ListingsService", () => {
       currentStatus: "SUBMITTED",
       currentModerationStatus: "PENDING_REVIEW",
       riskTier: "MEDIUM",
-      ruleSetVersion: 3,
+      ruleSetVersion: 4,
     });
 
     for (const type of ["SECONDHAND", "SERVICE"] as const) {
@@ -418,7 +457,7 @@ describe("ListingsService", () => {
         currentStatus: "PUBLISHED",
         currentModerationStatus: "AUTO_APPROVED",
         riskTier: "LOW",
-        ruleSetVersion: 3,
+        ruleSetVersion: 4,
       });
       const publicPage = await service.list({ type, limit: 20 });
       expect(publicPage.data).toEqual([

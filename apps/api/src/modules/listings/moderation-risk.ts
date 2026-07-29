@@ -1,6 +1,6 @@
 export const listingSubmissionRuleSet = {
   key: "listing-submission",
-  version: 3,
+  version: 4,
 } as const;
 
 export const moderationRiskTiers = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -13,11 +13,13 @@ export type ModerationRuleHit = {
     | "EXTERNAL_PAYMENT_REQUEST"
     | "EMPLOYMENT_POLICY_RISK"
     | "NEW_ACCOUNT"
+    | "POSSIBLE_DUPLICATE"
     | "PROHIBITED_GOODS_RISK"
     | "PUBLICATION_POLICY_INCOMPLETE";
   ruleVersion: 1;
   severity: Exclude<ModerationRiskTier, "LOW">;
-  evidenceKey: "account_age" | "body" | "publication_policy" | "summary" | "title";
+  evidenceKey:
+    "account_age" | "body" | "duplicate_candidates" | "publication_policy" | "summary" | "title";
 };
 
 export type ListingSubmissionRiskInput = {
@@ -31,6 +33,7 @@ export type ListingSubmissionRiskInput = {
     defaultLifetimeDays?: number;
     manualReviewRequired?: boolean;
   };
+  enforcedDuplicateCandidateCount?: number;
 };
 
 export type ListingSubmissionRiskResult = {
@@ -84,6 +87,14 @@ export function evaluateListingSubmissionRisk(
       ruleVersion: 1,
       severity: "MEDIUM",
       evidenceKey: "publication_policy",
+    });
+  }
+  if ((input.enforcedDuplicateCandidateCount ?? 0) > 0) {
+    hits.push({
+      ruleCode: "POSSIBLE_DUPLICATE",
+      ruleVersion: 1,
+      severity: "MEDIUM",
+      evidenceKey: "duplicate_candidates",
     });
   }
   const lifetimeDays = input.publicationPolicy.defaultLifetimeDays;

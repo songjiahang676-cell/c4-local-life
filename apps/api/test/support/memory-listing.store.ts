@@ -9,6 +9,8 @@ import type {
   ListingStore,
   FindListingSubmissionRetryInput,
   FindListingSubmissionRetryResult,
+  FindListingDuplicateCandidatesInput,
+  ListingDuplicateCandidateMatch,
   ListingSubmissionCandidate,
   ListingSubmissionProjection,
   ListingRevisionProjection,
@@ -599,6 +601,7 @@ function applyFields(
 }
 
 export class MemoryListingStore implements ListingStore {
+  duplicateCandidateMatches: ListingDuplicateCandidateMatch[] = [];
   readonly auditActions: string[] = [];
   readonly outboxEvents: string[] = [];
   readonly #rows = new Map<string, OwnerListingProjection>();
@@ -914,6 +917,10 @@ export class MemoryListingStore implements ListingStore {
       title: row.title,
       summary: row.summary,
       body: row.body,
+      attributes: structuredClone(row.attributes),
+      mediaPerceptualHashes: row.mediaIds
+        .filter((mediaId) => this.#readyMedia.has(mediaId))
+        .map(() => "0123456789abcdef"),
       priceAmount: row.price?.amount ?? null,
       priceUnit: row.price?.unit ?? null,
       formSchemaDefinition: {
@@ -937,6 +944,27 @@ export class MemoryListingStore implements ListingStore {
       updatedAt: row.updatedAt,
       version: row.version,
     });
+  }
+
+  findDuplicateCandidates(
+    input: FindListingDuplicateCandidatesInput,
+  ): Promise<ListingDuplicateCandidateMatch[]> {
+    void input;
+    return Promise.resolve(structuredClone(this.duplicateCandidateMatches));
+  }
+
+  findMediaPerceptualHashes(input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  }): Promise<string[]> {
+    const row = this.#rows.get(input.listingId);
+    if (!row || !this.#canWrite(input.actorUserId, row)) return Promise.resolve([]);
+    return Promise.resolve(
+      input.mediaIds
+        .filter((mediaId) => this.#readyMedia.has(mediaId))
+        .map(() => "0123456789abcdef"),
+    );
   }
 
   submit(input: SubmitListingInput): Promise<SubmitListingResult> {

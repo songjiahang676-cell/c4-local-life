@@ -36,6 +36,7 @@ describe("SharpImageTransformer", () => {
     }
     expect(transformed.width).toBe(480);
     expect(transformed.height).toBe(640);
+    expect(transformed.perceptualHash).toMatch(/^[0-9a-f]{16}$/);
   });
 
   it("rejects undecodable input instead of copying it through", async () => {

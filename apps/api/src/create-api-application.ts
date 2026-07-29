@@ -148,6 +148,7 @@ export async function createApiApplication(
       options.moderationStore,
       options.notificationStore,
       options.trustSafetyStore,
+      observability.metrics,
     ),
     adapter,
     {
