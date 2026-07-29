@@ -5,16 +5,15 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：等待 `WEB-001` 受保护 CI 后，按实施顺序进入 `WEB-002` 首页
+- 目标：完成 `WEB-001` 证据头受保护 CI 与合并后，按实施顺序进入 `WEB-002` 首页
 - 进度：5 个 G3 任务、51/101 个总任务本地完成
-- 风险：`WEB-001` 本地质量、架构、运行时和桌面/移动浏览器验证已通过，仍需受保护 CI
-  补齐真实 PostgreSQL、OpenSearch、Redis、ClamAV、Linux 与四镜像证据；生产域名与最终品牌资产仍待负责人确认
+- 风险：`WEB-001` 本地与首轮受保护 CI 已通过，仍需证据头复跑和受保护合并；生产域名与最终品牌资产仍待负责人确认
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target       | Status     | Notes                          |
-| ------- | -------------------- | ---------- | ------------ | ---------- | ------------------------------ |
-| WEB-001 | @songjiahang676-cell | 2026-07-29 | protected CI | local done | awaiting hosted service checks |
+| Task    | Owner                | Started    | Target       | Status          | Notes                        |
+| ------- | -------------------- | ---------- | ------------ | --------------- | ---------------------------- |
+| WEB-001 | @songjiahang676-cell | 2026-07-29 | protected CI | evidence update | initial hosted checks passed |
 
 ## Gate Evidence
 
@@ -219,6 +218,7 @@
 | WEB-001 local quality           | `pnpm ci:quality`                     | 357 passed / 83 service-skipped tests；9 typechecks/lints；8 builds passed | 2026-07-29 |
 | WEB-001 runtime/browser         | API runtime + production Playwright   | 68 paths / 163 schemas；desktop/mobile Chromium 22/22 passed               | 2026-07-29 |
 | WEB-001 architecture            | `scripts/check-architecture.sh`       | 101 tasks；60 models；68 paths；163 schemas；36 JSON files passed          | 2026-07-29 |
+| WEB-001 protected checks        | PR #37 / run `30494055315`            | 98 files / 440 real-service tests；Linux 22/22 E2E；four images passed     | 2026-07-29 |
 
 ## Decisions / Blocks
 
@@ -233,8 +233,8 @@
   `cdd3c53`；`WEB-004` 已由 PR #32 / final main run `30473551979` 受保护合并为 `1bdcab9`，
   Gate 2 已关闭；`SEARCH-001` 至 `SEARCH-004` 已在受保护 `main` 完成，其中 `SEARCH-004`
   由 PR #36 / evidence-head run `30491148630` 合并为 `30be880`，final main run
-  `30491653244` 全绿；`WEB-001` 本地实施和全量验证完成，正等待受保护 PR/CI 证据，之后按
-  `IMPLEMENTATION_SEQUENCE.md` 进入 `WEB-002`。
+  `30491653244` 全绿；`WEB-001` 本地实施和 PR #37 首轮 run `30494055315` 全绿，正执行证据头
+  受保护 CI，之后按 `IMPLEMENTATION_SEQUENCE.md` 进入 `WEB-002`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
