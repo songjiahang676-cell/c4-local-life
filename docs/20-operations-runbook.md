@@ -99,7 +99,18 @@
 - 错发或越权按隐私事件处理：立即停用相关事件映射、核对 canonical owner 和模板变量，不在工单中复制
   完整通知内容或 PII。
 
-## 20.13 定期运维
+## 20.13 Listing 索引同步异常
+
+- 先比较 urgent/normal freshness histogram、Outbox oldest age、BullMQ backlog 和 reconciliation
+  outcome，判断延迟位于数据库领取、队列消费、canonical 查询还是 OpenSearch。
+- 下架积压时暂停非必要普通消费者并保留 Outbox；不得删除队列或以 payload 直接补文档。确认
+  `listing.*` 紧急事件在 claim 与 BullMQ 都保持优先级后再扩容。
+- reconciliation 持续 upsert/delete 表示丢事件或索引漂移；持续 failed 或 stale 且索引版本领先
+  PostgreSQL 时停止就地修补，保留证据并进入 `SEARCH-005` 新索引重建/alias 切换流程。
+- 手工验证只比较 Listing ID、canonical/index version 和是否存在，不把公开索引内容写回 PostgreSQL，
+  不在工单复制标题、联系方式、坐标或完整文档。
+
+## 20.14 定期运维
 
 每日：关键告警、审核/队列 SLA、支付对账、备份状态。
 

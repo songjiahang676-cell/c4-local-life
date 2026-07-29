@@ -53,6 +53,11 @@ describe("OutboxDispatcher", () => {
       },
     };
     const observability = runtime(records);
+    const claimInputs: unknown[] = [];
+    repository.claimBatch = (input) => {
+      claimInputs.push(input);
+      return Promise.resolve([claimed]);
+    };
     const dispatcher = new OutboxDispatcher({
       repository,
       publisher,
@@ -64,6 +69,7 @@ describe("OutboxDispatcher", () => {
         retryBaseSeconds: 5,
         retryMaximumSeconds: 900,
         pollIntervalMilliseconds: 1_000,
+        priorityEventTypes: ["listing.deleted"],
       },
     });
 
@@ -76,6 +82,14 @@ describe("OutboxDispatcher", () => {
       oldestPendingAgeSeconds: 12,
     });
     expect(published).toEqual([claimed.id]);
+    expect(claimInputs).toEqual([
+      {
+        now,
+        batchSize: 25,
+        leaseSeconds: 60,
+        priorityEventTypes: ["listing.deleted"],
+      },
+    ]);
     const metrics = observability.metrics.renderPrometheus();
     expect(metrics).toContain('socal_outbox_dispatch_total{outcome="published"} 1');
     expect(metrics).toContain("socal_outbox_oldest_pending_age_seconds 12");

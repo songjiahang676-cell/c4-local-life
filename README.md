@@ -269,7 +269,10 @@ guest、错误/重试、无组织状态和组织类型/角色本地化，并保�
 Gate 3 从 `SEARCH-001` 开始建立可执行的 OpenSearch 公共投影。v1 使用版本化物理索引和稳定读写
 alias，严格 mapping 只允许双语文本、分类/地区、价格/属性、模糊公开 geo、公开发布者信号、推广标志
 和内容版本；PII、精确地址、审核/风险字段及私有媒体标识明确排除。`pnpm search:index:ensure` 可重复
-创建或校验该契约，索引 Worker、查询 API 和原子重建仍由后续 SEARCH 任务负责。
+创建或校验该契约。`SEARCH-002` 已把 Listing Outbox 接入 canonical PostgreSQL 公共投影和 OpenSearch
+external version 写删：下架事件在数据库领取和 BullMQ 两段都优先，旧事件不能覆盖新状态；定时
+reconciliation 扫描 Listing 版本并修复缺失、落后或应删除的文档，指标可分别计算紧急下架和普通更新
+的 p95 freshness。查询 API、同义词/建议和原子重建仍由后续 SEARCH 任务负责。
 
 ## 七、规划容量与服务目标
 

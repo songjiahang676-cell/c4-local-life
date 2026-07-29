@@ -134,3 +134,15 @@ no-store，并在可见状态下每 15 秒、focus、pageshow、恢复可见和�
 401、过期、网络/服务错误以及 malformed、重复或越界响应都会清空旧能力并失败关闭。导航隐藏仅用于
 减少无效入口，不构成授权；每个 owner/组织资源和 mutation 仍由 API 当前 Actor、Policy、Repository
 对象范围、版本与幂等规则独立验证。账号切换、角色撤销或受限状态不能继承上一快照的能力。
+
+## 公共搜索索引消费边界
+
+Listing Outbox payload 不能作为搜索文档；Worker 严格校验最小 envelope 后必须从 PostgreSQL 读取
+当前公开状态和历史 schema 白名单字段。联系方式、精确地址、owner-only/未知 attributes、审核/风险、
+媒体 key 和组织法律资料不得进入投影、日志或指标。EXACT 点只能降为公开 Region CITY 点，其他公开
+点最多三位小数。
+
+OpenSearch 写入和删除使用 canonical Listing external version；旧事件冲突视为 stale，数据库版本
+落后 durable event 时重试而不是信任 payload。下架在 Outbox 和 BullMQ 两段优先，周期对账以
+PostgreSQL 决定缺失重建和非公开删除，绝不把索引反写事实源。指标只使用固定 operation/outcome/
+priority，不包含 Listing/event/owner ID、标题、坐标或文档。

@@ -11,6 +11,7 @@ describe("BullMqOutboxPublisher", () => {
       {
         maximumPayloadBytes: 131_072,
         jobAttempts: 8,
+        priorityEventTypes: ["listing.submitted"],
       },
     );
     const id = randomUUID();
@@ -42,7 +43,43 @@ describe("BullMqOutboxPublisher", () => {
         jobId: id,
         attempts: 8,
         backoff: { type: "exponential", delay: 1_000 },
+        priority: 1,
       }),
+    );
+  });
+
+  it("uses a lower BullMQ priority for removal events than ordinary work", async () => {
+    const add = vi.fn(() => Promise.resolve({}));
+    const publisher = new BullMqOutboxPublisher(
+      { add },
+      {
+        maximumPayloadBytes: 131_072,
+        jobAttempts: 8,
+        priorityEventTypes: ["listing.deleted"],
+      },
+    );
+    const base = {
+      aggregateType: "LISTING",
+      aggregateId: randomUUID(),
+      payload: { schemaVersion: 1 },
+      attempt: 1,
+      leaseExpiresAt: new Date("2026-07-29T18:01:00.000Z"),
+      createdAt: new Date("2026-07-29T18:00:00.000Z"),
+    };
+    await publisher.publish({ ...base, id: randomUUID(), eventType: "listing.published" });
+    await publisher.publish({ ...base, id: randomUUID(), eventType: "listing.deleted" });
+
+    expect(add).toHaveBeenNthCalledWith(
+      1,
+      "listing.published",
+      expect.anything(),
+      expect.objectContaining({ priority: 10 }),
+    );
+    expect(add).toHaveBeenNthCalledWith(
+      2,
+      "listing.deleted",
+      expect.anything(),
+      expect.objectContaining({ priority: 1 }),
     );
   });
 

@@ -17,14 +17,20 @@ type ListingExpiryOutcome = "expired" | "idle";
 type NotificationEventOutcome =
   "created" | "duplicate" | "ignored" | "recipient_unavailable" | "failed";
 type ModerationDuplicateReviewOutcome = "confirmed" | "false_positive";
+type SearchIndexOperation = "upsert" | "delete";
+type SearchIndexOutcome = "applied" | "stale" | "missing" | "failed";
+type SearchIndexPriority = "urgent" | "normal";
+type SearchReconciliationOutcome = "current" | "upserted" | "deleted" | "failed";
 
 type Histogram = {
   count: number;
   sum: number;
+  boundaries: number[];
   buckets: number[];
 };
 
 const durationBuckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const searchFreshnessBuckets = [1, 2, 5, 10, 30, 60, 120, 300, 900];
 
 function escapeLabel(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll('"', '\\"');
@@ -48,15 +54,21 @@ function increment(map: Map<string, number>, key: string, amount = 1): void {
   map.set(key, (map.get(key) ?? 0) + amount);
 }
 
-function observe(map: Map<string, Histogram>, key: string, value: number): void {
+function observe(
+  map: Map<string, Histogram>,
+  key: string,
+  value: number,
+  boundaries = durationBuckets,
+): void {
   const histogram = map.get(key) ?? {
     count: 0,
     sum: 0,
-    buckets: durationBuckets.map(() => 0),
+    boundaries,
+    buckets: boundaries.map(() => 0),
   };
   histogram.count += 1;
   histogram.sum += value;
-  durationBuckets.forEach((boundary, index) => {
+  histogram.boundaries.forEach((boundary, index) => {
     if (value <= boundary) histogram.buckets[index] = (histogram.buckets[index] ?? 0) + 1;
   });
   map.set(key, histogram);
@@ -88,6 +100,9 @@ export class MetricsRegistry {
   readonly #listingExpiryPolls = new Map<ListingExpiryOutcome, number>();
   readonly #notificationEvents = new Map<NotificationEventOutcome, number>();
   readonly #moderationDuplicateReviews = new Map<ModerationDuplicateReviewOutcome, number>();
+  readonly #searchIndexEvents = new Map<string, number>();
+  readonly #searchIndexFreshness = new Map<string, Histogram>();
+  readonly #searchReconciliations = new Map<SearchReconciliationOutcome, number>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -147,6 +162,31 @@ export class MetricsRegistry {
   moderationDuplicateReview(outcome: ModerationDuplicateReviewOutcome, count = 1): void {
     if (!Number.isInteger(count) || count < 1 || count > 10) return;
     increment(this.#moderationDuplicateReviews, outcome, count);
+  }
+
+  searchIndex(input: {
+    operation: SearchIndexOperation;
+    outcome: SearchIndexOutcome;
+    priority: SearchIndexPriority;
+    freshnessSeconds: number;
+  }): void {
+    const dimensions = {
+      operation: input.operation,
+      outcome: input.outcome,
+      priority: input.priority,
+    };
+    increment(this.#searchIndexEvents, labelKey(dimensions));
+    if (input.outcome === "failed") return;
+    observe(
+      this.#searchIndexFreshness,
+      labelKey({ operation: input.operation, priority: input.priority }),
+      Number.isFinite(input.freshnessSeconds) ? Math.max(0, input.freshnessSeconds) : 0,
+      searchFreshnessBuckets,
+    );
+  }
+
+  searchReconciliation(outcome: SearchReconciliationOutcome): void {
+    this.#searchReconciliations.set(outcome, (this.#searchReconciliations.get(outcome) ?? 0) + 1);
   }
 
   observeListingExpiry(expiredCount: number): void {
@@ -230,6 +270,29 @@ export class MetricsRegistry {
       lines.push(`socal_moderation_duplicate_reviews_total${labels({ outcome })} ${value}`);
     }
     lines.push(
+      "# HELP socal_search_index_events_total Listing search projection writes by bounded operation, outcome, and priority.",
+      "# TYPE socal_search_index_events_total counter",
+    );
+    for (const [key, value] of [...this.#searchIndexEvents].sort()) {
+      lines.push(`socal_search_index_events_total${labels(parseLabelKey(key))} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_search_index_freshness_seconds Time from durable Listing event creation to successful index processing.",
+      "# TYPE socal_search_index_freshness_seconds histogram",
+    );
+    this.#renderHistograms(
+      lines,
+      "socal_search_index_freshness_seconds",
+      this.#searchIndexFreshness,
+    );
+    lines.push(
+      "# HELP socal_search_reconciliation_total Listing index reconciliation outcomes.",
+      "# TYPE socal_search_reconciliation_total counter",
+    );
+    for (const [outcome, value] of [...this.#searchReconciliations].sort()) {
+      lines.push(`socal_search_reconciliation_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",
       "# TYPE socal_listing_expiry_polls_total counter",
     );
@@ -250,7 +313,7 @@ export class MetricsRegistry {
   #renderHistograms(lines: string[], metricName: string, histograms: Map<string, Histogram>): void {
     for (const [key, histogram] of [...histograms].sort()) {
       const dimensions = parseLabelKey(key);
-      durationBuckets.forEach((boundary, index) => {
+      histogram.boundaries.forEach((boundary, index) => {
         lines.push(
           `${metricName}_bucket${labels({ ...dimensions, le: String(boundary) })} ${
             histogram.buckets[index] ?? 0

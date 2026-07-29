@@ -33,6 +33,7 @@ export type ClaimOutboxEventsInput = {
   now: Date;
   batchSize: number;
   leaseSeconds: number;
+  priorityEventTypes?: readonly string[];
 };
 
 export type CompleteOutboxEventInput = {
@@ -123,14 +124,26 @@ export class OutboxEventRepository {
   async claimBatch(input: ClaimOutboxEventsInput): Promise<ClaimedOutboxEvent[]> {
     assertPositiveInteger(input.batchSize, "batchSize");
     assertPositiveInteger(input.leaseSeconds, "leaseSeconds");
+    if (
+      (input.priorityEventTypes?.length ?? 0) > 32 ||
+      input.priorityEventTypes?.some((value) => !outboxEventTypePattern.test(value))
+    ) {
+      throw new RangeError("priorityEventTypes must contain at most 32 valid event types");
+    }
     const leaseExpiresAt = new Date(input.now.getTime() + input.leaseSeconds * 1_000);
+    const priorityOrder =
+      input.priorityEventTypes && input.priorityEventTypes.length > 0
+        ? Prisma.sql`CASE WHEN "event_type" IN (${Prisma.join(
+            input.priorityEventTypes,
+          )}) THEN 0 ELSE 1 END`
+        : Prisma.sql`CASE WHEN FALSE THEN 0 ELSE 1 END`;
     const rows = await this.#client.$queryRaw<ClaimedOutboxEventRow[]>(Prisma.sql`
       WITH candidates AS (
         SELECT "id"
         FROM "outbox_events"
         WHERE "status" = 'PENDING'::"OutboxStatus"
           AND "available_at" <= ${input.now}
-        ORDER BY "available_at" ASC, "id" ASC
+        ORDER BY ${priorityOrder} ASC, "available_at" ASC, "id" ASC
         FOR UPDATE SKIP LOCKED
         LIMIT ${input.batchSize}
       )

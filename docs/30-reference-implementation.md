@@ -188,3 +188,14 @@ analyzer、mapping 和 alias；`listing-index-manager.ts` 只负责针对 OpenSe
 manager。Web/API 不导入这些模块，Worker 不把 OpenSearch 当 canonical store，也不在本切片消费
 Outbox 或实现查询 API。事件投影、乱序保护和 reconciliation 由 `SEARCH-002` 实现，公共搜索查询由
 `SEARCH-003` 实现，重建和 alias 切换由 `SEARCH-005` 实现。
+
+## 30.8 SEARCH-002 索引 Worker 边界
+
+`ListingSearchRepository` 位于 database package，只读取 canonical Listing、历史 form schema、
+taxonomy 和公开主体信号并返回不含 HTTP/OpenSearch 类型的最小投影；`ListingIndexHandler` 位于
+Worker，校验 Outbox、构造版本化文档并调用 `OpenSearchListingIndex` adapter；`ListingIndexReconciler`
+只编排有界状态扫描和修复。Controller/Web/Admin 不导入 Prisma 或搜索 adapter，OpenSearch 不参与
+业务写事务，也没有新增进程、队列、数据库或 API 范式。
+
+同一 BullMQ Listing job 可以顺序执行搜索和通知 handler；失败后整个 job 重试，各 handler 必须保持
+幂等。下架优先级通过通用 Outbox claim 配置和 BullMQ priority 传递，不创建第二队列或服务。

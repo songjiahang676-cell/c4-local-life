@@ -1721,6 +1721,49 @@ natural_score =
 
 在线：搜索到详情率、有效联系率、筛选使用、改写率、快速返回、举报率和推广点击质量。A/B 实验必须有样本、停止规则和负面指标，不仅追点击率。
 
+## 9.11 SEARCH-001 可执行索引契约
+
+`apps/worker/src/search/listing-index-definition.ts` 固化首个 Listing 公共搜索投影：
+
+- schema version 为 `1`，物理索引为 `<prefix>_listings_v1`，读写 alias 分别为
+  `<prefix>_listings_read` 和 `<prefix>_listings_write`；
+- 根对象和所有结构化子对象均为 `dynamic: strict`，mapping `_meta` 固定记录版本、PostgreSQL
+  canonical source、公共投影和 PII 排除声明；
+- 标题、摘要、正文、分类、地区和公开显示名提供双语、中文 CJK bigram、英文 stop/stem 及前缀字段；
+  分类/地区路径、价格、动态属性、模糊公开 `geo_point`、公开发布者信号、推广标志和内容版本保持结构化；
+- 电话、邮箱、精确地址、联系方式策略、审核状态/备注、风险分、媒体 object key 和认证材料不在
+  `ListingSearchDocument` 或 mapping 中。
+
+`ListingIndexManager` 是可重复执行的 create-or-validate 边界。`pnpm search:index:ensure` 只在目标物理
+索引不存在时创建 v1 和两个 alias；已有索引必须同时满足 `_meta` 与 alias 契约，否则失败关闭，禁止
+原地悄悄修改 mapping。改变字段或 analyzer 必须提升 schema version，并由 `SEARCH-005` 的重建、
+追赶、校验和原子 alias 切换流程发布。该命令不读取或写入 PostgreSQL；索引删除不影响 canonical
+业务数据。
+
+本地 Compose 与托管 CI 使用相同的 OpenSearch 2.19.5 基线。CI 对真实节点执行 analyzer、mapping、
+读写 alias、中文/英文命中、geo filter 和 strict-mapping PII 拒绝测试；单节点 replica 导致 yellow
+是预期可服务状态，生产副本数仍由基础设施模板和容量评审确定。
+
+## 9.12 SEARCH-002 索引消费、优先下架与对账
+
+`apps/worker/src/search/listing-index-handler.ts` 严格校验 Listing Outbox envelope，但事件 payload 只
+提供 Listing ID、aggregate version 和发生时间。每次消费都通过
+`ListingSearchRepository.findById` 从 PostgreSQL 重新读取当前状态、历史表单的 PUBLIC attributes、
+taxonomy path/alias 和最小公开发布者信号；不公开或不存在的 Listing 执行删除，当前有效 Listing 才
+构造 `ListingSearchDocument`。EXACT 位置只投影为 Region 的 CITY 点，APPROXIMATE/NEIGHBORHOOD
+坐标最多保留三位小数，原精确点不进入 DTO 或 OpenSearch。
+
+写入和删除均使用 Listing canonical version 与 `external_gte`。迟到事件会加载较新数据库版本，
+OpenSearch 版本冲突视为 stale 而不是覆盖；若 durable event 版本反而领先数据库则重试并告警，不能
+用 payload 补齐数据。下架类事件先在 Outbox `claimBatch` 的有界 priority allowlist 中被领取，再以
+BullMQ priority 1（普通事件为 10）入队；同一事件同时驱动搜索和通知时顺序执行，重试依赖各消费者
+幂等性。
+
+`ListingIndexReconciler` 每五分钟默认扫描 100 个 canonical Listing 状态，以稳定 UUID cursor 分页。
+公开行缺失或版本落后会重建，不公开行若仍存在则删除；完成全表后从头开始。索引版本领先 PostgreSQL
+无法安全降级，按失败处理并保留重复告警，后续由 `SEARCH-005` 新索引重建。周期和批量由
+`SEARCH_RECONCILIATION_INTERVAL_MS` / `SEARCH_RECONCILIATION_BATCH_SIZE` 有界配置控制。
+
 ---
 
 <!-- source: docs\10-ui-ux-design-system.md -->
@@ -2701,6 +2744,32 @@ Idempotency-Key 或请求哈希。
 - PII/共享缓存：壳只消费安全 UserSummary 和 OrganizationSummary，不读取联系方式、地址或 token；
   页面与 BFF no-store，错误状态和日志不包含 Session payload。
 
+## 14.25 SEARCH-001 公共索引最小化
+
+- Listing 搜索文档使用显式 TypeScript DTO 和 `dynamic: strict` mapping 双重 allowlist；未知字段会被
+  OpenSearch 拒绝，而不是自动扩展为可检索字段。
+- 仅允许模糊公开位置的 `geo_point`；精确地址、电话、邮箱、联系方式策略、审核备注、风险分、媒体
+  object key、执照/认证材料和原始私有 attributes 不进入索引。
+- 索引 `_meta` 固定声明 `public-listing`、`postgresql` 和 `pii: excluded`，启动工具遇到版本或 alias
+  漂移时失败关闭；它不会把索引当成事实源，也不会原地覆盖未知 mapping。
+- OpenSearch 用户名和 SecretValue 密码必须成对提供；配置摘要、CLI 成功日志和失败日志都不输出
+  节点 URL、凭据、文档内容或查询文本。
+- 真实集成测试证明额外 `phone` 字段被 strict mapping 拒绝；后续 `SEARCH-002` 仍必须从 canonical
+  PostgreSQL 重新加载授权公开投影，不能信任 Outbox payload 作为完整索引文档。
+
+## 14.26 SEARCH-002 索引消费威胁和缓解
+
+- 事件 payload 注入/旧事件覆盖：Worker 只接受固定 Listing event allowlist、UUID、ISO 时间、
+  schemaVersion 和正 aggregateVersion；文档始终从 PostgreSQL 重新加载。external version 阻止旧写/
+  删覆盖较新状态，数据库版本落后事件时重试而不信任 payload。
+- PII/精确位置扩散：Repository 只按发布时 form schema 选择 PUBLIC primitive attributes；联系方式、
+  未知/owner-only 字段、审核/风险、媒体 key 和组织法律名不进入投影。EXACT 位置替换为公开 Region
+  CITY 点，其他公开点三位小数化，结构化日志和指标不记录 Listing/event ID、标题、坐标或文档。
+- 下架延迟：提交复审、拒绝、移除、申诉维持、归档、删除和过期事件在 PostgreSQL Outbox claim 与
+  BullMQ 两段优先；索引失败可安全重试，周期 reconciliation 还会删除任何 canonical 非公开行。
+- 索引漂移/事实源反转：对账只以 PostgreSQL 状态和版本决定写删，绝不把 OpenSearch 内容写回数据库；
+  OpenSearch 版本异常领先会失败并告警，不以强制降版本掩盖损坏。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3067,6 +3136,18 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 hash、阈值值和审核员均不得成为标签。运行期误杀率只使用已人工复核样本，必须同时展示样本量、阈值
 版本和观察窗口；未复核 dry-run 命中只作为离线候选量，不可混入质量分母或宣称生产准确率。
 
+## 17.12 SEARCH-002 索引时效与对账指标
+
+- `socal_search_index_events_total{operation,outcome,priority}`：operation 仅 upsert/delete，outcome 仅
+  applied/stale/missing/failed，priority 仅 urgent/normal。
+- `socal_search_index_freshness_seconds{operation,priority}`：从 durable Outbox createdAt 到成功完成
+  写入/删除的 histogram；失败尝试只进入事件 counter，不污染 SLO；urgent 以 p95 10 秒、normal
+  以 p95 60 秒为设计目标，不能用平均值替代。
+- `socal_search_reconciliation_total{outcome}`：仅 current/upserted/deleted/failed，用于发现持续漂移。
+
+所有标签都是固定低基数枚举；Listing/event/owner ID、标题、分类、坐标、payload、provider 错误和
+索引文档都不进入标签或结构日志。正式 Dashboard/告警阈值仍由 `OBS-002` 发布 Gate 固化。
+
 ---
 
 <!-- source: docs\18-testing-quality.md -->
@@ -3370,6 +3451,30 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构语义和托管真实服务/四镜像门禁继续执行；
   本任务不修改 OpenAPI、Prisma 或 migration。
 
+## 18.27 SEARCH-001 索引契约验证增量
+
+- 单元测试锁定 v1 物理名和读写 alias、非法 prefix、strict mapping、双语/CJK/英文/前缀 analyzer、
+  `geo_point`、写 alias 和 PII/审核字段负断言。
+- Manager 测试覆盖首次创建、重复启动、mapping version 漂移和 write-alias 漂移；漂移必须抛出稳定
+  `LISTING_INDEX_CONTRACT_MISMATCH`，不得就地覆盖。
+- 托管 CI 启动 OpenSearch 2.19.5 真实节点；集成测试实际创建随机命名索引、运行中英文 `_analyze`、
+  经 write alias 写入、经 read alias 执行中文+geo 查询，并证明 strict mapping 拒绝额外电话字段。
+- Runtime config 测试覆盖 index prefix 边界和用户名/SecretValue 密码成对要求；Workflow checker
+  锁定版本化 OpenSearch service、cluster health 和 integration URL，避免 CI 静默跳过。
+- 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构和四镜像门禁继续执行；本任务不修改
+  OpenAPI、Prisma 或 migration。
+
+## 18.28 SEARCH-002 索引 Worker 验证增量
+
+- 单元测试覆盖严格 envelope、canonical 较新版本重载、整数金额、primitive PUBLIC attributes、
+  紧急删除、失败/时效指标、对账 cursor 与 provider 错误脱敏。
+- BullMQ 测试证明下架 priority 1、普通事件 priority 10；真实 PostgreSQL 测试证明 Outbox 领取优先、
+  历史 PUBLIC 字段白名单、taxonomy path/alias、非公开删除状态和 EXACT 坐标不进入投影。
+- 真实 OpenSearch 测试在 read/write alias 上验证 external version：v2 写入后 v1 写/删均 stale，
+  v3 删除成功且读 alias 不再返回。
+- 托管质量门必须同时提供 PostgreSQL、Redis、ClamAV、OpenSearch，执行完整 test/build、Linux
+  Chromium 和四个非 root 镜像；本任务不修改 OpenAPI、Prisma 或 migration。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3562,7 +3667,18 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - 错发或越权按隐私事件处理：立即停用相关事件映射、核对 canonical owner 和模板变量，不在工单中复制
   完整通知内容或 PII。
 
-## 20.13 定期运维
+## 20.13 Listing 索引同步异常
+
+- 先比较 urgent/normal freshness histogram、Outbox oldest age、BullMQ backlog 和 reconciliation
+  outcome，判断延迟位于数据库领取、队列消费、canonical 查询还是 OpenSearch。
+- 下架积压时暂停非必要普通消费者并保留 Outbox；不得删除队列或以 payload 直接补文档。确认
+  `listing.*` 紧急事件在 claim 与 BullMQ 都保持优先级后再扩容。
+- reconciliation 持续 upsert/delete 表示丢事件或索引漂移；持续 failed 或 stale 且索引版本领先
+  PostgreSQL 时停止就地修补，保留证据并进入 `SEARCH-005` 新索引重建/alias 切换流程。
+- 手工验证只比较 Listing ID、canonical/index version 和是否存在，不把公开索引内容写回 PostgreSQL，
+  不在工单复制标题、联系方式、坐标或完整文档。
+
+## 20.14 定期运维
 
 每日：关键告警、审核/队列 SLA、支付对账、备份状态。
 
@@ -3856,6 +3972,32 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 用户/组织只使用安全摘要并本地化角色/类型；服务端仍对每个资源与 mutation 独立授权。
 - 私有页 noindex/no-store、桌面/移动无横向溢出、键盘焦点、组件回归和生产 Chromium 门禁通过；
   OpenAPI/Prisma/migration 无变化并明确记录。
+
+## 22.13 SEARCH-001 版本索引验收
+
+- v1 物理索引、read/write alias 和 `_meta` 版本可重复创建/验证；已有 mapping 或 write alias 漂移时
+  失败关闭，不执行不可审查的原地修补。
+- 中文 CJK bigram、英文 stop/stem、双语和前缀 analyzer 在目标 OpenSearch 版本真实执行；结构化分类、
+  地区、价格、attributes、内容版本和模糊公开 geo point 有确定 mapping。
+- TypeScript 文档 DTO 与 `dynamic: strict` mapping 都不允许电话、邮箱、精确地址、审核备注、风险分、
+  object key 或认证材料；真实节点写入额外电话字段返回 400。
+- CI 固定版本化 OpenSearch service 并健康检查，真实运行 analyzer、alias、index/search、geo 和负例；
+  本地缺少 Docker 时必须明确记录，不能把跳过当通过。
+- PostgreSQL、OpenAPI、Prisma 和 migration 不变；后续 Worker、query API、同义词和重建任务保持各自
+  Backlog 边界。
+
+## 22.14 SEARCH-002 索引 Worker 验收
+
+- 所有 Listing 状态事件只用最小 envelope 触发，文档从 PostgreSQL 当前公开投影重载；非公开、过期、
+  删除、主体/taxonomy 无效或不存在的 Listing 执行索引删除。
+- 写入/删除使用 canonical external version；真实 OpenSearch 证明旧写和旧删不能覆盖新版本，重复
+  投递安全，数据库版本意外落后事件时不信任 payload。
+- 下架类事件在 Outbox 领取和 BullMQ 两段优先；freshness histogram 能分别计算 urgent p95 10 秒和
+  normal p95 60 秒，标签无资源 ID/PII。
+- 周期 reconciliation 稳定分页比较 canonical/index version，能修复缺失、落后和应删除文档；索引
+  版本领先失败告警且不反写 PostgreSQL。
+- PUBLIC attributes 以历史 schema 白名单；EXACT 坐标、联系方式、未知/私有字段、审核/风险和媒体
+  标识有真实 PostgreSQL/OpenSearch 负例；OpenAPI、Prisma 和 migration 保持不变。
 
 ---
 
@@ -4806,3 +4948,23 @@ Audit/Outbox 原子写入。站内通知继续由既有 Worker 从最小 Listing
 最小组织摘要。`/[locale]/account/layout.tsx` 组合 Provider/Shell，使 Listing 管理与通知中心不再
 分别请求或持久化 Session。所有业务数据仍从各自同源 BFF/API 读取，Web 不导入 Prisma、不自行授予
 权限，也不新增服务、数据库、契约或架构边界。
+
+## 30.7 SEARCH-001 索引定义边界
+
+`apps/worker/src/search/listing-index-definition.ts` 只定义可序列化的公共 Listing 搜索 DTO、版本化名称、
+analyzer、mapping 和 alias；`listing-index-manager.ts` 只负责针对 OpenSearch 的 create-or-validate；
+`opensearch-client.ts` 是官方 Node client 和 SecretValue 的 adapter；CLI 只组合配置、client 和
+manager。Web/API 不导入这些模块，Worker 不把 OpenSearch 当 canonical store，也不在本切片消费
+Outbox 或实现查询 API。事件投影、乱序保护和 reconciliation 由 `SEARCH-002` 实现，公共搜索查询由
+`SEARCH-003` 实现，重建和 alias 切换由 `SEARCH-005` 实现。
+
+## 30.8 SEARCH-002 索引 Worker 边界
+
+`ListingSearchRepository` 位于 database package，只读取 canonical Listing、历史 form schema、
+taxonomy 和公开主体信号并返回不含 HTTP/OpenSearch 类型的最小投影；`ListingIndexHandler` 位于
+Worker，校验 Outbox、构造版本化文档并调用 `OpenSearchListingIndex` adapter；`ListingIndexReconciler`
+只编排有界状态扫描和修复。Controller/Web/Admin 不导入 Prisma 或搜索 adapter，OpenSearch 不参与
+业务写事务，也没有新增进程、队列、数据库或 API 范式。
+
+同一 BullMQ Listing job 可以顺序执行搜索和通知 handler；失败后整个 job 重试，各 handler 必须保持
+幂等。下架优先级通过通用 Outbox claim 配置和 BullMQ priority 传递，不创建第二队列或服务。

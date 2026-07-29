@@ -120,3 +120,15 @@ Feature Flag 与实验分开建模，但可关联。实验定义 hypothesis、pr
 按一次写定的候选数累加。精确幂等重试不增加计数；Listing ID、候选 ID、标题、分值、联系方式、图片
 hash、阈值值和审核员均不得成为标签。运行期误杀率只使用已人工复核样本，必须同时展示样本量、阈值
 版本和观察窗口；未复核 dry-run 命中只作为离线候选量，不可混入质量分母或宣称生产准确率。
+
+## 17.12 SEARCH-002 索引时效与对账指标
+
+- `socal_search_index_events_total{operation,outcome,priority}`：operation 仅 upsert/delete，outcome 仅
+  applied/stale/missing/failed，priority 仅 urgent/normal。
+- `socal_search_index_freshness_seconds{operation,priority}`：从 durable Outbox createdAt 到成功完成
+  写入/删除的 histogram；失败尝试只进入事件 counter，不污染 SLO；urgent 以 p95 10 秒、normal
+  以 p95 60 秒为设计目标，不能用平均值替代。
+- `socal_search_reconciliation_total{outcome}`：仅 current/upserted/deleted/failed，用于发现持续漂移。
+
+所有标签都是固定低基数枚举；Listing/event/owner ID、标题、分类、坐标、payload、provider 错误和
+索引文档都不进入标签或结构日志。正式 Dashboard/告警阈值仍由 `OBS-002` 发布 Gate 固化。

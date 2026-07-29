@@ -129,4 +129,44 @@ integration("OutboxEventRepository with PostgreSQL", () => {
       await database.client.outboxEvent.deleteMany({ where: { id } });
     }
   });
+
+  it("claims urgent removal events ahead of older normal work", async () => {
+    const repository = new OutboxEventRepository(database.client);
+    const now = new Date("2026-07-29T18:00:00.000Z");
+    const normalId = randomUUID();
+    const urgentId = randomUUID();
+    try {
+      await repository.append({
+        id: normalId,
+        aggregateType: "LISTING",
+        aggregateId: randomUUID(),
+        eventType: "listing.published",
+        payload: { schemaVersion: 1 },
+        availableAt: new Date(now.getTime() - 10_000),
+        createdAt: new Date(now.getTime() - 10_000),
+      });
+      await repository.append({
+        id: urgentId,
+        aggregateType: "LISTING",
+        aggregateId: randomUUID(),
+        eventType: "listing.deleted",
+        payload: { schemaVersion: 1 },
+        availableAt: new Date(now.getTime() - 1_000),
+        createdAt: new Date(now.getTime() - 1_000),
+      });
+
+      await expect(
+        repository.claimBatch({
+          now,
+          batchSize: 1,
+          leaseSeconds: 60,
+          priorityEventTypes: ["listing.deleted"],
+        }),
+      ).resolves.toMatchObject([{ id: urgentId, eventType: "listing.deleted" }]);
+    } finally {
+      await database.client.outboxEvent.deleteMany({
+        where: { id: { in: [normalId, urgentId] } },
+      });
+    }
+  });
 });

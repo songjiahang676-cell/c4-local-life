@@ -309,3 +309,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   锁定版本化 OpenSearch service、cluster health 和 integration URL，避免 CI 静默跳过。
 - 全仓格式、类型、lint、单元/集成、八应用构建、运行时、架构和四镜像门禁继续执行；本任务不修改
   OpenAPI、Prisma 或 migration。
+
+## 18.28 SEARCH-002 索引 Worker 验证增量
+
+- 单元测试覆盖严格 envelope、canonical 较新版本重载、整数金额、primitive PUBLIC attributes、
+  紧急删除、失败/时效指标、对账 cursor 与 provider 错误脱敏。
+- BullMQ 测试证明下架 priority 1、普通事件 priority 10；真实 PostgreSQL 测试证明 Outbox 领取优先、
+  历史 PUBLIC 字段白名单、taxonomy path/alias、非公开删除状态和 EXACT 坐标不进入投影。
+- 真实 OpenSearch 测试在 read/write alias 上验证 external version：v2 写入后 v1 写/删均 stale，
+  v3 删除成功且读 alias 不再返回。
+- 托管质量门必须同时提供 PostgreSQL、Redis、ClamAV、OpenSearch，执行完整 test/build、Linux
+  Chromium 和四个非 root 镜像；本任务不修改 OpenAPI、Prisma 或 migration。

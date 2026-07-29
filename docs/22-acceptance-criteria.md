@@ -252,3 +252,16 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   本地缺少 Docker 时必须明确记录，不能把跳过当通过。
 - PostgreSQL、OpenAPI、Prisma 和 migration 不变；后续 Worker、query API、同义词和重建任务保持各自
   Backlog 边界。
+
+## 22.14 SEARCH-002 索引 Worker 验收
+
+- 所有 Listing 状态事件只用最小 envelope 触发，文档从 PostgreSQL 当前公开投影重载；非公开、过期、
+  删除、主体/taxonomy 无效或不存在的 Listing 执行索引删除。
+- 写入/删除使用 canonical external version；真实 OpenSearch 证明旧写和旧删不能覆盖新版本，重复
+  投递安全，数据库版本意外落后事件时不信任 payload。
+- 下架类事件在 Outbox 领取和 BullMQ 两段优先；freshness histogram 能分别计算 urgent p95 10 秒和
+  normal p95 60 秒，标签无资源 ID/PII。
+- 周期 reconciliation 稳定分页比较 canonical/index version，能修复缺失、落后和应删除文档；索引
+  版本领先失败告警且不反写 PostgreSQL。
+- PUBLIC attributes 以历史 schema 白名单；EXACT 坐标、联系方式、未知/私有字段、审核/风险和媒体
+  标识有真实 PostgreSQL/OpenSearch 负例；OpenAPI、Prisma 和 migration 保持不变。

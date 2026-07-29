@@ -174,6 +174,8 @@ describe("runtime configuration", () => {
     expect(environment.MEDIA_PROCESS_MAX_BYTES).toBe(20_971_520);
     expect(environment.MEDIA_IMAGE_MAX_PIXELS).toBe(40_000_000);
     expect(environment.OPENSEARCH_INDEX_PREFIX).toBe("socal_local");
+    expect(environment.SEARCH_RECONCILIATION_BATCH_SIZE).toBe(100);
+    expect(environment.SEARCH_RECONCILIATION_INTERVAL_MS).toBe(300_000);
 
     expect(() =>
       parseWorkerEnvironment({
