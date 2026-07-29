@@ -8,15 +8,15 @@
 - 目标：完成账户中心共享壳的受保护托管验证并关闭 Gate 2，再按序进入 G3 Search / Web / SEO
 - 进度：16/16 个 G2 任务、46/101 个总任务完成
 - 风险：`MOD-003` 已由 PR #31 受保护合并且 merged-main 门禁通过；`WEB-004` 已通过完整本地质量、
-  真实 PostgreSQL 与生产 Chromium 18/18，正在等待受保护 Linux 真实服务、四镜像、evidence-head、
-  合并和 merged-main 复验。生产重复阈值校准、HMAC 密钥轮换/保留清理、Beta 查询计划及数据库加密
-  仍需运营/法律/基础设施确认
+  真实 PostgreSQL、生产 Chromium 18/18，以及 PR #32 首轮受保护 Linux 380/380 真实服务测试和
+  四镜像门禁；正在固化 evidence-head，随后仍需受保护合并与 merged-main 复验。生产重复阈值校准、
+  HMAC 密钥轮换/保留清理、Beta 查询计划及数据库加密仍需运营/法律/基础设施确认
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target  | Status                  | Notes                                                         |
-| ------- | -------------------- | ---------- | ------- | ----------------------- | ------------------------------------------------------------- |
-| WEB-004 | @songjiahang676-cell | 2026-07-29 | pending | protected hosted checks | 共享 no-store Session、能力导航、主动失效、双语/移动/错误状态 |
+| Task    | Owner                | Started    | Target  | Status               | Notes                                                         |
+| ------- | -------------------- | ---------- | ------- | -------------------- | ------------------------------------------------------------- |
+| WEB-004 | @songjiahang676-cell | 2026-07-29 | pending | evidence-head checks | 共享 no-store Session、能力导航、主动失效、双语/移动/错误状态 |
 
 ## Gate Evidence
 
@@ -191,6 +191,7 @@
 | WEB-004 local quality           | `pnpm ci:quality`                     | 85 files；378 passed / 2 skips；9 checks；8 builds passed                  | 2026-07-29 |
 | WEB-004 runtime/browser         | production Chromium desktop/mobile    | private capability shell and existing journeys；18/18 E2E passed           | 2026-07-29 |
 | WEB-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI passed；101 tasks / 57 models / 67 paths / 153 schemas passed  | 2026-07-29 |
+| WEB-004 protected checks        | PR #32 / run `30472304542`            | 380 real-service tests；Linux 18/18 E2E and four non-root images passed    | 2026-07-29 |
 
 ## Decisions / Blocks
 
