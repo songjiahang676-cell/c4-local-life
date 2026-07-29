@@ -94,6 +94,7 @@ describe("auth session HTTP boundary", () => {
         "account:sessions:revoke",
         "listing:draft:create",
         "listing:draft:update",
+        "listing:submit",
         "media:upload:complete",
         "media:upload:create",
         "organization:create",

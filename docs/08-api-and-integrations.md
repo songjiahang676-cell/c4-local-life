@@ -295,3 +295,11 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
 
 数据库模型和内部领域对象不从 OpenAPI 生成；它们通过显式 application mapping 隔离，避免把
 私有字段意外暴露为公共响应。
+
+## 8.15 Listing 提交契约
+
+`POST /listings/{listingId}/submit` 无请求体，必须携带强 Listing ETag 的 `If-Match` 和
+16–128 字符的 `Idempotency-Key`。成功固定返回 202、`no-store`、新 ETag，以及前后内容/
+审核状态、风险层、规则集版本、可空 caseId、发生时间和资源版本。响应不公开命中规则、
+阈值或输入摘要。相同 actor/key/Listing 版本返回原结果；同 key 不同请求返回 409。
+owner 范围外统一 404，受限账户 403，缺少/错误前置条件 400。

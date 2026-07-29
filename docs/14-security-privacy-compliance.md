@@ -236,3 +236,11 @@ CI：secret scanning、SAST、依赖/许可证、IaC 和容器扫描；定期 DA
 ## 14.13 事件响应
 
 建立 Sev0–Sev3 分级、值班、证据保全、密钥旋转、用户/监管通知决策和事后复盘。不得为了“清理”而删除审计证据；也不得无限保存无关 PII。详见 `docs/20-operations-runbook.md`。
+
+## 14.14 提交审核证据最小化
+
+`MOD-001` 的提交风险控制在授权后的应用层执行，并在 repository 事务内再次验证 ACTIVE actor、
+当前组织写角色、DRAFT/NOT_REVIEWED 状态和版本。规则命中证据不保存匹配原文，只保存规则代码、
+版本、严重度和字段名；公开响应仅返回 LOW/MEDIUM/HIGH 与规则集版本。数据库将 evaluation/hit
+设为不可变，避免审核历史被覆盖；Audit/Outbox payload 不包含正文、attributes、联系信息、
+Idempotency-Key 或请求哈希。

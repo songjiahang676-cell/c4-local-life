@@ -1588,6 +1588,26 @@ export interface components {
                 readonly updatedAt: string;
             };
         };
+        readonly ListingSubmissionResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly resourceId: string;
+                readonly previousStatus: components["schemas"]["ContentStatus"];
+                readonly currentStatus: components["schemas"]["ContentStatus"];
+                /** @enum {string} */
+                readonly previousModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                /** @enum {string} */
+                readonly currentModerationStatus: "NOT_REVIEWED" | "AUTO_APPROVED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ESCALATED";
+                /** @enum {string} */
+                readonly riskTier: "LOW" | "MEDIUM" | "HIGH";
+                readonly ruleSetVersion: number;
+                /** Format: date-time */
+                readonly occurredAt: string;
+                /** Format: uuid */
+                readonly caseId: string | null;
+                readonly version: number;
+            };
+        };
         readonly WorkflowTransitionResponse: {
             readonly data: {
                 /** Format: uuid */
@@ -2693,6 +2713,8 @@ export interface operations {
             readonly query?: never;
             readonly header: {
                 readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Strong ETag returned with the current resource version. */
+                readonly "If-Match": components["parameters"]["IfMatch"];
             };
             readonly path: {
                 readonly listingId: components["parameters"]["ListingId"];
@@ -2704,12 +2726,18 @@ export interface operations {
             /** @description Listing entered automated/manual review workflow */
             readonly 202: {
                 headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly ETag?: string;
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["WorkflowTransitionResponse"];
+                    readonly "application/json": components["schemas"]["ListingSubmissionResponse"];
                 };
             };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
             readonly 409: components["responses"]["Conflict"];
             readonly 422: components["responses"]["UnprocessableEntity"];
         };

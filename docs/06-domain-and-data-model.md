@@ -237,3 +237,11 @@ Gate 0 CI 同时执行两类迁移保护：
 - S3 开启版本控制和生命周期；私有验证材料使用独立桶/KMS key。
 - OpenSearch、Redis 不作为备份事实源；定义全量重建任务。
 - 每季度做恢复演练，验证不仅能恢复数据库，还能重新索引、重放任务并恢复应用密钥依赖。
+
+### MOD-001 审核证据模型
+
+`moderation_evaluations` 以 Listing + 提交版本唯一，并以 actor +
+`Idempotency-Key` 唯一；保存规则集版本、风险层、输入哈希和最终状态/版本。
+`moderation_rule_hits` 只保存稳定规则代码、规则版本、严重度和证据字段名。
+两表由数据库触发器阻止 UPDATE/DELETE。中高风险 evaluation 与
+`moderation_cases` 一对一；Listing 状态、evaluation、case、Audit 和 Outbox 在同一事务提交。

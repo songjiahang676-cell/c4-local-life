@@ -196,6 +196,12 @@ enum ModerationCaseStatus {
   CLOSED
 }
 
+enum ModerationRiskTier {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -309,6 +315,7 @@ model User {
   mfaCredential           MfaCredential?
   passwordAuthAttempts    PasswordAuthAttempt[]
   passwordRecoveries      PasswordRecoveryRequest[]
+  submissionEvaluations   ModerationEvaluation[]      @relation("SubmissionEvaluationActor")
 
   @@index([status, createdAt])
   @@map("users")
@@ -687,6 +694,7 @@ model Listing {
   uploadedMedia     MediaAsset[]
   favorites         Favorite[]
   conversations     Conversation[]
+  moderationEvaluations ModerationEvaluation[]
 
   @@unique([type, slug])
   @@unique([ownerId, createIdempotencyKey])
@@ -989,6 +997,7 @@ model Report {
 model ModerationCase {
   id             String               @id @default(uuid()) @db.Uuid
   reportId       String?              @unique @map("report_id") @db.Uuid
+  evaluationId   String?              @unique @map("evaluation_id") @db.Uuid
   targetType     String               @map("target_type") @db.VarChar(40)
   targetId       String               @map("target_id") @db.Uuid
   queue          String               @db.VarChar(80)
@@ -1001,12 +1010,56 @@ model ModerationCase {
   updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   resolvedAt     DateTime?            @map("resolved_at") @db.Timestamptz(6)
   report         Report?              @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  evaluation     ModerationEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
   assignedTo     User?                @relation("CaseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   actions        ModerationAction[]
 
   @@index([queue, status, priority(sort: Desc), createdAt])
   @@index([targetType, targetId])
   @@map("moderation_cases")
+}
+
+model ModerationEvaluation {
+  id                       String             @id @default(uuid()) @db.Uuid
+  listingId                String             @map("listing_id") @db.Uuid
+  actorUserId              String             @map("actor_user_id") @db.Uuid
+  listingVersion           Int                @map("listing_version")
+  ruleSetKey               String             @map("rule_set_key") @db.VarChar(80)
+  ruleSetVersion           Int                @map("rule_set_version")
+  riskTier                 ModerationRiskTier @map("risk_tier")
+  inputHash                String             @map("input_hash") @db.Char(64)
+  idempotencyKey           String             @map("idempotency_key") @db.VarChar(128)
+  requestHash              String             @map("request_hash") @db.Char(64)
+  resultContentStatus      ContentStatus      @map("result_content_status")
+  resultModerationStatus   ModerationStatus   @map("result_moderation_status")
+  resultListingVersion     Int                @map("result_listing_version")
+  occurredAt               DateTime           @map("occurred_at") @db.Timestamptz(6)
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  listing                  Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  actor                    User               @relation("SubmissionEvaluationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  ruleHits                 ModerationRuleHit[]
+  moderationCase           ModerationCase?
+
+  @@unique([actorUserId, idempotencyKey])
+  @@unique([listingId, listingVersion])
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([riskTier, createdAt(sort: Desc)])
+  @@map("moderation_evaluations")
+}
+
+model ModerationRuleHit {
+  id              String             @id @default(uuid()) @db.Uuid
+  evaluationId    String             @map("evaluation_id") @db.Uuid
+  ruleCode        String             @map("rule_code") @db.VarChar(80)
+  ruleVersion     Int                @map("rule_version")
+  severity        ModerationRiskTier
+  evidenceKey     String             @map("evidence_key") @db.VarChar(80)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  evaluation      ModerationEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Restrict)
+
+  @@unique([evaluationId, ruleCode])
+  @@index([ruleCode, createdAt(sort: Desc)])
+  @@map("moderation_rule_hits")
 }
 
 model ModerationAction {

@@ -205,6 +205,19 @@ payloads.
 - Rollback: disable media selection and retain nullable binding evidence. Exceptional stopped-writer
   physical removal is documented in the migration-local `ROLLBACK.md`.
 
+## `20260729130000_listing_submission_moderation`
+
+Adds immutable `moderation_evaluations` and `moderation_rule_hits` evidence, the versioned
+`ModerationRiskTier` decision, actor-scoped submission idempotency, and a one-to-one link from a
+medium/high-risk evaluation to its moderation case. Checks bind every risk tier to the only valid
+resulting content/moderation state and keep hashes, rule codes and versions bounded.
+
+- Roll forward: apply before enabling `POST /listings/{listingId}/submit`; verify exact retry,
+  changed-request conflict, low-risk publication, high-risk escalation, case priority, immutable
+  evidence, Audit and Outbox atomicity.
+- Rollback: disable submission writes and retain evidence. Do not remove production moderation
+  history; the migration-local `ROLLBACK.md` documents exceptional pre-production physical removal.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

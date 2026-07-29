@@ -18,6 +18,14 @@ import {
   type PublicListingReadInput,
   type ScopedListingReadInput,
 } from "@socal/database/listing";
+import {
+  ListingSubmissionRepository,
+  type FindListingSubmissionRetryInput,
+  type FindListingSubmissionRetryResult,
+  type ListingSubmissionCandidate,
+  type SubmitListingInput,
+  type SubmitListingResult,
+} from "@socal/database/listing-submission";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
 import type { ListingStore } from "./listing.store";
 
@@ -25,6 +33,7 @@ import type { ListingStore } from "./listing.store";
 export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
   readonly #drafts: ListingDraftRepository;
   readonly #listings: ListingRepository;
+  readonly #submissions: ListingSubmissionRepository;
 
   constructor(@Inject(API_ENVIRONMENT) environment: ApiEnvironment) {
     const options = {
@@ -33,6 +42,7 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     };
     this.#drafts = new ListingDraftRepository(options);
     this.#listings = new ListingRepository(options);
+    this.#submissions = new ListingSubmissionRepository(options);
   }
 
   resolveReferences(
@@ -63,7 +73,24 @@ export class DatabaseListingStore implements ListingStore, OnModuleDestroy {
     return this.#listings.findByIdForOwner(input);
   }
 
+  findSubmissionRetry(
+    input: FindListingSubmissionRetryInput,
+  ): Promise<FindListingSubmissionRetryResult> {
+    return this.#submissions.findRetry(input);
+  }
+
+  findSubmissionCandidate(input: {
+    actorUserId: string;
+    listingId: string;
+  }): Promise<ListingSubmissionCandidate | null> {
+    return this.#submissions.findCandidate(input);
+  }
+
+  submit(input: SubmitListingInput): Promise<SubmitListingResult> {
+    return this.#submissions.submit(input);
+  }
+
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([this.#drafts.close(), this.#listings.close()]);
+    await Promise.all([this.#drafts.close(), this.#listings.close(), this.#submissions.close()]);
   }
 }

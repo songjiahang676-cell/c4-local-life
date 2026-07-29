@@ -106,3 +106,16 @@ PUBLISHED
 ## 11.10 审计与隐私
 
 审计日志包含 who/what/when/target/reason/requestId/before-after hash，不保存超过必要范围的敏感原文。验证材料和举报证据独立授权、加密、定期清理。任何导出有水印/审计/时限和最小字段。
+
+## 11.11 MOD-001 已实现的提交风险基线
+
+`POST /listings/{listingId}/submit` 要求 ACTIVE actor、当前 owner 或组织
+OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集固定为
+`listing-submission` v1；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式
+以及平台外付款诱导。低风险按提交时绑定的历史表单发布策略自动发布；中风险创建普通审核案件；
+高风险进入优先队列并标记 `ESCALATED`。
+
+一次事务同时写 Listing 状态/版本、不可变 `ModerationEvaluation`、仅含规则代码/版本/证据字段名
+的 `ModerationRuleHit`、可选 `ModerationCase`、最小 Audit 和逐状态 Outbox。命中原文、阈值、
+手机号、邮箱和风险输入不进入公开响应或日志；输入仅保存 canonical SHA-256。后续调整规则必须
+增加规则集/规则版本，不能改写历史证据。

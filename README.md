@@ -187,6 +187,12 @@ Linux quality、浏览器和四镜像非 root 检查，final run `30412407859` �
 状态/owner 检查和数据库约束原子绑定媒体；Web 同源 BFF 只允许该流程所需 method/path。全量本地
 质量门禁通过 61 个文件/235 项测试、9 个 typecheck/lint、8 个构建；Chromium 桌面/移动 8/8 通过。
 
+`MOD-001` 新增 owner/组织写角色限定的 `POST /listings/{listingId}/submit`，以强 ETag 和
+actor-scoped 幂等键保护提交。`listing-submission` v1 对新账户、人工审核策略、发布期限、
+外部联系方式和平台外付款进行确定性分层：低风险按历史期限自动发布，中/高风险创建审核案件，
+高风险进入优先队列。Listing 状态、不可变 evaluation/rule hits、case、Audit 和 Outbox 在同一
+PostgreSQL 事务提交，公开响应与日志不包含命中原文、阈值或联系信息。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

@@ -162,3 +162,12 @@ pnpm test:e2e:ci
 `test:e2e` 先执行全仓构建；`test:e2e:ci` 只用于质量构建已完成的 CI job。standalone 构建不会自动携带
 `public` 和 `.next/static`，因此两条路径都先运行 `scripts/prepare-standalone-runtime.mjs`。
 HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`；CI 即使失败也上传报告。
+
+## 18.16 MOD-001 验证增量
+
+- 纯规则测试覆盖低/中/高风险、规则顺序、规则版本和无原文证据。
+- HTTP/契约测试覆盖强 ETag、幂等重试/冲突、owner/组织对象授权、guest/受限/外部用户和
+  `no-store` 安全响应。
+- PostgreSQL 集成测试覆盖一次事务内的状态、evaluation/hits、case、Audit/Outbox，以及
+  evaluation/hit 不可变触发器。
+- 空库重放、上一发布基线升级和数据库负例必须识别提交审核表、唯一约束、状态一致性与触发器。

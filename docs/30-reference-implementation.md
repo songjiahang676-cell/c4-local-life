@@ -95,6 +95,11 @@ apps/api/src/modules/listings/
 
 不过不要为了目录形式引入过多样板；当模块小、规则简单时可合并文件，但依赖方向不变。
 
+`MOD-001` 保持该依赖方向：`moderation-risk.ts` 是无 I/O 的版本化规则模块，
+`ListingsService.submit` 负责 Policy、历史表单策略和领域状态转换，
+`ListingSubmissionRepository` 只负责 PostgreSQL 范围复核、幂等锁与原子证据持久化。
+Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
+
 ## 30.4 生成与手写边界
 
 - Prisma client：生成，不手改。

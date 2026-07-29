@@ -54,6 +54,7 @@ try {
     "20260729003000_media_processing_lifecycle",
     "20260729010000_listing_draft_idempotency",
     "20260729020000_listing_media_binding",
+    "20260729130000_listing_submission_moderation",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -86,7 +87,9 @@ try {
             to_regclass('public.mfa_credentials') AS mfa_credentials,
             to_regclass('public.mfa_recovery_codes') AS mfa_recovery_codes,
             to_regclass('public.password_auth_attempts') AS password_auth_attempts,
-            to_regclass('public.password_recovery_requests') AS password_recovery_requests`,
+            to_regclass('public.password_recovery_requests') AS password_recovery_requests,
+            to_regclass('public.moderation_evaluations') AS moderation_evaluations,
+            to_regclass('public.moderation_rule_hits') AS moderation_rule_hits`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -481,6 +484,37 @@ try {
     throw new Error("Listing READY-media binding controls are missing");
   }
 
+  const listingSubmissionStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'moderation_evaluations_actor_user_id_idempotency_key_key'
+       ) AS actor_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'moderation_evaluations'
+            AND constraint_name = 'moderation_evaluations_result_check'
+            AND constraint_type = 'CHECK'
+       ) AS result_check,
+       (
+         SELECT count(*)::integer
+           FROM pg_trigger
+          WHERE tgname IN ('moderation_evaluations_immutable', 'moderation_rule_hits_immutable')
+            AND NOT tgisinternal
+       ) AS immutable_triggers`,
+  );
+  if (
+    !listingSubmissionStorage.rows[0]?.actor_idempotency ||
+    !listingSubmissionStorage.rows[0]?.result_check ||
+    listingSubmissionStorage.rows[0]?.immutable_triggers !== 2
+  ) {
+    throw new Error("Listing submission evidence or immutability controls are missing");
+  }
+
   await client.query("BEGIN");
   await client.query(
     `INSERT INTO users (id, email, updated_at)
@@ -581,6 +615,73 @@ try {
        now()
      )`,
     "23505",
+  );
+  await client.query(
+    `INSERT INTO moderation_evaluations (
+       id, listing_id, actor_user_id, listing_version, rule_set_key, rule_set_version,
+       risk_tier, input_hash, idempotency_key, request_hash,
+       result_content_status, result_moderation_status, result_listing_version, occurred_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000030',
+       '00000000-0000-4000-8000-000000000004',
+       '00000000-0000-4000-8000-000000000001',
+       1, 'listing-submission', 1, 'LOW', repeat('a', 64),
+       'baseline-listing-submit-0001', repeat('b', 64),
+       'PUBLISHED', 'AUTO_APPROVED', 3, now()
+     )`,
+  );
+  await expectSqlState(
+    "moderation evaluation result consistency",
+    `INSERT INTO moderation_evaluations (
+       id, listing_id, actor_user_id, listing_version, rule_set_key, rule_set_version,
+       risk_tier, input_hash, idempotency_key, request_hash,
+       result_content_status, result_moderation_status, result_listing_version, occurred_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000031',
+       '00000000-0000-4000-8000-000000000004',
+       '00000000-0000-4000-8000-000000000001',
+       2, 'listing-submission', 1, 'LOW', repeat('a', 64),
+       'baseline-listing-submit-0002', repeat('b', 64),
+       'SUBMITTED', 'PENDING_REVIEW', 3, now()
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "moderation evaluation immutability",
+    `UPDATE moderation_evaluations
+        SET rule_set_version = 2
+      WHERE id = '00000000-0000-4000-8000-000000000030'`,
+    "P0001",
+  );
+  await expectSqlState(
+    "moderation rule-hit code",
+    `INSERT INTO moderation_rule_hits (
+       id, evaluation_id, rule_code, rule_version, severity, evidence_key
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000032',
+       '00000000-0000-4000-8000-000000000030',
+       'unsafe code', 1, 'MEDIUM', 'body'
+     )`,
+    "23514",
+  );
+  await client.query(
+    `INSERT INTO moderation_rule_hits (
+       id, evaluation_id, rule_code, rule_version, severity, evidence_key
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000033',
+       '00000000-0000-4000-8000-000000000030',
+       'NEW_ACCOUNT', 1, 'MEDIUM', 'account_age'
+     )`,
+  );
+  await expectSqlState(
+    "moderation rule-hit immutability",
+    `DELETE FROM moderation_rule_hits
+      WHERE id = '00000000-0000-4000-8000-000000000033'`,
+    "P0001",
   );
 
   await expectSqlState(
@@ -976,7 +1077,8 @@ try {
       mediaProcessingStorage: true,
       listingDraftStorage: true,
       listingMediaBindingStorage: true,
-      negativeCases: 23,
+      listingSubmissionStorage: true,
+      negativeCases: 27,
     }),
   );
 } finally {
