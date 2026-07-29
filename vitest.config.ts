@@ -67,6 +67,12 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/homepage-layout": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/homepage-layout.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/listing-submission": fileURLToPath(
         new URL(
           "./packages/database/src/repositories/listing-submission.repository.ts",

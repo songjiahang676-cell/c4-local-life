@@ -23,6 +23,8 @@ tags:
     description: Regions, categories, and dynamic form definitions
   - name: Search
     description: Public search and query suggestions
+  - name: Homepage
+    description: Public modular homepage projection
   - name: Listings
     description: Classified listing lifecycle and public views
   - name: Media
@@ -1041,6 +1043,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchTrendingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /homepage:
+    get:
+      tags: [Homepage]
+      security: []
+      summary: Get the modular public homepage
+      description: >
+        Composes the current published layout with canonical public projections.
+        Modules with no real data are omitted, and one module dependency failure
+        does not fail otherwise available modules.
+      operationId: getHomepage
+      parameters:
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [zh-Hans, en-US]
+            default: zh-Hans
+        - name: regionCode
+          in: query
+          description: Published homepage layout scope and public data region.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            default: US-CA-SOCAL
+        - name: device
+          in: query
+          schema:
+            $ref: "#/components/schemas/HomepageDevice"
+      responses:
+        "200":
+          description: Available real-data homepage modules in published layout order
+          headers:
+            Cache-Control:
+              description: Shared caching remains disabled until PERF-001 validates production budgets.
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomepageResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "503":
@@ -4154,6 +4201,193 @@ components:
           items:
             $ref: "#/components/schemas/SearchTrendingItem"
         window: { type: string, enum: [DAY_1, DAY_7, DAY_30] }
+        generatedAt: { type: string, format: date-time }
+    HomepageDevice:
+      type: string
+      enum: [desktop, tablet, mobile]
+      default: desktop
+    HomepageModuleCachePolicy:
+      type: object
+      required: [ttlSeconds, tags]
+      additionalProperties: false
+      properties:
+        ttlSeconds: { type: integer, minimum: 0, maximum: 86400 }
+        tags:
+          type: array
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 2
+            maxLength: 160
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    HomepageHeroData:
+      type: object
+      required: [contentKey, title, subtitle, searchPlaceholder]
+      additionalProperties: false
+      properties:
+        contentKey:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        title: { type: string, minLength: 1, maxLength: 120 }
+        subtitle: { type: string, minLength: 1, maxLength: 240 }
+        searchPlaceholder: { type: string, minLength: 1, maxLength: 160 }
+    HomepageHotSearchesData:
+      type: object
+      required: [window, items]
+      additionalProperties: false
+      properties:
+        window: { type: string, enum: [DAY_1, DAY_7, DAY_30] }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/SearchTrendingItem"
+    HomepageRegion:
+      type: object
+      required: [id, code, slug, type, name]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        code:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        slug: { type: string, minLength: 1, maxLength: 120 }
+        type: { type: string, const: CITY }
+        name: { type: string, minLength: 1, maxLength: 160 }
+    HomepageCitiesData:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/HomepageRegion"
+    HomepageListingFeedData:
+      type: object
+      required: [listingType, items]
+      additionalProperties: false
+      properties:
+        listingType:
+          $ref: "#/components/schemas/ListingType"
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/PublicListingSummaryView"
+    HomepageHeroModule:
+      type: object
+      required: [key, kind, dataVersion, cache, data]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        kind: { type: string, const: HERO }
+        dataVersion: { type: string, pattern: "^[0-9a-f]{64}$" }
+        cache:
+          $ref: "#/components/schemas/HomepageModuleCachePolicy"
+        data:
+          $ref: "#/components/schemas/HomepageHeroData"
+    HomepageHotSearchesModule:
+      type: object
+      required: [key, kind, dataVersion, cache, data]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        kind: { type: string, const: HOT_SEARCHES }
+        dataVersion: { type: string, pattern: "^[0-9a-f]{64}$" }
+        cache:
+          $ref: "#/components/schemas/HomepageModuleCachePolicy"
+        data:
+          $ref: "#/components/schemas/HomepageHotSearchesData"
+    HomepageCitiesModule:
+      type: object
+      required: [key, kind, dataVersion, cache, data]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        kind: { type: string, const: CITY_CHIPS }
+        dataVersion: { type: string, pattern: "^[0-9a-f]{64}$" }
+        cache:
+          $ref: "#/components/schemas/HomepageModuleCachePolicy"
+        data:
+          $ref: "#/components/schemas/HomepageCitiesData"
+    HomepageListingFeedModule:
+      type: object
+      required: [key, kind, dataVersion, cache, data]
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        kind: { type: string, const: LISTING_FEED }
+        dataVersion: { type: string, pattern: "^[0-9a-f]{64}$" }
+        cache:
+          $ref: "#/components/schemas/HomepageModuleCachePolicy"
+        data:
+          $ref: "#/components/schemas/HomepageListingFeedData"
+    HomepageModule:
+      oneOf:
+        - $ref: "#/components/schemas/HomepageHeroModule"
+        - $ref: "#/components/schemas/HomepageHotSearchesModule"
+        - $ref: "#/components/schemas/HomepageCitiesModule"
+        - $ref: "#/components/schemas/HomepageListingFeedModule"
+      discriminator:
+        propertyName: kind
+        mapping:
+          HERO: "#/components/schemas/HomepageHeroModule"
+          HOT_SEARCHES: "#/components/schemas/HomepageHotSearchesModule"
+          CITY_CHIPS: "#/components/schemas/HomepageCitiesModule"
+          LISTING_FEED: "#/components/schemas/HomepageListingFeedModule"
+    HomepageLayoutProjection:
+      type: object
+      required: [version, locale, regionCode, device]
+      additionalProperties: false
+      properties:
+        version: { type: integer, minimum: 1 }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        regionCode:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        device:
+          $ref: "#/components/schemas/HomepageDevice"
+    HomepageResponse:
+      type: object
+      required: [layout, modules, partial, generatedAt]
+      additionalProperties: false
+      properties:
+        layout:
+          $ref: "#/components/schemas/HomepageLayoutProjection"
+        modules:
+          type: array
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/HomepageModule"
+        partial: { type: boolean }
         generatedAt: { type: string, format: date-time }
     CursorPage:
       type: object

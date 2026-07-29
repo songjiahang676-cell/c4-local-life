@@ -5,20 +5,25 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `TAX-003` 受保护验证后进入 `WEB-002` 首页模块化与真实数据 API
-- 进度：6 个 G3 任务、52/101 个总任务完成
-- 风险：`WEB-002` 必须逐模块使用 canonical 公开投影、隔离依赖错误并隐藏无真实数据模块；不能从布局 seed、测试 fixture 或未知 source 伪造首页内容
+- 目标：完成 `WEB-002` 受保护合并证据后进入 `SEO-001`
+- 进度：7 个 G3 任务、53/101 个总任务完成
+- 风险：生产 canonical/hreflang/structured data/sitemap、共享首页缓存与真实 SLO 仍分别属于 `SEO-001`/`SEO-002`/`PERF-001`；不得用测试 fixture 或本地延迟宣称生产结果
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target          | Status                | Notes             |
-| ------- | -------------------- | ---------- | --------------- | --------------------- | ----------------- |
-| TAX-003 | @songjiahang676-cell | 2026-07-29 | homepage config | evidence head pending | unlocks `WEB-002` |
+| Task    | Owner                | Started    | Target   | Status                   | Notes                           |
+| ------- | -------------------- | ---------- | -------- | ------------------------ | ------------------------------- |
+| WEB-002 | @songjiahang676-cell | 2026-07-29 | homepage | local complete / PR next | protected evidence still needed |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| WEB-002 protected checks        | PR #39 / run `30500065008`            | 106 files / 467 real-service tests；Linux 22/22 E2E；four images passed    | 2026-07-29 |
+| WEB-002 local quality           | `pnpm ci:quality` + runtime/E2E       | 381 tests、8 builds、API runtime、Chromium 22/22 passed                    | 2026-07-29 |
+| WEB-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |
+| TAX-003 final main quality      | run `30497890894` / `29a7d06`         | merged main quality + four non-root images passed                          | 2026-07-29 |
+| TAX-003 evidence head           | PR #38 / run `30497442795`            | final head quality + four non-root images passed                           | 2026-07-29 |
 | TAX-003 protected checks        | PR #38 / run `30496917730`            | 450 tests、22 E2E、fresh/upgrade DB、4 images passed                       | 2026-07-29 |
 | TAX-003 local quality           | `pnpm ci:quality` + runtime/E2E       | passed：450 tests、8 builds、22 E2E、API runtime                           | 2026-07-29 |
 | Static architecture check       | `scripts/check-architecture.sh`       | passed：101 tasks、31 paths、52 schemas、36 models                         | 2026-07-25 |
@@ -240,6 +245,9 @@
   由 PR #36 / evidence-head run `30491148630` 合并为 `30be880`，final main run
   `30491653244` 全绿；`WEB-001` 已由 PR #37 / evidence-head run `30494632057` 受保护合并为
   `6532c81`，final main run `30495144658` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-002`。
+  `WEB-002` 的本地完整质量、API runtime 与 22/22 production Chromium 已通过；PR #39 run
+  `30500065008` 的 467 个真实服务测试、Linux E2E 与四镜像检查全绿，正在执行证据 head 复验；
+  合并后按强制序列进入 `SEO-001`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。

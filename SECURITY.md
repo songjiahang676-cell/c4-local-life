@@ -178,3 +178,11 @@ query/source/UTC day 只贡献一次，原 IP/User-Agent 不入样本表。
 scope revision 与当前版本双重乐观校验；已发布版本由数据库触发器禁止更新和删除，回滚只能追加新版本。
 发布事件只含 locale、region、版本、内容 hash、操作和时间，不含配置正文、用户输入或 PII。未来 Admin
 入口仍须经 MFA、近期认证、Policy 和审计，不能把本内部 Store 直接暴露为匿名 mutation。
+
+## 公共首页数据边界
+
+`GET /v1/homepage` 只暴露严格 allowlist 的 Hero、热门词、城市和公共 Listing 摘要。热门词沿用五个
+独立来源阈值及读取时二次敏感筛查；Listing 只允许当前地区、PUBLISHED 且未过期的 canonical 投影，
+并在首页 adapter 再次移除精确坐标、正文、联系方式、审核/风险和内部统计。模块依赖错误不会把 provider
+异常或私有字段反射给客户端；未实现的商家、师傅、广告、行情或商业入口必须隐藏，不能用 seed/fixture
+占位。首页 SSR 不转发 Cookie，响应保持 `no-store`，缓存失效日志和指标不含 scope、内容或资源 ID。

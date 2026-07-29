@@ -1103,6 +1103,124 @@ a {
   line-height: 1.5;
 }
 
+.homepageRealData .heroCard {
+  min-height: 226px;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 190, 110, 0.32), transparent 25%),
+    linear-gradient(125deg, #164f8b 0%, #2574b7 58%, #69a4d2 100%);
+}
+
+.homepageHeroSearch {
+  width: min(620px, 100%);
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.homepageHeroSearch input {
+  min-width: 0;
+  padding: 0 16px;
+  border: 0;
+  outline: 0;
+}
+
+.homepageHeroSearch button {
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding-inline: 16px;
+  color: #fff;
+  background: var(--orange);
+  border: 0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.homepageRealData .hotRank h2,
+.homepageRealData .cityCard h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.homepageRealData .hotRank li {
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+
+.homepageRealData .cityGrid a {
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 7px 4px;
+  border-radius: 6px;
+  background: #f5f7fa;
+  font-size: 11px;
+  text-align: center;
+}
+
+.homepageRealData .iconDirectory {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.homepageListingGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.homepageListingRow {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 28px;
+}
+
+.homepageSponsored {
+  padding: 2px 5px;
+  color: #8a3d00;
+  background: #fff1df;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.homepageUnavailable {
+  min-height: 226px;
+  display: grid;
+  align-content: center;
+  padding: 32px;
+}
+
+.homepageUnavailable h1 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.homepageUnavailable p,
+.homepagePartialNotice {
+  color: var(--muted);
+}
+
+.homepagePartialNotice {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid #f0d6ae;
+  border-radius: 8px;
+  background: #fff9ef;
+}
+
+.homepageRightRail:empty {
+  display: none;
+}
+
+.footerHelp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--blue);
+}
+
 @media (max-width: 1550px) {
   .homeLayout {
     grid-template-columns: 210px minmax(0, 1fr) 320px;
@@ -1211,8 +1329,8 @@ a {
   .heroRow {
     grid-template-columns: 1fr;
   }
-  .hotRank {
-    display: none;
+  .homepageRealData .hotRank {
+    display: block;
   }
   .heroStats {
     grid-template-columns: repeat(3, 1fr);
@@ -1282,7 +1400,7 @@ a {
     display: none;
   }
   .heroCard {
-    min-height: 300px;
+    min-height: 250px;
   }
   .heroContent {
     padding: 24px 20px;
@@ -1307,6 +1425,9 @@ a {
   .lowerGrid,
   .rightRail {
     grid-template-columns: 1fr;
+  }
+  .homepageRealData .iconDirectory {
+    grid-template-columns: repeat(3, 1fr);
   }
   .crossBorder,
   .adCard {

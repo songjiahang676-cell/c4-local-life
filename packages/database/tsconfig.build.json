@@ -17,6 +17,7 @@
     "src/repositories/listing.repository.ts",
     "src/repositories/listing-search.repository.ts",
     "src/repositories/search-discovery.repository.ts",
+    "src/repositories/homepage-layout.repository.ts",
     "src/repositories/listing-draft.repository.ts",
     "src/repositories/listing-submission.repository.ts",
     "src/repositories/listing-revision.repository.ts",

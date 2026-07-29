@@ -291,7 +291,10 @@ cursor 和筛选页先行 `noindex,follow`，完整 canonical/hreflang/schema/si
 `TAX-003` 已把首页模块编排收敛为严格、版本化的运营配置：十类模块各自使用可序列化 source
 白名单，不接受任意 HTML、URL 或未知字段；locale/region scope 采用乐观并发草稿、不可变发布历史和
 追加式回滚。发布与回滚在同一 PostgreSQL 事务写入最小化 `homepage.layout.published` Outbox 事件，
-供 `WEB-002` 失效派生缓存；中英文种子只提供结构，不伪造业务内容。
+中英文种子只提供结构，不伪造业务内容。`WEB-002` 已增加 `GET /v1/homepage`：按发布顺序组合 allowlist
+Hero、隐私安全热门词、active 城市和当前地区公开 Listing，逐模块隔离错误并隐藏真实空集合；尚未具有
+canonical 投影的商家、师傅、广告、行情与商业入口不会渲染。Web 使用一次 strict/no-store SSR 请求，
+Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字和虚构业务内容已移出运行路径。
 
 ## 七、规划容量与服务目标
 

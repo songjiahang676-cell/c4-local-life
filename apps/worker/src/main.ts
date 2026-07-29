@@ -17,6 +17,12 @@ import {
   type ObservabilityRuntime,
 } from "@socal/observability";
 import { workerLiveness, workerReadiness } from "./health-status";
+import {
+  HomepageCacheInvalidationHandler,
+  homepageLayoutPublishedEventType,
+  PermanentHomepageCacheInvalidationError,
+} from "./homepage/homepage-cache-invalidation";
+import { RedisHomepageCacheInvalidator } from "./homepage/redis-homepage-cache-invalidator";
 import { runObservedJob } from "./job-observability";
 import { ListingExpiryDispatcher } from "./listing/listing-expiry-dispatcher";
 import {
@@ -179,6 +185,10 @@ const listingIndexReconciler = new ListingIndexReconciler({
     intervalMilliseconds: environment.SEARCH_RECONCILIATION_INTERVAL_MS,
   },
 });
+const homepageCacheInvalidation = new HomepageCacheInvalidationHandler(
+  new RedisHomepageCacheInvalidator(connection),
+  (outcome) => runtimeState.observability?.metrics.homepageCacheInvalidation(outcome),
+);
 
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   runtimeState.observability?.logger.info(event, fields);
@@ -208,6 +218,16 @@ registerHandler("organization.invitation.revoked", () => Promise.resolve());
 registerHandler("organization.member.role.changed", () => Promise.resolve());
 registerHandler("organization.membership.removed", () => Promise.resolve());
 registerHandler("organization.owner.transferred", () => Promise.resolve());
+registerHandler(homepageLayoutPublishedEventType, async (job) => {
+  try {
+    await homepageCacheInvalidation.handle(job.data);
+  } catch (error: unknown) {
+    if (error instanceof PermanentHomepageCacheInvalidationError) {
+      throw new UnrecoverableError(error.code);
+    }
+    throw error;
+  }
+});
 for (const eventType of listingSearchEventTypes) {
   registerHandler(eventType, async (job) => {
     try {

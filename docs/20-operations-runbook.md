@@ -162,3 +162,16 @@
 但不得手工 UPDATE 已发布 JSON 或把草稿设为公开。内容错误使用应用层 rollback：复制已知安全历史版本、
 追加更高版本并产生新失效事件。只有 migration 故障才按随迁移提供的 roll-forward/rollback 说明处理，
 删除表前必须确认版本历史和 Outbox 均已备份。
+
+## 20.19 WEB-002 首页模块或缓存失效异常
+
+- 首页整体 503 时先检查 locale/region scope 是否有已发布版本、Web 的 `API_BASE_URL` 与 API
+  `/v1/homepage`；不得临时读取草稿、layout seed 或静态 mock。响应 `partial=true` 时根据固定 kind/
+  outcome 指标定位单一模块，不在日志复制热门词、Listing 内容或 provider 错误。
+- 模块持续 `empty` 时分别核对 active CITY taxonomy、热门词五来源阈值和当前地区有效公开 Listing；
+  不降低隐私阈值、不放宽 PUBLISHED/未过期/region 条件，也不插入假内容掩盖空态。
+- 新布局未生效时检查 Outbox 重投与 `socal:homepage:v1:<locale>:<region>:layout-version` 水位。旧版本
+  重投为 stale 是预期；failed 应修复 Redis 后让 BullMQ 重试。必要时可删除可重建的首页派生 key，
+  但不得修改 PostgreSQL 已发布版本或清空业务事实。
+- Web 契约失败时比较 OpenAPI、生成类型与 API payload；不要放宽 strict parser、增加任意代理 URL、
+  转发 Cookie 或把模块内部 DTO 直接暴露给浏览器。

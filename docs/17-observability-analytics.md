@@ -155,3 +155,13 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
 `homepage.layout.published`。允许的诊断字段只有 operation、locale 类别、版本和固定 outcome；配置
 正文、content key、region code、actor ID 和内容 hash 不进入指标标签。`WEB-002` 接入消费者时再增加
 固定 outcome 的 cache invalidation 指标，TAX-003 不虚构尚未存在的消费端可用性。
+
+## 17.16 WEB-002 首页模块与失效指标
+
+- `socal_homepage_modules_total{kind,outcome}` 的 kind 只允许 HERO/HOT_SEARCHES/CITY_CHIPS/
+  LISTING_FEED，outcome 只允许 success/empty/unavailable；用于区分真实空模块与依赖故障。
+- `socal_homepage_cache_invalidations_total{outcome}` 只允许 invalidated/stale/failed；重复或乱序版本
+  计入 stale，依赖故障计入 failed 后由既有队列重试。
+- locale、region、layout/module key、版本、content hash、query、Listing/用户 ID、正文、错误消息和
+  provider detail 均不进入指标标签。HTTP RED 继续覆盖 `/v1/homepage`，正式 SLO/告警由 OBS-002
+  结合生产流量设定。

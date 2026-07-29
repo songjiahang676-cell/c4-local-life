@@ -63,7 +63,7 @@ Homepage
 避免浏览器首屏请求十几个 endpoint。服务端可调用组合 endpoint：
 
 ```http
-GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
+GET /v1/homepage?locale=zh-Hans&regionCode=US-CA-SOCAL&device=desktop
 ```
 
 响应包含 layout version、模块列表、模块级 data/version/cache policy。高变化内容（消息数、登录状态）独立请求/服务端 session 读取；广告可在合规延迟加载。
@@ -116,3 +116,20 @@ Hero、热门搜索、城市、Listing feed、商家、师傅、广告、行情�
 业务数据、任意 HTML、外部 URL、查询表达式或私有字段。草稿可 preview；publish 切换 canonical
 版本；rollback 复制历史配置为新版本并发送原子失效事件。`WEB-002` 负责从各领域公开投影装配数据，
 模块失败需隔离为真实空态/错误态，不能从 layout seed 伪造 500 条内容或生产指标。
+
+## 26.8 WEB-002 已实现模块映射
+
+公共响应与 SSR 目前只实现具有 canonical 数据口径的四类：
+
+| Layout kind  | API 数据源                                 | Web 组件        | 空/错策略                                  |
+| ------------ | ------------------------------------------ | --------------- | ------------------------------------------ |
+| HERO         | allowlist 本地化 `contentKey`              | `Hero`          | 无文案时隐藏；无可用 Hero 时显示全页恢复态 |
+| HOT_SEARCHES | 隐私安全 Search Discovery                  | `Trending`      | 空集合隐藏；依赖失败令响应 partial         |
+| CITY_CHIPS   | active CITY taxonomy                       | `CityModule`    | 空集合隐藏；链接只携带公开 region code     |
+| LISTING_FEED | region-scoped PostgreSQL 公共 Listing 投影 | `ListingModule` | 空集合隐藏；推广使用文字披露               |
+
+API 应用服务从已发布 layout 读取顺序并并发装配，Controller 不访问 Prisma；Web 只调用一次
+`/v1/homepage` 并在 strict contract 后进行 Server Component 渲染。原参考实现中的 `256,893`、虚构
+商家/师傅、评分、广告、价格行情和模拟 Listing 已从生产运行路径移除。BUSINESS_FEATURED、
+PROVIDER_FEATURED、AD、PRICE_METRIC、RESOURCE_PRODUCTS、PORTAL_LINKS 即使出现在布局中，也必须等
+各自真实领域投影和验收完成后才能加入公共响应。

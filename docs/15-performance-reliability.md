@@ -124,3 +124,14 @@ reconciliation 仍属于 `EVT-002`。
 locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读；Redis/CDN 只保存可重建
 派生状态。TTL 由严格配置限制在 0–86400 秒，故障时允许短暂读取最后一个已发布版本，不得读取草稿或
 静默拼接不同版本模块。
+
+## 15.13 WEB-002 首页读取与失效边界
+
+- 当前 Web SSR 对首页聚合 API 只有一次匿名读取，固定 5 秒超时、禁 redirect、正文最大 1 MB，并用
+  shared Zod contract 失败关闭；不会从浏览器并发请求十几个内部模块，也不转发 Cookie。
+- API 对支持的已启用模块并发读取且逐模块隔离；Listing feed 使用布局 limit 与当前 region scope，
+  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据，但在 `PERF-001` 完成共享缓存与实测预算前，
+  API 和 Web 都保持 `no-store`，不得宣称 CDN/Redis 命中率或生产 LCP。
+- `homepage.layout.published` Worker 以 locale/region/version 为幂等键，在 Redis Lua 中原子推进版本
+  水位并删除 desktop/tablet/mobile 派生 key。重复或乱序旧版本为 `stale`；Redis 丢失只丢可重建水位，
+  不影响 PostgreSQL canonical 布局与业务数据。

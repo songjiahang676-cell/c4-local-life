@@ -1,453 +1,92 @@
-import {
-  ArrowLeftRight,
-  BadgeCheck,
-  BadgePercent,
-  BookOpen,
-  Boxes,
-  Briefcase,
-  Building2,
-  CalendarClock,
-  CalendarDays,
-  ChefHat,
-  CircleHelp,
-  Coins,
-  FileText,
-  Grid3X3,
-  Hammer,
-  House,
-  KeyRound,
-  Languages,
-  Megaphone,
-  MessageSquare,
-  Newspaper,
-  Package,
-  Paintbrush,
-  Pin,
-  RefreshCw,
-  ShieldAlert,
-  ShieldCheck,
-  ShoppingBag,
-  Star,
-  Store,
-  Truck,
-  User,
-  Users,
-  Wrench,
-} from "lucide-react";
-import type { IconEntry } from "@/components/icons/icon-types";
+import { Briefcase, House, Search, ShoppingBag, Store, Wrench } from "lucide-react";
+import type { Locale } from "@socal/contracts";
+import type { IconEntry } from "../components/icons/icon-types";
 import { ROUTES } from "./routes";
 
-export type ListingRow = { title: string; meta?: string; price?: string };
+type LocalizedText = Readonly<Record<Locale, string>>;
 
-export const primaryNav = [
-  ["首页", ROUTES.home],
-  ["招聘", ROUTES.jobs],
-  ["租房", ROUTES.housingRent],
-  ["转让", ROUTES.businessTransfer],
-  ["二手", ROUTES.marketplace],
-  ["找师傅", ROUTES.professionals],
-  ["商家", ROUTES.businesses],
-  ["优惠", ROUTES.deals],
-  ["问答", ROUTES.questions],
-  ["论坛", ROUTES.forum],
-  ["活动", ROUTES.events],
-] as const;
+function text(value: LocalizedText, locale: Locale): string {
+  return value[locale];
+}
 
-export const quickPublish: IconEntry[] = [
-  {
-    key: "job-post",
-    label: "发布招聘",
-    href: ROUTES.jobPost,
-    icon: Briefcase,
-    theme: "orange",
-    description: "招人才 / 找工作",
-  },
-  {
-    key: "housing-post",
-    label: "发布房源",
-    href: ROUTES.rentalPost,
-    icon: House,
-    theme: "red",
-    description: "出租 / 出售 / 求租",
-  },
-  {
-    key: "transfer-post",
-    label: "发布转让",
-    href: ROUTES.transferPost,
-    icon: Store,
-    theme: "blue",
-    description: "店铺 / 商铺 / 设备",
-  },
-  {
-    key: "market-post",
-    label: "发布二手",
-    href: ROUTES.secondhandPost,
-    icon: ShoppingBag,
-    theme: "purple",
-    description: "闲置物品 / 低价转让",
-  },
-  {
-    key: "service-post",
-    label: "发布服务",
-    href: ROUTES.servicePost,
-    icon: Wrench,
-    theme: "blue",
-    description: "找师傅 / 找服务",
-  },
-];
+export function primaryNavigation(locale: Locale): readonly (readonly [string, string])[] {
+  return [
+    [text({ "zh-Hans": "首页", "en-US": "Home" }, locale), ROUTES.home],
+    [text({ "zh-Hans": "招聘", "en-US": "Jobs" }, locale), ROUTES.jobs],
+    [text({ "zh-Hans": "租房", "en-US": "Rentals" }, locale), ROUTES.housingRent],
+    [text({ "zh-Hans": "转让", "en-US": "Transfers" }, locale), ROUTES.businessTransfer],
+    [text({ "zh-Hans": "二手", "en-US": "Marketplace" }, locale), ROUTES.marketplace],
+    [text({ "zh-Hans": "本地服务", "en-US": "Services" }, locale), ROUTES.services],
+  ];
+}
 
-export const categoryShortcuts: IconEntry[] = [
-  {
-    key: "news",
-    label: "新闻资讯",
-    href: ROUTES.news,
-    icon: Newspaper,
-    theme: "blue",
-  },
-  {
-    key: "jobs",
-    label: "招聘招工",
-    href: ROUTES.jobs,
-    icon: Briefcase,
-    theme: "orange",
-  },
-  {
-    key: "resumes",
-    label: "求职简历",
-    href: ROUTES.resumes,
-    icon: FileText,
-    theme: "green",
-  },
-  {
-    key: "rent",
-    label: "房屋出租",
-    href: ROUTES.housingRent,
-    icon: Building2,
-    theme: "red",
-  },
-  {
-    key: "wanted",
-    label: "房屋求租",
-    href: ROUTES.housingWanted,
-    icon: KeyRound,
-    theme: "green",
-  },
-  {
-    key: "commercial",
-    label: "商铺出租",
-    href: ROUTES.commercial,
-    icon: Store,
-    theme: "green",
-  },
-  {
-    key: "transfer",
-    label: "店铺转让",
-    href: ROUTES.businessTransfer,
-    icon: ArrowLeftRight,
-    theme: "orange",
-  },
-  {
-    key: "marketplace",
-    label: "二手物品",
-    href: ROUTES.marketplace,
-    icon: Package,
-    theme: "purple",
-  },
-  {
-    key: "renovation",
-    label: "装修服务",
-    href: ROUTES.services,
-    icon: Paintbrush,
-    theme: "blue",
-  },
-  {
-    key: "pros",
-    label: "本地师傅",
-    href: ROUTES.professionals,
-    icon: Hammer,
-    theme: "orange",
-  },
-  {
-    key: "food",
-    label: "美食分享",
-    href: ROUTES.food,
-    icon: ChefHat,
-    theme: "red",
-  },
-  {
-    key: "forum",
-    label: "本地论坛",
-    href: ROUTES.forum,
-    icon: MessageSquare,
-    theme: "blue",
-  },
-  {
-    key: "businesses",
-    label: "商家黄页",
-    href: ROUTES.businesses,
-    icon: BookOpen,
-    theme: "purple",
-  },
-  {
-    key: "events",
-    label: "本地活动",
-    href: ROUTES.events,
-    icon: CalendarDays,
-    theme: "green",
-  },
-  {
-    key: "deals",
-    label: "商家优惠",
-    href: ROUTES.deals,
-    icon: BadgePercent,
-    theme: "orange",
-  },
-  {
-    key: "classified",
-    label: "分类广告",
-    href: ROUTES.classified,
-    icon: Grid3X3,
-    theme: "blue",
-  },
-];
+export function quickPublishEntries(locale: Locale): readonly IconEntry[] {
+  return [
+    {
+      key: "job-post",
+      label: text({ "zh-Hans": "发布招聘", "en-US": "Post a job" }, locale),
+      href: ROUTES.jobPost,
+      icon: Briefcase,
+      theme: "orange",
+      description: text({ "zh-Hans": "招聘或求职信息", "en-US": "Hiring information" }, locale),
+    },
+    {
+      key: "rental-post",
+      label: text({ "zh-Hans": "发布房源", "en-US": "Post a rental" }, locale),
+      href: ROUTES.rentalPost,
+      icon: House,
+      theme: "red",
+      description: text({ "zh-Hans": "出租或求租信息", "en-US": "Rental information" }, locale),
+    },
+    {
+      key: "transfer-post",
+      label: text({ "zh-Hans": "发布转让", "en-US": "Post a transfer" }, locale),
+      href: ROUTES.transferPost,
+      icon: Store,
+      theme: "blue",
+      description: text({ "zh-Hans": "店铺或生意转让", "en-US": "Business transfers" }, locale),
+    },
+    {
+      key: "market-post",
+      label: text({ "zh-Hans": "发布二手", "en-US": "Post an item" }, locale),
+      href: ROUTES.secondhandPost,
+      icon: ShoppingBag,
+      theme: "purple",
+      description: text({ "zh-Hans": "本地闲置物品", "en-US": "Local marketplace" }, locale),
+    },
+    {
+      key: "service-post",
+      label: text({ "zh-Hans": "发布服务", "en-US": "Post a service" }, locale),
+      href: ROUTES.servicePost,
+      icon: Wrench,
+      theme: "green",
+      description: text({ "zh-Hans": "提供本地服务", "en-US": "Local services" }, locale),
+    },
+  ];
+}
 
-export const trustEntries: IconEntry[] = [
-  {
-    key: "users",
-    label: "普通用户",
-    href: ROUTES.register,
-    icon: User,
-    theme: "blue",
-    description: "自由注册",
-  },
-  {
-    key: "merchants",
-    label: "商家 / 师傅 / 供应商",
-    href: ROUTES.businesses,
-    icon: Store,
-    theme: "green",
-    description: "审核入驻",
-  },
-  {
-    key: "reviews",
-    label: "5星评价体系",
-    href: ROUTES.help,
-    icon: Star,
-    theme: "orange",
-    description: "真实反馈",
-  },
-  {
-    key: "moderation",
-    label: "敏感词审核",
-    href: ROUTES.help,
-    icon: ShieldCheck,
-    theme: "blue",
-    description: "信息更安全",
-  },
-  {
-    key: "risk",
-    label: "黑名单风控",
-    href: ROUTES.help,
-    icon: ShieldAlert,
-    theme: "red",
-    description: "严格治理",
-  },
-  {
-    key: "languages",
-    label: "中英文显示",
-    href: ROUTES.home,
-    icon: Languages,
-    theme: "purple",
-    description: "双语浏览",
-  },
-];
-
-export const portalEntries: IconEntry[] = [
-  {
-    key: "account",
-    label: "用户中心",
-    href: ROUTES.userCenter,
-    icon: User,
-    theme: "blue",
-    description: "个人信息管理",
-    requiresAuth: true,
-  },
-  {
-    key: "merchant",
-    label: "商家后台",
-    href: ROUTES.merchantPortal,
-    icon: Store,
-    theme: "green",
-    description: "店铺管理 / 数据",
-    requiresAuth: true,
-  },
-  {
-    key: "professional",
-    label: "师傅后台",
-    href: ROUTES.professionalPortal,
-    icon: Hammer,
-    theme: "orange",
-    description: "接单 / 服务管理",
-    requiresAuth: true,
-  },
-  {
-    key: "supplier",
-    label: "供应商后台",
-    href: ROUTES.supplierPortal,
-    icon: Boxes,
-    theme: "purple",
-    description: "货源订单管理",
-    requiresAuth: true,
-  },
-  {
-    key: "moderation",
-    label: "后台审核",
-    href: ROUTES.moderationPortal,
-    icon: BadgeCheck,
-    theme: "blue",
-    description: "信息审核管理",
-    requiresAuth: true,
-  },
-  {
-    key: "customers",
-    label: "客户管理",
-    href: ROUTES.customerPortal,
-    icon: Users,
-    theme: "green",
-    description: "客户跟进 / 回访",
-    requiresAuth: true,
-  },
-  {
-    key: "points",
-    label: "积分系统",
-    href: ROUTES.pointsPortal,
-    icon: Coins,
-    theme: "orange",
-    description: "积分记录 / 明细",
-    requiresAuth: true,
-  },
-  {
-    key: "fulfillment",
-    label: "Shopify 发货",
-    href: ROUTES.fulfillmentPortal,
-    icon: Truck,
-    theme: "purple",
-    description: "跨境订单履约",
-    requiresAuth: true,
-  },
-  {
-    key: "ads",
-    label: "广告管理",
-    href: ROUTES.adsPortal,
-    icon: Megaphone,
-    theme: "blue",
-    description: "广告投放 / 数据",
-    requiresAuth: true,
-  },
-];
-
-export const valueServices: IconEntry[] = [
-  {
-    key: "points",
-    label: "积分充值",
-    href: ROUTES.points,
-    icon: Coins,
-    theme: "orange",
-  },
-  {
-    key: "pin",
-    label: "置顶信息",
-    href: `${ROUTES.points}/promotions`,
-    icon: Pin,
-    theme: "red",
-  },
-  {
-    key: "featured",
-    label: "推荐位",
-    href: ROUTES.advertising,
-    icon: Star,
-    theme: "orange",
-  },
-  {
-    key: "home-ad",
-    label: "首页广告",
-    href: ROUTES.advertising,
-    icon: Megaphone,
-    theme: "blue",
-  },
-  {
-    key: "refresh",
-    label: "刷新信息",
-    href: `${ROUTES.points}/refresh`,
-    icon: RefreshCw,
-    theme: "green",
-  },
-  {
-    key: "marketing",
-    label: "营销推广",
-    href: ROUTES.advertising,
-    icon: BadgePercent,
-    theme: "purple",
-  },
-  {
-    key: "renewal",
-    label: "自动续费",
-    href: `${ROUTES.points}/renewal`,
-    icon: CalendarClock,
-    theme: "blue",
-  },
-  {
-    key: "help",
-    label: "帮助中心",
-    href: ROUTES.help,
-    icon: CircleHelp,
-    theme: "slate",
-  },
-];
-
-export const latestJobs: ListingRow[] = [
-  { title: "中餐厅服务员", price: "$18–22/时" },
-  { title: "仓库管理员", price: "$20–24/时" },
-  { title: "收银员 Cashier", price: "$17–20/时" },
-  { title: "美甲师（有经验）", price: "$28–35/时" },
-  { title: "卡车司机 Class A", price: "面议" },
-];
-export const latestRentals: ListingRow[] = [
-  { title: "尔湾主卧招租", meta: "尔湾", price: "$1,200/月" },
-  { title: "圣盖博单间出租", meta: "圣盖博", price: "$750/月" },
-  { title: "Arcadia 整租3房", meta: "阿凯迪亚", price: "$2,800/月" },
-  { title: "工业市仓库出租", meta: "工业市", price: "$2,500/月起" },
-  { title: "蒙市好学区独立屋", meta: "蒙特利公园", price: "$3,200/月" },
-];
-export const latestTransfers: ListingRow[] = [
-  { title: "奶茶店转让（蒙市）", price: "$68,000" },
-  { title: "美甲店转让（核桃市）", price: "$45,000" },
-  { title: "餐馆转让（尔湾）", price: "$120,000" },
-  { title: "烟酒便利店转让", price: "$35,000" },
-  { title: "手机店转让（阿罕布拉）", price: "$25,000" },
-];
-export const latestSecondhand: ListingRow[] = [
-  { title: "宜家沙发（8成新）", price: "$180" },
-  { title: "iPhone 14 Pro 256G", price: "$650" },
-  { title: "婴儿车（几乎全新）", price: "$120" },
-  { title: "办公桌和椅子", price: "$80" },
-  { title: "洗衣机（9成新）", price: "$150" },
-];
-
-export const merchants = ["鼎泰丰", "海底捞", "小肥羊", "大华超市"] as const;
-export const providers = [
-  ["张师傅", "装修", "5.0"],
-  ["李师傅", "水电", "4.9"],
-  ["王师傅", "空调", "4.9"],
-  ["陈师傅", "油漆", "4.8"],
-] as const;
-export const cities = [
-  "洛杉矶 LA",
-  "尔湾 Irvine",
-  "圣盖博 SGV",
-  "蒙市 MPK",
-  "阿凯迪亚",
-  "核桃市",
-  "工业市",
-  "长滩",
-];
+export function categoryEntries(locale: Locale): readonly IconEntry[] {
+  return [
+    {
+      key: "search",
+      label: text({ "zh-Hans": "全部信息", "en-US": "All listings" }, locale),
+      href: ROUTES.classified,
+      icon: Search,
+      theme: "blue",
+    },
+    ...quickPublishEntries(locale).map((entry) => ({
+      ...entry,
+      href:
+        entry.key === "job-post"
+          ? ROUTES.jobs
+          : entry.key === "rental-post"
+            ? ROUTES.housingRent
+            : entry.key === "transfer-post"
+              ? ROUTES.businessTransfer
+              : entry.key === "market-post"
+                ? ROUTES.marketplace
+                : ROUTES.services,
+      description: undefined,
+    })),
+  ];
+}
