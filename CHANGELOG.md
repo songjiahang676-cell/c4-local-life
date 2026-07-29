@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added bilingual SSR pages for all five public Listing verticals and site-wide search, with strict
+  anonymous runtime response validation, category/city/price/sort filters, stable detail routes,
+  visible status/sponsored/verification labels, honest empty/error states, safe canonical-list
+  degradation, mobile reflow, and production desktop/mobile browser coverage.
 - Added reviewed immutable versioned search dictionaries, cursor-stable bounded synonym expansion,
   strict suggestion/trending APIs, five-source privacy thresholds, bot/PII filtering, IP-derived
   HMAC source deduplication, bounded 30–90 day retention, and count-free low-cardinality telemetry.

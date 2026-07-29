@@ -5,8 +5,11 @@ import {
   createListingSchema,
   listMyListingsQuerySchema,
   listListingsQuerySchema,
+  listingCollectionSchema,
   listingSearchSchema,
   moneySchema,
+  publicListingResponseSchema,
+  searchResponseSchema,
   updateListingSchema,
 } from "../src";
 
@@ -147,6 +150,115 @@ describe("listing contracts", () => {
       expect(listListingsQuerySchema.parse({ type })).toMatchObject({ type, limit: 20 });
     }
     expect(listListingsQuerySchema.safeParse({ type: "BUSINESS" }).success).toBe(false);
+  });
+
+  it("validates strict anonymous list, detail, and search projections", () => {
+    const common = {
+      id: "11111111-1111-4111-8111-111111111111",
+      type: "RENTAL",
+      status: "PUBLISHED",
+      locale: "en-US",
+      title: "Synthetic public rental",
+      slug: "synthetic-public-rental",
+      summary: "Contract-safe fictional public content.",
+      price: { amount: "2450.00", currency: "USD", unit: "MONTHLY" },
+      region: {
+        id: "22222222-2222-4222-8222-222222222222",
+        type: "CITY",
+        code: "US-CA-SYNTHETIC",
+        slug: "synthetic-city",
+        nameZhHans: "测试城市",
+        nameEn: "Synthetic City",
+        timezone: "America/Los_Angeles",
+      },
+      category: {
+        id: "33333333-3333-4333-8333-333333333333",
+        vertical: "RENTAL",
+        slug: "apartments",
+        nameZhHans: "公寓",
+        nameEn: "Apartments",
+      },
+      owner: {
+        id: "44444444-4444-4444-8444-444444444444",
+        displayName: "Synthetic Publisher",
+        avatarUrl: null,
+      },
+      organization: null,
+      location: { precision: "CITY" },
+      attributes: { bedrooms: 2 },
+      featured: false,
+      featuredUntil: null,
+      publishedAt: "2026-07-29T12:00:00.000Z",
+      expiresAt: "2026-08-29T12:00:00.000Z",
+      updatedAt: "2026-07-29T12:00:00.000Z",
+      version: 1,
+    } as const;
+
+    expect(
+      listingCollectionSchema.parse({
+        data: [common],
+        page: { hasMore: false, nextCursor: null },
+        generatedAt: "2026-07-29T12:01:00.000Z",
+      }).data,
+    ).toHaveLength(1);
+    expect(
+      publicListingResponseSchema.parse({
+        data: {
+          ...common,
+          body: "A fictional public body rendered as escaped text.",
+          createdAt: "2026-07-29T11:00:00.000Z",
+        },
+      }).data.status,
+    ).toBe("PUBLISHED");
+    expect(
+      publicListingResponseSchema.safeParse({
+        data: {
+          ...common,
+          body: "Owner-only fields must fail the anonymous projection boundary.",
+          createdAt: "2026-07-29T11:00:00.000Z",
+          ownerId: common.owner.id,
+        },
+      }).success,
+    ).toBe(false);
+
+    const searchRegion = {
+      id: common.region.id,
+      code: common.region.code,
+      slug: common.region.slug,
+      nameZhHans: common.region.nameZhHans,
+      nameEn: common.region.nameEn,
+    };
+    const { featured: _featured, featuredUntil: _featuredUntil, ...searchBase } = common;
+    void _featured;
+    void _featuredUntil;
+    expect(
+      searchResponseSchema.parse({
+        data: [
+          {
+            ...searchBase,
+            region: searchRegion,
+            location: { precision: "CITY", point: null },
+            sponsored: false,
+            distanceMiles: null,
+          },
+        ],
+        page: { hasMore: false, nextCursor: null },
+        facets: { types: [], categories: [], regions: [], priceUnits: [] },
+        correctedQuery: null,
+        tookMs: 5,
+        generatedAt: "2026-07-29T12:01:00.000Z",
+      }).data,
+    ).toHaveLength(1);
+    expect(
+      searchResponseSchema.safeParse({
+        data: [],
+        page: { hasMore: true, nextCursor: null },
+        facets: { types: [], categories: [], regions: [], priceUnits: [] },
+        correctedQuery: null,
+        tookMs: 5,
+        generatedAt: "2026-07-29T12:01:00.000Z",
+      }).success,
+    ).toBe(false);
   });
 
   it("bounds private management filters, cursors, and ordered batch mutations", () => {

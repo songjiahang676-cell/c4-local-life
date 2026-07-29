@@ -346,3 +346,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   literal prefix、30–90 天保留约束和有界过期删除；低于阈值即使调用方传 1 也不得返回。
 - 真实 OpenSearch 测试证明审核扩展可命中且不改变索引事实源；CI 继续运行 fresh baseline、upgrade、
   全量质量、Linux Chromium 和四镜像。没有本地服务时必须明确 skip，不能声称通过。
+
+## 18.31 WEB-001 公共页面验证增量
+
+- Contracts 单测覆盖公开 list/detail/search/taxonomy 的严格运行时响应、PUBLISHED 常量、分页 cursor
+  一致性、Owner 字段/未知键拒绝、递归 taxonomy 和 Search attributes 上限。
+- Web 单测覆盖 NFKC/decimal/倒置价格/重复参数、匿名 header、SSR bot 采样排除、Search 查询参数、
+  503 简单首屏降级、复杂筛选失败、两类 cursor 不混用、Owner 投影失败关闭、稳定路由/货币/属性输出。
+- 组件测试覆盖中英文筛选、原生 label、有效/推广/验证文字、诚实空态、详情安全提示、用户
+  `<script>` 文本转义和嵌套属性不展示。
+- Playwright 使用独立、纯虚构、无网络依赖的公共 API fixture，生产 standalone Web 在桌面/Pixel 7
+  验证 SSR HTML、搜索 noindex、筛选值、列表/详情、推广/验证、无效价格恢复和无横向溢出；fixture
+  只在 E2E 进程存在，不进入应用、seed 或生产数据路径。
+- 全仓格式、类型、lint、单元/集成、八应用构建、API 运行时、架构和四镜像保护门禁继续执行。本任务
+  不修改 OpenAPI、Prisma 或 migration；真实 OpenSearch 查询回归继续由既有 SEARCH 测试承担。

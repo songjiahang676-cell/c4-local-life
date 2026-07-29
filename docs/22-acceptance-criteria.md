@@ -292,3 +292,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 样本默认 30 天、数据库不超过 90 天并可有界清理；query/source/hash 不进入日志或指标标签。
 - OpenAPI/生成类型、Prisma/migration/回滚说明、单元/HTTP/PostgreSQL/OpenSearch、全量质量、Linux
   Chromium 和四镜像保护门禁均有真实通过证据后才可标记 done。
+
+## 22.17 WEB-001 公开列表、详情与筛选验收
+
+- 五类 `jobs/rentals/transfers/marketplace/services`、城市路径、全站 `/search` 与
+  `[city]/[slug]-[UUID]` 详情均为真实动态 SSR；首页对应入口使用 canonical 新路由。
+- 搜索 GET 表单支持中英文 q、类型、分类、城市、decimal 价格与相关度/最新/价格排序；重复参数、
+  bidi/control、倒置价格、未知城市和过期 cursor 有明确、安全的恢复或 404。
+- 响应经严格 Search/Public Listing/recursive taxonomy Schema；SSR 不转发 Cookie，Owner/内部字段或
+  越界响应失败关闭。用户 HTML 不执行，结构化属性只显示有界公开 primitive。
+- 卡片和详情以文字标明 PUBLISHED、Sponsored/推广和已验证机构；日期/货币本地化，地点仅显示区域与
+  精度，不显示 point、联系方式、审核、风险或媒体内部标识。
+- 无结果明确不使用模拟内容；Search 故障仅简单单垂类首屏降级 canonical PostgreSQL 且无后续 cursor，
+  复杂筛选显示通用恢复状态。搜索/筛选/cursor 页面 `noindex,follow`。
+- 单元/组件/生产 Chromium 桌面和移动覆盖 SSR HTML、双语、label/skip/focus/44px/reflow、列表/详情、
+  空态/错误、推广/状态和无横向溢出；完整质量与受保护门禁有真实证据后才可标记 done。

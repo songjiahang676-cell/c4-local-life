@@ -89,3 +89,11 @@
 - Beta 前用至少一种主流屏幕阅读器检查搜索、发布、消息和支付。
 - Search Console/日志监控索引覆盖、软 404、重复 canonical 和结构化数据错误。
 - SEO 变更灰度并跟踪自然流量之外的质量指标，避免靠薄内容换流量。
+
+`WEB-001` 先落实模板级安全基线：全站搜索及带任意筛选/cursor 的频道页为 `noindex,follow`，公开
+频道/城市与详情只生成描述性 title/description；完整 canonical、hreflang、Open Graph、结构化数据和
+sitemap 仍必须由 `SEO-001` 按质量白名单完成，不能将当前模板元数据误报为 SEO Gate 已关闭。页面具备
+skip link、main/nav/search/aside/article 语义地标、连续标题、原生 label、44px 控件、可见焦点、
+纯文字广告/状态标签、`bdi` 用户内容隔离以及 720/520px reflow。货币和日期使用 `Intl` 与
+`America/Los_Angeles`；用户正文保留原语言，不伪装机器翻译。axe、200% zoom 和屏幕阅读器人工基线
+仍由 `SEO-004` 验收。

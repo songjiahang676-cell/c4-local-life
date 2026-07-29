@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { listCategoriesQuerySchema, listRegionsQuerySchema } from "../src/index";
+import {
+  categoryCollectionResponseSchema,
+  listCategoriesQuerySchema,
+  listRegionsQuerySchema,
+  regionCollectionResponseSchema,
+} from "../src/index";
 
 describe("taxonomy contracts", () => {
   it("parses active-only, REGION_GROUP, and normalized bilingual query text", () => {
@@ -32,5 +37,56 @@ describe("taxonomy contracts", () => {
     }
     expect(listCategoriesQuerySchema.safeParse({ parentId: "not-a-uuid" }).success).toBe(false);
     expect(listCategoriesQuerySchema.safeParse({ activeOnly: "yes" }).success).toBe(false);
+  });
+
+  it("keeps recursive public taxonomy responses strict", () => {
+    const shared = {
+      id: "11111111-1111-4111-8111-111111111111",
+      parentId: null,
+      slug: "synthetic",
+      name: { "zh-Hans": "测试", "en-US": "Synthetic" },
+      active: true,
+      aliases: [],
+      children: [],
+    } as const;
+
+    expect(
+      regionCollectionResponseSchema.parse({
+        data: [
+          {
+            ...shared,
+            code: "US-CA-SYNTHETIC",
+            type: "CITY",
+            timezone: "America/Los_Angeles",
+            centroid: null,
+          },
+        ],
+      }).data,
+    ).toHaveLength(1);
+    expect(
+      categoryCollectionResponseSchema.parse({
+        data: [
+          {
+            ...shared,
+            vertical: "SERVICE",
+            iconKey: "wrench",
+            formSchemaVersion: 1,
+          },
+        ],
+      }).data,
+    ).toHaveLength(1);
+    expect(
+      categoryCollectionResponseSchema.safeParse({
+        data: [
+          {
+            ...shared,
+            vertical: "SERVICE",
+            iconKey: null,
+            formSchemaVersion: 1,
+            privateRule: true,
+          },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });

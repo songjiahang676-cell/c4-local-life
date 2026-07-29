@@ -107,3 +107,13 @@ reconciliation 仍属于 `EVT-002`。
 - 数据规模接近目标，避免空数据库压测。
 - 逐步负载、突发、耐久、队列积压和依赖故障测试。
 - 记录版本、数据集、环境、阈值和瓶颈；性能结果可重复。
+
+## 15.11 WEB-001 公共 SSR 边界
+
+- 一次公共 SSR 最多读取 Search、active Category 和 CITY taxonomy；非城市频道并行请求，城市聚合先用
+  taxonomy 解析 canonical code。每个上游调用固定 5 秒、禁 redirect、JSON 正文最多 1 MB。
+- OpenSearch/Search 不可用时，只有单垂类简单首屏额外读取 canonical PostgreSQL 列表；不对 q、价格、
+  geo、cursor 或全站搜索降级，避免把故障扩大为多次错误查询。
+- 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
+  taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
+  本地 fixture 延迟宣称生产 SLO。
