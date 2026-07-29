@@ -15,8 +15,15 @@
         "unit": "HOURLY"
       },
       "attributes": {
+        "employerName": "虚构测试餐厅",
         "employmentType": "full-time",
-        "language": ["zh-hans", "english"]
+        "experienceLevel": "entry",
+        "remoteType": "onsite",
+        "wageMax": "23.00",
+        "schedule": "周一至周五虚构测试班次",
+        "language": ["zh-hans", "english"],
+        "visaSupport": false,
+        "employmentPolicyAcknowledged": true
       }
     },
     {
@@ -50,7 +57,13 @@
         "unit": "FIXED"
       },
       "attributes": {
-        "includesInventory": true
+        "businessType": "food-beverage",
+        "includesInventory": true,
+        "monthlyRent": "6800.00",
+        "leaseRemainingMonths": 36,
+        "reasonForTransfer": "虚构业主计划调整，仅供开发测试",
+        "licenseStatus": "requires-review",
+        "financialDisclaimerAcknowledged": true
       }
     },
     {
@@ -66,7 +79,11 @@
         "unit": "FIXED"
       },
       "attributes": {
-        "condition": "like-new"
+        "condition": "like-new",
+        "brand": "虚构测试品牌",
+        "model": "TEST-SOFA-3",
+        "deliveryOptions": ["pickup"],
+        "marketplacePolicyAcknowledged": true
       }
     },
     {
@@ -83,7 +100,12 @@
       },
       "attributes": {
         "serviceRadiusMiles": 25,
-        "insured": true
+        "insured": true,
+        "licenseNumber": "SYNTHETIC-DEV-ONLY",
+        "licenseStatus": "licensed",
+        "emergencyService": true,
+        "availability": ["weekdays", "on-call"],
+        "servicePolicyAcknowledged": true
       }
     }
   ]

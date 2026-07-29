@@ -258,17 +258,20 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
 
-### LIST-005 公共生命周期持久化
+### LIST-005/LIST-007 公共生命周期持久化
 
-Rental 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
+五类 Listing 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
 PUBLISHED + AUTO_APPROVED/APPROVED、未到期、未删除、active taxonomy 与可公开主体。新增部分索引
-`listings_rental_expiry_due_idx(expires_at,id)` 只覆盖可过期 Rental；它是可重建索引，不是第二份
-数据。
+分别只覆盖可过期的 Rental、Job、Transfer、Secondhand 和 Service；它们是可重建索引，不是第二份数据。
 
 Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner 或组织 OWNER/ADMIN/EDITOR、
 状态、时间和 version。成功更新与 `AuditLog`、`OutboxEvent` 同事务；DELETE 写 `deleted_at` 而不物理
 级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
-Rental 只产生一次 `listing.expired` 审计和事件。
+Listing 只产生一次 `listing.expired` 审计和事件。
+
+Transfer/Secondhand/Service 明细与对应 Listing 在创建/更新事务内 upsert，并删除不属于当前类型的
+其他垂直明细。数据库 check 分别约束转让核心字段、二手成色/交付数组和服务半径/可用时间；应用层
+在进入 Repository 前继续执行价格单位、政策确认和有界业务规则，形成双层失败关闭。
 
 ### NOTIF-001 站内通知投影
 

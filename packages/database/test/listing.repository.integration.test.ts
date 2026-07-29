@@ -507,6 +507,158 @@ integration("ListingRepository safe PostgreSQL projections", () => {
     });
   });
 
+  it("projects and expires Transfer, Secondhand, and Service without owner-only fields", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createFixture(transaction);
+      const repository = new ListingRepository(transaction);
+      const verticals = [
+        {
+          type: ListingType.TRANSFER,
+          publicAttributes: { businessType: "retail", monthlyRent: "2500.00" },
+          privateAttributes: { financialDisclaimerAcknowledged: true },
+          fields: [
+            { key: "businessType", visibility: "PUBLIC" },
+            { key: "monthlyRent", visibility: "PUBLIC" },
+            { key: "financialDisclaimerAcknowledged", visibility: "OWNER_ONLY" },
+          ],
+          priceAmount: "125000.00",
+          priceUnit: "FIXED" as const,
+        },
+        {
+          type: ListingType.SECONDHAND,
+          publicAttributes: { condition: "good", deliveryOptions: ["pickup"] },
+          privateAttributes: { marketplacePolicyAcknowledged: true },
+          fields: [
+            { key: "condition", visibility: "PUBLIC" },
+            { key: "deliveryOptions", visibility: "PUBLIC" },
+            { key: "marketplacePolicyAcknowledged", visibility: "OWNER_ONLY" },
+          ],
+          priceAmount: null,
+          priceUnit: "NEGOTIABLE" as const,
+        },
+        {
+          type: ListingType.SERVICE,
+          publicAttributes: { serviceRadiusMiles: 20, availability: ["weekdays"] },
+          privateAttributes: {
+            licenseNumber: "SYNTHETIC-PRIVATE-LICENSE",
+            servicePolicyAcknowledged: true,
+          },
+          fields: [
+            { key: "serviceRadiusMiles", visibility: "PUBLIC" },
+            { key: "availability", visibility: "PUBLIC" },
+            { key: "licenseNumber", visibility: "OWNER_ONLY" },
+            { key: "servicePolicyAcknowledged", visibility: "OWNER_ONLY" },
+          ],
+          priceAmount: "95.00",
+          priceUnit: "HOURLY" as const,
+        },
+      ] as const;
+      const dueIds: string[] = [];
+
+      for (const [index, vertical] of verticals.entries()) {
+        const categoryId = randomUUID();
+        const visibleId = randomUUID();
+        const dueId = randomUUID();
+        dueIds.push(dueId);
+        await transaction.category.create({
+          data: {
+            id: categoryId,
+            vertical: vertical.type,
+            slug: `synthetic-${vertical.type.toLowerCase()}-${categoryId}`,
+            nameZhHans: `测试${vertical.type}`,
+            nameEn: `Synthetic ${vertical.type}`,
+            formSchemaVersions: {
+              create: {
+                version: 1,
+                definition: {
+                  categoryId,
+                  version: 1,
+                  fields: vertical.fields,
+                },
+                contentHash: String(index + 1).repeat(64),
+                publishedAt: new Date("2026-07-01T00:00:00.000Z"),
+              },
+            },
+          },
+        });
+        const base = {
+          type: vertical.type,
+          ownerId: fixture.ownerId,
+          categoryId,
+          regionId: fixture.regionId,
+          locale: "zh-Hans",
+          summary: `Fictional ${vertical.type} fixture.`,
+          body: `This synthetic ${vertical.type} is used only by repository integration tests.`,
+          priceAmount: vertical.priceAmount,
+          currency: "USD",
+          priceUnit: vertical.priceUnit,
+          contactMode: ContactMode.IN_APP,
+          locationPrecision: "CITY",
+          attributes: {
+            ...vertical.publicAttributes,
+            ...vertical.privateAttributes,
+            unknownInjected: "must never escape",
+          },
+          status: ContentStatus.PUBLISHED,
+          moderationStatus: ModerationStatus.APPROVED,
+          publishedAt: new Date("2026-07-20T12:00:00.000Z"),
+        } satisfies Omit<Prisma.ListingCreateManyInput, "id" | "title" | "slug" | "expiresAt">;
+        await transaction.listing.createMany({
+          data: [
+            {
+              ...base,
+              id: visibleId,
+              title: `Visible synthetic ${vertical.type}`,
+              slug: `visible-${vertical.type.toLowerCase()}-${visibleId}`,
+              expiresAt: new Date("2026-08-20T12:00:00.000Z"),
+            },
+            {
+              ...base,
+              id: dueId,
+              title: `Due synthetic ${vertical.type}`,
+              slug: `due-${vertical.type.toLowerCase()}-${dueId}`,
+              expiresAt: new Date("2026-07-29T11:59:00.000Z"),
+            },
+          ],
+        });
+
+        const page = await repository.listPublic({ type: vertical.type, now, limit: 20 });
+        expect(page.items).toHaveLength(1);
+        expect(page.items[0]).toMatchObject({
+          id: visibleId,
+          type: vertical.type,
+          attributes: vertical.publicAttributes,
+        });
+        for (const key of Object.keys(vertical.privateAttributes)) {
+          expect(page.items[0]?.attributes).not.toHaveProperty(key);
+        }
+        expect(page.items[0]?.attributes).not.toHaveProperty("unknownInjected");
+      }
+
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 4,
+      });
+      await expect(repository.expireDue({ now, limit: 50 })).resolves.toEqual({
+        expiredCount: 0,
+      });
+      await expect(
+        transaction.listing.count({
+          where: { id: { in: dueIds }, status: ContentStatus.EXPIRED, version: 2 },
+        }),
+      ).resolves.toBe(3);
+      await expect(
+        transaction.auditLog.count({
+          where: { targetId: { in: dueIds }, action: "listing.expired", actorType: "SYSTEM" },
+        }),
+      ).resolves.toBe(3);
+      await expect(
+        transaction.outboxEvent.count({
+          where: { aggregateId: { in: dueIds }, eventType: "listing.expired" },
+        }),
+      ).resolves.toBe(3);
+    });
+  });
+
   it("scopes owner views to the direct owner or a current organization member", async () => {
     await database.withRollback(async (transaction) => {
       const fixture = await createFixture(transaction);

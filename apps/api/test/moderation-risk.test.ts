@@ -20,11 +20,11 @@ function baseline(): ListingSubmissionRiskInput {
   };
 }
 
-describe("listing submission risk rules v1", () => {
+describe("listing submission risk rules v3", () => {
   it("auto-approves an established account with a complete risk-based policy", () => {
     expect(evaluateListingSubmissionRisk(baseline())).toEqual({
       ruleSetKey: "listing-submission",
-      ruleSetVersion: 2,
+      ruleSetVersion: 3,
       riskTier: "LOW",
       hits: [],
       defaultLifetimeDays: 30,
@@ -56,7 +56,7 @@ describe("listing submission risk rules v1", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 2,
+      ruleSetVersion: 3,
       riskTier: "HIGH",
       hits: [
         {
@@ -77,7 +77,7 @@ describe("listing submission risk rules v1", () => {
     });
 
     expect(result).toMatchObject({
-      ruleSetVersion: 2,
+      ruleSetVersion: 3,
       riskTier: "MEDIUM",
       hits: [
         {
@@ -89,5 +89,27 @@ describe("listing submission risk rules v1", () => {
       ],
     });
     expect(JSON.stringify(result.hits)).not.toContain("women only");
+  });
+
+  it("escalates prohibited Secondhand goods without retaining the matched text", () => {
+    const result = evaluateListingSubmissionRisk({
+      ...baseline(),
+      listingType: "SECONDHAND",
+      title: "Synthetic counterfeit item",
+    });
+
+    expect(result).toMatchObject({
+      ruleSetVersion: 3,
+      riskTier: "HIGH",
+      hits: [
+        {
+          ruleCode: "PROHIBITED_GOODS_RISK",
+          ruleVersion: 1,
+          severity: "HIGH",
+          evidenceKey: "title",
+        },
+      ],
+    });
+    expect(JSON.stringify(result.hits)).not.toContain("counterfeit");
   });
 });

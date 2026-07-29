@@ -141,6 +141,9 @@ function writeFields(fixture: DraftFixture, title: string): ListingDraftWriteFie
     locationPrecision: "APPROXIMATE",
     mediaIds: [],
     jobDetail: null,
+    transferDetail: null,
+    secondhandDetail: null,
+    serviceDetail: null,
   };
 }
 
@@ -352,6 +355,136 @@ integration("ListingDraftRepository with PostgreSQL", () => {
       });
       expect(updatedDetail.wageMin?.toString()).toBe("25");
       expect(updatedDetail.wageMax?.toString()).toBe("33");
+    });
+  });
+
+  it("persists exactly one coherent Transfer, Secondhand, or Service detail", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createDraftFixture(transaction);
+      const categoryIds = {
+        TRANSFER: randomUUID(),
+        SECONDHAND: randomUUID(),
+        SERVICE: randomUUID(),
+      } as const;
+      for (const [index, type] of (
+        [ListingType.TRANSFER, ListingType.SECONDHAND, ListingType.SERVICE] as const
+      ).entries()) {
+        const categoryId = categoryIds[type];
+        await transaction.category.create({
+          data: {
+            id: categoryId,
+            vertical: type,
+            slug: `listing-${type.toLowerCase()}-category-${categoryId}`,
+            nameZhHans: `测试${type}`,
+            nameEn: `Synthetic ${type}`,
+            formSchemaVersions: {
+              create: {
+                version: 1,
+                definition: { categoryId, version: 1, fields: [] },
+                contentHash: String(index + 6).repeat(64),
+                publishedAt: baseTime,
+              },
+            },
+          },
+        });
+      }
+      const repository = new ListingDraftRepository(transaction);
+      const transferInput = createInput(fixture, {
+        id: randomUUID(),
+        type: ListingType.TRANSFER,
+        categoryId: categoryIds.TRANSFER,
+        priceAmount: "125000.00",
+        priceUnit: PriceUnit.FIXED,
+        transferDetail: {
+          businessType: "retail",
+          askingPrice: "125000.00",
+          monthlyRent: "2500.00",
+          leaseRemainingMonths: 24,
+          reasonForTransfer: "Synthetic owner relocation",
+          includesInventory: true,
+        },
+      });
+      const secondhandInput = createInput(fixture, {
+        id: randomUUID(),
+        type: ListingType.SECONDHAND,
+        categoryId: categoryIds.SECONDHAND,
+        priceAmount: null,
+        priceUnit: PriceUnit.NEGOTIABLE,
+        secondhandDetail: {
+          condition: "good",
+          brand: "Synthetic Brand",
+          model: null,
+          deliveryOptions: ["pickup"],
+        },
+      });
+      const serviceInput = createInput(fixture, {
+        id: randomUUID(),
+        type: ListingType.SERVICE,
+        categoryId: categoryIds.SERVICE,
+        priceAmount: "95.00",
+        priceUnit: PriceUnit.HOURLY,
+        serviceDetail: {
+          serviceRadiusMiles: 20,
+          licenseNumber: null,
+          insured: true,
+          emergencyService: false,
+          availability: ["weekdays"],
+        },
+      });
+
+      await expect(
+        repository.createDraft({
+          ...createInput(fixture),
+          idempotencyKey: "repository-rental-transfer-detail-0001",
+          transferDetail: transferInput.transferDetail,
+        }),
+      ).resolves.toEqual({ kind: "invalid_reference" });
+      for (const input of [transferInput, secondhandInput, serviceInput]) {
+        await expect(repository.createDraft(input)).resolves.toMatchObject({
+          kind: "created",
+          listing: { id: input.id, type: input.type },
+        });
+      }
+
+      await expect(
+        transaction.transferDetail.findUniqueOrThrow({ where: { listingId: transferInput.id } }),
+      ).resolves.toMatchObject({
+        businessType: "retail",
+        leaseRemainingMonths: 24,
+        includesInventory: true,
+      });
+      await expect(
+        transaction.secondhandDetail.findUniqueOrThrow({
+          where: { listingId: secondhandInput.id },
+        }),
+      ).resolves.toMatchObject({
+        condition: "good",
+        brand: "Synthetic Brand",
+        deliveryOptions: ["pickup"],
+      });
+      await expect(
+        transaction.serviceDetail.findUniqueOrThrow({ where: { listingId: serviceInput.id } }),
+      ).resolves.toMatchObject({
+        serviceRadiusMiles: 20,
+        insured: true,
+        emergencyService: false,
+        availability: ["weekdays"],
+      });
+      await expect(
+        transaction.$queryRaw<Array<{ count: bigint }>>`
+          SELECT count(*)::bigint AS count
+          FROM (
+            SELECT listing_id FROM transfer_details
+            WHERE listing_id IN (${transferInput.id}::uuid, ${secondhandInput.id}::uuid, ${serviceInput.id}::uuid)
+            UNION ALL
+            SELECT listing_id FROM secondhand_details
+            WHERE listing_id IN (${transferInput.id}::uuid, ${secondhandInput.id}::uuid, ${serviceInput.id}::uuid)
+            UNION ALL
+            SELECT listing_id FROM service_details
+            WHERE listing_id IN (${transferInput.id}::uuid, ${secondhandInput.id}::uuid, ${serviceInput.id}::uuid)
+          ) AS vertical_details
+        `,
+      ).resolves.toEqual([{ count: 3n }]);
     });
   });
 

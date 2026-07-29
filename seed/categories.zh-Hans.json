@@ -394,6 +394,32 @@
       "manualReview": "always",
       "formFields": [
         {
+          "key": "businessType",
+          "type": "SELECT",
+          "label": { "zh-Hans": "业务类型", "en-US": "Business type" },
+          "required": true,
+          "filterable": true,
+          "searchable": true,
+          "options": [
+            {
+              "value": "food-beverage",
+              "label": { "zh-Hans": "餐饮", "en-US": "Food & beverage" }
+            },
+            { "value": "retail", "label": { "zh-Hans": "零售", "en-US": "Retail" } },
+            {
+              "value": "professional-service",
+              "label": { "zh-Hans": "专业服务", "en-US": "Professional service" }
+            },
+            {
+              "value": "equipment-inventory",
+              "label": { "zh-Hans": "设备/库存", "en-US": "Equipment / inventory" }
+            },
+            { "value": "other", "label": { "zh-Hans": "其他", "en-US": "Other" } }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 10
+        },
+        {
           "key": "includesInventory",
           "type": "BOOLEAN",
           "label": { "zh-Hans": "包含库存", "en-US": "Inventory included" },
@@ -401,7 +427,80 @@
           "filterable": true,
           "searchable": false,
           "visibility": "PUBLIC",
-          "sortOrder": 10
+          "sortOrder": 20
+        },
+        {
+          "key": "monthlyRent",
+          "type": "MONEY",
+          "label": { "zh-Hans": "每月租金（美元）", "en-US": "Monthly rent (USD)" },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 0, "max": 9999999999.99 },
+          "visibility": "PUBLIC",
+          "sortOrder": 30
+        },
+        {
+          "key": "leaseRemainingMonths",
+          "type": "NUMBER",
+          "label": { "zh-Hans": "剩余租期（月）", "en-US": "Lease remaining (months)" },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "validation": { "min": 0, "max": 1200 },
+          "visibility": "PUBLIC",
+          "sortOrder": 40
+        },
+        {
+          "key": "reasonForTransfer",
+          "type": "TEXTAREA",
+          "label": { "zh-Hans": "转让原因", "en-US": "Reason for transfer" },
+          "required": true,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "minLength": 5, "maxLength": 300 },
+          "visibility": "PUBLIC",
+          "sortOrder": 50
+        },
+        {
+          "key": "licenseStatus",
+          "type": "SELECT",
+          "label": {
+            "zh-Hans": "许可/执照状态（发布者声明）",
+            "en-US": "Permit / license status (seller-reported)"
+          },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "options": [
+            {
+              "value": "transferable",
+              "label": { "zh-Hans": "发布者称可转移", "en-US": "Seller reports transferable" }
+            },
+            {
+              "value": "requires-review",
+              "label": { "zh-Hans": "需主管机构确认", "en-US": "Agency review required" }
+            },
+            {
+              "value": "not-applicable",
+              "label": { "zh-Hans": "不适用", "en-US": "Not applicable" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 60
+        },
+        {
+          "key": "financialDisclaimerAcknowledged",
+          "type": "BOOLEAN",
+          "label": {
+            "zh-Hans": "我确认价格、租约、收入或经营数据均由发布者提供，平台未核验",
+            "en-US": "I confirm business figures are seller-provided and not platform-verified"
+          },
+          "required": true,
+          "filterable": false,
+          "searchable": false,
+          "visibility": "OWNER_ONLY",
+          "sortOrder": 100
         }
       ],
       "children": [
@@ -505,6 +604,59 @@
           ],
           "visibility": "PUBLIC",
           "sortOrder": 10
+        },
+        {
+          "key": "brand",
+          "type": "TEXT",
+          "label": { "zh-Hans": "品牌（可选）", "en-US": "Brand (optional)" },
+          "required": false,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "maxLength": 80 },
+          "visibility": "PUBLIC",
+          "sortOrder": 20
+        },
+        {
+          "key": "model",
+          "type": "TEXT",
+          "label": { "zh-Hans": "型号（可选）", "en-US": "Model (optional)" },
+          "required": false,
+          "filterable": false,
+          "searchable": true,
+          "validation": { "maxLength": 100 },
+          "visibility": "PUBLIC",
+          "sortOrder": 30
+        },
+        {
+          "key": "deliveryOptions",
+          "type": "MULTISELECT",
+          "label": { "zh-Hans": "交付方式", "en-US": "Delivery options" },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "options": [
+            { "value": "pickup", "label": { "zh-Hans": "自取", "en-US": "Pickup" } },
+            {
+              "value": "local-delivery",
+              "label": { "zh-Hans": "本地送货", "en-US": "Local delivery" }
+            },
+            { "value": "shipping", "label": { "zh-Hans": "邮寄", "en-US": "Shipping" } }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 40
+        },
+        {
+          "key": "marketplacePolicyAcknowledged",
+          "type": "BOOLEAN",
+          "label": {
+            "zh-Hans": "我确认物品来源合法且不属于武器、毒品、处方药、仿牌、赃物或危险品",
+            "en-US": "I confirm lawful ownership and that the item is not prohibited or hazardous"
+          },
+          "required": true,
+          "filterable": false,
+          "searchable": false,
+          "visibility": "OWNER_ONLY",
+          "sortOrder": 100
         }
       ],
       "children": [
@@ -585,7 +737,7 @@
           "key": "serviceRadiusMiles",
           "type": "NUMBER",
           "label": { "zh-Hans": "服务半径（英里）", "en-US": "Service radius (miles)" },
-          "required": false,
+          "required": true,
           "filterable": true,
           "searchable": false,
           "validation": { "min": 1, "max": 100 },
@@ -601,6 +753,89 @@
           "searchable": false,
           "visibility": "PUBLIC",
           "sortOrder": 20
+        },
+        {
+          "key": "licenseNumber",
+          "type": "TEXT",
+          "label": {
+            "zh-Hans": "执照号（如适用，仅供核验）",
+            "en-US": "License number (if applicable; verification only)"
+          },
+          "required": false,
+          "filterable": false,
+          "searchable": false,
+          "validation": { "maxLength": 100 },
+          "visibility": "OWNER_ONLY",
+          "sortOrder": 30
+        },
+        {
+          "key": "licenseStatus",
+          "type": "SELECT",
+          "label": {
+            "zh-Hans": "资质状态（发布者声明）",
+            "en-US": "Credential status (provider-reported)"
+          },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "options": [
+            {
+              "value": "licensed",
+              "label": { "zh-Hans": "发布者称已持证", "en-US": "Provider reports licensed" }
+            },
+            {
+              "value": "not-required",
+              "label": {
+                "zh-Hans": "发布者称无需执照",
+                "en-US": "Provider reports no license required"
+              }
+            },
+            {
+              "value": "unverified",
+              "label": { "zh-Hans": "尚未核验", "en-US": "Not yet verified" }
+            }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 40
+        },
+        {
+          "key": "emergencyService",
+          "type": "BOOLEAN",
+          "label": { "zh-Hans": "提供紧急服务", "en-US": "Emergency service available" },
+          "required": false,
+          "filterable": true,
+          "searchable": false,
+          "visibility": "PUBLIC",
+          "sortOrder": 50
+        },
+        {
+          "key": "availability",
+          "type": "MULTISELECT",
+          "label": { "zh-Hans": "可服务时间", "en-US": "Availability" },
+          "required": true,
+          "filterable": true,
+          "searchable": false,
+          "options": [
+            { "value": "weekdays", "label": { "zh-Hans": "工作日", "en-US": "Weekdays" } },
+            { "value": "evenings", "label": { "zh-Hans": "晚间", "en-US": "Evenings" } },
+            { "value": "weekends", "label": { "zh-Hans": "周末", "en-US": "Weekends" } },
+            { "value": "on-call", "label": { "zh-Hans": "随叫随到", "en-US": "On call" } }
+          ],
+          "visibility": "PUBLIC",
+          "sortOrder": 60
+        },
+        {
+          "key": "servicePolicyAcknowledged",
+          "type": "BOOLEAN",
+          "label": {
+            "zh-Hans": "我确认资质、保险和服务范围均为发布者声明，受监管服务须依法执业",
+            "en-US": "I confirm service claims are provider-reported and regulated work must be lawful"
+          },
+          "required": true,
+          "filterable": false,
+          "searchable": false,
+          "visibility": "OWNER_ONLY",
+          "sortOrder": 100
         }
       ],
       "children": [

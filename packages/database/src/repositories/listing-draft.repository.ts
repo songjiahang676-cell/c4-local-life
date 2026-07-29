@@ -69,6 +69,27 @@ export type ListingDraftWriteFields = {
     remoteType: string | null;
     visaSupport: boolean | null;
   } | null;
+  transferDetail: {
+    businessType: string;
+    askingPrice: string;
+    monthlyRent: string;
+    leaseRemainingMonths: number;
+    reasonForTransfer: string;
+    includesInventory: boolean | null;
+  } | null;
+  secondhandDetail: {
+    condition: string;
+    brand: string | null;
+    model: string | null;
+    deliveryOptions: readonly string[];
+  } | null;
+  serviceDetail: {
+    serviceRadiusMiles: number;
+    licenseNumber: string | null;
+    insured: boolean | null;
+    emergencyService: boolean | null;
+    availability: readonly string[];
+  } | null;
 };
 
 export type CreateListingDraftInput = ListingDraftWriteFields & {
@@ -140,6 +161,10 @@ function isRepositoryOptions(
 
 function asJsonInput(value: Record<string, ListingDraftJsonValue>): Prisma.InputJsonObject {
   return value as Prisma.InputJsonObject;
+}
+
+function asJsonArray(value: readonly ListingDraftJsonValue[]): Prisma.InputJsonArray {
+  return [...value] as Prisma.InputJsonArray;
 }
 
 async function lockIdempotencyKey(
@@ -360,27 +385,74 @@ function listingData(
   };
 }
 
-async function applyJobDetail(
+async function applyVerticalDetails(
   transaction: Prisma.TransactionClient,
   listingId: string,
-  detail: ListingDraftWriteFields["jobDetail"],
+  fields: Pick<
+    ListingDraftWriteFields,
+    "jobDetail" | "secondhandDetail" | "serviceDetail" | "transferDetail"
+  >,
 ): Promise<void> {
-  if (!detail) {
+  if (!fields.jobDetail) {
     await transaction.jobDetail.deleteMany({ where: { listingId } });
-    return;
+  } else {
+    await transaction.jobDetail.upsert({
+      where: { listingId },
+      create: { listingId, ...fields.jobDetail },
+      update: fields.jobDetail,
+    });
   }
-  await transaction.jobDetail.upsert({
-    where: { listingId },
-    create: { listingId, ...detail },
-    update: detail,
-  });
+  if (!fields.transferDetail) {
+    await transaction.transferDetail.deleteMany({ where: { listingId } });
+  } else {
+    await transaction.transferDetail.upsert({
+      where: { listingId },
+      create: { listingId, ...fields.transferDetail },
+      update: fields.transferDetail,
+    });
+  }
+  if (!fields.secondhandDetail) {
+    await transaction.secondhandDetail.deleteMany({ where: { listingId } });
+  } else {
+    const detail = {
+      ...fields.secondhandDetail,
+      deliveryOptions: asJsonArray(fields.secondhandDetail.deliveryOptions),
+    };
+    await transaction.secondhandDetail.upsert({
+      where: { listingId },
+      create: { listingId, ...detail },
+      update: detail,
+    });
+  }
+  if (!fields.serviceDetail) {
+    await transaction.serviceDetail.deleteMany({ where: { listingId } });
+  } else {
+    const detail = {
+      ...fields.serviceDetail,
+      availability: asJsonArray(fields.serviceDetail.availability),
+    };
+    await transaction.serviceDetail.upsert({
+      where: { listingId },
+      create: { listingId, ...detail },
+      update: detail,
+    });
+  }
 }
 
-function jobDetailMatchesListingType(
+function verticalDetailsMatchListingType(
   type: ListingType,
-  detail: ListingDraftWriteFields["jobDetail"],
+  fields: Pick<
+    ListingDraftWriteFields,
+    "jobDetail" | "secondhandDetail" | "serviceDetail" | "transferDetail"
+  >,
 ): boolean {
-  return type === "JOB" ? detail !== null : detail === null;
+  const present = [
+    fields.jobDetail ? "JOB" : null,
+    fields.transferDetail ? "TRANSFER" : null,
+    fields.secondhandDetail ? "SECONDHAND" : null,
+    fields.serviceDetail ? "SERVICE" : null,
+  ].filter((value): value is ListingType => value !== null);
+  return type === "RENTAL" ? present.length === 0 : present.length === 1 && present[0] === type;
 }
 
 async function appendDraftEvidence(
@@ -545,7 +617,7 @@ export class ListingDraftRepository {
       }
 
       if (
-        !jobDetailMatchesListingType(input.type, input.jobDetail) ||
+        !verticalDetailsMatchListingType(input.type, input) ||
         !(await referencesRemainValid(transaction, input.type, input))
       ) {
         return { kind: "invalid_reference" };
@@ -575,7 +647,7 @@ export class ListingDraftRepository {
         },
         select: { id: true },
       });
-      await applyJobDetail(transaction, input.id, input.jobDetail);
+      await applyVerticalDetails(transaction, input.id, input);
       await applyMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.id,
@@ -632,7 +704,7 @@ export class ListingDraftRepository {
         return { kind: "time_conflict", currentVersion: current.version };
       }
       if (
-        !jobDetailMatchesListingType(current.type, input.jobDetail) ||
+        !verticalDetailsMatchListingType(current.type, input) ||
         !(await referencesRemainValid(transaction, current.type, input))
       ) {
         return { kind: "invalid_reference" };
@@ -663,7 +735,7 @@ export class ListingDraftRepository {
       if (updated.count !== 1) {
         return { kind: "version_conflict", currentVersion: current.version };
       }
-      await applyJobDetail(transaction, input.listingId, input.jobDetail);
+      await applyVerticalDetails(transaction, input.listingId, input);
       await applyMediaBindings(transaction, {
         actorUserId: input.actorUserId,
         listingId: input.listingId,

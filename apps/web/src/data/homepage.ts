@@ -73,7 +73,7 @@ export const quickPublish: IconEntry[] = [
   {
     key: "transfer-post",
     label: "发布转让",
-    href: `${ROUTES.businessTransfer}/post`,
+    href: ROUTES.transferPost,
     icon: Store,
     theme: "blue",
     description: "店铺 / 商铺 / 设备",
@@ -81,7 +81,7 @@ export const quickPublish: IconEntry[] = [
   {
     key: "market-post",
     label: "发布二手",
-    href: `${ROUTES.marketplace}/post`,
+    href: ROUTES.secondhandPost,
     icon: ShoppingBag,
     theme: "purple",
     description: "闲置物品 / 低价转让",
@@ -89,7 +89,7 @@ export const quickPublish: IconEntry[] = [
   {
     key: "service-post",
     label: "发布服务",
-    href: `${ROUTES.services}/post`,
+    href: ROUTES.servicePost,
     icon: Wrench,
     theme: "blue",
     description: "找师傅 / 找服务",

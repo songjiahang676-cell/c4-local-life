@@ -893,7 +893,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [RENTAL, JOB]
+            enum: [RENTAL, JOB, TRANSFER, SECONDHAND, SERVICE]
             default: RENTAL
         - name: categoryId
           in: query
@@ -907,7 +907,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         "200":
-          description: Stable cursor-paginated public Rental or Job summaries
+          description: Stable cursor-paginated public listing summaries
           headers:
             Cache-Control:
               schema: { type: string, const: "public, max-age=30" }
@@ -3199,7 +3199,7 @@ components:
       additionalProperties: false
       properties:
         id: { type: string, format: uuid }
-        type: { type: string, enum: [RENTAL, JOB] }
+        type: { type: string, enum: [RENTAL, JOB, TRANSFER, SECONDHAND, SERVICE] }
         status: { type: string, const: PUBLISHED }
         locale: { type: string, enum: [zh-Hans, en-US] }
         title: { type: string, maxLength: 120 }

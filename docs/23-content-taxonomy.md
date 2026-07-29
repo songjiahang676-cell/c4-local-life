@@ -48,17 +48,32 @@ allowedRegionTypes, promotionEligibility
 
 关键字段：asking price、monthly rent、lease remaining、面积、营业/收入声明（需免责声明）、inventory、转让原因、许可。财务数字需标“发布者提供，平台未验证”。
 
+`LIST-007` 已落地 Transfer v1：通用 `price` 是正数 FIXED 要价，`businessType`、`monthlyRent`、
+`leaseRemainingMonths`、`reasonForTransfer` 和发布者声明的 `licenseStatus` 必填，
+`includesInventory` 可选。`financialDisclaimerAcknowledged` 必须明确为 true 且为 OWNER_ONLY。
+分类策略固定人工审核，不能因未命中自动规则而直接公开。
+
 ### 二手
 
 家具家电、电子数码、车辆配件（车辆整车是否启用需政策）、母婴、服饰、美容、办公/商业设备、运动户外、收藏/其他。
 
 禁止/限制：武器、毒品、处方药、假货、盗窃物、危险品、成人内容等，正式政策确认。
 
+`LIST-007` 已落地 Secondhand v1：价格只允许 FIXED/NEGOTIABLE/FREE；`condition` 与非空
+`deliveryOptions` 必填，品牌/型号可选。`marketplacePolicyAcknowledged` 必须明确为 true 且为
+OWNER_ONLY。v3 高置信禁售品规则只把字段名送高优先人工审核，不复制疑似原文，也不代替正式政策、
+人工判断或执法结论。
+
 ### 服务
 
 装修、水电、空调、屋顶、园艺、搬家、清洁、汽车、家政、摄影、会计税务、法律/移民（资质严格）、保险/地产（执照）、教育、IT、餐饮活动、其他。
 
 关键字段：service area/radius、执照/保险、经验、报价单位、紧急服务、可用时间。受监管职业必须验证或明确“未验证”。
+
+`LIST-007` 已落地 Service v1：价格只允许 HOURLY/FIXED/NEGOTIABLE；`serviceRadiusMiles` 限制
+1–100，`licenseStatus`、非空 `availability` 和 `servicePolicyAcknowledged` 必填，保险和紧急服务
+可选。`licenseNumber` 与政策确认属于 OWNER_ONLY；公开的执照/保险状态必须继续标为发布者声明，
+不能呈现为平台核验。
 
 ## 23.3 地区层级
 

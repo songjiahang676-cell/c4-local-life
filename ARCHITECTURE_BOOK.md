@@ -913,17 +913,20 @@ SHA-256、抓取时间和已脱敏 JSON。动态 PHONE/EMAIL/contact/address 字
 最小 AuditLog 和 OutboxEvent。Case 快照外键使用 RESTRICT，因此动作或资源处置不能顺带删除审核
 事实；事故恢复优先停用工作台并保留证据，再通过新迁移 roll forward。
 
-### LIST-005 公共生命周期持久化
+### LIST-005/LIST-007 公共生命周期持久化
 
-Rental 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
+五类 Listing 公开查询仍以 `listings` 为事实源，使用 `(published_at DESC, id DESC)` 复合游标，并要求
 PUBLISHED + AUTO_APPROVED/APPROVED、未到期、未删除、active taxonomy 与可公开主体。新增部分索引
-`listings_rental_expiry_due_idx(expires_at,id)` 只覆盖可过期 Rental；它是可重建索引，不是第二份
-数据。
+分别只覆盖可过期的 Rental、Job、Transfer、Secondhand 和 Service；它们是可重建索引，不是第二份数据。
 
 Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner 或组织 OWNER/ADMIN/EDITOR、
 状态、时间和 version。成功更新与 `AuditLog`、`OutboxEvent` 同事务；DELETE 写 `deleted_at` 而不物理
 级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
-Rental 只产生一次 `listing.expired` 审计和事件。
+Listing 只产生一次 `listing.expired` 审计和事件。
+
+Transfer/Secondhand/Service 明细与对应 Listing 在创建/更新事务内 upsert，并删除不属于当前类型的
+其他垂直明细。数据库 check 分别约束转让核心字段、二手成色/交付数组和服务半径/可用时间；应用层
+在进入 Repository 前继续执行价格单位、政策确认和有界业务规则，形成双层失败关闭。
 
 ### NOTIF-001 站内通知投影
 
@@ -1809,8 +1812,9 @@ PUBLISHED
 
 `POST /listings/{listingId}/submit` 要求 ACTIVE actor、当前 owner 或组织
 OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集当前为
-`listing-submission` v2；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式、
-平台外付款诱导，以及 Job 中保守匹配的疑似歧视性招聘措辞。低风险按提交时绑定的历史表单发布
+`listing-submission` v3；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式、
+平台外付款诱导、Job 中保守匹配的疑似歧视性招聘措辞，以及 Secondhand 中高置信疑似禁售品。
+低风险按提交时绑定的历史表单发布
 策略自动发布；中风险创建普通审核案件；
 高风险进入优先队列并标记 `ESCALATED`。
 
@@ -1823,6 +1827,10 @@ Job 规则只保存 `EMPLOYMENT_POLICY_RISK`、规则版本、严重度和 title
 命中词或正文片段，也不自动拒绝/处罚；它仅将内容送人工复核。薪资完整性在草稿写入时先由
 versioned schema 与 Job 应用规则校验，再由 `job_details_wage_range_coherent` 防止旁路写入不一致
 范围。
+
+Secondhand 规则只保存 `PROHIBITED_GOODS_RISK` 和字段级证据，并将高风险内容升级到优先人工队列；
+不保存疑似禁售品原文，也不自动处罚。Transfer 分类策略始终人工审核。三类新增垂直的政策确认均为
+OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约束中失败关闭。
 
 ## 11.12 ADMIN-002 已实现的人工审核闭环
 
@@ -1842,11 +1850,11 @@ versioned schema 与 Job 应用规则校验，再由 `job_details_wage_range_coh
 
 - 低风险自动批准或人工批准后，公开详情/列表只读取当前有效安全投影；过期、归档、删除、未批准、
   taxonomy/主体停用的内容立即从 PostgreSQL 公开读消失。
-- Rental 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
+- 五类 Listing 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
   跨筛选复用返回通用 400。
 - Owner/组织 Writer 使用强 ETag 将 PUBLISHED 归档；同一目标状态重试返回当前版本且不重复写。
   DELETE 是软删除并对同一 owner 重试保持 204。
-- Worker 有界轮询到期 Rental，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
+- Worker 有界轮询到期五类 Listing，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
   和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。
 
 ---
@@ -2328,7 +2336,7 @@ Idempotency-Key 或请求哈希。
   通用 400，不回显 payload。
 - 越权/并发覆盖：归档与删除要求 ACTIVE permission、对象 Policy、Repository 锁后授权复核和强
   ETag；外部用户得到通用 404，受限账号 403。
-- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved Rental/Job 和当前
+- 重复/并发过期：到期查询有界并使用 `SKIP LOCKED`；只允许 PUBLISHED + approved 五类 Listing 和当前
   version 更新。Audit/Outbox 与状态原子提交，重复轮询不复制证据。
 
 ## 14.17 ORG-002 成员与 Owner 转移威胁和缓解
@@ -2350,12 +2358,26 @@ Idempotency-Key 或请求哈希。
   防止 repository 旁路产生不一致范围。
 - 发布者必须明确确认职位条件、薪资真实且无歧视性要求。确认值仅供 owner/审核证据使用，
   `OWNER_ONLY` 投影规则阻止其进入公开 API。
-- v2 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
+- v3 风险规则对少量高置信疑似歧视措辞只产生人工审核命中，不保存原文、不自动判定违法，
   以减少错误处罚和敏感内容扩散。
 - `visaSupport` 明确标为发布者声明，不视为平台核验或移民法律意见；表单不收集申请人的国籍、
   年龄、证件或其他非必要 PII。
 - Web 提交复用 BFF 精确 allowlist、强 ETag 和 actor-scoped 幂等键；Job 草稿、媒体和恢复数据仍
   按账号隔离，公开投影省略联系方式、精确坐标和 owner-only 字段。
+
+## 14.19 LIST-007 转让、二手与服务安全边界
+
+- Transfer 创建/更新要求正数 FIXED 要价、非负租金、0–1200 的整数剩余租期和非空转让原因；
+  应用层与数据库约束双层校验。分类策略始终人工审核，发布者还必须确认财务数字未经平台验证。
+- Secondhand 只接受 FIXED/NEGOTIABLE/FREE；交付方式不得为空，发布者必须确认合法来源和禁售品政策。
+  v3 `PROHIBITED_GOODS_RISK` 对高置信疑似禁售品只保存规则代码/版本/严重度和命中字段名，
+  送高优先人工审核，不保存原文、不自动处罚。
+- Service 只接受 HOURLY/FIXED/NEGOTIABLE，服务半径限制 1–100 英里且可用时间不得为空。
+  `licenseNumber` 和政策确认是 `OWNER_ONLY`；公开 `licenseStatus`、保险和紧急服务均为发布者声明，
+  不是平台核验或专业建议。
+- 三类详情与 Listing 一对一，应用服务和 Repository 双层执行类型严格耦合，数据库约束独立保护各类
+  核心字段；跨类型明细、缺失明细、未知动态字段均失败关闭。
+  公开投影省略联系方式、精确坐标、执照号、政策确认和审核证据。
 
 ---
 
@@ -2869,9 +2891,9 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 46 个 path 的唯一 OpenAPI 文档；
+- 运行时提供 canonical OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
-- Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
+- 五类发布表单可在中文/英文与移动宽度完成自动保存、账号范围恢复和无横向溢出。
 
 首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
 
@@ -2940,6 +2962,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   与已读，同时断言不出现联系方式或组织私有名称。
 - 空库和上一基线升级检查要求 21 个 migration、18 条已发布双语模板、邀请/转移表、membership 版本、
   PENDING 唯一索引和两个 Owner trigger；OpenAPI 规模同步为 57 paths、123 schemas。
+
+## 18.21 LIST-006/LIST-007 垂直复用验证增量
+
+- API/契约测试对五类 `GET /listings?type` 逐项接受，并拒绝非 Listing 类型；公开摘要与详情按历史
+  schema 剔除 OWNER_ONLY、未知字段、联系方式和精确坐标。
+- 应用单元测试覆盖五类价格单位、必填政策确认、Transfer 固定人工审核、Secondhand 禁售品高风险
+  路由、Service 半径和低风险自动发布；命中证据只包含字段名，不包含命中原文。
+- PostgreSQL 集成逐项验证 detail create/update、类型错配拒绝、三类新增 check、五个到期部分索引，
+  以及五类到期批次重复执行不重复 Audit/Outbox。
+- Web 单元和 production Playwright 覆盖五类账号/locale/vertical 隔离恢复、价格单位映射、READY
+  媒体路径、中英文入口、桌面/移动无横向溢出，以及 Job/Transfer/Secondhand/Service 幂等提交。
+- 空库 baseline 要求 23 个 migration、8 个 Listing 部分索引和 37 个数据库负例；上一发布基线升级
+  必须保留哨兵并验证三个新增 detail 约束与五类到期索引。
 
 ---
 
@@ -3265,20 +3300,23 @@ Audit/Outbox 和安全详情投影。`LIST-004` 已验收 Rental 中英/移动�
 账号与 locale 隔离的离线恢复、字段错误定位、上传进度/扫描/重试，以及事务化 READY 媒体绑定；
 Rental 的提交、审核、发布、删除和过期已由后续 `MOD-001`、`ADMIN-002`、`LIST-005` 完成；
 `LIST-006` 已复用同一闭环完成 Job 的岗位/薪资/就业政策、双语移动发布提交、公开读取和过期；
-Transfer/Secondhand/Service 三个垂直仍须复用并验收，不能因 Rental/Job 通过而标记整个 22.4 完成。
+`LIST-007` 已继续完成 Transfer/Secondhand/Service 的 schema、明细持久化、政策确认、双语移动提交、
+安全公开读取和过期。五类垂直基线均已验收；revision/重大编辑复审、账户管理和搜索派生状态仍由
+后续任务完成，因此整个 22.4 尚不能标记完成。
 
 `MOD-001` 已验收提交风险切片：提交使用强 ETag 与 actor-scoped 幂等键；规则集和命中均有
 版本；低风险按历史发布期限自动发布，中风险创建普通案件，高风险升级并创建高优先案件；
 Listing/evaluation/hits/case/Audit/Outbox 原子提交且重复请求不重复写。公开响应不包含命中原文、
 规则阈值或内部输入。Rental 公开列表/详情、人工审核动作、删除和过期已分别由
-`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用并增加 v2 就业政策人工审核规则；其余
-三个垂直类型与搜索派生状态仍待后续切片。
+`LIST-005`/`ADMIN-002` 验收；Job 已由 `LIST-006` 复用，`LIST-007` 又覆盖其余三类。v3 风险规则
+继续把就业政策疑点送人工审核，并把 Secondhand 高置信疑似禁售品送高优先人工审核；搜索派生状态
+仍待 Gate 3。
 
 `ADMIN-002` 已验收人工审核切片：队列具备风险/SLA、稳定签名 cursor 和有界筛选；详情来自不可变、
 脱敏的提交快照并展示首提 diff、规则/媒体/发布者聚合；MFA + 当前 moderator 保护读取，recent MFA +
 Case ETag + 幂等键保护批准/要求修改/拒绝/升级。动作与 Listing/Case/Audit/Outbox 同事务且证据不可
 覆盖。Rental 公开列表/详情、Owner 归档/软删除和 Worker 过期已由 `LIST-005` 完成；重新提交的历史
-revision diff、通知、搜索索引消费和其余垂直类型仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
+revision diff、申诉/举报和搜索索引消费仍由后续切片负责，因此整个 Listing 生命周期尚未完成。
 
 `LIST-005` 已验收 Rental 公开生命周期：公开列表只返回批准、未过期、未删除且 taxonomy/主体有效的
 安全摘要；按 `publishedAt + id` 稳定分页，HMAC cursor 绑定 type/category/region 并拒绝篡改或跨筛选
@@ -3293,6 +3331,14 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 详情、归档/删除和 Worker 过期复用现有状态链并接受 `type=JOB`，公开 schema 投影剔除政策确认。
 中英 noindex Job 发布页复用 900ms 自动保存、账号/locale/vertical 隔离恢复、READY 图片和 ETag，
 并通过精确 BFF allowlist 以幂等键提交审核；桌面/移动 E2E 覆盖填写、保存、提交和无横向溢出。
+
+`LIST-007` 已验收其余三个垂直切片：Transfer 要求 FIXED 正数要价、租金/剩余租期/转让原因、
+OWNER_ONLY 财务免责声明并始终人工审核；Secondhand 要求成色、非空交付方式、合法来源/禁售品确认，
+只接受 FIXED/NEGOTIABLE/FREE；Service 要求 1–100 英里服务半径、非空可用时间和资质声明，
+只接受 HOURLY/FIXED/NEGOTIABLE，执照号仅 owner/审核可见。三个 detail 与 Listing 在同一事务
+upsert 且类型严格耦合，数据库约束阻止应用旁路。五类公共 list/detail、签名 cursor、归档/软删除和
+到期处理统一；v3 禁售品规则只保留字段级证据。三个中英文 noindex 发布页复用账号/locale/vertical
+隔离恢复、READY 图片、强 ETag 和幂等提交，桌面/移动 E2E 覆盖三类填写、保存与提交。
 
 `NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
 Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
@@ -3417,17 +3463,32 @@ allowedRegionTypes, promotionEligibility
 
 关键字段：asking price、monthly rent、lease remaining、面积、营业/收入声明（需免责声明）、inventory、转让原因、许可。财务数字需标“发布者提供，平台未验证”。
 
+`LIST-007` 已落地 Transfer v1：通用 `price` 是正数 FIXED 要价，`businessType`、`monthlyRent`、
+`leaseRemainingMonths`、`reasonForTransfer` 和发布者声明的 `licenseStatus` 必填，
+`includesInventory` 可选。`financialDisclaimerAcknowledged` 必须明确为 true 且为 OWNER_ONLY。
+分类策略固定人工审核，不能因未命中自动规则而直接公开。
+
 ### 二手
 
 家具家电、电子数码、车辆配件（车辆整车是否启用需政策）、母婴、服饰、美容、办公/商业设备、运动户外、收藏/其他。
 
 禁止/限制：武器、毒品、处方药、假货、盗窃物、危险品、成人内容等，正式政策确认。
 
+`LIST-007` 已落地 Secondhand v1：价格只允许 FIXED/NEGOTIABLE/FREE；`condition` 与非空
+`deliveryOptions` 必填，品牌/型号可选。`marketplacePolicyAcknowledged` 必须明确为 true 且为
+OWNER_ONLY。v3 高置信禁售品规则只把字段名送高优先人工审核，不复制疑似原文，也不代替正式政策、
+人工判断或执法结论。
+
 ### 服务
 
 装修、水电、空调、屋顶、园艺、搬家、清洁、汽车、家政、摄影、会计税务、法律/移民（资质严格）、保险/地产（执照）、教育、IT、餐饮活动、其他。
 
 关键字段：service area/radius、执照/保险、经验、报价单位、紧急服务、可用时间。受监管职业必须验证或明确“未验证”。
+
+`LIST-007` 已落地 Service v1：价格只允许 HOURLY/FIXED/NEGOTIABLE；`serviceRadiusMiles` 限制
+1–100，`licenseStatus`、非空 `availability` 和 `servicePolicyAcknowledged` 必填，保险和紧急服务
+可选。`licenseNumber` 与政策确认属于 OWNER_ONLY；公开的执照/保险状态必须继续标为发布者声明，
+不能呈现为平台核验。
 
 ## 23.3 地区层级
 
@@ -3819,9 +3880,10 @@ GET /v1/homepage?locale=zh-Hans&regionId=<id>&device=desktop
 | `/[locale]/account/orders`           | 订单          |
 | `/[locale]/account/wallet`           | 积分/信用     |
 
-当前已实现的规范创建路由为 `/[locale]/post/rental/new` 与
-`/[locale]/post/job/new`；首页招聘入口指向后者。两者均为 noindex 私有草稿页，复用账号隔离恢复、
-动态 schema、READY 媒体绑定和强并发控制。Job 页另外提供幂等提交审核动作。
+当前五类规范创建路由为 `/[locale]/post/rental/new`、`/[locale]/post/job/new`、
+`/[locale]/post/transfer/new`、`/[locale]/post/secondhand/new` 和
+`/[locale]/post/service/new`；首页相应快速发布入口指向各自页面。它们均为 noindex 私有草稿页，
+复用账号/locale/vertical 隔离恢复、动态 schema、READY 媒体绑定、强并发控制和幂等提交审核动作。
 | `/[locale]/account/organizations` | 组织与成员 |
 | `/[locale]/account/profile` | 资料 |
 | `/[locale]/account/verification` | 验证 |
@@ -4119,6 +4181,7 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
   中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
   轮询及事务化 READY 绑定；`LIST-005` 已接公开安全列表/详情、归档/软删除和批量过期；
+  `LIST-006`/`LIST-007` 已把完整链扩展到 Job、Transfer、Secondhand 和 Service；
   `NOTIF-001` 已接账号私有通知列表/已读 API 与 Policy。
 
 ### `apps/worker`
@@ -4209,6 +4272,11 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
 公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
 `ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
+
+`LIST-006`/`LIST-007` 不新增服务边界：`ListingsService` 按 type 构造并验证五类 detail，
+`ListingDraftRepository` 在同一事务 upsert 匹配明细并清理错配明细；公共读与过期仍走共享
+`ListingRepository`。Web 五类发布页复用同一个 schema-driven 组件，但保持路由、本地恢复 key 和
+动态字段按 vertical 隔离。
 
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的

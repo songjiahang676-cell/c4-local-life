@@ -111,8 +111,9 @@ PUBLISHED
 
 `POST /listings/{listingId}/submit` 要求 ACTIVE actor、当前 owner 或组织
 OWNER/ADMIN/EDITOR、强 `If-Match` 与 actor-scoped `Idempotency-Key`。风险规则集当前为
-`listing-submission` v2；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式、
-平台外付款诱导，以及 Job 中保守匹配的疑似歧视性招聘措辞。低风险按提交时绑定的历史表单发布
+`listing-submission` v3；当前规则覆盖新账户、分类强制人工审核、缺失发布期限、外部联系方式、
+平台外付款诱导、Job 中保守匹配的疑似歧视性招聘措辞，以及 Secondhand 中高置信疑似禁售品。
+低风险按提交时绑定的历史表单发布
 策略自动发布；中风险创建普通审核案件；
 高风险进入优先队列并标记 `ESCALATED`。
 
@@ -125,6 +126,10 @@ Job 规则只保存 `EMPLOYMENT_POLICY_RISK`、规则版本、严重度和 title
 命中词或正文片段，也不自动拒绝/处罚；它仅将内容送人工复核。薪资完整性在草稿写入时先由
 versioned schema 与 Job 应用规则校验，再由 `job_details_wage_range_coherent` 防止旁路写入不一致
 范围。
+
+Secondhand 规则只保存 `PROHIBITED_GOODS_RISK` 和字段级证据，并将高风险内容升级到优先人工队列；
+不保存疑似禁售品原文，也不自动处罚。Transfer 分类策略始终人工审核。三类新增垂直的政策确认均为
+OWNER_ONLY，并在动态 schema、应用明细规则和数据库类型耦合约束中失败关闭。
 
 ## 11.12 ADMIN-002 已实现的人工审核闭环
 
@@ -144,9 +149,9 @@ versioned schema 与 Job 应用规则校验，再由 `job_details_wage_range_coh
 
 - 低风险自动批准或人工批准后，公开详情/列表只读取当前有效安全投影；过期、归档、删除、未批准、
   taxonomy/主体停用的内容立即从 PostgreSQL 公开读消失。
-- Rental 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
+- 五类 Listing 列表按发布时间与 UUID 稳定分页；签名 cursor 同时绑定 type、category 和 region，篡改或
   跨筛选复用返回通用 400。
 - Owner/组织 Writer 使用强 ETag 将 PUBLISHED 归档；同一目标状态重试返回当前版本且不重复写。
   DELETE 是软删除并对同一 owner 重试保持 204。
-- Worker 有界轮询到期 Rental，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
+- Worker 有界轮询到期五类 Listing，使用 `FOR UPDATE SKIP LOCKED` 支持多实例；状态、版本、系统 Audit
   和 `listing.expired` Outbox 原子提交。搜索侧移除由后续消费者按 eventId/aggregateVersion 幂等完成。

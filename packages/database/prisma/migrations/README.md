@@ -311,6 +311,19 @@ fields before creating or updating a Job draft.
 - Rollback: disable Job posting/listing and retain the additive constraints/index. Exceptional
   pre-production physical recovery is documented in the migration-local `ROLLBACK.md`.
 
+## `20260730040000_remaining_verticals_baseline`
+
+Adds coherent required detail checks for Transfer, Secondhand, and Service records, rejects blank
+optional detail text, and adds per-vertical partial `(expires_at, id)` indexes for visible-state
+expiry candidates. Legacy empty detail rows remain readable, while application writers require
+complete policy-acknowledged details.
+
+- Roll forward: apply before enabling the three posting flows; verify valid detail persistence,
+  invalid core fields fail, public pages omit owner-only acknowledgements and license numbers, and
+  duplicate expiry polls emit one Audit/Outbox transition.
+- Rollback: disable the affected posting/listing flows and retain the additive constraints/indexes.
+  Exceptional pre-production physical recovery is documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

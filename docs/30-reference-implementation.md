@@ -29,6 +29,7 @@
   API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
   中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
   轮询及事务化 READY 绑定；`LIST-005` 已接公开安全列表/详情、归档/软删除和批量过期；
+  `LIST-006`/`LIST-007` 已把完整链扩展到 Job、Transfer、Secondhand 和 Service；
   `NOTIF-001` 已接账号私有通知列表/已读 API 与 Policy。
 
 ### `apps/worker`
@@ -119,6 +120,11 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
 公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
 `ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
+
+`LIST-006`/`LIST-007` 不新增服务边界：`ListingsService` 按 type 构造并验证五类 detail，
+`ListingDraftRepository` 在同一事务 upsert 匹配明细并清理错配明细；公共读与过期仍走共享
+`ListingRepository`。Web 五类发布页复用同一个 schema-driven 组件，但保持路由、本地恢复 key 和
+动态字段按 vertical 隔离。
 
 `NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
 瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的

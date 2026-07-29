@@ -416,21 +416,28 @@ try {
            FROM pg_indexes
           WHERE schemaname = 'public'
             AND indexname IN (
-              'listings_rental_expiry_due_idx',
-              'listings_job_expiry_due_idx'
-            )
-       ) AS expiry_indexes,
+               'listings_rental_expiry_due_idx',
+               'listings_job_expiry_due_idx',
+               'listings_transfer_expiry_due_idx',
+               'listings_secondhand_expiry_due_idx',
+               'listings_service_expiry_due_idx'
+             )
+        ) AS expiry_indexes,
        (
          SELECT count(*)::integer
            FROM information_schema.table_constraints
           WHERE constraint_schema = 'public'
-            AND table_name = 'job_details'
-            AND constraint_name IN (
-              'job_details_wage_range_coherent',
-              'job_details_text_fields_nonblank'
-            )
-            AND constraint_type = 'CHECK'
-       ) AS job_checks`,
+             AND constraint_name IN (
+               'job_details_wage_range_coherent',
+               'job_details_text_fields_nonblank',
+               'transfer_details_core_fields_coherent',
+               'secondhand_details_core_fields_coherent',
+               'secondhand_details_optional_text_nonblank',
+               'service_details_core_fields_coherent',
+               'service_details_license_nonblank'
+             )
+             AND constraint_type = 'CHECK'
+        ) AS detail_checks`,
   );
   const notificationStorage = await upgrade.query(
     `SELECT
@@ -524,8 +531,8 @@ try {
     !moderationWorkbenchStorage.rows[0].action_idempotency ||
     moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
     moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
-    listingPublicLifecycleStorage.rows[0].expiry_indexes !== 2 ||
-    listingPublicLifecycleStorage.rows[0].job_checks !== 2 ||
+    listingPublicLifecycleStorage.rows[0].expiry_indexes !== 5 ||
+    listingPublicLifecycleStorage.rows[0].detail_checks !== 7 ||
     notificationStorage.rows[0].templates !== "notification_templates" ||
     !notificationStorage.rows[0].source_event_idempotency ||
     !notificationStorage.rows[0].immutable_trigger ||

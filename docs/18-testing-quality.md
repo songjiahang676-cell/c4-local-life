@@ -147,9 +147,9 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 46 个 path 的唯一 OpenAPI 文档；
+- 运行时提供 canonical OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
-- Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
+- 五类发布表单可在中文/英文与移动宽度完成自动保存、账号范围恢复和无横向溢出。
 
 首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
 
@@ -218,3 +218,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   与已读，同时断言不出现联系方式或组织私有名称。
 - 空库和上一基线升级检查要求 21 个 migration、18 条已发布双语模板、邀请/转移表、membership 版本、
   PENDING 唯一索引和两个 Owner trigger；OpenAPI 规模同步为 57 paths、123 schemas。
+
+## 18.21 LIST-006/LIST-007 垂直复用验证增量
+
+- API/契约测试对五类 `GET /listings?type` 逐项接受，并拒绝非 Listing 类型；公开摘要与详情按历史
+  schema 剔除 OWNER_ONLY、未知字段、联系方式和精确坐标。
+- 应用单元测试覆盖五类价格单位、必填政策确认、Transfer 固定人工审核、Secondhand 禁售品高风险
+  路由、Service 半径和低风险自动发布；命中证据只包含字段名，不包含命中原文。
+- PostgreSQL 集成逐项验证 detail create/update、类型错配拒绝、三类新增 check、五个到期部分索引，
+  以及五类到期批次重复执行不重复 Audit/Outbox。
+- Web 单元和 production Playwright 覆盖五类账号/locale/vertical 隔离恢复、价格单位映射、READY
+  媒体路径、中英文入口、桌面/移动无横向溢出，以及 Job/Transfer/Secondhand/Service 幂等提交。
+- 空库 baseline 要求 23 个 migration、8 个 Listing 部分索引和 37 个数据库负例；上一发布基线升级
+  必须保留哨兵并验证三个新增 detail 约束与五类到期索引。

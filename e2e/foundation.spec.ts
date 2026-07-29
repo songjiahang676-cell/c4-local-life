@@ -449,7 +449,7 @@ test("completes the bilingual Job wage and employment-policy path through submis
           previousModerationStatus: "NOT_REVIEWED",
           currentModerationStatus: "AUTO_APPROVED",
           riskTier: "LOW",
-          ruleSetVersion: 2,
+          ruleSetVersion: 3,
           caseId: null,
           occurredAt: "2026-07-29T01:01:00.000Z",
           version: 3,
@@ -500,6 +500,406 @@ test("completes the bilingual Job wage and employment-policy path through submis
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test("completes Transfer, Secondhand, and Service forms through save and submission", async ({
+  page,
+}) => {
+  const userId = "10000000-0000-4000-8000-000000000073";
+  const regionId = "40000000-0000-4000-8000-000000000073";
+  const specs = [
+    {
+      type: "TRANSFER" as const,
+      route: "transfer",
+      categoryId: "20000000-0000-4000-8000-000000000073",
+      categoryZh: "零售转让",
+      categoryEn: "Retail transfer",
+      heading: "发布生意转让",
+      fields: [
+        {
+          key: "businessType",
+          type: "SELECT",
+          label: { "zh-Hans": "业务类型", "en-US": "Business type" },
+          required: true,
+          filterable: true,
+          searchable: true,
+          visibility: "PUBLIC",
+          sortOrder: 10,
+          options: [{ value: "retail", label: { "zh-Hans": "零售", "en-US": "Retail" } }],
+        },
+        {
+          key: "monthlyRent",
+          type: "MONEY",
+          label: { "zh-Hans": "每月租金（美元）", "en-US": "Monthly rent (USD)" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 20,
+          validation: { min: 0, max: 9999999999.99 },
+        },
+        {
+          key: "leaseRemainingMonths",
+          type: "NUMBER",
+          label: { "zh-Hans": "剩余租期（月）", "en-US": "Lease remaining (months)" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 30,
+          validation: { min: 0, max: 1200 },
+        },
+        {
+          key: "reasonForTransfer",
+          type: "TEXTAREA",
+          label: { "zh-Hans": "转让原因", "en-US": "Reason for transfer" },
+          required: true,
+          filterable: false,
+          searchable: true,
+          visibility: "PUBLIC",
+          sortOrder: 40,
+          validation: { minLength: 5, maxLength: 300 },
+        },
+        {
+          key: "financialDisclaimerAcknowledged",
+          type: "BOOLEAN",
+          label: { "zh-Hans": "我确认经营数据由发布者提供", "en-US": "Seller-reported figures" },
+          required: true,
+          filterable: false,
+          searchable: false,
+          visibility: "OWNER_ONLY",
+          sortOrder: 100,
+        },
+      ],
+      expected: {
+        price: { amount: "125000.00", currency: "USD", unit: "FIXED" },
+        attributes: {
+          businessType: "retail",
+          monthlyRent: "2500.00",
+          leaseRemainingMonths: 24,
+          reasonForTransfer: "虚构业主搬迁测试",
+          financialDisclaimerAcknowledged: true,
+        },
+      },
+      fill: async () => {
+        await page.getByLabel("转让类别").selectOption("20000000-0000-4000-8000-000000000073");
+        await page.getByLabel("城市").selectOption("US-CA-IRVINE");
+        await page.getByLabel("生意或资产名称").fill("尔湾零售店转让测试");
+        await page
+          .getByLabel("经营情况与转让说明")
+          .fill("这是仅供端到端验证使用的虚构转让信息，不代表真实经营数据或交易承诺。");
+        await page.getByLabel("转让价").fill("125000.00");
+        await page.getByLabel(/业务类型/).selectOption("retail");
+        await page.getByLabel(/每月租金/).fill("2500.00");
+        await page.getByLabel(/剩余租期/).fill("24");
+        await page.getByLabel(/转让原因/).fill("虚构业主搬迁测试");
+        await page.getByLabel(/我确认经营数据由发布者提供/).check();
+      },
+    },
+    {
+      type: "SECONDHAND" as const,
+      route: "secondhand",
+      categoryId: "20000000-0000-4000-8000-000000000074",
+      categoryZh: "二手家具",
+      categoryEn: "Used furniture",
+      heading: "发布二手物品",
+      fields: [
+        {
+          key: "condition",
+          type: "SELECT",
+          label: { "zh-Hans": "物品成色", "en-US": "Condition" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 10,
+          options: [{ value: "good", label: { "zh-Hans": "良好", "en-US": "Good" } }],
+        },
+        {
+          key: "deliveryOptions",
+          type: "MULTISELECT",
+          label: { "zh-Hans": "交付方式", "en-US": "Delivery options" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 20,
+          options: [{ value: "pickup", label: { "zh-Hans": "自取", "en-US": "Pickup" } }],
+        },
+        {
+          key: "marketplacePolicyAcknowledged",
+          type: "BOOLEAN",
+          label: { "zh-Hans": "我确认物品合法且不属于禁售品", "en-US": "Lawful item policy" },
+          required: true,
+          filterable: false,
+          searchable: false,
+          visibility: "OWNER_ONLY",
+          sortOrder: 100,
+        },
+      ],
+      expected: {
+        price: { amount: "180.00", currency: "USD", unit: "FIXED" },
+        attributes: {
+          condition: "good",
+          deliveryOptions: ["pickup"],
+          marketplacePolicyAcknowledged: true,
+        },
+      },
+      fill: async () => {
+        await page.getByLabel("二手类别").selectOption("20000000-0000-4000-8000-000000000074");
+        await page.getByLabel("城市").selectOption("US-CA-IRVINE");
+        await page.getByLabel("物品名称").fill("尔湾木桌二手测试");
+        await page
+          .getByLabel("成色、使用情况与交付说明")
+          .fill("这是仅供端到端验证使用的虚构二手物品，不代表真实库存或交易承诺。");
+        await page.getByLabel("价格", { exact: true }).fill("180.00");
+        await page.getByLabel(/物品成色/).selectOption("good");
+        await page.getByLabel("自取").check();
+        await page.getByLabel(/我确认物品合法且不属于禁售品/).check();
+      },
+    },
+    {
+      type: "SERVICE" as const,
+      route: "service",
+      categoryId: "20000000-0000-4000-8000-000000000075",
+      categoryZh: "家庭清洁",
+      categoryEn: "Home cleaning",
+      heading: "发布本地服务",
+      fields: [
+        {
+          key: "serviceRadiusMiles",
+          type: "NUMBER",
+          label: { "zh-Hans": "服务半径（英里）", "en-US": "Service radius (miles)" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 10,
+          validation: { min: 1, max: 100 },
+        },
+        {
+          key: "availability",
+          type: "MULTISELECT",
+          label: { "zh-Hans": "可服务时间", "en-US": "Availability" },
+          required: true,
+          filterable: true,
+          searchable: false,
+          visibility: "PUBLIC",
+          sortOrder: 20,
+          options: [{ value: "weekdays", label: { "zh-Hans": "工作日", "en-US": "Weekdays" } }],
+        },
+        {
+          key: "servicePolicyAcknowledged",
+          type: "BOOLEAN",
+          label: { "zh-Hans": "我确认服务声明由发布者提供", "en-US": "Provider-reported claims" },
+          required: true,
+          filterable: false,
+          searchable: false,
+          visibility: "OWNER_ONLY",
+          sortOrder: 100,
+        },
+      ],
+      expected: {
+        price: { amount: "95.00", currency: "USD", unit: "HOURLY" },
+        attributes: {
+          serviceRadiusMiles: 20,
+          availability: ["weekdays"],
+          servicePolicyAcknowledged: true,
+        },
+      },
+      fill: async () => {
+        await page.getByLabel("服务类别").selectOption("20000000-0000-4000-8000-000000000075");
+        await page.getByLabel("城市").selectOption("US-CA-IRVINE");
+        await page.getByLabel("服务名称").fill("尔湾家庭清洁服务测试");
+        await page
+          .getByLabel("服务内容、经验与范围说明")
+          .fill("这是仅供端到端验证使用的虚构本地服务，不代表真实资质或服务承诺。");
+        await page.getByLabel("起步价或时薪").fill("95.00");
+        await page.getByLabel(/服务半径/).fill("20");
+        await page.getByLabel("工作日").check();
+        await page.getByLabel(/我确认服务声明由发布者提供/).check();
+      },
+    },
+  ] as const;
+  let active: (typeof specs)[number] = specs[0];
+  const created = new Map<string, Record<string, unknown>>();
+  const submitted = new Set<string>();
+
+  await page.route("**/v1/auth/session", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          user: { id: userId, displayName: "Synthetic Vertical Owner", avatarUrl: null },
+          expiresAt: "2026-07-30T01:00:00.000Z",
+          permissions: ["listing:create", "listing:submit"],
+          platformRoles: [],
+          organizations: [],
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/categories?vertical=*", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            id: active.categoryId,
+            parentId: "20000000-0000-4000-8000-000000000070",
+            vertical: active.type,
+            slug: active.route,
+            name: { "zh-Hans": active.categoryZh, "en-US": active.categoryEn },
+            iconKey: null,
+            formSchemaVersion: 1,
+            children: [],
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/v1/regions?type=CITY", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          {
+            id: regionId,
+            parentId: "40000000-0000-4000-8000-000000000070",
+            code: "US-CA-IRVINE",
+            type: "CITY",
+            slug: "irvine",
+            name: { "zh-Hans": "尔湾", "en-US": "Irvine" },
+            timezone: "America/Los_Angeles",
+            centroid: null,
+            children: [],
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/v1/categories/*/form-schema", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        categoryId: active.categoryId,
+        version: 1,
+        fields: active.fields,
+        publicationPolicy: {
+          defaultLifetimeDays: active.type === "SERVICE" ? 90 : 45,
+          manualReviewRequired: active.type === "TRANSFER",
+          phoneVerificationRequired: false,
+          maxMedia: 20,
+          allowExactAddress: false,
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/listings", async (route) => {
+    const input = route.request().postDataJSON() as Record<string, unknown>;
+    created.set(active.type, input);
+    const listingId =
+      active.type === "TRANSFER"
+        ? "30000000-0000-4000-8000-000000000073"
+        : active.type === "SECONDHAND"
+          ? "30000000-0000-4000-8000-000000000074"
+          : "30000000-0000-4000-8000-000000000075";
+    await route.fulfill({
+      status: 201,
+      headers: { etag: '"listing-v1"', "content-type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          id: listingId,
+          type: active.type,
+          ownerId: userId,
+          organizationId: null,
+          formSchemaVersion: 1,
+          status: "DRAFT",
+          moderationStatus: "NOT_REVIEWED",
+          locale: input.locale,
+          title: input.title,
+          slug: `e2e-synthetic-${active.route}`,
+          summary: input.summary ?? null,
+          body: input.body,
+          price: input.price,
+          region: {
+            id: regionId,
+            type: "CITY",
+            code: "US-CA-IRVINE",
+            slug: "irvine",
+            nameZhHans: "尔湾",
+            nameEn: "Irvine",
+            timezone: "America/Los_Angeles",
+          },
+          category: {
+            id: active.categoryId,
+            vertical: active.type,
+            slug: active.route,
+            nameZhHans: active.categoryZh,
+            nameEn: active.categoryEn,
+          },
+          owner: { id: userId, displayName: "Synthetic Vertical Owner", avatarUrl: null },
+          organization: null,
+          location: { precision: "CITY" },
+          contactMode: "IN_APP",
+          attributes: input.attributes,
+          mediaIds: [],
+          isFeatured: false,
+          featuredUntil: null,
+          publishedAt: null,
+          expiresAt: null,
+          createdAt: "2026-07-29T01:00:00.000Z",
+          updatedAt: "2026-07-29T01:00:00.000Z",
+          version: 1,
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/listings/*/submit", async (route) => {
+    submitted.add(active.type);
+    await route.fulfill({
+      status: 202,
+      headers: { etag: '"listing-v3"', "content-type": "application/json" },
+      body: JSON.stringify({
+        data: {
+          resourceId: route.request().url().split("/").at(-2),
+          previousStatus: "DRAFT",
+          currentStatus: active.type === "TRANSFER" ? "SUBMITTED" : "PUBLISHED",
+          previousModerationStatus: "NOT_REVIEWED",
+          currentModerationStatus: active.type === "TRANSFER" ? "PENDING_REVIEW" : "AUTO_APPROVED",
+          riskTier: active.type === "TRANSFER" ? "MEDIUM" : "LOW",
+          ruleSetVersion: 3,
+          caseId: active.type === "TRANSFER" ? "50000000-0000-4000-8000-000000000073" : null,
+          occurredAt: "2026-07-29T01:01:00.000Z",
+          version: 3,
+        },
+      }),
+    });
+  });
+
+  for (const spec of specs) {
+    active = spec;
+    const response = await page.goto(`/zh-Hans/post/${spec.route}/new`);
+    expect(response?.ok()).toBe(true);
+    await expect(page.getByRole("heading", { level: 1, name: spec.heading })).toBeVisible();
+    await spec.fill();
+    await page.getByRole("button", { name: "立即保存" }).click();
+    await expect(page.getByText("已保存到服务器")).toBeVisible();
+    expect(created.get(spec.type)).toMatchObject({
+      type: spec.type,
+      ...spec.expected,
+    });
+    await page.getByRole("button", { name: "提交审核" }).click();
+    await expect(page.getByText(/已提交；平台会按风险规则/)).toBeVisible();
+    expect(submitted.has(spec.type)).toBe(true);
+    await expect(page.getByRole("link", { name: "切换到英文" })).toHaveAttribute(
+      "href",
+      `/en-US/post/${spec.route}/new`,
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
 });
 
 test("renders and updates the private bilingual notification center", async ({ page }) => {

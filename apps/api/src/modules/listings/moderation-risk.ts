@@ -1,6 +1,6 @@
 export const listingSubmissionRuleSet = {
   key: "listing-submission",
-  version: 2,
+  version: 3,
 } as const;
 
 export const moderationRiskTiers = ["LOW", "MEDIUM", "HIGH"] as const;
@@ -13,6 +13,7 @@ export type ModerationRuleHit = {
     | "EXTERNAL_PAYMENT_REQUEST"
     | "EMPLOYMENT_POLICY_RISK"
     | "NEW_ACCOUNT"
+    | "PROHIBITED_GOODS_RISK"
     | "PUBLICATION_POLICY_INCOMPLETE";
   ruleVersion: 1;
   severity: Exclude<ModerationRiskTier, "LOW">;
@@ -46,6 +47,9 @@ const externalPaymentPattern =
   /(?:gift\s*cards?|wire\s+transfer|bitcoin|cryptocurrency|crypto\s+payment|zelle\s+(?:deposit|payment)|礼品卡|电汇|比特币|加密货币|先付(?:押金|定金)|平台外付款)/iu;
 const employmentPolicyRiskPattern =
   /(?:women\s+only|men\s+only|female\s+only|male\s+only|young\s+(?:women|men|people)\s+only|under\s+\d{2}\s+only|仅限女性|仅限男性|只招女性|只招男性|只要年轻人|年轻漂亮)/iu;
+
+const prohibitedGoodsPattern =
+  /(?:\b(?:weapon|firearm|gun|drugs?|prescription\s+(?:drug|medicine)|counterfeit|stolen\s+(?:goods?|item)|hazardous\s+material)\b|武器|枪支|毒品|处方药|仿牌|赃物|危险品)/iu;
 
 function textHit(
   input: ListingSubmissionRiskInput,
@@ -117,6 +121,16 @@ export function evaluateListingSubmissionRisk(
       ruleVersion: 1,
       severity: "MEDIUM",
       evidenceKey: employmentEvidence,
+    });
+  }
+  const prohibitedGoodsEvidence =
+    input.listingType === "SECONDHAND" ? textHit(input, prohibitedGoodsPattern) : null;
+  if (prohibitedGoodsEvidence) {
+    hits.push({
+      ruleCode: "PROHIBITED_GOODS_RISK",
+      ruleVersion: 1,
+      severity: "HIGH",
+      evidenceKey: prohibitedGoodsEvidence,
     });
   }
   return {

@@ -179,6 +179,78 @@ describe("rental draft model", () => {
     );
   });
 
+  it("isolates Transfer, Secondhand, and Service drafts with vertical price and policy rules", () => {
+    const cases = [
+      {
+        type: "TRANSFER" as const,
+        unit: "FIXED" as const,
+        amount: "125000.00",
+        policyKey: "financialDisclaimerAcknowledged",
+      },
+      {
+        type: "SECONDHAND" as const,
+        unit: "FREE" as const,
+        amount: "",
+        policyKey: "marketplacePolicyAcknowledged",
+      },
+      {
+        type: "SERVICE" as const,
+        unit: "HOURLY" as const,
+        amount: "95.00",
+        policyKey: "servicePolicyAcknowledged",
+      },
+    ];
+
+    for (const item of cases) {
+      const verticalDefinition: CategoryFormSchema = {
+        categoryId,
+        version: 1,
+        fields: [
+          {
+            key: item.policyKey,
+            type: "BOOLEAN",
+            label: { "zh-Hans": "政策确认", "en-US": "Policy acknowledgement" },
+            required: true,
+            filterable: false,
+            searchable: false,
+            visibility: "OWNER_ONLY",
+            sortOrder: 100,
+          },
+        ],
+      };
+      const values = {
+        ...emptyRentalDraft(item.type),
+        categoryId,
+        regionCode: "US-CA-IRVINE",
+        title: `Synthetic ${item.type.toLowerCase()} listing`,
+        body: "This is a deliberately fictional draft used only for a deterministic unit test.",
+        priceAmount: item.amount,
+        priceUnit: item.unit,
+        attributes: { [item.policyKey]: true },
+      };
+
+      expect(validateRentalDraft(values, verticalDefinition, "en-US", item.type)).toEqual({});
+      expect(toCreateListingInput(values, "en-US", item.type)).toMatchObject({
+        type: item.type,
+        price: {
+          amount: item.unit === "FREE" ? null : item.amount,
+          unit: item.unit,
+        },
+      });
+      expect(rentalDraftStorageKey("vertical-owner", "en-US", item.type)).toBe(
+        `socal:${item.type.toLowerCase()}-draft:v1:vertical-owner:en-US`,
+      );
+      expect(
+        validateRentalDraft(
+          { ...values, attributes: { [item.policyKey]: false } },
+          verticalDefinition,
+          "en-US",
+          item.type,
+        ),
+      ).toHaveProperty(`attribute.${item.policyKey}`);
+    }
+  });
+
   it("restores only the owner-safe projection and READY media identifiers", () => {
     const listing = {
       id: "55555555-5555-4555-8555-555555555555",
