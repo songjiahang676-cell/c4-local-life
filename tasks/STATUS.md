@@ -6,14 +6,14 @@
 
 - Gate：G2 Listings / Moderation
 - 目标：先用 Rental 证明草稿、审核、发布与过期垂直链，再复用到其余四类
-- 进度：8/16 个 G2 任务、37/101 个总任务完成
-- 风险：`ORG-002` 是 G1/P1 但显式依赖 G2 `NOTIF-001`，按依赖顺序延后；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产审核词库、阈值、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v1 保守地把命中内容送入队列而不自动处罚
+- 进度：9/16 个 G2 任务、38/101 个总任务完成
+- 风险：`ORG-002` 的 G2 `NOTIF-001` 前置已完成，下一可验收切片先回补该 G1/P1 任务，再回到 Gate 2 的 `LIST-006`；Windows 中等完整性进程不能创建 Next standalone symlink，Linux 托管门禁负责完整构建；生产审核词库、阈值、抽检比例、SLA 和原因码仍需运营/法律确认，当前规则 v1 保守地把命中内容送入队列而不自动处罚
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target            | Status          | Notes                                                             |
-| -------- | -------------------- | ---------- | ----------------- | --------------- | ----------------------------------------------------------------- |
-| LIST-005 | @songjiahang676-cell | 2026-07-29 | protected task PR | protected green | Rental 公开游标列表、Owner 归档/软删除、Worker 批量过期与原子审计 |
+| Task      | Owner                | Started    | Target            | Status      | Notes                                                            |
+| --------- | -------------------- | ---------- | ----------------- | ----------- | ---------------------------------------------------------------- |
+| NOTIF-001 | @songjiahang676-cell | 2026-07-29 | protected task PR | local green | Listing 状态事件幂等站内投影、不可变双语模板、私有通知中心与已读 |
 
 ## Gate Evidence
 
@@ -123,13 +123,21 @@
 | LIST-005 runtime/browser        | API runtime + Chromium desktop/mobile | canonical contract and 8/8 production E2E passed                          | 2026-07-29 |
 | LIST-005 architecture           | `scripts/check-architecture.sh`       | 101 tasks、50 models、47 paths、109 schemas passed                        | 2026-07-29 |
 | LIST-005 protected checks       | PR #23 / run `30430161567`            | real services、Linux build/E2E and four non-root images passed            | 2026-07-29 |
+| LIST-005 final checks           | PR #23 / run `30430614404`            | evidence head quality + four non-root images passed                       | 2026-07-29 |
+| LIST-005 protected merge        | PR #23 / merge `7a42b00`              | protected squash merge completed                                          | 2026-07-29 |
+| NOTIF-001 database lifecycle    | fresh 20-migration empty database     | baseline 33 negatives；upgrade sentinel；75 DB tests passed               | 2026-07-29 |
+| NOTIF-001 local quality         | type/lint/test/build + static checks  | 75 files / 302 tests；9 typechecks/lints；8 builds passed                 | 2026-07-29 |
+| NOTIF-001 runtime/browser       | API runtime + Chromium desktop/mobile | canonical contract and notification flow；10/10 production E2E passed     | 2026-07-29 |
+| NOTIF-001 architecture          | `scripts/check-architecture.sh`       | 101 tasks、51 models、49 paths、113 schemas passed                        | 2026-07-29 |
+| NOTIF-001 protected checks      | PR #24 / run `30434003970`            | 304 real-service tests、Linux build/E2E and four non-root images passed   | 2026-07-29 |
 
 ## Decisions / Blocks
 
 - ADR-0006：正式公开上线后 12 个月全站免费；收费与自动充值延后到 Gate 5，默认关闭。
 - 项目负责人于 2026-07-25 明确授权公开仓库；公开后立即启用 `main` 强制保护。
-- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`；LIST-002 已由受保护 PR #18 / final run `30410107716` 合并为 `a8db956`；LIST-003 已由受保护 PR #19 / final run `30412407859` 合并为 `c9a6db2`；LIST-004 已由受保护 PR #20 / final run `30415124557` 合并为 `fd27e19`；MOD-001 已由受保护 PR #21 / final run `30417062067` 合并为 `d9f632d`；ADMIN-002 已由受保护 PR #22 / final run `30419743207` 合并为 `cb02bda`。
-- `ORG-002` 保留原 G1/P1 标签，但它显式依赖 `NOTIF-001`；`MEDIA-003` 属于 G4 受限验证文件。两者不提前实现，也不阻塞按 `IMPLEMENTATION_SEQUENCE.md` 进入 LIST-001。
+- Gate 0 已由受保护 PR #1 合并；AUTH-001/002/003/API-004/ORG-001/TAX-001/TAX-002/MEDIA-001/ADMIN-001/AUTH-005 已由受保护 PR #3–#12 合并；AUTH-005 的 MFA tamper 测试稳定性修复另由 PR #13 合并；AUTH-004 已由受保护 PR #14 / run `30402997906` 合并为 `b4d9474`；EVT-001 已由受保护 PR #15 / final run `30404864972` 合并为 `490efa4`；MEDIA-002 已由受保护 PR #16 / final run `30407394217` 合并为 `d4abece`，Gate 1 实施主线与退出条件完成；LIST-001 已由受保护 PR #17 / final run `30408759770` 合并为 `c1709a7`；LIST-002 已由受保护 PR #18 / final run `30410107716` 合并为 `a8db956`；LIST-003 已由受保护 PR #19 / final run `30412407859` 合并为 `c9a6db2`；LIST-004 已由受保护 PR #20 / final run `30415124557` 合并为 `fd27e19`；MOD-001 已由受保护 PR #21 / final run `30417062067` 合并为 `d9f632d`；ADMIN-002 已由受保护 PR #22 / final run `30419743207` 合并为 `cb02bda`；LIST-005 已由受保护 PR #23 / final run `30430614404` 合并为 `7a42b00`。
+- `ORG-002` 保留原 G1/P1 标签；其 `NOTIF-001` 依赖现已完成，下一可审查切片先回补 `ORG-002`，
+  再按 `IMPLEMENTATION_SEQUENCE.md` 继续 `LIST-006`。`MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
 - 需要选择短信、邮件、地图和支付生产账号。

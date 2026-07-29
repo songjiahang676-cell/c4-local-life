@@ -28,6 +28,9 @@
   媒体状态未知/跨 owner/删除统一 404，只有数据库确认 READY 的 LISTING_MEDIA 图片可在事务中绑定。
 - 异步事件采用数据库同事务 Outbox 和至少一次投递；`eventId` 是消费者幂等键，队列 envelope 有大小
   上限和版本。日志/指标不记录事件 payload、原始提供商错误或 PII，失败只保留有界错误码。
+- Listing 状态通知只从 canonical Listing owner/locale 投影，严格验证事件且以 eventId 锁和复合唯一键
+  去重；模板发布后不可修改，变量仅含资源 ID/版本。通知列表和已读要求服务端账号 Policy，cursor 绑定
+  账号/筛选，未知与跨账号 ID 统一 404；响应、BFF 和页面均 no-store/noindex，不记录正文或收件人。
 - 支付数据由支付服务商托管；平台不保存完整卡号和 CVC。
 - 密钥存入云 Secret Manager/KMS，禁止写入镜像、日志或仓库。
 - 依赖、容器、IaC、SAST、secret scanning 和 DAST 纳入 CI/CD。

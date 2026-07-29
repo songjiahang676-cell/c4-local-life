@@ -232,9 +232,17 @@ WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性�
 
 定义端口：`EmailProvider`、`SmsProvider`、`PushProvider`。模板使用稳定 key、locale、版本和变量 schema。通知记录先写库，再由 Worker 发送；provider message id、attempt、失败分类和退订状态可追踪。
 
+`NOTIF-001` 已实现站内通知基线：Listing 状态 Outbox 事件由 Worker 严格校验 envelope，并用
+`source_event_id + user_id + channel` 唯一键及事件级 advisory lock 幂等投影；中英文已发布模板行
+不可修改或删除，Notification 保存模板版本、locale、渲染后的 title/body、资源引用与聚合版本快照。
+`GET /notifications` 使用绑定 user 与 unread filter 的 HMAC 游标，`PUT
+/notifications/{notificationId}/read` 仅能更新当前用户记录且可安全重试；两个端点均 `no-store`，外部
+ID 与未知 ID 共用 404。当前切片只投递 `IN_APP`，邮件/SMS provider、偏好、退订、回执和重试属于
+`NOTIF-002`，不得由空适配器伪装为成功。
+
 OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 渗透进认证领域。当前未确认生产
 供应商时适配器 fail closed 并返回通用 503，不记录或回显验证码；测试通过捕获型适配器覆盖 EMAIL/SMS
-两条通道。生产投递适配器、重试和供应商回执仍由已规划的通知/Outbox 切片实现，不能用记录明文验证码
+两条通道。生产投递适配器、重试和供应商回执仍由 `NOTIF-002` 实现，不能用记录明文验证码
 或静默丢弃投递代替。
 
 营销与事务通知分开处理。短信/邮件退订不应阻断安全和订单必要通知，但必须遵守法律和用户偏好。
@@ -276,7 +284,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 46 个 path、108 个 schema、55 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 49 个 path、113 个 schema、58 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 

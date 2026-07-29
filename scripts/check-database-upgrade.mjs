@@ -417,6 +417,29 @@ try {
           AND indexname = 'listings_rental_expiry_due_idx'
      ) AS expiry_index`,
   );
+  const notificationStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.notification_templates') AS templates,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'notifications_source_event_user_channel_key'
+       ) AS source_event_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_trigger
+          WHERE tgname = 'notification_templates_published_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_trigger,
+       (
+         SELECT count(*)::integer
+           FROM notification_templates
+          WHERE channel = 'IN_APP'
+            AND published_at IS NOT NULL
+            AND locale IN ('zh-Hans', 'en-US')
+       ) AS published_templates`,
+  );
   const moderationSentinelSnapshot = await upgrade.query(
     `SELECT "listing_version", "snapshot"
        FROM "moderation_case_snapshots"
@@ -466,6 +489,10 @@ try {
     moderationWorkbenchStorage.rows[0].immutable_triggers !== 2 ||
     moderationWorkbenchStorage.rows[0].workbench_columns !== 3 ||
     !listingPublicLifecycleStorage.rows[0].expiry_index ||
+    notificationStorage.rows[0].templates !== "notification_templates" ||
+    !notificationStorage.rows[0].source_event_idempotency ||
+    !notificationStorage.rows[0].immutable_trigger ||
+    notificationStorage.rows[0].published_templates !== 16 ||
     moderationSentinelSnapshot.rowCount !== 1 ||
     moderationSentinelSnapshot.rows[0].listing_version !== 3 ||
     moderationSentinelSnapshot.rows[0].snapshot.sensitiveFieldsRedacted !== true ||
@@ -500,6 +527,7 @@ try {
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
       listingPublicLifecycleStorage: true,
+      notificationStorage: true,
       moderationSnapshotBackfilledAndRedacted: true,
     }),
   );

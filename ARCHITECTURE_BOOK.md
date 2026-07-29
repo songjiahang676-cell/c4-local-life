@@ -916,6 +916,14 @@ Owner 归档/软删除在 Listing 行锁内复核 ACTIVE actor、个人 owner �
 级联。过期 Worker 通过 `FOR UPDATE SKIP LOCKED` 领取到期行，状态/version predicate 保证同一
 Rental 只产生一次 `listing.expired` 审计和事件。
 
+### NOTIF-001 站内通知投影
+
+`notification_templates` 以稳定 key、channel、locale、version 唯一，已发布版本由数据库触发器禁止
+UPDATE/DELETE。`notifications` 保存渲染快照及 `template_id/template_version`、Listing 资源引用、
+`source_event_id/aggregate_version`；同一事件对同一用户和 channel 只能产生一行。Worker 可以接收
+重复或乱序事件，但按事件发生时间生成通知并通过 advisory lock/唯一键收敛。读取只返回当前用户的
+IN_APP 投影，按 `(created_at DESC,id DESC)` 稳定分页；已读更新绑定 user，外部标识不会越权改变状态。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1323,9 +1331,17 @@ WebP。重编码不复制 EXIF、ICC 或原始 metadata；变体使用确定性�
 
 定义端口：`EmailProvider`、`SmsProvider`、`PushProvider`。模板使用稳定 key、locale、版本和变量 schema。通知记录先写库，再由 Worker 发送；provider message id、attempt、失败分类和退订状态可追踪。
 
+`NOTIF-001` 已实现站内通知基线：Listing 状态 Outbox 事件由 Worker 严格校验 envelope，并用
+`source_event_id + user_id + channel` 唯一键及事件级 advisory lock 幂等投影；中英文已发布模板行
+不可修改或删除，Notification 保存模板版本、locale、渲染后的 title/body、资源引用与聚合版本快照。
+`GET /notifications` 使用绑定 user 与 unread filter 的 HMAC 游标，`PUT
+/notifications/{notificationId}/read` 仅能更新当前用户记录且可安全重试；两个端点均 `no-store`，外部
+ID 与未知 ID 共用 404。当前切片只投递 `IN_APP`，邮件/SMS provider、偏好、退订、回执和重试属于
+`NOTIF-002`，不得由空适配器伪装为成功。
+
 OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 渗透进认证领域。当前未确认生产
 供应商时适配器 fail closed 并返回通用 503，不记录或回显验证码；测试通过捕获型适配器覆盖 EMAIL/SMS
-两条通道。生产投递适配器、重试和供应商回执仍由已规划的通知/Outbox 切片实现，不能用记录明文验证码
+两条通道。生产投递适配器、重试和供应商回执仍由 `NOTIF-002` 实现，不能用记录明文验证码
 或静默丢弃投递代替。
 
 营销与事务通知分开处理。短信/邮件退订不应阻断安全和订单必要通知，但必须遵守法律和用户偏好。
@@ -1367,7 +1383,7 @@ OTP 使用独立的 `OtpDeliveryGateway` 端口，以避免把邮件/短信 SDK 
   所有 endpoint 都有摘要、Tag 描述和明确响应；结构、语义或未使用组件错误会阻断质量门。
   项目负责人尚未确认软件许可证，因此 `info-license` 暂时关闭；`operation-4xx-response` 不适用于
   liveness 等永远不应返回 4xx 的端点，也不作为全局规则。
-- 契约测试解析并解引用文档，校验 46 个 path、108 个 schema、55 个唯一 operationId，
+- 契约测试解析并解引用文档，校验 49 个 path、113 个 schema、58 个唯一 operationId，
   验证所有 schema 示例，并把已实现的健康检查和 Problem Details 实际响应与契约对照。
 - API 生产镜像必须携带 `openapi/` 目录；缺失或不可解析的契约会令 API 在绑定端口前启动失败。
 
@@ -1628,6 +1644,14 @@ REJECTED、重试和移除状态，但只有 owner-scoped 状态端点确认 `RE
 ## 10.9 设计图与真实产品的差异
 
 设想图中的二维码、统计、评级、师傅头像、商家 logo 和广告均视为占位内容。生产实现必须使用授权素材和真实可解释数据。设计图大量采用中文小字号，正式页面应在保持信息密度的同时满足阅读、触控和英文长度要求。
+
+## 10.10 站内通知中心
+
+`NOTIF-001` 的 `/{locale}/account/notifications` 是私有、noindex、移动优先页面。页面先通过同源
+Session 边界确认账号，再读取账号范围通知；提供未读总数、未读筛选、稳定分页和单条已读，不把通知
+内容写入 URL、缓存或客户端持久存储。中文/英文文案不拼接翻译片段，时间以
+`America/Los_Angeles` 展示；加载、错误、空态和状态更新使用节制的 live region，控件保持可见焦点与
+至少 44px 触控目标。
 
 ---
 
@@ -2132,7 +2156,7 @@ identifier、IP、device 三个维度串行限流；连续失败达到阈值后�
 错误证明最多五次，新请求会使旧请求失效。成功后在同一 PostgreSQL 事务内更换 verifier、清除失败状态、
 消费恢复记录、撤销该用户全部 Session 并追加不含 token/PII 的 `AuditLog`，然后发送密码变更通知；
 绝不自动登录。通知端口在未配置真实 provider 时 fail-closed，真实邮件/SMS durable adapter 仍由
-`NOTIF-001`/`EVT-001` 接入。
+`NOTIF-002` 接入；`NOTIF-001` 只实现不含联系方式或 provider 凭据的站内 Listing 状态通知。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi
@@ -2550,6 +2574,8 @@ Outbox dispatcher 额外暴露：
 - `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
 - `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
 - `socal_media_processing_total{outcome}`：仅允许 ready/rejected/stale，区分终态和重复/乱序事件。
+- `socal_notification_events_total{outcome}`：仅允许 created/duplicate/ignored/
+  recipient_unavailable/failed，不使用 user、Listing、event 或模板 key 作为 label。
 
 事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
 有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
@@ -2820,6 +2846,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   测试验证批次/间隔配置、idle/expired 指标和无资源标识日志。
 - 空库 baseline 要求 19 个 migration、31 个约束负例和过期部分索引；上一发布基线升级必须保留哨兵。
 
+## 18.19 NOTIF-001 验证增量
+
+- Worker 单元测试覆盖八类 Listing 状态事件、严格 envelope、风险分支、永久/瞬时错误、无 PII
+  payload 和 created/duplicate/ignored/unavailable/failed 有界结果。
+- PostgreSQL 集成使用两个独立 Repository 并发投递同一 eventId，要求恰好一条通知；同时覆盖双语、
+  canonical owner、LOW/MEDIUM 规则、稳定分页、跨用户已读拒绝、重复已读和模板 UPDATE/DELETE 失败。
+- HTTP/契约测试覆盖 guest/LIMITED、账号隔离、未读计数、签名 cursor 的账号/筛选绑定、篡改、未知/
+  外部 404、CSRF origin、严格 query 和 no-store。
+- Web DOM 与 production Playwright 覆盖登录门、畸形响应拒绝、已读状态、中英链接、noindex、桌面/
+  移动无横向溢出和 BFF method/path confusion。
+- 空库 baseline 要求 20 个 migration、16 条已发布双语模板和 33 个数据库负例；上一发布升级保留哨兵，
+  全量架构检查要求 49 paths、113 schemas 和 51 models。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -3003,7 +3042,16 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - 回滚后核查 Outbox、队列、索引版本、支付和缓存。
 - 记录为什么自动保护没有提前阻止。
 
-## 20.12 定期运维
+## 20.12 站内通知异常
+
+- 重复通知先按 `source_event_id + user_id + channel` 与 Worker outcome 指标确认是否来自迁移前数据、
+  非法人工写入或消费者回归；不要直接删除审计证据。
+- 模板发布后不可原地修改；文案错误发布新版本并修复事件映射，已有 Notification 保留当时的渲染快照。
+- 投影积压时保留 PostgreSQL Outbox，暂停故障消费者并按 eventId 重放；确认幂等约束存在后再扩大批次。
+- 错发或越权按隐私事件处理：立即停用相关事件映射、核对 canonical owner 和模板变量，不在工单中复制
+  完整通知内容或 PII。
+
+## 20.13 定期运维
 
 每日：关键告警、审核/队列 SLA、支付对账、备份状态。
 
@@ -3154,6 +3202,15 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 归档与 DELETE 重试不重复写，状态、版本、最小 Audit 和 Outbox 在同一事务提交。Worker 通过有界批次和
 `FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
 读立即移除，搜索侧最终移除仍由后续索引消费者处理。
+
+`NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
+Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
+lock、canonical Listing owner 和 `source_event_id + user_id + channel` 唯一键保证并发重复投递只产生
+一条；LOW 自动发布和 MEDIUM 待审核规则、中文/英文 locale 选择及不可变模板由真实 PostgreSQL 验证。
+私有列表按 `createdAt + id` 稳定分页，HMAC cursor 绑定账号和未读筛选；外部/未知通知共用 404，已读
+重试不重复改变状态。中英文 noindex Web 通知中心具备登录门、未读筛选、分页、已读、错误/空态、44px
+触控目标和移动无溢出 E2E。当前只支持 IN_APP；邮件/SMS、偏好、退订与 provider 重试明确属于
+`NOTIF-002`。
 
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
@@ -3925,6 +3982,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - `/` 到 `/zh-Hans` 的入口。
 - 响应式首页视觉参考，映射设想图的主要区域。
 - 静态模拟数据和纯 CSS，用于让开发者快速理解布局。
+- `NOTIF-001` 已增加私有、noindex 的中英文通知中心，具备登录门、未读筛选、稳定分页、已读和严格
+  同源 BFF allowlist。
 
 它尚未连接 API、身份、真实图片、i18n 库、无障碍测试、SEO 元数据、缓存和设计系统。因此不得把当前首页直接当作生产完成品。
 
@@ -3943,7 +4002,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   visibility 过滤；`LIST-003` 已接入数据库草稿创建/owner 读取/条件更新、actor-scoped 幂等、
   API-004 对象 Policy、强 ETag/409，以及同事务最小化 Audit/Outbox。`LIST-004` 已接入 Rental
   中英/移动动态表单、防抖自动保存、user + locale 隔离恢复、同源 allowlist BFF、owner 媒体状态
-  轮询及事务化 READY 绑定。公开列表仍留给 `LIST-005`。
+  轮询及事务化 READY 绑定；`LIST-005` 已接公开安全列表/详情、归档/软删除和批量过期；
+  `NOTIF-001` 已接账号私有通知列表/已读 API 与 Policy。
 
 ### `apps/worker`
 
@@ -3953,7 +4013,10 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   oldest-age/结果指标。
 - `MEDIA-002` 已接真实媒体消费者：有界 S3/MinIO 读取、内容 hash/magic-byte、ClamAV INSTREAM、
   Sharp 解码/方向校正/去 metadata、三个确定性 WebP 变体和 lifecycleVersion 幂等终态。
-- 仍需其他领域真实幂等消费者、provider adapter，以及 `EVT-002` 的 DLQ/replay/reconciliation 工具。
+- `NOTIF-001` 已接 Listing 状态通知消费者：严格 envelope、eventId 幂等投影、canonical recipient、
+  风险分支和有界结果指标。
+- 仍需搜索等其他领域真实幂等消费者、通知 provider adapter，以及 `EVT-002` 的
+  DLQ/replay/reconciliation 工具。
 
 ### `packages/database`
 
@@ -3969,12 +4032,14 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
 - Moderation Case Repository 提供 MFA/current-role 范围队列与安全详情，并以 actor/key advisory
   lock、Case/Listing 行锁和 version predicate 原子提交 Action/Audit/Outbox。快照在 submission
   事务按历史表单 visibility 脱敏，数据库阻止 snapshot/action 改写。
+- Notification Repository 以 eventId advisory lock 和复合唯一键投影 Listing Outbox，只从 canonical
+  Listing 读取 owner/locale；已发布双语模板不可变，通知保存静态渲染快照并提供账号范围稳定分页/已读。
 
 Schema 是详细起点，不替代首次 `prisma validate`、migration 生成、约束/索引评审和集成测试。
 
 ### 契约与数据
 
-- `openapi/openapi.yaml`：31 个主要 path 的初始 API 契约。
+- `openapi/openapi.yaml`：当前 49 个 path、58 个 operation 和 113 个 schema 的 REST 契约。
 - `schemas/`：Listing 动态表单、首页编排、分析事件。
 - `seed/`：分类、地区、首页和示例 Listing。
 - `diagrams/`：系统/容器/部署/流程/ER Mermaid 图。
@@ -4028,6 +4093,10 @@ Controller 不导入 Prisma，Web/Admin 也不导入数据库 adapter。
 `ListingsService` 负责签名 cursor、对象 Policy 与领域状态机；`ListingRepository` 负责 PostgreSQL
 公开投影、锁后授权复核、状态/version predicate 和 Audit/Outbox 原子提交。Worker 的
 `ListingExpiryDispatcher` 只编排轮询、指标与结构化结果，实际领取/转换仍由 database package 完成。
+
+`NOTIF-001` 继续保持相同方向：Worker 的 `ListingNotificationHandler` 只校验/分派事件并分类永久与
+瞬时错误；`NotificationRepository` 持有模板选择、canonical recipient、幂等事务和查询；API 的
+`NotificationsService` 持有 Policy 与签名 cursor；Web 只调用同源 BFF。
 
 ## 30.4 生成与手写边界
 

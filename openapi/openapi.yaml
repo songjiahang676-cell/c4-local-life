@@ -31,6 +31,8 @@ tags:
     description: Favorites, reviews, and other trust interactions
   - name: Messaging
     description: Private conversations and messages
+  - name: Notifications
+    description: Private in-app notifications and read state
   - name: Businesses
     description: Business directory resources
   - name: Providers
@@ -371,6 +373,62 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List the current user's in-app notifications
+      description: Returns only rendered, private notification content owned by the authenticated user. Cursors are opaque and bound to the user and unread filter.
+      operationId: listNotifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Cursor-paginated in-app notifications
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /notifications/{notificationId}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark an owned in-app notification as read
+      description: Idempotently marks only the authenticated user's notification as read. Unknown and foreign identifiers share one 404 response.
+      operationId: markNotificationRead
+      parameters:
+        - $ref: "#/components/parameters/NotificationId"
+      responses:
+        "200":
+          description: Notification is read
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /organizations:
     post:
       tags: [Organizations]
@@ -1572,6 +1630,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     OrganizationId:
       name: organizationId
       in: path
@@ -2026,6 +2089,54 @@ components:
         createdAt: { type: string, format: date-time }
         lastSeenAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+    NotificationResource:
+      type: object
+      required: [type, id]
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [LISTING] }
+        id: { type: string, format: uuid }
+    InAppNotification:
+      type: object
+      required:
+        [id, templateKey, templateVersion, locale, title, body, resource, status, createdAt, readAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        templateKey:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9._-]+$"
+        templateVersion: { type: integer, minimum: 1 }
+        locale: { type: string, enum: [zh-Hans, en-US] }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        resource:
+          $ref: "#/components/schemas/NotificationResource"
+        status: { type: string, enum: [UNREAD, READ] }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: [string, "null"], format: date-time }
+    NotificationCollection:
+      type: object
+      required: [data, pageInfo, unreadCount, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/InAppNotification"
+        pageInfo:
+          $ref: "#/components/schemas/CursorPage"
+        unreadCount: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+    NotificationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/InAppNotification"
     UserSummary:
       type: object
       required: [id, displayName, locale, status]

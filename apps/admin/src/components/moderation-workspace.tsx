@@ -7,7 +7,15 @@ import type {
   ModerationCaseCollection,
   ModerationCaseDetailResponse,
 } from "@socal/contracts";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type Locale = "zh-Hans" | "en-US";
 type ModerationAction = ModerationActionRequest["action"];
@@ -227,7 +235,7 @@ export function ModerationWorkspace({ locale, canAct }: { locale: Locale; canAct
     [loadDetail],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     function keyboard(event: KeyboardEvent): void {
       const target = event.target;
       if (

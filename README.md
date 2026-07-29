@@ -160,11 +160,12 @@ PostgreSQL 测试通过；全仓 55 个文件/203 项测试通过，本机 Redis
 跳过。PR #16 / run `30406971001` 已在真实 Redis/clamd 上通过 57 个文件/205 项测试，并通过完整
 Linux 生产构建、运行时检查、Chromium 桌面/移动 smoke 和四个非 root 镜像。Windows 中等完整性进程
 在 Admin standalone 最终复制阶段不能创建 symlink；本地编译、类型和静态页面生成已通过，该宿主限制
-没有在 Linux 托管构建复现。真实短信/邮件提供商适配器仍保留到 `NOTIF-001`。
+没有在 Linux 托管构建复现。真实短信/邮件提供商适配器仍保留到 `NOTIF-002`。
 
 PR #16 的最终 head run `30407394217` 两项 required checks 均通过，随后受保护合并为
 `d4abece`，Gate 1 实施主线完成。Backlog 中的 `ORG-002` 是 G1/P1，但显式依赖 Gate 2
-`NOTIF-001`；受限验证文件 `MEDIA-003` 属于 Gate 4，因此两者按依赖延后而不提前跨 Gate。
+`NOTIF-001`；该依赖现已完成，下一切片回补 `ORG-002` 后再继续 LIST-006。受限验证文件
+`MEDIA-003` 属于 Gate 4，仍按 Gate 顺序延后。
 `LIST-001` 已由 PR #17 / final run `30408759770` 通过两项 required checks，并受保护合并为
 `c1709a7`。`LIST-002` 在此基础上提供真实 PostgreSQL public/owner/moderator 安全投影：公开内容在
 查询层过滤状态、审核、期限、taxonomy 与主体；owner/organization member 和当前 scoped moderator
@@ -206,6 +207,13 @@ cursor 绑定 `type/category/region` 并以 `publishedAt + id` 稳定分页。Ow
 Listing ETag 幂等归档或软删除，状态/版本/Audit/Outbox 原子提交。Worker 以有界批次和
 `FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复轮询不重复写证据，并暴露低基数
 轮询/过期/失败指标。搜索索引最终移除仍由 Gate 3 消费者负责。
+
+`NOTIF-001` 已把 Listing 状态 Outbox 事件投影为账号私有的站内通知：Worker 对 envelope、事件类型、
+聚合版本和最小 payload 严格校验，以 eventId advisory lock 和数据库唯一键保证至少一次投递下仅写一
+条；中英文模板按稳定 key/locale/version 发布后不可修改，Notification 保存渲染快照而不保存正文或
+联系方式。`GET /notifications` 使用绑定账号和未读筛选的 HMAC cursor，已读端点仅更新当前账号且可
+安全重试。Web 提供中英文、移动端、noindex 的通知中心与同源精确 allowlist BFF；外部邮件/SMS、偏好、
+退订和 provider 回执仍按边界留给 `NOTIF-002`。
 
 ## 七、规划容量与服务目标
 

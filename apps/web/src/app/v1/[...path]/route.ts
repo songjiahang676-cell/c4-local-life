@@ -40,6 +40,7 @@ const responseHeaderBlocklist = new Set([
 const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
   GET: [
     /^auth\/session$/,
+    /^notifications$/,
     /^regions$/,
     /^categories$/,
     new RegExp(`^categories/${uuid}/form-schema$`),
@@ -48,6 +49,7 @@ const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
   ],
   POST: [/^listings$/, /^media\/uploads$/, new RegExp(`^media/${uuid}/complete$`)],
   PATCH: [new RegExp(`^listings/${uuid}$`)],
+  PUT: [new RegExp(`^notifications/${uuid}/read$`)],
 };
 
 export function isAllowedWebApiPath(method: string, path: string): boolean {
@@ -123,3 +125,4 @@ async function proxyApi(request: NextRequest, context: ProxyContext): Promise<Ne
 export const GET = proxyApi;
 export const POST = proxyApi;
 export const PATCH = proxyApi;
+export const PUT = proxyApi;

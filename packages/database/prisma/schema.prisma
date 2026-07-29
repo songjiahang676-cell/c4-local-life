@@ -1098,22 +1098,52 @@ model ModerationAction {
 }
 
 model Notification {
-  id          String              @id @default(uuid()) @db.Uuid
-  userId      String              @map("user_id") @db.Uuid
-  channel     NotificationChannel
-  templateKey String              @map("template_key") @db.VarChar(120)
-  payload     Json
-  status      NotificationStatus  @default(PENDING)
-  scheduledAt DateTime?           @map("scheduled_at") @db.Timestamptz(6)
-  sentAt      DateTime?           @map("sent_at") @db.Timestamptz(6)
-  readAt      DateTime?           @map("read_at") @db.Timestamptz(6)
-  failureCode String?             @map("failure_code") @db.VarChar(120)
-  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String                @id @default(uuid()) @db.Uuid
+  userId           String                @map("user_id") @db.Uuid
+  channel          NotificationChannel
+  templateId       String?               @map("template_id") @db.Uuid
+  templateKey      String                @map("template_key") @db.VarChar(120)
+  templateVersion  Int                   @default(1) @map("template_version")
+  locale           String                @default("zh-Hans") @db.VarChar(16)
+  title            String                @db.VarChar(160)
+  body             String                @db.VarChar(2000)
+  payload          Json
+  resourceType     String?               @map("resource_type") @db.VarChar(40)
+  resourceId       String?               @map("resource_id") @db.Uuid
+  sourceEventId    String?               @map("source_event_id") @db.Uuid
+  aggregateVersion Int?                  @map("aggregate_version")
+  status           NotificationStatus    @default(PENDING)
+  scheduledAt      DateTime?             @map("scheduled_at") @db.Timestamptz(6)
+  sentAt           DateTime?             @map("sent_at") @db.Timestamptz(6)
+  readAt           DateTime?             @map("read_at") @db.Timestamptz(6)
+  failureCode      String?               @map("failure_code") @db.VarChar(120)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template         NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
+  @@unique([sourceEventId, userId, channel])
   @@index([userId, status, createdAt(sort: Desc)])
   @@index([status, scheduledAt])
   @@map("notifications")
+}
+
+model NotificationTemplate {
+  id             String              @id @default(uuid()) @db.Uuid
+  key            String              @db.VarChar(120)
+  channel        NotificationChannel
+  locale         String              @db.VarChar(16)
+  version        Int
+  title          String              @db.VarChar(160)
+  body           String              @db.VarChar(2000)
+  variableSchema Json                @map("variable_schema")
+  publishedAt    DateTime?           @map("published_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  notifications  Notification[]
+
+  @@unique([key, channel, locale, version])
+  @@index([key, channel, locale, publishedAt(sort: Desc)])
+  @@map("notification_templates")
 }
 
 model AdPlacement {

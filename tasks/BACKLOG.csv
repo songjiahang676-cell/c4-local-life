@@ -49,7 +49,7 @@ MOD-002,G2,MOD,P0,举报、处置和申诉,ADMIN-002;LIST-005,去重/证据/原�
 MOD-003,G2,MOD,P1,重复文本/图片/联系方式检测,MOD-001;MEDIA-002,相似候选、阈值版本、dry-run、误杀指标,docs/11-content-workflows-and-moderation.md,todo
 MOD-004,G6,MOD,P1,审核质量与 SLA 仪表盘,MOD-002;OBS-002,队列年龄、决定一致性、申诉恢复、抽检,docs/17-observability-analytics.md,todo
 ADMIN-002,G2,ADMIN,P0,Listing 审核工作台,ADMIN-001;MOD-001,队列/快照/diff/规则/动作/审计/键盘效率,docs/28-admin-console.md,done
-NOTIF-001,G2,NOTIF,P0,站内通知与模板基线,EVT-001;AUTH-003,Listing 状态通知；模板 locale/version；已读,docs/08-api-and-integrations.md,todo
+NOTIF-001,G2,NOTIF,P0,站内通知与模板基线,EVT-001;AUTH-003,Listing 状态通知；模板 locale/version；已读,docs/08-api-and-integrations.md,done
 EVT-001,G2,EVT,P0,Transactional Outbox dispatcher,DATA-001;OBS-001,SKIP LOCKED、重试、幂等、oldest-age metrics,adr/0004-transactional-outbox.md,done
 EVT-002,G3,EVT,P1,队列 DLQ/replay/reconciliation 工具,EVT-001;ADMIN-001,受控重放、批次、权限、审计、PII 最小化,docs/20-operations-runbook.md,todo
 SEARCH-001,G3,SEARCH,P0,版本化 Listing index/mapping/analyzers,LIST-005,alias、公开字段、中文英文、geo、mapping tests,docs/09-search-and-ranking.md,todo

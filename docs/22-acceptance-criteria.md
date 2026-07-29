@@ -97,6 +97,15 @@ revision diff、通知、搜索索引消费和其余垂直类型仍由后续切�
 `FOR UPDATE SKIP LOCKED` 将到期 Rental 转为 `EXPIRED`，重复/并发轮询只产生一组系统审计和事件；公开
 读立即移除，搜索侧最终移除仍由后续索引消费者处理。
 
+`NOTIF-001` 已验收 Listing 状态站内通知：Worker 只接受版本正确、UUID/时间/聚合一致且属于白名单事件的
+Outbox envelope；未知/畸形事件永久失败，瞬时数据库错误继续重试。Repository 以 eventId advisory
+lock、canonical Listing owner 和 `source_event_id + user_id + channel` 唯一键保证并发重复投递只产生
+一条；LOW 自动发布和 MEDIUM 待审核规则、中文/英文 locale 选择及不可变模板由真实 PostgreSQL 验证。
+私有列表按 `createdAt + id` 稳定分页，HMAC cursor 绑定账号和未读筛选；外部/未知通知共用 404，已读
+重试不重复改变状态。中英文 noindex Web 通知中心具备登录门、未读筛选、分页、已读、错误/空态、44px
+触控目标和移动无溢出 E2E。当前只支持 IN_APP；邮件/SMS、偏好、退订与 provider 重试明确属于
+`NOTIF-002`。
+
 Gate 1 的 MEDIA-001 前置验收：上传 intent 要求认证/CSRF/Policy 和 owner 范围幂等；并发活动数量与
 滚动字节配额不可绕过；仅返回五分钟、长度/MIME/SHA-256/SSE 绑定的私有 quarantine PUT；文件名不能
 决定 bucket/key；普通媒体路径拒绝 SVG/HTML 和验证文档；原始对象在 READY 前没有公共 URL。

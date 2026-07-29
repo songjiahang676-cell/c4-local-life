@@ -19,6 +19,8 @@ import type { ListingStore } from "./modules/listings/listing.store";
 import type { MediaObjectStorage } from "./modules/media/media-object-storage";
 import { MediaModule } from "./modules/media/media.module";
 import type { MediaStore } from "./modules/media/media.store";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
+import type { NotificationStore } from "./modules/notifications/notification.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
@@ -39,6 +41,7 @@ export class AppModule {
     passwordNotificationGateway?: PasswordNotificationGateway,
     listingStore?: ListingStore,
     moderationStore?: ModerationStore,
+    notificationStore?: NotificationStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -56,6 +59,7 @@ export class AppModule {
         HealthModule,
         ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
+        NotificationsModule.register(environment, notificationStore),
         OrganizationsModule.register(environment, organizationStore),
       ],
       providers: [

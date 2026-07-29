@@ -73,6 +73,9 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/notification": fileURLToPath(
+        new URL("./packages/database/src/repositories/notification.repository.ts", import.meta.url),
+      ),
       "@socal/database/outbox": fileURLToPath(
         new URL("./packages/database/src/repositories/outbox-event.repository.ts", import.meta.url),
       ),

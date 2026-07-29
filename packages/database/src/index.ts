@@ -100,6 +100,22 @@ export {
   type ReserveMediaUploadIntentResult,
 } from "./repositories/media-asset.repository";
 export {
+  listingNotificationEventTypes,
+  NotificationEventValidationError,
+  NotificationRepository,
+  NotificationTemplateUnavailableError,
+  type ConsumeListingNotificationResult,
+  type InAppNotificationRecord,
+  type ListingNotificationEventInput,
+  type ListingNotificationEventType,
+  type ListInAppNotificationsInput,
+  type ListInAppNotificationsResult,
+  type MarkInAppNotificationReadInput,
+  type NotificationCursor,
+  type NotificationLocale,
+  type NotificationRepositoryOptions,
+} from "./repositories/notification.repository";
+export {
   OrganizationRepository,
   type CreateOwnedOrganizationInput,
   type CreateOwnedOrganizationResult,

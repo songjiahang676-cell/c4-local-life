@@ -57,6 +57,7 @@ try {
     "20260729130000_listing_submission_moderation",
     "20260729150000_admin_moderation_workbench",
     "20260729230000_listing_public_lifecycle",
+    "20260730010000_notification_in_app_baseline",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -92,7 +93,8 @@ try {
             to_regclass('public.password_recovery_requests') AS password_recovery_requests,
             to_regclass('public.moderation_evaluations') AS moderation_evaluations,
             to_regclass('public.moderation_rule_hits') AS moderation_rule_hits,
-            to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots`,
+            to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots,
+            to_regclass('public.notification_templates') AS notification_templates`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -561,6 +563,57 @@ try {
     throw new Error(
       "Moderation workbench version, idempotency, or immutability controls are missing",
     );
+  }
+
+  const notificationStorage = await client.query(
+    `SELECT
+       to_regclass('public.notification_templates') AS templates,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'notifications_source_event_user_channel_key'
+       ) AS source_event_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_trigger
+          WHERE tgname = 'notification_templates_published_immutable'
+            AND NOT tgisinternal
+       ) AS immutable_trigger,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'notifications'
+            AND column_name IN (
+              'template_id',
+              'template_version',
+              'locale',
+              'title',
+              'body',
+              'resource_type',
+              'resource_id',
+              'source_event_id',
+              'aggregate_version',
+              'updated_at'
+            )
+       ) AS projection_columns,
+       (
+         SELECT count(*)::integer
+           FROM notification_templates
+          WHERE channel = 'IN_APP'
+            AND published_at IS NOT NULL
+            AND locale IN ('zh-Hans', 'en-US')
+       ) AS published_templates`,
+  );
+  if (
+    notificationStorage.rows[0]?.templates !== "notification_templates" ||
+    !notificationStorage.rows[0]?.source_event_idempotency ||
+    !notificationStorage.rows[0]?.immutable_trigger ||
+    notificationStorage.rows[0]?.projection_columns !== 10 ||
+    notificationStorage.rows[0]?.published_templates !== 16
+  ) {
+    throw new Error("In-app notification template or projection controls are missing");
   }
 
   await client.query("BEGIN");
@@ -1170,6 +1223,20 @@ try {
     "23514",
   );
 
+  await expectSqlState(
+    "published notification template update",
+    `UPDATE notification_templates
+        SET title = 'Unsafe mutation'
+      WHERE id = '4f000000-0000-4000-8000-000000000004'`,
+    "P0001",
+  );
+  await expectSqlState(
+    "published notification template deletion",
+    `DELETE FROM notification_templates
+      WHERE id = '4f000000-0000-4000-8000-000000000004'`,
+    "P0001",
+  );
+
   await client.query(
     `INSERT INTO auth_sessions (
        id, user_id, token_hash, expires_at, idle_expires_at, last_seen_at
@@ -1220,7 +1287,8 @@ try {
       listingMediaBindingStorage: true,
       listingSubmissionStorage: true,
       moderationWorkbenchStorage: true,
-      negativeCases: 31,
+      notificationStorage: true,
+      negativeCases: 33,
     }),
   );
 } finally {

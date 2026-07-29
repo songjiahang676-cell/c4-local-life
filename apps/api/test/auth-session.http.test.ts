@@ -90,6 +90,8 @@ describe("auth session HTTP boundary", () => {
         "account:session:read",
         "account:profile:read",
         "account:profile:update",
+        "notification:read",
+        "notification:update",
         "account:sessions:read",
         "account:sessions:revoke",
         "listing:draft:create",

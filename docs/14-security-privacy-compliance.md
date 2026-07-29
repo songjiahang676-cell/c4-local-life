@@ -139,7 +139,7 @@ identifier、IP、device 三个维度串行限流；连续失败达到阈值后�
 错误证明最多五次，新请求会使旧请求失效。成功后在同一 PostgreSQL 事务内更换 verifier、清除失败状态、
 消费恢复记录、撤销该用户全部 Session 并追加不含 token/PII 的 `AuditLog`，然后发送密码变更通知；
 绝不自动登录。通知端口在未配置真实 provider 时 fail-closed，真实邮件/SMS durable adapter 仍由
-`NOTIF-001`/`EVT-001` 接入。
+`NOTIF-002` 接入；`NOTIF-001` 只实现不含联系方式或 provider 凭据的站内 Listing 状态通知。
 
 `TAX-001` 的公开主数据端点只返回 active Region/Category 与受控公开字段；匿名请求不能用
 `activeOnly=false` 读取待发布/停用配置。查询 DTO 严格拒绝未知字段、模糊布尔值、控制字符和 bidi

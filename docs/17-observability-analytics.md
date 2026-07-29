@@ -43,6 +43,8 @@ Outbox dispatcher 额外暴露：
 - `socal_outbox_dispatch_total{outcome}`：仅允许 published/retry/failed/stale；
 - `socal_outbox_poll_failures_total`：数据库领取或状态写回失败。
 - `socal_media_processing_total{outcome}`：仅允许 ready/rejected/stale，区分终态和重复/乱序事件。
+- `socal_notification_events_total{outcome}`：仅允许 created/duplicate/ignored/
+  recipient_unavailable/failed，不使用 user、Listing、event 或模板 key 作为 label。
 
 事件类型、aggregateId、eventId 和 payload 不作为指标标签；结构日志只保留内部 eventId、attempt、
 有界 outcome/errorCode，不序列化 payload 或 provider 原始错误。
