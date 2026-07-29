@@ -272,7 +272,10 @@ alias，严格 mapping 只允许双语文本、分类/地区、价格/属性、�
 创建或校验该契约。`SEARCH-002` 已把 Listing Outbox 接入 canonical PostgreSQL 公共投影和 OpenSearch
 external version 写删：下架事件在数据库领取和 BullMQ 两段都优先，旧事件不能覆盖新状态；定时
 reconciliation 扫描 Listing 版本并修复缺失、落后或应删除的文档，指标可分别计算紧急下架和普通更新
-的 p95 freshness。查询 API、同义词/建议和原子重建仍由后续 SEARCH 任务负责。
+的 p95 freshness。`SEARCH-003` 已实现 `GET /v1/search`：只读 v1 公共投影，固定公开字段与 facets，
+使用短效 PIT、HMAC 查询绑定 cursor 和 `search_after` 保持分页稳定，并支持类型、分类、地区、价格、
+半径及距离排序。查询文本、cursor、坐标和对象 ID 不进入指标；OpenSearch 超时、PIT 过期或不可用
+分别返回 504、410、503，详情与发布链路不依赖搜索。同义词/建议和原子重建仍由后续 SEARCH 任务负责。
 
 ## 七、规划容量与服务目标
 

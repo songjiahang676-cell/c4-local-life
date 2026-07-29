@@ -97,6 +97,7 @@ describe("observability primitives", () => {
       freshnessSeconds: 900,
     });
     runtime.metrics.searchReconciliation("deleted");
+    runtime.metrics.searchQuery({ outcome: "success", sort: "DISTANCE", geo: true });
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -123,6 +124,9 @@ describe("observability primitives", () => {
       'socal_search_index_freshness_seconds_count{operation="upsert",priority="normal"}',
     );
     expect(metrics).toContain('socal_search_reconciliation_total{outcome="deleted"} 1');
+    expect(metrics).toContain(
+      'socal_search_queries_total{outcome="success",sort="DISTANCE",geo="true"} 1',
+    );
     expect(metrics).not.toContain("person@example.com");
   });
 });

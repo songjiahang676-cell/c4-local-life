@@ -24,6 +24,8 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import type { NotificationStore } from "./modules/notifications/notification.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { SearchModule } from "./modules/search/search.module";
+import type { SearchStore } from "./modules/search/search.store";
 import type { TaxonomyStore } from "./modules/taxonomy/taxonomy.store";
 import { TrustSafetyModule } from "./modules/trust-safety/trust-safety.module";
 import type { TrustSafetyStore } from "./modules/trust-safety/trust-safety.store";
@@ -46,6 +48,7 @@ export class AppModule {
     moderationStore?: ModerationStore,
     notificationStore?: NotificationStore,
     trustSafetyStore?: TrustSafetyStore,
+    searchStore?: SearchStore,
     metrics?: MetricsRegistry,
   ): DynamicModule {
     return {
@@ -66,6 +69,7 @@ export class AppModule {
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
         NotificationsModule.register(environment, notificationStore),
         OrganizationsModule.register(environment, organizationStore),
+        SearchModule.register(environment, searchStore, metrics),
         TrustSafetyModule.register(environment, trustSafetyStore),
       ],
       providers: [

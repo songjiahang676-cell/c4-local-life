@@ -47,7 +47,7 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 
 - [x] Outbox 和 `SEARCH-001` 版本索引/双语 analyzer/geo/公开字段契约。
 - [x] `SEARCH-002` 下架优先、external version 和 reconciliation。
-- [ ] 双语/地理/筛选/排序和推广标识。
+- [x] 双语/地理/筛选/排序和推广标识。
 - [ ] 首页真实数据与模块隔离。
 - [ ] canonical/hreflang/sitemap/schema/a11y/performance。
 

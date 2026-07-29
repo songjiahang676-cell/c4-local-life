@@ -146,3 +146,16 @@ OpenSearch 写入和删除使用 canonical Listing external version；旧事件�
 落后 durable event 时重试而不是信任 payload。下架在 Outbox 和 BullMQ 两段优先，周期对账以
 PostgreSQL 决定缺失重建和非公开删除，绝不把索引反写事实源。指标只使用固定 operation/outcome/
 priority，不包含 Listing/event/owner ID、标题、坐标或文档。
+
+## 公共搜索查询边界
+
+`GET /v1/search` 只接受严格 allowlist 的文本、类型、分类、地区、价格、geo、排序、cursor 和 limit；
+文本先 NFKC/去空白并拒绝控制符和双向控制符，geo 参数必须成对，距离排序必须有坐标，limit 最大 50。
+金额保持两位以内十进制字符串并转换为安全整数 minor units，不使用 IEEE 浮点作为资金事实。
+
+分页 cursor 使用 `SESSION_SECRET` 派生的独立 HMAC domain，只保存 query fingerprint、短效 OpenSearch
+PIT、固定快照时间和稳定 sort values；篡改、跨筛选/排序/limit 重放和过期均失败关闭。查询固定过滤
+`PUBLISHED` 与未过期内容，使用字段/source/facet 白名单和 bounded timeout；响应映射再次验证 UUID、
+枚举、模糊位置、金额与最小公开 publisher 字段，正文、内部质量分、campaign/placement、审核状态、
+联系数据和精确位置均不能返回。日志和 `socal_search_queries_total` 只使用固定 outcome/sort/geo
+标签，不记录 query、cursor、PIT、坐标或资源标识。

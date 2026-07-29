@@ -407,3 +407,17 @@ Idempotency-Key 或请求哈希。
   BullMQ 两段优先；索引失败可安全重试，周期 reconciliation 还会删除任何 canonical 非公开行。
 - 索引漂移/事实源反转：对账只以 PostgreSQL 状态和版本决定写删，绝不把 OpenSearch 内容写回数据库；
   OpenSearch 版本异常领先会失败并告警，不以强制降版本掩盖损坏。
+
+## 14.27 SEARCH-003 查询威胁和缓解
+
+- 查询/资源耗尽：严格 NFKC 文本与控制符校验、固定 filter/sort/facet/source、50 条上限、禁止 partial
+  search、1500 ms 默认/5000 ms 最大 timeout 和短 PIT 限制单请求与遗留资源；不接受脚本或任意字段。
+- cursor 篡改/漏重页：独立 HMAC domain 绑定 query fingerprint、全部筛选、排序和 limit；PIT 与固定
+  snapshotAt 冻结文档/过期/新鲜度语义，稳定 sort + ID 作为边界，终页尽力关闭，遗留 PIT 自动过期。
+- PII/内部字段扩散：OpenSearch `_source` allowlist 不取 body、quality、promotion 或 indexedAt；
+  adapter 对 UUID、枚举、金额、模糊 geo、attributes 和 publisher 再次 fail-closed 映射，响应 DTO
+  没有审核、联系、精确位置、campaign/placement 或全文字段。
+- 查询泄漏/枚举：cursor 只保存 query hash，不保存原 query；metrics/logs 不记录 query、cursor、PIT、
+  筛选值、坐标、金额或资源 ID。公开结果仍强制 PUBLISHED、未过期，索引漂移返回 503 而不宽松公开。
+- 依赖故障：PIT 过期、查询超时、OpenSearch 不可用分别映射 410/504/503 且 no-store；搜索 adapter
+  不在应用启动或 Listing 写入链做远程探测，详情、发布和 PostgreSQL canonical 状态保持可用。

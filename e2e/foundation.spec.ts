@@ -1124,7 +1124,7 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
   expect(Object.keys(contract.paths)).toHaveLength(67);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(153);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(160);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);

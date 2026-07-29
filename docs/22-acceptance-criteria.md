@@ -265,3 +265,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   版本领先失败告警且不反写 PostgreSQL。
 - PUBLIC attributes 以历史 schema 白名单；EXACT 坐标、联系方式、未知/私有字段、审核/风险和媒体
   标识有真实 PostgreSQL/OpenSearch 负例；OpenAPI、Prisma 和 migration 保持不变。
+
+## 22.15 SEARCH-003 查询 API 验收
+
+- 中英 NFKC query、类型、分类、地区、decimal price、半径与距离筛选工作；未知/危险/不完整参数、
+  倒置价格和超过 50 条请求明确 400。
+- 只返回 PUBLISHED、固定快照时未过期的最小公开投影；body、审核/风险、内部 quality/promotion、
+  联系方式、精确位置和 provider detail 不进入响应。
+- PIT + search_after cursor 绑定全部筛选/排序/limit；篡改/跨查询重放失败，真实 OpenSearch 中分页
+  无重复/漏页，第一页后新写入不进入既有 PIT，终页关闭且遗留资源有短效 TTL。
+- facets 固定为 type/category/region/price unit；五种排序均有稳定 ID tie-break，distance 只在有坐标
+  时使用。query/source/facet/limit/timeout 均受 allowlist，不接受任意脚本或聚合。
+- cursor/PIT 过期、timeout 和 OpenSearch 不可用分别返回 410/504/503 与 no-store Problem Details；
+  详情、发布和 PostgreSQL canonical 写链不依赖搜索。
+- 指标只有固定 outcome/sort/geo；query/cursor/PIT/ID/筛选值/坐标/金额不进入日志或标签。OpenAPI、
+  生成类型、单元/HTTP/真实 OpenSearch、完整质量和保护门禁通过后方可标记完成。

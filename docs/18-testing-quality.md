@@ -320,3 +320,18 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   v3 删除成功且读 alias 不再返回。
 - 托管质量门必须同时提供 PostgreSQL、Redis、ClamAV、OpenSearch，执行完整 test/build、Linux
   Chromium 和四个非 root 镜像；本任务不修改 OpenAPI、Prisma 或 migration。
+
+## 18.29 SEARCH-003 公共查询验证增量
+
+- 契约测试覆盖 NFKC、控制/双向字符、成对 geo、距离排序、decimal price、倒置范围、50 条 limit、
+  2048 cursor、unknown key 和独立最小 Search response；生成类型与 OpenAPI 无漂移。
+- Service 单测证明一次 PIT 跨页复用、固定 snapshotAt、`limit + 1`、稳定 search_after、终页关闭，
+  以及 cursor 篡改、跨 query/filter/limit 重放和过期在访问 backend 前失败。
+- Adapter 单测锁定公开 `_source`、固定 bool/filter/facets、geo/price minor-unit 查询、无脚本，并对
+  partial shard、timeout、malformed/PII 投影 fail closed；HTTP 测试覆盖 400/410/503/504 Problem
+  Details、no-store 和敏感字段负断言。
+- 托管 CI 的真实 OpenSearch 测试创建随机严格索引，经 read/write alias 执行文本、geo、facets、
+  PIT + search_after；第一页后新增文档不得进入既有 PIT，三条快照结果不重复/漏页。无本地节点时
+  明确 skip，不能把 skip 声称为通过。
+- metrics 测试只接受固定 outcome/sort/geo，禁止 query、cursor、PIT 或资源标识。全仓格式、类型、
+  lint、测试、八应用构建、运行时、生产 Chromium 和四镜像门禁继续执行。

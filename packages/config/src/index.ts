@@ -65,6 +65,8 @@ const apiEnvironmentSchema = commonServerSchema
     OPENSEARCH_USERNAME: z.string().optional().default(""),
     OPENSEARCH_PASSWORD: optionalSecretSchema(),
     OPENSEARCH_INDEX_PREFIX: openSearchIndexPrefixSchema,
+    SEARCH_QUERY_TIMEOUT_MS: positiveInteger(1_500, 5_000),
+    SEARCH_PIT_KEEP_ALIVE_SECONDS: positiveInteger(120, 300),
     S3_ENDPOINT: z.string().url().optional().or(z.literal("")).default(""),
     S3_REGION: z.string().min(1).max(64).default("us-west-2"),
     S3_QUARANTINE_BUCKET: z

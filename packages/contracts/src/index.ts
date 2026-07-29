@@ -25,6 +25,8 @@ export type MyListingCollection = components["schemas"]["MyListingCollection"];
 export type BatchListingActionRequest = components["schemas"]["BatchListingActionRequest"];
 export type BatchListingActionResponse = components["schemas"]["BatchListingActionResponse"];
 export type ListingSearchInput = NonNullable<operations["searchContent"]["parameters"]["query"]>;
+export type SearchListingResult = components["schemas"]["SearchListingResult"];
+export type SearchResponse = components["schemas"]["SearchResponse"];
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ListListingRevisionsQuery = NonNullable<
   operations["listListingRevisions"]["parameters"]["query"]
@@ -355,24 +357,79 @@ export const updateListingSchema: z.ZodType<UpdateListingInput> = z
   .strict()
   .refine((value) => Object.keys(value).length > 0, "Listing patch must not be empty");
 
+const searchQueryTextSchema = z
+  .string()
+  .transform((value) => value.trim().normalize("NFKC"))
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(120)
+      .refine(
+        (value) => safeListingText(value, false),
+        "Search query contains unsupported characters",
+      ),
+  );
+
+function decimalAmountMinor(value: string): bigint {
+  const [whole = "0", fraction = ""] = value.split(".");
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+}
+
 export const listingSearchSchema: z.ZodType<ListingSearchInput> = z
   .object({
-    q: z.string().trim().max(120).optional(),
+    q: searchQueryTextSchema.optional(),
     type: listingTypeSchema.optional(),
     categoryId: z.uuid().optional(),
-    regionCode: z.string().max(80).optional(),
+    regionCode: listingRegionCodeSchema.optional(),
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
     radiusMiles: z.coerce.number().int().min(1).max(100).optional(),
-    minPrice: z.coerce.number().nonnegative().optional(),
-    maxPrice: z.coerce.number().nonnegative().optional(),
+    minPrice: moneyAmountSchema.optional(),
+    maxPrice: moneyAmountSchema.optional(),
     sort: z
       .enum(["RELEVANCE", "NEWEST", "PRICE_ASC", "PRICE_DESC", "DISTANCE"])
       .default("RELEVANCE"),
-    cursor: z.string().optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(20),
+    cursor: z.string().max(2048).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const hasLatitude = value.latitude !== undefined;
+    const hasLongitude = value.longitude !== undefined;
+    if (hasLatitude !== hasLongitude) {
+      context.addIssue({
+        code: "custom",
+        path: [hasLatitude ? "longitude" : "latitude"],
+        message: "Latitude and longitude must be provided together",
+      });
+    }
+    if (value.radiusMiles !== undefined && (!hasLatitude || !hasLongitude)) {
+      context.addIssue({
+        code: "custom",
+        path: ["radiusMiles"],
+        message: "Radius requires latitude and longitude",
+      });
+    }
+    if (value.sort === "DISTANCE" && (!hasLatitude || !hasLongitude)) {
+      context.addIssue({
+        code: "custom",
+        path: ["sort"],
+        message: "Distance sorting requires latitude and longitude",
+      });
+    }
+    if (
+      value.minPrice !== undefined &&
+      value.maxPrice !== undefined &&
+      decimalAmountMinor(value.minPrice) > decimalAmountMinor(value.maxPrice)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["maxPrice"],
+        message: "Maximum price must not be lower than minimum price",
+      });
+    }
+  });
 
 export const listListingsQuerySchema: z.ZodType<ListListingsQuery> = z
   .object({

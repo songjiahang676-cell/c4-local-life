@@ -110,7 +110,18 @@
 - 手工验证只比较 Listing ID、canonical/index version 和是否存在，不把公开索引内容写回 PostgreSQL，
   不在工单复制标题、联系方式、坐标或完整文档。
 
-## 20.14 定期运维
+## 20.14 搜索查询异常
+
+- 先按 HTTP 410/504/503 与 `socal_search_queries_total` 的 expired_cursor/timeout/unavailable 区分
+  客户端闲置、慢查询和依赖故障；不得在日志或工单粘贴 query、cursor、PIT、坐标或完整命中文档。
+- timeout 增长时检查 cluster rejection/heap/disk、慢查询和固定 facet；不要临时开放脚本、任意聚合、
+  更大 limit 或无限 timeout。需要调整时先用版本化数据集和压测证明。
+- 410 只要求客户端从第一页重新查询；不要尝试延长或解码用户 cursor。大量 PIT 时确认终页关闭、
+  transport 错误清理和 120 秒默认 TTL，必要时先限流而非删除 canonical 数据。
+- 503 时保持详情/发布链可用并进入 OpenSearch 故障流程；source/mapping drift 也按 503 fail closed，
+  不能忽略字段验证或将索引结果写回 PostgreSQL。
+
+## 20.15 定期运维
 
 每日：关键告警、审核/队列 SLA、支付对账、备份状态。
 

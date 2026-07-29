@@ -19,6 +19,7 @@
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-fastify": "11.1.28",
     "@nestjs/swagger": "11.4.6",
+    "@opensearch-project/opensearch": "2.13.0",
     "@socal/config": "workspace:*",
     "@socal/contracts": "workspace:*",
     "@socal/database": "workspace:*",

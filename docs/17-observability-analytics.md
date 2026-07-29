@@ -132,3 +132,11 @@ hash、阈值值和审核员均不得成为标签。运行期误杀率只使用�
 
 所有标签都是固定低基数枚举；Listing/event/owner ID、标题、分类、坐标、payload、provider 错误和
 索引文档都不进入标签或结构日志。正式 Dashboard/告警阈值仍由 `OBS-002` 发布 Gate 固化。
+
+## 17.13 SEARCH-003 查询结果指标
+
+`socal_search_queries_total{outcome,sort,geo}` 的 outcome 只允许 success、empty、invalid_cursor、
+expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false。HTTP RED
+histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可变 bucket。query、cursor、PIT、
+Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
+零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
