@@ -1,6 +1,9 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   ContentStatus,
+  MediaKind,
+  MediaPurpose,
+  MediaStatus,
   MembershipRole,
   ModerationStatus,
   Prisma,
@@ -55,6 +58,7 @@ export type ListingDraftWriteFields = {
   latitude: string | null;
   longitude: string | null;
   locationPrecision: string;
+  mediaIds: readonly string[];
 };
 
 export type CreateListingDraftInput = ListingDraftWriteFields & {
@@ -72,7 +76,11 @@ export type CreateListingDraftResult =
   | { kind: "created" | "exact_retry"; listing: OwnerListingProjection }
   | {
       kind:
-        "actor_unavailable" | "idempotency_conflict" | "invalid_organization" | "invalid_reference";
+        | "actor_unavailable"
+        | "idempotency_conflict"
+        | "invalid_media"
+        | "invalid_organization"
+        | "invalid_reference";
     };
 
 export type FindListingDraftCreateRetryInput = {
@@ -97,7 +105,12 @@ export type UpdateListingDraftResult =
   | { kind: "updated"; listing: OwnerListingProjection }
   | {
       kind:
-        "invalid_reference" | "not_found" | "state_conflict" | "time_conflict" | "version_conflict";
+        | "invalid_media"
+        | "invalid_reference"
+        | "not_found"
+        | "state_conflict"
+        | "time_conflict"
+        | "version_conflict";
       currentVersion?: number;
     };
 
@@ -210,6 +223,90 @@ async function referencesRemainValid(
     select: { id: true },
   });
   return Boolean(category && region && formSchema);
+}
+
+async function validateReadyMediaBindings(
+  transaction: Prisma.TransactionClient,
+  input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  },
+): Promise<boolean> {
+  if (new Set(input.mediaIds).size !== input.mediaIds.length) return false;
+  if (input.mediaIds.length > 0) {
+    const orderedIds = [...input.mediaIds].sort();
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT "id"::text
+        FROM "media_assets"
+        WHERE "id" IN (${Prisma.join(orderedIds.map((id) => Prisma.sql`${id}::uuid`))})
+        ORDER BY "id"
+        FOR UPDATE`,
+    );
+  }
+  const assets =
+    input.mediaIds.length === 0
+      ? []
+      : await transaction.mediaAsset.findMany({
+          where: { id: { in: [...input.mediaIds] } },
+          select: {
+            id: true,
+            ownerId: true,
+            listingId: true,
+            purpose: true,
+            kind: true,
+            status: true,
+          },
+        });
+  if (assets.length !== input.mediaIds.length) return false;
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  for (const mediaId of input.mediaIds) {
+    const asset = assetsById.get(mediaId);
+    if (
+      !asset ||
+      asset.purpose !== MediaPurpose.LISTING_MEDIA ||
+      asset.kind !== MediaKind.IMAGE ||
+      asset.status !== MediaStatus.READY ||
+      (asset.listingId !== null && asset.listingId !== input.listingId) ||
+      (asset.listingId === null && asset.ownerId !== input.actorUserId)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function applyMediaBindings(
+  transaction: Prisma.TransactionClient,
+  input: {
+    actorUserId: string;
+    listingId: string;
+    mediaIds: readonly string[];
+  },
+): Promise<void> {
+  await transaction.mediaAsset.updateMany({
+    where: {
+      listingId: input.listingId,
+      ...(input.mediaIds.length > 0 ? { id: { notIn: [...input.mediaIds] } } : {}),
+    },
+    data: { listingId: null, sortOrder: 0 },
+  });
+  for (const [sortOrder, mediaId] of input.mediaIds.entries()) {
+    const updated = await transaction.mediaAsset.updateMany({
+      where: {
+        id: mediaId,
+        status: MediaStatus.READY,
+        purpose: MediaPurpose.LISTING_MEDIA,
+        kind: MediaKind.IMAGE,
+        OR: [{ listingId: input.listingId }, { listingId: null, ownerId: input.actorUserId }],
+      },
+      data: { listingId: input.listingId, sortOrder },
+    });
+    if (updated.count !== 1) {
+      throw new Error("Validated media binding changed inside the Listing transaction");
+    }
+  }
 }
 
 function listingData(
@@ -417,6 +514,15 @@ export class ListingDraftRepository {
       if (!(await referencesRemainValid(transaction, input.type, input))) {
         return { kind: "invalid_reference" };
       }
+      if (
+        !(await validateReadyMediaBindings(transaction, {
+          actorUserId: input.actorUserId,
+          listingId: input.id,
+          mediaIds: input.mediaIds,
+        }))
+      ) {
+        return { kind: "invalid_media" };
+      }
       await transaction.listing.create({
         data: {
           ...listingData(input),
@@ -432,6 +538,11 @@ export class ListingDraftRepository {
           updatedAt: input.occurredAt,
         },
         select: { id: true },
+      });
+      await applyMediaBindings(transaction, {
+        actorUserId: input.actorUserId,
+        listingId: input.id,
+        mediaIds: input.mediaIds,
       });
       await appendDraftEvidence(transaction, {
         action: "listing.draft.created",
@@ -486,6 +597,15 @@ export class ListingDraftRepository {
       if (!(await referencesRemainValid(transaction, current.type, input))) {
         return { kind: "invalid_reference" };
       }
+      if (
+        !(await validateReadyMediaBindings(transaction, {
+          actorUserId: input.actorUserId,
+          listingId: input.listingId,
+          mediaIds: input.mediaIds,
+        }))
+      ) {
+        return { kind: "invalid_media" };
+      }
 
       const updated = await transaction.listing.updateMany({
         where: {
@@ -503,6 +623,11 @@ export class ListingDraftRepository {
       if (updated.count !== 1) {
         return { kind: "version_conflict", currentVersion: current.version };
       }
+      await applyMediaBindings(transaction, {
+        actorUserId: input.actorUserId,
+        listingId: input.listingId,
+        mediaIds: input.mediaIds,
+      });
       const version = current.version + 1;
       await appendDraftEvidence(transaction, {
         action: "listing.draft.updated",

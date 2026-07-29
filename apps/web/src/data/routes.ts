@@ -5,6 +5,7 @@ export const ROUTES = {
   jobPost: "/jobs/post",
   resumes: "/resumes",
   housingRent: "/housing/rent",
+  rentalPost: "/post/rental/new",
   housingWanted: "/housing/wanted",
   commercial: "/commercial",
   businessTransfer: "/business-transfer",

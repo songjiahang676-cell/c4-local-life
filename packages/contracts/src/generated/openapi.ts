@@ -468,6 +468,28 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/media/{mediaId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * Get owner-scoped media processing status
+         * @description Returns only bounded lifecycle state for an asset owned by the current user. Object keys,
+         *     storage buckets, hashes, original URLs and provider errors are never exposed. Unknown and
+         *     foreign identifiers share the same 404 response.
+         */
+        readonly get: operations["getMediaStatus"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/media/{mediaId}/complete": {
         readonly parameters: {
             readonly query?: never;
@@ -1352,6 +1374,7 @@ export interface components {
             readonly attributes: {
                 readonly [key: string]: unknown;
             };
+            readonly mediaIds: readonly string[];
             readonly isFeatured: boolean;
             /** Format: date-time */
             readonly featuredUntil: string | null;
@@ -1550,6 +1573,17 @@ export interface components {
                 readonly mediaId: string;
                 /** @enum {string} */
                 readonly status: "SCANNING" | "READY";
+                /** Format: date-time */
+                readonly updatedAt: string;
+            };
+        };
+        readonly MediaStatusResponse: {
+            readonly data: {
+                /** Format: uuid */
+                readonly mediaId: string;
+                /** @enum {string} */
+                readonly status: "UPLOADING" | "SCANNING" | "READY" | "REJECTED";
+                readonly rejectionCode: string | null;
                 /** Format: date-time */
                 readonly updatedAt: string;
             };
@@ -2746,6 +2780,33 @@ export interface operations {
             readonly 422: components["responses"]["UnprocessableEntity"];
             readonly 429: components["responses"]["TooManyRequests"];
             readonly 503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    readonly getMediaStatus: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly mediaId: components["parameters"]["MediaId"];
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Current private media lifecycle state */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["MediaStatusResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly completeMediaUpload: {

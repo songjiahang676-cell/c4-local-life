@@ -3,6 +3,7 @@ import type {
   CompleteMediaUploadResult,
   MediaStore,
   MediaUploadIntentRecord,
+  OwnedMediaStatusRecord,
   ReserveMediaUploadIntentInput,
   ReserveMediaUploadIntentResult,
 } from "../../src/modules/media/media.store";
@@ -62,6 +63,19 @@ export class MemoryMediaStore implements MediaStore {
       (candidate) => candidate.id === id && candidate.ownerId === ownerId,
     );
     return Promise.resolve(intent ?? null);
+  }
+
+  findOwnedStatus(id: string, ownerId: string): Promise<OwnedMediaStatusRecord | null> {
+    const intent = [...this.intents.values()].find(
+      (candidate) => candidate.id === id && candidate.ownerId === ownerId,
+    );
+    if (!intent || intent.status === "DELETED") return Promise.resolve(null);
+    return Promise.resolve({
+      id: intent.id,
+      status: intent.status,
+      rejectionCode: intent.status === "REJECTED" ? "OBJECT_METADATA_MISMATCH" : null,
+      updatedAt: intent.createdAt,
+    });
   }
 
   completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult> {

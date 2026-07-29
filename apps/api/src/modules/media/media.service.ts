@@ -5,6 +5,7 @@ import type {
   CreateUploadRequest,
   CreateUploadResponse,
   MediaProcessingResponse,
+  MediaStatusResponse,
 } from "@socal/contracts";
 import type { MediaKind, MediaPurpose } from "@socal/database/media";
 import { API_ENVIRONMENT } from "../../common/api-environment.token";
@@ -256,6 +257,24 @@ export class MediaService {
         mediaId,
         status: result.status,
         updatedAt: result.updatedAt.toISOString(),
+      },
+    };
+  }
+
+  async getStatus(context: PolicyRequestContext, mediaId: string): Promise<MediaStatusResponse> {
+    await this.policies.require({
+      action: activeUserPolicyActions.mediaUploadComplete,
+      context,
+    });
+    const ownerId = authenticatedUserId(context);
+    const asset = await this.store.findOwnedStatus(mediaId, ownerId);
+    if (!asset) throw new MediaUploadNotFoundError();
+    return {
+      data: {
+        mediaId: asset.id,
+        status: asset.status,
+        rejectionCode: asset.rejectionCode,
+        updatedAt: asset.updatedAt.toISOString(),
       },
     };
   }

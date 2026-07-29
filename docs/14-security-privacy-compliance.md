@@ -185,6 +185,12 @@ Worker 对实际字节再次复算长度/SHA-256、检查 magic bytes 和执行�
 `image/webp` 类型。永久拒绝仅保存有界错误码，不保存扫描响应或原始 provider 错误；暂时依赖故障重试。
 数据库 row lock + lifecycleVersion 阻止重复/乱序队列覆盖终态，只有 READY 才能被后续业务绑定。
 
+`LIST-004` 的 Web BFF 仅允许发布表单所需的 method/path 组合，UUID 段严格校验且不代理 Admin、
+DELETE 或任意上游路径。浏览器恢复 key 同时绑定 server-derived userId 与 locale，解析时限制总大小、
+字段长度、媒体数量和枚举；切换账号不能读取上一账号草稿。媒体状态查询只对 owner 返回有界生命周期，
+跨 owner/删除/未知统一 404；数据库和事务双重要求 READY + LISTING_MEDIA + IMAGE，并以确定性行锁
+阻止跨 Listing 竞争绑定。客户端移除图片只解绑，不绕过未来媒体删除和审计工作流。
+
 ## 14.8 PII 分类
 
 | 等级              | 示例                             | 控制                       |

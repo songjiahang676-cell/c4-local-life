@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the bilingual/mobile Rental dynamic form, debounced account-scoped autosave recovery,
+  strict same-origin Web BFF, owner-safe media status polling, and atomic READY media binding.
 - Added shared strict TypeScript, typed ESLint, and Prettier configuration for every workspace.
 - Replaced placeholder lint commands in Worker and shared packages with real ESLint checks.
 - Added validated API and Worker runtime configuration with fail-fast startup, secret-safe summaries, and recursive log redaction.

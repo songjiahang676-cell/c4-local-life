@@ -53,6 +53,7 @@ try {
     "20260728234500_outbox_dispatcher_constraints",
     "20260729003000_media_processing_lifecycle",
     "20260729010000_listing_draft_idempotency",
+    "20260729020000_listing_media_binding",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -434,6 +435,50 @@ try {
     listingDraftStorage.rows[0]?.nullable_evidence_columns !== 2
   ) {
     throw new Error("Listing draft idempotency evidence controls are missing");
+  }
+
+  const listingMediaBindingStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_listing_binding_check'
+            AND constraint_type = 'CHECK'
+       ) AS binding_check,
+       EXISTS (
+         SELECT 1
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND table_name = 'media_assets'
+            AND constraint_name = 'media_assets_listing_id_fkey'
+            AND constraint_type = 'FOREIGN KEY'
+       ) AS listing_foreign_key,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'media_assets_listing_id_sort_order_idx'
+       ) AS binding_index,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'media_assets'
+            AND (
+              (column_name = 'listing_id' AND is_nullable = 'YES')
+              OR (column_name = 'sort_order' AND is_nullable = 'NO')
+            )
+       ) AS binding_columns`,
+  );
+  if (
+    !listingMediaBindingStorage.rows[0]?.binding_check ||
+    !listingMediaBindingStorage.rows[0]?.listing_foreign_key ||
+    !listingMediaBindingStorage.rows[0]?.binding_index ||
+    listingMediaBindingStorage.rows[0]?.binding_columns !== 2
+  ) {
+    throw new Error("Listing READY-media binding controls are missing");
   }
 
   await client.query("BEGIN");
@@ -846,6 +891,13 @@ try {
     "23514",
   );
   await expectSqlState(
+    "listing media READY binding coherence",
+    `UPDATE media_assets
+        SET listing_id = '00000000-0000-4000-8000-000000000004'
+      WHERE id = '00000000-0000-4000-8000-000000000023'`,
+    "23514",
+  );
+  await expectSqlState(
     "media rejection code bound",
     `UPDATE media_assets
         SET status = 'REJECTED',
@@ -923,7 +975,8 @@ try {
       outboxStorage: true,
       mediaProcessingStorage: true,
       listingDraftStorage: true,
-      negativeCases: 22,
+      listingMediaBindingStorage: true,
+      negativeCases: 23,
     }),
   );
 } finally {

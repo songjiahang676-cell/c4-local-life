@@ -191,6 +191,20 @@ advisory transaction lock serializes concurrent exact retries.
 - Rollback: disable the LIST-003 routes and retain the additive evidence. Physical removal loses
   retry provenance and requires stopped writers plus backup; see the migration-local `ROLLBACK.md`.
 
+## `20260729020000_listing_media_binding`
+
+Adds a nullable, single-Listing binding and stable order to private `media_assets`. The database
+constraint permits a binding only for `LISTING_MEDIA` image assets already in `READY`; application
+transactions additionally require current owner authorization, lock selected assets in UUID order,
+reject cross-Listing reuse, and atomically synchronize the ordered set with the Listing version
+write. Original and derivative object locations remain private and are not copied into Listing
+payloads.
+
+- Roll forward: apply before enabling media selection in draft create/update; verify owner READY
+  attach, ordered replacement/removal, unready/foreign rejection and concurrent reuse.
+- Rollback: disable media selection and retain nullable binding evidence. Exceptional stopped-writer
+  physical removal is documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

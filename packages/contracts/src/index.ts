@@ -75,6 +75,7 @@ export type GetCategoryFormSchemaQuery = NonNullable<
 export type CreateUploadRequest = components["schemas"]["CreateUploadRequest"];
 export type CreateUploadResponse = components["schemas"]["CreateUploadResponse"];
 export type MediaProcessingResponse = components["schemas"]["MediaProcessingResponse"];
+export type MediaStatusResponse = components["schemas"]["MediaStatusResponse"];
 
 export const localeSchema: z.ZodType<Locale> = z.enum(["zh-Hans", "en-US"]);
 export const listingTypeSchema: z.ZodType<ListingType> = z.enum([
@@ -123,6 +124,22 @@ export const createUploadRequestSchema: z.ZodType<CreateUploadRequest> = z
     byteSize: z.number().int().min(1).max(20_971_520),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     purpose: z.enum(["LISTING_MEDIA", "AVATAR", "BUSINESS_LOGO", "AD_CREATIVE", "VERIFICATION"]),
+  })
+  .strict();
+
+export const mediaStatusResponseSchema: z.ZodType<MediaStatusResponse> = z
+  .object({
+    data: z
+      .object({
+        mediaId: z.uuid(),
+        status: z.enum(["UPLOADING", "SCANNING", "READY", "REJECTED"]),
+        rejectionCode: z
+          .string()
+          .regex(/^[A-Z][A-Z0-9_]{2,63}$/)
+          .nullable(),
+        updatedAt: z.iso.datetime({ offset: true }),
+      })
+      .strict(),
   })
   .strict();
 
@@ -220,7 +237,10 @@ const listingRegionCodeSchema = z
 const listingAttributesSchema = z
   .record(z.string(), z.json())
   .refine((value) => Object.keys(value).length <= 100, "Attributes exceed the field limit");
-const listingMediaIdsSchema = z.array(z.uuid()).max(20);
+const listingMediaIdsSchema = z
+  .array(z.uuid())
+  .max(20)
+  .refine((value) => new Set(value).size === value.length, "Media IDs must be unique");
 const listingContactModeSchema = z.enum(["IN_APP", "PHONE_REVEAL", "EMAIL_REVEAL"]);
 const listingLocationPrecisionSchema = z.enum(["CITY", "NEIGHBORHOOD", "APPROXIMATE", "EXACT"]);
 const createListingLocationSchema = z

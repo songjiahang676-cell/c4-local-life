@@ -867,6 +867,35 @@ paths:
           $ref: "#/components/responses/TooManyRequests"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /media/{mediaId}:
+    get:
+      tags: [Media]
+      summary: Get owner-scoped media processing status
+      description: |
+        Returns only bounded lifecycle state for an asset owned by the current user. Object keys,
+        storage buckets, hashes, original URLs and provider errors are never exposed. Unknown and
+        foreign identifiers share the same 404 response.
+      operationId: getMediaStatus
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: Current private media lifecycle state
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /media/{mediaId}/complete:
     post:
       tags: [Media]
@@ -2319,6 +2348,7 @@ components:
           location,
           contactMode,
           attributes,
+          mediaIds,
           isFeatured,
           featuredUntil,
           publishedAt,
@@ -2364,6 +2394,11 @@ components:
         attributes:
           type: object
           additionalProperties: true
+        mediaIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: { type: string, format: uuid }
         isFeatured: { type: boolean }
         featuredUntil: { type: [string, "null"], format: date-time }
         publishedAt: { type: [string, "null"], format: date-time }
@@ -2492,6 +2527,7 @@ components:
         mediaIds:
           type: array
           maxItems: 20
+          uniqueItems: true
           default: []
           items: { type: string, format: uuid }
         contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL], default: IN_APP }
@@ -2525,6 +2561,7 @@ components:
         mediaIds:
           type: array
           maxItems: 20
+          uniqueItems: true
           items: { type: string, format: uuid }
         contactMode: { type: string, enum: [IN_APP, PHONE_REVEAL, EMAIL_REVEAL] }
     ListingCollection:
@@ -2629,6 +2666,22 @@ components:
           properties:
             mediaId: { type: string, format: uuid }
             status: { type: string, enum: [SCANNING, READY] }
+            updatedAt: { type: string, format: date-time }
+    MediaStatusResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [mediaId, status, rejectionCode, updatedAt]
+          additionalProperties: false
+          properties:
+            mediaId: { type: string, format: uuid }
+            status: { type: string, enum: [UPLOADING, SCANNING, READY, REJECTED] }
+            rejectionCode:
+              type: [string, "null"]
+              pattern: "^[A-Z][A-Z0-9_]{2,63}$"
             updatedAt: { type: string, format: date-time }
     WorkflowTransitionResponse:
       type: object

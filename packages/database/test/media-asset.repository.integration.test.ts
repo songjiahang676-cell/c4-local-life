@@ -462,6 +462,17 @@ integration("MediaAssetRepository with PostgreSQL", () => {
           where: { aggregateId: intent.id, eventType: "media.processing.ready" },
         }),
       ).resolves.toBe(1);
+      await expect(repository.findOwnedStatus(intent.id, ownerId)).resolves.toMatchObject({
+        id: intent.id,
+        status: MediaStatus.READY,
+        rejectionCode: null,
+      });
+      await expect(repository.findOwnedStatus(intent.id, randomUUID())).resolves.toBeNull();
+      await transaction.mediaAsset.update({
+        where: { id: intent.id },
+        data: { status: MediaStatus.DELETED },
+      });
+      await expect(repository.findOwnedStatus(intent.id, ownerId)).resolves.toBeNull();
     });
   });
 });

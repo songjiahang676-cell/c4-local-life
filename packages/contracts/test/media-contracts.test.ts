@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { createUploadRequestSchema, idempotencyKeySchema } from "../src";
+import { createUploadRequestSchema, idempotencyKeySchema, mediaStatusResponseSchema } from "../src";
 
 describe("media upload contracts", () => {
+  it("accepts only bounded owner status without storage metadata", () => {
+    const valid = {
+      data: {
+        mediaId: "00000000-0000-4000-8000-000000000001",
+        status: "READY",
+        rejectionCode: null,
+        updatedAt: "2026-07-29T01:00:00.000Z",
+      },
+    } as const;
+    expect(mediaStatusResponseSchema.parse(valid)).toEqual(valid);
+    expect(
+      mediaStatusResponseSchema.safeParse({
+        ...valid,
+        data: { ...valid.data, bucket: "private-media" },
+      }).success,
+    ).toBe(false);
+    expect(
+      mediaStatusResponseSchema.safeParse({
+        ...valid,
+        data: { ...valid.data, status: "DELETED" },
+      }).success,
+    ).toBe(false);
+  });
+
   const valid = {
     filename: "客厅照片.webp",
     mimeType: "image/webp" as const,

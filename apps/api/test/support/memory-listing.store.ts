@@ -138,6 +138,7 @@ function rowFromCreate(input: CreateListingDraftInput): OwnerListingProjection {
     },
     contactMode: input.contactMode,
     attributes: structuredClone(input.attributes),
+    mediaIds: [...input.mediaIds],
     isFeatured: false,
     featuredUntil: null,
     publishedAt: null,
@@ -173,6 +174,7 @@ function applyFields(
           },
     contactMode: fields.contactMode,
     attributes: structuredClone(fields.attributes),
+    mediaIds: [...fields.mediaIds],
     location: {
       precision: fields.locationPrecision,
       ...(fields.latitude !== null && fields.longitude !== null
@@ -197,6 +199,11 @@ export class MemoryListingStore implements ListingStore {
   readonly #idempotency = new Map<string, { hash: string; listingId: string }>();
   readonly #organizationReaders = new Map<string, Set<string>>();
   readonly #organizationWriters = new Map<string, Set<string>>();
+  readonly #readyMedia = new Set<string>();
+
+  registerReadyMedia(...mediaIds: readonly string[]): void {
+    for (const mediaId of mediaIds) this.#readyMedia.add(mediaId);
+  }
 
   registerOrganization(
     organizationId: string,
@@ -248,6 +255,9 @@ export class MemoryListingStore implements ListingStore {
     ) {
       return Promise.resolve({ kind: "invalid_organization" });
     }
+    if (input.mediaIds.some((mediaId) => !this.#readyMedia.has(mediaId))) {
+      return Promise.resolve({ kind: "invalid_media" });
+    }
     const key = `${input.actorUserId}:${input.idempotencyKey}`;
     const existing = this.#idempotency.get(key);
     if (existing) {
@@ -276,6 +286,9 @@ export class MemoryListingStore implements ListingStore {
     }
     if (row.status !== "DRAFT") {
       return Promise.resolve({ kind: "state_conflict", currentVersion: row.version });
+    }
+    if (input.mediaIds.some((mediaId) => !this.#readyMedia.has(mediaId))) {
+      return Promise.resolve({ kind: "invalid_media" });
     }
     const updated = applyFields(row, input, input.occurredAt);
     this.#rows.set(updated.id, updated);

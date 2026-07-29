@@ -3,6 +3,9 @@ import {
   ContactMode,
   ContentStatus,
   ListingType,
+  MediaKind,
+  MediaPurpose,
+  MediaStatus,
   MembershipRole,
   PriceUnit,
   RegionType,
@@ -136,6 +139,7 @@ function writeFields(fixture: DraftFixture, title: string): ListingDraftWriteFie
     latitude: "33.684600",
     longitude: "-117.826500",
     locationPrecision: "APPROXIMATE",
+    mediaIds: [],
   };
 }
 
@@ -349,6 +353,128 @@ integration("ListingDraftRepository with PostgreSQL", () => {
           where: { aggregateId: personalInput.id, eventType: "listing.draft.updated" },
         }),
       ).resolves.toBe(1);
+    });
+  });
+
+  it("atomically binds ordered owner READY media and rejects foreign or unready assets", async () => {
+    await database.withRollback(async (transaction) => {
+      const fixture = await createDraftFixture(transaction);
+      const repository = new ListingDraftRepository(transaction);
+      const readyId = randomUUID();
+      const scanningId = randomUUID();
+      const foreignId = randomUUID();
+      const mediaBase = {
+        purpose: MediaPurpose.LISTING_MEDIA,
+        kind: MediaKind.IMAGE,
+        bucket: "socal-test-private",
+        mimeType: "image/webp",
+        byteSize: 1_024,
+        sha256: "9".repeat(64),
+        requestHash: "8".repeat(64),
+        uploadExpiresAt: new Date(baseTime.getTime() + 300_000),
+        uploadedAt: baseTime,
+        scanStartedAt: new Date(baseTime.getTime() + 1_000),
+      };
+      await transaction.mediaAsset.createMany({
+        data: [
+          {
+            ...mediaBase,
+            id: readyId,
+            ownerId: fixture.ownerId,
+            status: MediaStatus.READY,
+            objectKey: `quarantine/${readyId.slice(0, 2)}/${readyId}/original`,
+            idempotencyKey: `media-ready-${readyId}`,
+            processedAt: new Date(baseTime.getTime() + 2_000),
+            detectedMimeType: "image/webp",
+            width: 1_200,
+            height: 800,
+          },
+          {
+            ...mediaBase,
+            id: scanningId,
+            ownerId: fixture.ownerId,
+            status: MediaStatus.SCANNING,
+            objectKey: `quarantine/${scanningId.slice(0, 2)}/${scanningId}/original`,
+            idempotencyKey: `media-scanning-${scanningId}`,
+          },
+          {
+            ...mediaBase,
+            id: foreignId,
+            ownerId: fixture.outsiderId,
+            status: MediaStatus.READY,
+            objectKey: `quarantine/${foreignId.slice(0, 2)}/${foreignId}/original`,
+            idempotencyKey: `media-foreign-${foreignId}`,
+            processedAt: new Date(baseTime.getTime() + 2_000),
+            detectedMimeType: "image/webp",
+            width: 1_200,
+            height: 800,
+          },
+        ],
+      });
+
+      const input = createInput(fixture, {
+        idempotencyKey: "repository-listing-media-0001",
+        mediaIds: [readyId],
+      });
+      const created = await repository.createDraft(input);
+      expect(created).toMatchObject({
+        kind: "created",
+        listing: { id: input.id, mediaIds: [readyId] },
+      });
+      await expect(
+        transaction.mediaAsset.findUniqueOrThrow({
+          where: { id: readyId },
+          select: { listingId: true, sortOrder: true },
+        }),
+      ).resolves.toEqual({ listingId: input.id, sortOrder: 0 });
+
+      const unready = await repository.updateDraft({
+        ...writeFields(fixture, "Unready media must not bind"),
+        mediaIds: [readyId, scanningId],
+        actorUserId: fixture.ownerId,
+        listingId: input.id,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        occurredAt: new Date(baseTime.getTime() + 1_000),
+      });
+      expect(unready).toEqual({ kind: "invalid_media" });
+      await expect(
+        transaction.listing.findUniqueOrThrow({
+          where: { id: input.id },
+          select: { version: true },
+        }),
+      ).resolves.toEqual({ version: 1 });
+
+      const foreignCreateId = randomUUID();
+      const foreign = await repository.createDraft(
+        createInput(fixture, {
+          id: foreignCreateId,
+          idempotencyKey: "repository-listing-media-0002",
+          mediaIds: [foreignId],
+        }),
+      );
+      expect(foreign).toEqual({ kind: "invalid_media" });
+      await expect(transaction.listing.count({ where: { id: foreignCreateId } })).resolves.toBe(0);
+
+      const removed = await repository.updateDraft({
+        ...writeFields(fixture, "Ready media removed from the draft"),
+        mediaIds: [],
+        actorUserId: fixture.ownerId,
+        listingId: input.id,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        occurredAt: new Date(baseTime.getTime() + 2_000),
+      });
+      expect(removed).toMatchObject({
+        kind: "updated",
+        listing: { version: 2, mediaIds: [] },
+      });
+      await expect(
+        transaction.mediaAsset.findUniqueOrThrow({
+          where: { id: readyId },
+          select: { listingId: true, sortOrder: true },
+        }),
+      ).resolves.toEqual({ listingId: null, sortOrder: 0 });
     });
   });
 

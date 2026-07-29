@@ -7,6 +7,7 @@ import type {
   CompleteMediaUploadResult,
   MediaStore,
   MediaUploadIntentRecord,
+  OwnedMediaStatusRecord,
   ReserveMediaUploadIntentInput,
   ReserveMediaUploadIntentResult,
 } from "./media.store";
@@ -30,6 +31,10 @@ export class DatabaseMediaStore implements MediaStore, OnModuleDestroy {
 
   findOwnedUploadIntent(id: string, ownerId: string): Promise<MediaUploadIntentRecord | null> {
     return this.#repository.findOwnedUploadIntent(id, ownerId);
+  }
+
+  findOwnedStatus(id: string, ownerId: string): Promise<OwnedMediaStatusRecord | null> {
+    return this.#repository.findOwnedStatus(id, ownerId);
   }
 
   completeUpload(input: CompleteMediaUploadInput): Promise<CompleteMediaUploadResult> {

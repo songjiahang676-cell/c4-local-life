@@ -50,6 +50,12 @@ taxonomy 和字段泄漏负例；owner 层覆盖直接 owner、organization memb
 并发 PATCH 只成功一个；每次成功恰有一条 Audit 和一条 Outbox，序列化负例证明其中没有业务正文或
 PII。并行集成测试只按稳定 seed ID 断言 taxonomy，避免其他隔离 fixture 造成全表计数抖动。
 
+`LIST-004` 增加 READY 媒体绑定和浏览器发布测试。Repository 集成验证 owner READY 图片的稳定排序、
+解绑、未扫描/跨 owner 拒绝且失败时 Listing 不创建、不递增版本；API/契约验证 owner 状态、统一 404、
+无存储 metadata 泄漏和唯一 `mediaIds`。Web 单测覆盖双语校验、create/update payload、user + locale
+恢复隔离和严格 BFF allowlist。Playwright 在 Desktop Chrome 与 Pixel 7 上用真实生产构建验证中文填写、
+自动保存、刷新恢复、切换英文和无横向溢出，共 8 个 E2E case。
+
 ## 18.4 授权测试
 
 为每个 resource/action 维护矩阵：Guest、owner、同组织各角色、无关用户、limited/suspended、后台正确/错误角色、跨组织、已删除状态。测试不仅看 403，还验证没有数据侧信道和部分批量泄漏。
@@ -141,8 +147,9 @@ CI 在测试失败时仍上传报告；测试源码同时经过 `tsconfig.tests.
 
 - `/zh-Hans` 标题、搜索输入和语言入口可见，页面没有横向溢出；
 - API health 返回可追踪 request ID；
-- 运行时提供包含 31 个 path 的唯一 OpenAPI 文档；
+- 运行时提供包含 45 个 path 的唯一 OpenAPI 文档；
 - 非法请求返回无 stack trace 的 RFC 9457 Problem Details。
+- Rental 发布表单可在中文/英文与移动宽度完成自动保存和账号范围恢复。
 
 首次使用先安装与锁定依赖匹配的 Chromium。常用命令：
 

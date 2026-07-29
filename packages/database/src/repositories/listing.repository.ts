@@ -111,6 +111,7 @@ export type OwnerListingProjection = {
   location: ListingLocationProjection;
   contactMode: ContactMode;
   attributes: Record<string, Prisma.JsonValue>;
+  mediaIds: string[];
   isFeatured: boolean;
   featuredUntil: Date | null;
   publishedAt: Date | null;
@@ -265,6 +266,11 @@ const ownerListingSelect = {
   contactMode: true,
   latitude: true,
   longitude: true,
+  uploadedMedia: {
+    where: { status: "READY", purpose: "LISTING_MEDIA", kind: "IMAGE" },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    select: { id: true },
+  },
 } satisfies Prisma.ListingSelect;
 
 const moderatorListingSelect = {
@@ -550,6 +556,7 @@ export class ListingRepository {
         ...(point ? { point } : {}),
       },
       contactMode: row.contactMode,
+      mediaIds: row.uploadedMedia.map((asset) => asset.id),
       isFeatured: row.isFeatured,
     };
   }
