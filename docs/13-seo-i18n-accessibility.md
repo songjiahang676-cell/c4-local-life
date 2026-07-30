@@ -91,9 +91,30 @@
 - SEO 变更灰度并跟踪自然流量之外的质量指标，避免靠薄内容换流量。
 
 `WEB-001` 先落实模板级安全基线：全站搜索及带任意筛选/cursor 的频道页为 `noindex,follow`，公开
-频道/城市与详情只生成描述性 title/description；完整 canonical、hreflang、Open Graph、结构化数据和
-sitemap 仍必须由 `SEO-001` 按质量白名单完成，不能将当前模板元数据误报为 SEO Gate 已关闭。页面具备
+频道/城市与详情只生成描述性 title/description。`SEO-001` 进一步统一绝对 canonical、中英
+`hreflang`/`x-default`、Open Graph/Twitter 与 robots；结构化数据和 sitemap 分片由独立 `SEO-002`
+完成，不能把后者误报为当前任务已关闭。页面具备
 skip link、main/nav/search/aside/article 语义地标、连续标题、原生 label、44px 控件、可见焦点、
 纯文字广告/状态标签、`bdi` 用户内容隔离以及 720/520px reflow。货币和日期使用 `Intl` 与
 `America/Los_Angeles`；用户正文保留原语言，不伪装机器翻译。axe、200% zoom 和屏幕阅读器人工基线
 仍由 `SEO-004` 验收。
+
+## 13.11 SEO-001 实施矩阵
+
+- `PUBLIC_WEB_URL` 是绝对 canonical、社交 URL 和 robots Host 的部署事实源；只接受无凭据的
+  HTTP(S) origin，本地无效配置回退到 localhost，生产无效配置还会强制 noindex；不从请求 Host
+  推断可信生产域名。
+- 首页和五类频道无查询根页为 `index,follow`，并声明真实存在的 `zh-Hans`、`en-US` 与
+  `x-default` 等价路径；任意未知/重复/筛选/cursor 参数都切换为 `noindex,follow`，canonical
+  永远移除 query。
+- 城市频道默认 `noindex,follow`。Growth/Ops 只有在内容达到最低有效供给并批准后，才可把精确
+  `<vertical>:<city-slug>` 加入 `SEO_INDEXABLE_CITY_ROUTES`；任一非法或越界白名单值会使整份配置
+  失败关闭为空集。
+- 详情只有匿名公共 Listing API 返回的 PUBLISHED、未过期投影可索引；错误垂类/UUID 返回 404，
+  非 canonical 城市/slug 永久跳转。title/summary 先 NFKC、移除控制/双向字符和 HTML-like 标签，
+  再按 code point 限长；用户正文、联系方式和私有字段不进入 metadata。
+- 全站搜索、占位入口、登录、账户、发布草稿和管理页面分别保持 `noindex,follow` 或
+  `noindex,nofollow`。Web `robots.txt` 禁止 BFF、健康检查和私有路径但允许抓取搜索页以读取
+  noindex；Admin `robots.txt` 全站禁止抓取。
+- sitemap、schema.org、索引质量后台与 Search Console 观测仍属于 `SEO-002`/后续运营任务；当前
+  robots 不伪造 sitemap 地址，也不为没有真实评价的页面生成评分。

@@ -175,3 +175,15 @@
   但不得修改 PostgreSQL 已发布版本或清空业务事实。
 - Web 契约失败时比较 OpenAPI、生成类型与 API payload；不要放宽 strict parser、增加任意代理 URL、
   转发 Cookie 或把模块内部 DTO 直接暴露给浏览器。
+
+## 20.20 SEO metadata 与城市索引白名单
+
+- 部署前确认 `PUBLIC_WEB_URL` 是正式无凭据 HTTP(S) origin，并用生产响应核对 canonical、Open Graph
+  URL 与 robots Host 完全一致；不得信任请求 Host 动态拼接生产 canonical。
+- `SEO_INDEXABLE_CITY_ROUTES` 默认为空。只有 Growth/Ops 确认城市/垂类达到最低有效内容和翻译质量后，
+  才加入逗号分隔的 `vertical:city-slug`；先在 preview 验证双语页面、公开结果、canonical/hreflang
+  和无软 404，再灰度到 production。非法 token 会让整份白名单失败关闭。
+- 错误开放索引时立即从白名单移除并重部署，确认页面返回 `noindex,follow`；不要删除 canonical
+  PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
+- 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
+  robots 不得手工加入虚假 sitemap URL。

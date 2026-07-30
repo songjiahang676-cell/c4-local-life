@@ -333,3 +333,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 发布事件消费者严格验证 Outbox envelope，并以 Redis Lua 原子处理新版本失效与重复/乱序 stale；
   指标只有固定 kind/outcome。OpenAPI、生成类型、单元/HTTP/Worker/Web、全量质量、生产 Chromium 与
   受保护 CI 有真实证据后方可标记 done。
+
+## 22.20 SEO-001 Metadata/canonical/hreflang/robots 验收
+
+- 首页、无查询频道根页及可用详情输出绝对同源 canonical、清洗限长的双语 title/description、
+  Open Graph/Twitter 和 `index,follow`；中英真实等价页声明 `zh-Hans`、`en-US`、`x-default`。
+- 任意查询参数、全站搜索、未批准城市聚合页为 `noindex,follow` 且 canonical 不含 query；
+  城市页仅由严格、有限的 `SEO_INDEXABLE_CITY_ROUTES` 精确白名单开放，非法配置整体失败关闭。
+- 详情元数据只从匿名公共 API 的 PUBLISHED、未过期安全投影读取 title/summary/时间；正文、PII、
+  精确坐标、联系方式、审核/风险和未知字段不进入 meta。错误 UUID/垂类 404，旧 slug 指向规范路径。
+- 占位、账户、消息、发布/编辑和 Admin 保持 `noindex,nofollow`。Web robots 禁止 BFF、健康和私有
+  路径且不伪造 sitemap；Admin robots 全站禁止抓取。
+- 单元测试覆盖文本清洗、可信 origin、allowlist 失败关闭和完整模板矩阵；生产 standalone Chromium
+  桌面/移动实际断言 title、canonical、hreflang、robots、Open Graph/Twitter 和 robots.txt。
+  OpenAPI、Prisma 与 migration 不变化；全量质量和受保护 CI 全绿后才可标记 done。

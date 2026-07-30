@@ -19,6 +19,9 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-001 local quality           | `pnpm ci:quality`                     | 81 files / 387 tests；9 typechecks/lints；8 builds passed                  | 2026-07-29 |
+| SEO-001 runtime/browser         | API runtime + production Playwright   | metadata/robots matrix；desktop/mobile Chromium 24/24 passed               | 2026-07-29 |
+| SEO-001 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |
 | WEB-002 final main quality      | run `30500952462` / `f0726df`         | merged main quality + four non-root images passed                          | 2026-07-29 |
 | WEB-002 protected merge         | PR #39 / merge `f0726df`              | protected squash merge completed                                           | 2026-07-29 |
 | WEB-002 evidence head           | PR #39 / run `30500526588`            | final head quality、real services、22/22 E2E and four images passed        | 2026-07-29 |

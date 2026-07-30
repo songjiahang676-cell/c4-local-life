@@ -17,6 +17,16 @@ import {
   publicAttributeEntries,
   type PublicListingIndexModel,
 } from "../src/lib/public-listings";
+import { publicSearchMetadata, publicVerticalMetadata } from "../src/lib/public-listing-routes";
+import {
+  hasTrustedPublicOrigin,
+  homepageSeoMetadata,
+  parseSeoCityRouteAllowlist,
+  privatePageMetadata,
+  publicWebOrigin,
+  sanitizeMetadataText,
+} from "../src/lib/seo";
+import webRobots from "../src/app/robots";
 
 const listingId = "11111111-1111-4111-8111-111111111111";
 
@@ -192,7 +202,190 @@ function routeFetch(options?: { searchStatus?: number; detail?: unknown }) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+
+describe("SEO metadata matrix", () => {
+  it("normalizes the public origin and removes markup, controls, and bidi overrides", () => {
+    expect(publicWebOrigin("https://www.socal.test/path?query=1#fragment").href).toBe(
+      "https://www.socal.test/",
+    );
+    expect(publicWebOrigin("https://user:secret@example.test").href).toBe("http://localhost:3000/");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PUBLIC_WEB_URL", "");
+    expect(hasTrustedPublicOrigin()).toBe(false);
+    expect(homepageSeoMetadata("en-US", false)).toMatchObject({
+      robots: { index: false, follow: true },
+    });
+    expect(sanitizeMetadataText("  Safe\u202e <script>alert(1)</script>\n title  ", 40)).toBe(
+      "Safe alert(1) title",
+    );
+    expect(parseSeoCityRouteAllowlist("rentals:irvine, jobs:los-angeles")).toEqual(
+      new Set(["rentals:irvine", "jobs:los-angeles"]),
+    );
+    expect(parseSeoCityRouteAllowlist("rentals:irvine,invalid/path")).toEqual(new Set());
+  });
+
+  it("indexes clean homepage and channel URLs with absolute bilingual alternates", async () => {
+    vi.stubEnv("PUBLIC_WEB_URL", "https://www.socal.test/base");
+
+    const homepage = homepageSeoMetadata("en-US", false);
+    expect(homepage).toMatchObject({
+      title: { absolute: "Southern California Local Services | SoCal Life" },
+      alternates: {
+        canonical: "https://www.socal.test/en-US",
+        languages: {
+          "zh-Hans": "https://www.socal.test/zh-Hans",
+          "en-US": "https://www.socal.test/en-US",
+          "x-default": "https://www.socal.test/zh-Hans",
+        },
+      },
+      robots: { index: true, follow: true },
+      openGraph: { type: "website", locale: "en_US" },
+      twitter: { card: "summary" },
+    });
+    expect(homepageSeoMetadata("en-US", true)).toMatchObject({
+      alternates: { canonical: "https://www.socal.test/en-US" },
+      robots: { index: false, follow: true },
+    });
+    expect(homepageSeoMetadata("en-US", true).alternates).not.toHaveProperty("languages");
+
+    const vertical = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({ locale: "en-US" }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(vertical).toMatchObject({
+      title: { absolute: "Rentals | SoCal Life" },
+      alternates: {
+        canonical: "https://www.socal.test/en-US/rentals",
+        languages: {
+          "zh-Hans": "https://www.socal.test/zh-Hans/rentals",
+          "en-US": "https://www.socal.test/en-US/rentals",
+        },
+      },
+      robots: { index: true, follow: true },
+    });
+  });
+
+  it("canonicalizes but does not index search, arbitrary filters, or unapproved city pages", async () => {
+    vi.stubEnv("PUBLIC_WEB_URL", "https://www.socal.test");
+    vi.stubGlobal("fetch", routeFetch());
+
+    const filtered = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({ locale: "en-US" }),
+      searchParams: Promise.resolve({ unknown: "value" }),
+    });
+    expect(filtered).toMatchObject({
+      alternates: { canonical: "https://www.socal.test/en-US/rentals" },
+      robots: { index: false, follow: true },
+    });
+    expect(filtered.alternates).not.toHaveProperty("languages");
+
+    vi.stubEnv("SEO_INDEXABLE_CITY_ROUTES", "");
+    const unapprovedCity = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({ locale: "en-US", listingPath: ["synthetic-city"] }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(unapprovedCity).toMatchObject({
+      title: { absolute: "Synthetic City Rentals | SoCal Life" },
+      alternates: { canonical: "https://www.socal.test/en-US/rentals/synthetic-city" },
+      robots: { index: false, follow: true },
+    });
+    expect(unapprovedCity.alternates).not.toHaveProperty("languages");
+
+    vi.stubEnv("SEO_INDEXABLE_CITY_ROUTES", "rentals:synthetic-city");
+    const approvedCity = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({ locale: "en-US", listingPath: ["synthetic-city"] }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(approvedCity).toMatchObject({
+      alternates: {
+        canonical: "https://www.socal.test/en-US/rentals/synthetic-city",
+        languages: {
+          "zh-Hans": "https://www.socal.test/zh-Hans/rentals/synthetic-city",
+          "en-US": "https://www.socal.test/en-US/rentals/synthetic-city",
+        },
+      },
+      robots: { index: true, follow: true },
+    });
+
+    const search = await publicSearchMetadata({
+      params: Promise.resolve({ locale: "zh-Hans" }),
+      searchParams: Promise.resolve({ q: "租房" }),
+    });
+    expect(search).toMatchObject({
+      alternates: { canonical: "https://www.socal.test/zh-Hans/search" },
+      robots: { index: false, follow: true },
+    });
+  });
+
+  it("uses only sanitized public Listing fields for canonical article metadata", async () => {
+    vi.stubEnv("PUBLIC_WEB_URL", "https://www.socal.test");
+    vi.stubGlobal("fetch", routeFetch());
+
+    const metadata = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({
+        locale: "en-US",
+        listingPath: ["wrong-city", `old-title-${listingId}`],
+      }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(metadata).toMatchObject({
+      title: { absolute: "Synthetic detail alert(1) | SoCal Life" },
+      description: searchListing.summary,
+      alternates: {
+        canonical: `https://www.socal.test/en-US/rentals/synthetic-city/synthetic-rental-${listingId}`,
+        languages: {
+          "zh-Hans": `https://www.socal.test/zh-Hans/rentals/synthetic-city/synthetic-rental-${listingId}`,
+          "en-US": `https://www.socal.test/en-US/rentals/synthetic-city/synthetic-rental-${listingId}`,
+        },
+      },
+      robots: { index: true, follow: true },
+      openGraph: {
+        type: "article",
+        publishedTime: publicListing.publishedAt,
+        modifiedTime: publicListing.updatedAt,
+        expirationTime: publicListing.expiresAt,
+      },
+    });
+    expect(JSON.stringify(metadata)).not.toContain(publicListing.body);
+    expect(JSON.stringify(metadata)).not.toContain("<script>");
+
+    const duplicate = await publicVerticalMetadata("RENTAL", {
+      params: Promise.resolve({
+        locale: "en-US",
+        listingPath: ["synthetic-city", `synthetic-rental-${listingId}`],
+      }),
+      searchParams: Promise.resolve({ tracking: "untrusted" }),
+    });
+    expect(duplicate).toMatchObject({
+      robots: { index: false, follow: true },
+      alternates: {
+        canonical: `https://www.socal.test/en-US/rentals/synthetic-city/synthetic-rental-${listingId}`,
+      },
+    });
+    expect(duplicate.alternates).not.toHaveProperty("languages");
+  });
+
+  it("fails placeholder templates and private crawler paths closed", () => {
+    vi.stubEnv("PUBLIC_WEB_URL", "https://www.socal.test");
+    expect(
+      privatePageMetadata("en-US", "Sign In", "/en-US/login", "Private authentication boundary."),
+    ).toMatchObject({
+      alternates: { canonical: "https://www.socal.test/en-US/login" },
+      robots: { index: false, follow: false },
+    });
+    expect(webRobots()).toEqual({
+      rules: expect.objectContaining({
+        userAgent: "*",
+        allow: "/",
+        disallow: expect.arrayContaining(["/v1/", "/health/", "/zh-Hans/account", "/en-US/post"]),
+      }),
+      host: "https://www.socal.test",
+    });
+    expect(webRobots()).not.toHaveProperty("sitemap");
+  });
 });
 
 describe("public listing SSR boundary", () => {

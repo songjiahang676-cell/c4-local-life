@@ -296,6 +296,14 @@ Hero、隐私安全热门词、active 城市和当前地区公开 Listing，逐�
 canonical 投影的商家、师傅、广告、行情与商业入口不会渲染。Web 使用一次 strict/no-store SSR 请求，
 Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字和虚构业务内容已移出运行路径。
 
+`SEO-001` 已建立失败关闭的模板矩阵。首页和无查询频道根页输出绝对 canonical、中英
+`hreflang`/`x-default`、Open Graph/Twitter 与 `index,follow`；任意查询参数、全站搜索及未获运营
+批准的城市聚合页保持 `noindex,follow` 并收敛到无查询 canonical。城市页只有列入
+`SEO_INDEXABLE_CITY_ROUTES` 的 `<vertical>:<city-slug>` 才开放索引。详情元数据只读取匿名公共 API
+返回的 PUBLISHED、未过期安全投影，并清洗/限制标题和摘要，正文绝不进入 meta。占位/账户/发布页为
+`noindex,nofollow`；Web robots 禁止 BFF、健康检查和私有路径，Admin robots 全站禁止抓取。结构化数据
+与仅含真实可索引资源的 sitemap 分片仍由独立 `SEO-002` 完成。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

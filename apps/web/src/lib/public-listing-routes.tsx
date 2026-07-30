@@ -5,19 +5,20 @@ import {
   PublicListingDetailUnavailable,
   PublicListingDetailView,
   PublicListingIndexView,
-  publicSearchTitle,
-  publicVerticalTitle,
 } from "../components/public-listing-pages";
 import {
   listingIdFromSlug,
+  loadPublicCity,
   loadPublicListingDetail,
   loadPublicListingIndex,
   publicListingPath,
   publicSearchPath,
   publicVerticalPath,
   type PublicSearchParams,
+  verticalLabel,
   verticalSlug,
 } from "./public-listings";
+import { isSeoCityRouteApproved, publicPageMetadata } from "./seo";
 
 export type PublicVerticalRouteProps = Readonly<{
   params: Promise<{
@@ -37,10 +38,8 @@ function localeValue(value: string): Locale {
   return value;
 }
 
-function hasFilterParameters(params: PublicSearchParams): boolean {
-  return ["q", "type", "categoryId", "regionCode", "minPrice", "maxPrice", "sort", "cursor"].some(
-    (key) => params[key] !== undefined,
-  );
+function hasQueryParameters(params: PublicSearchParams): boolean {
+  return Object.values(params).some((value) => value !== undefined);
 }
 
 export async function publicVerticalMetadata(
@@ -52,20 +51,102 @@ export async function publicVerticalMetadata(
     props.searchParams,
   ]);
   const locale = localeValue(rawLocale);
-  const detail = listingPath.length === 2;
-  const indexable = detail || (listingPath.length <= 1 && !hasFilterParameters(searchParams));
-  return {
-    title: detail
-      ? locale === "zh-Hans"
-        ? `信息详情 — ${publicVerticalTitle(locale, type)}`
-        : `Listing details — ${publicVerticalTitle(locale, type)}`
-      : publicVerticalTitle(locale, type),
-    description:
-      locale === "zh-Hans"
-        ? "南加州本地已发布公开信息；支持城市、分类、价格与排序筛选。"
-        : "Published Southern California listings with city, category, price, and sort filters.",
-    robots: { index: indexable, follow: true },
-  };
+  const vertical = verticalSlug(type);
+  const filtered = hasQueryParameters(searchParams);
+  const description =
+    locale === "zh-Hans"
+      ? "南加州本地已发布公开信息；支持城市、分类、价格与排序筛选。"
+      : "Published Southern California listings with city, category, price, and sort filters.";
+
+  if (listingPath.length === 0) {
+    return publicPageMetadata({
+      locale,
+      title: verticalLabel(locale, type),
+      description,
+      canonicalPath: publicVerticalPath(locale, type),
+      index: !filtered,
+      follow: true,
+      ...(!filtered
+        ? {
+            alternatePath: (alternateLocale: Locale) => publicVerticalPath(alternateLocale, type),
+          }
+        : {}),
+    });
+  }
+
+  if (listingPath.length === 1) {
+    const citySlug = listingPath[0];
+    if (!citySlug) notFound();
+    const city = await loadPublicCity(locale, citySlug);
+    if (city.kind === "not-found") notFound();
+    const approved =
+      city.kind === "ready" && isSeoCityRouteApproved(vertical, citySlug) && !filtered;
+    const cityName =
+      city.kind === "ready" ? city.region.name[locale] : locale === "zh-Hans" ? "城市" : "City";
+    const canonicalPath = `/${locale}/${vertical}/${encodeURIComponent(citySlug)}`;
+    return publicPageMetadata({
+      locale,
+      title:
+        locale === "zh-Hans"
+          ? `${cityName}${verticalLabel(locale, type)}`
+          : `${cityName} ${verticalLabel(locale, type)}`,
+      description,
+      canonicalPath,
+      index: approved,
+      follow: true,
+      ...(approved
+        ? {
+            alternatePath: (alternateLocale: Locale) =>
+              `/${alternateLocale}/${vertical}/${encodeURIComponent(citySlug)}`,
+          }
+        : {}),
+    });
+  }
+
+  if (listingPath.length !== 2) notFound();
+  const [citySlug, listingSlug] = listingPath;
+  if (!citySlug || !listingSlug) notFound();
+  const listingId = listingIdFromSlug(listingSlug);
+  if (!listingId) notFound();
+  const model = await loadPublicListingDetail(locale, listingId);
+  if (model.kind === "not-found") notFound();
+  if (model.kind === "unavailable") {
+    return publicPageMetadata({
+      locale,
+      title: locale === "zh-Hans" ? "信息暂时不可用" : "Listing temporarily unavailable",
+      description,
+      canonicalPath: `/${locale}/${vertical}/${encodeURIComponent(
+        citySlug,
+      )}/${encodeURIComponent(listingSlug)}`,
+      index: false,
+      follow: true,
+    });
+  }
+  if (model.listing.type !== type) notFound();
+  const canonicalPath = publicListingPath(locale, model.listing);
+  const listingDescription =
+    model.listing.summary ??
+    (locale === "zh-Hans"
+      ? `查看${verticalLabel(locale, type)}公开信息、地区和有效期。`
+      : `View this public ${verticalLabel(locale, type).toLowerCase()} listing, region, and expiry.`);
+  return publicPageMetadata({
+    locale,
+    title: model.listing.title,
+    description: listingDescription,
+    canonicalPath,
+    index: !filtered,
+    follow: true,
+    ...(!filtered
+      ? {
+          alternatePath: (alternateLocale: Locale) =>
+            publicListingPath(alternateLocale, model.listing),
+        }
+      : {}),
+    openGraphType: "article",
+    publishedTime: model.listing.publishedAt,
+    modifiedTime: model.listing.updatedAt,
+    expirationTime: model.listing.expiresAt,
+  });
 }
 
 export async function renderPublicVerticalRoute(
@@ -134,14 +215,17 @@ export async function renderPublicVerticalRoute(
 export async function publicSearchMetadata(props: PublicSearchRouteProps): Promise<Metadata> {
   const { locale: rawLocale } = await props.params;
   const locale = localeValue(rawLocale);
-  return {
-    title: publicSearchTitle(locale),
+  return publicPageMetadata({
+    locale,
+    title: locale === "zh-Hans" ? "搜索公开信息" : "Search public listings",
     description:
       locale === "zh-Hans"
         ? "搜索南加州招聘、租房、转让、二手和本地服务。"
         : "Search Southern California jobs, rentals, transfers, secondhand items, and services.",
-    robots: { index: false, follow: true },
-  };
+    canonicalPath: publicSearchPath(locale),
+    index: false,
+    follow: true,
+  });
 }
 
 export async function renderPublicSearchRoute(props: PublicSearchRouteProps) {

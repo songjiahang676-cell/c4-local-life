@@ -37,6 +37,11 @@
 详情当前使用完整 UUID 作为稳定 key 后缀，不用标题推断 ID；API 返回的 type、region slug 或 Listing
 slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[locale]/search`。
 
+`SEO-001` 将首页、无查询频道根页和公共详情收敛到绝对 canonical；只有无 query 的等价公开页声明
+`zh-Hans`/`en-US`/`x-default`。任意 query 与全站搜索为 `noindex,follow`，canonical 去除 query。
+城市聚合默认 noindex，只有精确列入 `SEO_INDEXABLE_CITY_ROUTES` 的 `vertical:city-slug` 才开放
+索引；当前通用占位 catchall 即使对应未来公开路由，也在真实 API/文案接入前保持 `noindex,nofollow`。
+
 ## 27.2 发布与账户
 
 | Route                                  | 说明           |

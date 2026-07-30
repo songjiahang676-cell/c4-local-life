@@ -370,3 +370,15 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   的数据库负例；种子测试覆盖中英文结构且不含真实/伪造业务内容。
 - Prisma validate/generate、迁移安全、全仓质量、API runtime、架构检查和受保护 CI 均须真实通过；本地
   缺少 PostgreSQL 时明确记录 skip，不能把 skip 当作通过。
+
+## 18.33 SEO-001 元数据与爬虫验证增量
+
+- Web 单元测试覆盖可信 public origin 规范化、控制/双向字符和 HTML-like 标签清洗、code-point
+  限长、城市 allowlist 正常/非法失败关闭，以及首页、频道、城市、详情、搜索和私有模板矩阵。
+- 详情测试使用 strict 虚构公共 Listing 响应，断言 title/summary/发布时间可进入 meta，正文和
+  `<script>` 不进入；旧 city/title 路径的 canonical/hreflang 必须使用 API 返回的规范投影。
+- production standalone Playwright 在桌面和 Pixel 7 实际读取最终 HTML head，验证绝对 canonical、
+  `zh-Hans`/`en-US`/`x-default`、noindex 筛选、allowlisted 城市、article Open Graph、Twitter card
+  及 Web/Admin robots.txt；不能只断言 Metadata 对象。
+- 本任务不修改 OpenAPI、Prisma 或 migration。结构化数据/sitemap 测试由 `SEO-002` 负责；全仓
+  格式、类型、lint、单元/集成、八应用构建、API runtime、架构和四镜像保护门禁继续执行。
