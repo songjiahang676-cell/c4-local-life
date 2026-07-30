@@ -8,6 +8,7 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("GET", "auth/session")).toBe(true);
     expect(isAllowedWebApiPath("GET", "me/listings")).toBe(true);
     expect(isAllowedWebApiPath("POST", "me/listings/actions")).toBe(true);
+    expect(isAllowedWebApiPath("POST", "performance/web-vitals")).toBe(true);
     expect(isAllowedWebApiPath("GET", "notifications")).toBe(true);
     expect(isAllowedWebApiPath("PUT", `notifications/${id}/read`)).toBe(true);
     expect(isAllowedWebApiPath("GET", "categories")).toBe(true);

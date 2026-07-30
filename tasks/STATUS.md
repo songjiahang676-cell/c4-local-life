@@ -19,6 +19,9 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| PERF-001 local quality          | `pnpm ci:quality`                     | 84 files / 402 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-29 |
+| PERF-001 runtime/browser        | API runtime + production Playwright   | RED/Web Vital/OpenAPI；desktop/mobile Chromium 26/26 passed                | 2026-07-29 |
+| PERF-001 architecture           | `scripts/check-architecture.sh`       | 101 tasks；62 models；70 paths；181 schemas；36 JSON files passed          | 2026-07-29 |
 | SEO-001 final main quality      | run `30503597873` / `148a547`         | merged main quality + four non-root images passed                          | 2026-07-29 |
 | SEO-001 protected merge         | PR #40 / merge `148a547`              | protected squash merge completed                                           | 2026-07-29 |
 | SEO-001 evidence head           | PR #40 / run `30503181356`            | final head real services、24/24 E2E and four images passed                 | 2026-07-29 |

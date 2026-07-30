@@ -50,6 +50,7 @@ const pathRules: Readonly<Record<string, readonly RegExp[]>> = {
     new RegExp(`^media/${uuid}$`),
   ],
   POST: [
+    /^performance\/web-vitals$/,
     /^auth\/mfa\/enrollment$/,
     /^auth\/mfa\/enrollment\/verify$/,
     /^auth\/mfa\/verify$/,

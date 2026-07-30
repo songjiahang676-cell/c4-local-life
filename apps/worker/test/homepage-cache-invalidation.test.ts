@@ -78,17 +78,17 @@ describe("homepage cache invalidation consumer", () => {
     await expect(
       invalidator.invalidate({
         locale: "en-US",
-        regionCode: "US-CA-SOCAL",
+        regionCode: "US-CA:SOCAL",
         version: 5,
       }),
     ).resolves.toBe("invalidated");
     expect(evalScript).toHaveBeenCalledWith(
       expect.stringContaining('redis.call("DEL"'),
       4,
-      "socal:homepage:v1:en-US:US-CA-SOCAL:layout-version",
-      "socal:homepage:v1:en-US:US-CA-SOCAL:desktop",
-      "socal:homepage:v1:en-US:US-CA-SOCAL:tablet",
-      "socal:homepage:v1:en-US:US-CA-SOCAL:mobile",
+      "socal:homepage:v1:en-US:US-CA%3ASOCAL:layout-version",
+      "socal:homepage:v1:en-US:US-CA%3ASOCAL:desktop",
+      "socal:homepage:v1:en-US:US-CA%3ASOCAL:tablet",
+      "socal:homepage:v1:en-US:US-CA%3ASOCAL:mobile",
       5,
     );
   });

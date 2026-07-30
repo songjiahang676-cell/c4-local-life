@@ -293,7 +293,7 @@ cursor 和筛选页先行 `noindex,follow`，完整 canonical/hreflang/schema/si
 追加式回滚。发布与回滚在同一 PostgreSQL 事务写入最小化 `homepage.layout.published` Outbox 事件，
 中英文种子只提供结构，不伪造业务内容。`WEB-002` 已增加 `GET /v1/homepage`：按发布顺序组合 allowlist
 Hero、隐私安全热门词、active 城市和当前地区公开 Listing，逐模块隔离错误并隐藏真实空集合；尚未具有
-canonical 投影的商家、师傅、广告、行情与商业入口不会渲染。Web 使用一次 strict/no-store SSR 请求，
+canonical 投影的商家、师傅、广告、行情与商业入口不会渲染。Web 使用一次 strict 匿名 SSR 请求，
 Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字和虚构业务内容已移出运行路径。
 
 `SEO-001` 已建立失败关闭的模板矩阵。首页和无查询频道根页输出绝对 canonical、中英
@@ -303,6 +303,14 @@ Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字
 返回的 PUBLISHED、未过期安全投影，并清洗/限制标题和摘要，正文绝不进入 meta。占位/账户/发布页为
 `noindex,nofollow`；Web robots 禁止 BFF、健康检查和私有路径，Admin robots 全站禁止抓取。结构化数据
 与仅含真实可索引资源的 sitemap 分片仍由独立 `SEO-002` 完成。
+
+`PERF-001` 已把首页缓存接到现有派生状态边界：API 与 Worker 共享 locale/region/device 缓存键，
+只有 strict、完整、非 partial 的匿名投影会写入 Redis，TTL 取模块最小值并封顶 300 秒；损坏、错
+scope、过大条目或 Redis 故障均删除/忽略并回源 PostgreSQL，单实例并发 miss 会合并。Web 仅对完整
+聚合做最长 30 秒的进程内缓存和请求合并，API 对完整响应给 30 秒 `s-maxage`，partial/错误保持
+`no-store`。构建门禁限制 Web 最大/全部 gzip JavaScript chunk，生产 standalone 浏览器限制初始 HTML
+与实际脚本传输。首方 CWV 以可配置采样率上报固定 metric/route/数值，不发送 URL、query、Cookie 或
+标识；API p95 继续由 route-level RED histogram 计算。所有目标仍是 Beta 前须用真实流量校准的预算。
 
 ## 七、规划容量与服务目标
 

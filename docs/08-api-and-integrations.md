@@ -439,7 +439,7 @@ scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共
 
 ## 8.26 WEB-002 公共首页聚合契约
 
-- `GET /homepage` 是无认证、`no-store` 的聚合端点；只接受 `locale`、`regionCode` 和 `device`，
+- `GET /homepage` 是无认证聚合端点；只接受 `locale`、`regionCode` 和 `device`，
   unknown query key 返回 400。未找到对应已发布布局返回 503 Problem Details，不回退到草稿或 seed。
 - 响应固定包含布局版本、scope、设备、生成时间、`partial` 和按发布布局顺序排列的模块。当前公开
   discriminated union 只允许 HERO、HOT_SEARCHES、CITY_CHIPS、LISTING_FEED；尚无真实实现的商家、
@@ -450,3 +450,15 @@ scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共
 - 单个数据源失败只省略对应模块并令 `partial=true`；真实空集合省略模块但不伪装为故障。Controller
   只做生成契约校验、缓存头和 Problem Details 映射，应用服务编排 Store 端口，数据库 adapter 独占
   Repository/Prisma 访问。
+
+## 8.27 PERF-001 缓存与性能遥测契约
+
+- 完整首页响应为 `public, max-age=0, s-maxage=30, stale-while-revalidate=30`；`partial=true`、
+  validation/provider/Redis 错误和 Problem Details 均为 `no-store`。
+- API/Worker 通过共享 helper 生成 `socal:homepage:v1:<locale>:<encoded-region>:<device>`；Redis
+  内容必须再次通过 `HomepageResponse` strict Schema 且与 key scope 相符，最大 1 MB。TTL 为所有
+  返回模块最小 TTL、包含 0 即不缓存、整体封顶 300 秒。
+- `POST /performance/web-vitals` 只接受 CLS/FCP/INP/LCP/TTFB、六个固定 route 类别和有限非负数值，
+  返回 no-store 202；unknown 字段、URL、标识和自由文本为 400，短窗口超限为 429。
+- Controller 只设置缓存/状态并委托应用服务；Redis adapter、请求合并和低基数指标不接触 Prisma，
+  CWV 数值不作为可信业务事实。

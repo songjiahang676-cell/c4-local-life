@@ -16,6 +16,7 @@
     "@aws-sdk/client-s3": "3.1096.0",
     "@opensearch-project/opensearch": "2.13.0",
     "@socal/config": "workspace:*",
+    "@socal/contracts": "workspace:*",
     "@socal/database": "workspace:*",
     "@socal/observability": "workspace:*",
     "bullmq": "5.80.9",

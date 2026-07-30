@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import {
   homepageResponseSchema,
+  homepageCacheEntryKey,
   type HomepageModule,
   type HomepageResponse,
   type HomepageLayoutSlot,
@@ -11,6 +12,7 @@ import type { MetricsRegistry } from "@socal/observability";
 import { API_METRICS } from "../../common/api-metrics.token";
 import { HomepageLayoutService } from "../homepage-layout/homepage-layout.service";
 import { HOMEPAGE_DATA_SOURCE, type HomepageDataSource } from "./homepage-data.source";
+import { HOMEPAGE_CACHE, homepageCompositeTtlSeconds, type HomepageCache } from "./homepage-cache";
 
 const heroCopy = {
   "homepage.hero": {
@@ -54,14 +56,59 @@ function supportedSlot(slot: HomepageLayoutSlot): slot is SupportedSlot {
 
 @Injectable()
 export class HomepageService {
+  readonly #inFlight = new Map<string, Promise<HomepageResponse>>();
+
   constructor(
     private readonly layouts: HomepageLayoutService,
     @Inject(HOMEPAGE_DATA_SOURCE)
     private readonly dataSource: HomepageDataSource,
     @Optional() @Inject(API_METRICS) private readonly metrics?: MetricsRegistry,
+    @Optional() @Inject(HOMEPAGE_CACHE) private readonly cache?: HomepageCache,
   ) {}
 
   async get(query: ValidatedHomepageQuery, now = new Date()): Promise<HomepageResponse> {
+    const cacheKey = homepageCacheEntryKey(query);
+    if (this.cache) {
+      try {
+        const cached = await this.cache.read(query);
+        if (cached) {
+          this.metrics?.homepageCacheOperation("hit");
+          return cached;
+        }
+        this.metrics?.homepageCacheOperation("miss");
+      } catch {
+        this.metrics?.homepageCacheOperation("failed");
+      }
+    }
+
+    const pending = this.#inFlight.get(cacheKey);
+    if (pending) {
+      this.metrics?.homepageCacheOperation("coalesced");
+      return pending;
+    }
+
+    const composed = this.#compose(query, now);
+    this.#inFlight.set(cacheKey, composed);
+    try {
+      const response = await composed;
+      const ttlSeconds = homepageCompositeTtlSeconds(response);
+      if (!this.cache || ttlSeconds === 0) {
+        this.metrics?.homepageCacheOperation("bypassed");
+        return response;
+      }
+      try {
+        await this.cache.write(query, response, ttlSeconds);
+        this.metrics?.homepageCacheOperation("stored");
+      } catch {
+        this.metrics?.homepageCacheOperation("failed");
+      }
+      return response;
+    } finally {
+      this.#inFlight.delete(cacheKey);
+    }
+  }
+
+  async #compose(query: ValidatedHomepageQuery, now: Date): Promise<HomepageResponse> {
     const published = await this.layouts.getPublished({
       locale: query.locale,
       regionCode: query.regionCode,

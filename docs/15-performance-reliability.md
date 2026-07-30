@@ -114,9 +114,9 @@ reconciliation 仍属于 `EVT-002`。
   taxonomy 解析 canonical code。每个上游调用固定 5 秒、禁 redirect、JSON 正文最多 1 MB。
 - OpenSearch/Search 不可用时，只有单垂类简单首屏额外读取 canonical PostgreSQL 列表；不对 q、价格、
   geo、cursor 或全站搜索降级，避免把故障扩大为多次错误查询。
-- 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
-  taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
-  本地 fixture 延迟宣称生产 SLO。
+- 公共 Listing/Search 动态 SSR 仍按各端点既有缓存策略；首页由 `PERF-001` 只缓存 strict 匿名完整
+  投影。任何带 Session/Owner 字段、partial 或契约失败的响应不得进入共享缓存。生产 CWV/API p95
+  仍须用真实流量校准，不能用本地 fixture 延迟宣称生产 SLO。
 
 ## 15.12 首页配置缓存一致性
 
@@ -130,8 +130,22 @@ locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读
 - 当前 Web SSR 对首页聚合 API 只有一次匿名读取，固定 5 秒超时、禁 redirect、正文最大 1 MB，并用
   shared Zod contract 失败关闭；不会从浏览器并发请求十几个内部模块，也不转发 Cookie。
 - API 对支持的已启用模块并发读取且逐模块隔离；Listing feed 使用布局 limit 与当前 region scope，
-  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据，但在 `PERF-001` 完成共享缓存与实测预算前，
-  API 和 Web 都保持 `no-store`，不得宣称 CDN/Redis 命中率或生产 LCP。
+  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据；完整匿名响应启用短效共享缓存，
+  partial/错误保持 `no-store`，不得用测试命中率宣称生产 CDN/Redis 或 LCP 表现。
 - `homepage.layout.published` Worker 以 locale/region/version 为幂等键，在 Redis Lua 中原子推进版本
   水位并删除 desktop/tablet/mobile 派生 key。重复或乱序旧版本为 `stale`；Redis 丢失只丢可重建水位，
   不影响 PostgreSQL canonical 布局与业务数据。
+
+## 15.14 PERF-001 缓存与性能预算
+
+- API 缓存 key 完整绑定 locale/encoded-region/device，并与 Worker 失效 key 共用一个跨进程 helper。
+  Redis 条目最大 1 MB、必须 strict parse 且 scope 完全相符；组合 TTL 取模块最小值并封顶 300 秒。
+- 只有完整非 partial 响应写 Redis。miss 在 API 实例内请求合并；读/写/损坏/超时失败只记录固定
+  outcome 并回源，不把 Redis 提升为事实源。Web 同样仅缓存完整结果、最长 30 秒。
+- 完整 API 响应允许 30 秒 `s-maxage`/`stale-while-revalidate`，浏览器 `max-age=0`；partial、所有
+  Problem Details 与私有端点保持 `no-store`。CDN 最长短暂陈旧不替代 Outbox/Redis 主动失效。
+- CI 对 Web 生产 build 强制最大 gzip chunk 100 KB、所有 chunks 合计 500 KB；standalone Chromium
+  对首页初始 HTML 100 KB、脚本传输 350 KB 做独立桌面/移动预算。预算是回归上限，不是生产 CWV。
+- 首方 RUM 以默认 10% 可配置采样率提交固定 Web Vital/route/value；API p95 使用既有
+  `socal_http_request_duration_seconds`。LCP p75 2.5 秒、INP p75 200 毫秒、CLS p75 0.1 和 GET p95
+  300 毫秒仍为 Beta 校准目标，不将本地结果写成生产达成。

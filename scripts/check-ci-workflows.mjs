@@ -82,6 +82,7 @@ const requiredCommands = [
   "pnpm lint",
   "pnpm test",
   "pnpm build",
+  "pnpm performance:check",
   "pnpm observability:check",
   "pnpm exec playwright install --with-deps chromium",
   "pnpm test:e2e:ci",

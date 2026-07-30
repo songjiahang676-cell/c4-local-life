@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a fail-open, strictly scoped homepage Redis/Web cache with shared API/Worker keys,
+  request coalescing, partial-response bypass, poison cleanup, bounded shared-cache headers,
+  low-cardinality cache metrics, sampled identifier-free Core Web Vitals, and enforced
+  production-build/browser performance budgets.
 - Added a fail-closed bilingual SEO metadata matrix with absolute canonical URLs, equivalent
   `hreflang`/`x-default`, bounded Open Graph/Twitter fields, an explicit operator city-index
   allowlist, noindex search/filter/private templates, and Web/Admin crawler policies.

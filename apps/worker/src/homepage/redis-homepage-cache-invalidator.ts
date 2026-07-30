@@ -1,3 +1,4 @@
+import { homepageCacheEntryKey, homepageCacheLayoutVersionKey } from "@socal/contracts";
 import type { HomepageCacheInvalidator } from "./homepage-cache-invalidation";
 
 type RedisScriptClient = {
@@ -19,10 +20,6 @@ redis.call("DEL", KEYS[2], KEYS[3], KEYS[4])
 return 1
 `;
 
-function scopePrefix(locale: "zh-Hans" | "en-US", regionCode: string): string {
-  return `socal:homepage:v1:${locale}:${regionCode}`;
-}
-
 export class RedisHomepageCacheInvalidator implements HomepageCacheInvalidator {
   constructor(private readonly redis: RedisScriptClient) {}
 
@@ -31,14 +28,13 @@ export class RedisHomepageCacheInvalidator implements HomepageCacheInvalidator {
     regionCode: string;
     version: number;
   }): Promise<"invalidated" | "stale"> {
-    const prefix = scopePrefix(input.locale, input.regionCode);
     const result = await this.redis.eval(
       invalidateScript,
       4,
-      `${prefix}:layout-version`,
-      `${prefix}:desktop`,
-      `${prefix}:tablet`,
-      `${prefix}:mobile`,
+      homepageCacheLayoutVersionKey(input),
+      homepageCacheEntryKey({ ...input, device: "desktop" }),
+      homepageCacheEntryKey({ ...input, device: "tablet" }),
+      homepageCacheEntryKey({ ...input, device: "mobile" }),
       input.version,
     );
     if (result === 1 || result === "1") return "invalidated";

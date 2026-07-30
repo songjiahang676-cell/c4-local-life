@@ -36,6 +36,11 @@ type SearchDiscoveryOutcome =
 type HomepageModuleKind = "HERO" | "HOT_SEARCHES" | "CITY_CHIPS" | "LISTING_FEED";
 type HomepageModuleOutcome = "success" | "empty" | "unavailable";
 type HomepageCacheInvalidationOutcome = "invalidated" | "stale" | "failed";
+type HomepageCacheOperationOutcome =
+  "hit" | "miss" | "coalesced" | "stored" | "bypassed" | "failed";
+type WebVitalName = "CLS" | "FCP" | "INP" | "LCP" | "TTFB";
+type WebVitalRoute =
+  "homepage" | "listing-list" | "listing-detail" | "search" | "account" | "other";
 
 type Histogram = {
   count: number;
@@ -46,6 +51,8 @@ type Histogram = {
 
 const durationBuckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 const searchFreshnessBuckets = [1, 2, 5, 10, 30, 60, 120, 300, 900];
+const webVitalDurationBuckets = [0.05, 0.1, 0.2, 0.5, 1, 2.5, 4, 10, 30, 60, 120, 600];
+const webVitalClsBuckets = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
 
 function escapeLabel(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll("\n", "\\n").replaceAll('"', '\\"');
@@ -122,6 +129,9 @@ export class MetricsRegistry {
   readonly #searchDiscoveryEvents = new Map<string, number>();
   readonly #homepageModules = new Map<string, number>();
   readonly #homepageCacheInvalidations = new Map<HomepageCacheInvalidationOutcome, number>();
+  readonly #homepageCacheOperations = new Map<HomepageCacheOperationOutcome, number>();
+  readonly #webVitalDurations = new Map<string, Histogram>();
+  readonly #webVitalCls = new Map<string, Histogram>();
   #listingsExpired = 0;
   #listingExpiryPollFailures = 0;
   #outboxOldestPendingAgeSeconds = 0;
@@ -234,6 +244,32 @@ export class MetricsRegistry {
     this.#homepageCacheInvalidations.set(
       outcome,
       (this.#homepageCacheInvalidations.get(outcome) ?? 0) + 1,
+    );
+  }
+
+  homepageCacheOperation(outcome: HomepageCacheOperationOutcome): void {
+    this.#homepageCacheOperations.set(
+      outcome,
+      (this.#homepageCacheOperations.get(outcome) ?? 0) + 1,
+    );
+  }
+
+  webVital(input: { name: WebVitalName; route: WebVitalRoute; value: number }): void {
+    const value = Number.isFinite(input.value) ? Math.max(0, input.value) : 0;
+    if (input.name === "CLS") {
+      observe(
+        this.#webVitalCls,
+        labelKey({ route: input.route }),
+        Math.min(value, 10),
+        webVitalClsBuckets,
+      );
+      return;
+    }
+    observe(
+      this.#webVitalDurations,
+      labelKey({ metric: input.name, route: input.route }),
+      Math.min(value, 600_000) / 1_000,
+      webVitalDurationBuckets,
     );
   }
 
@@ -368,6 +404,23 @@ export class MetricsRegistry {
     for (const [outcome, value] of [...this.#homepageCacheInvalidations].sort()) {
       lines.push(`socal_homepage_cache_invalidations_total${labels({ outcome })} ${value}`);
     }
+    lines.push(
+      "# HELP socal_homepage_cache_operations_total Homepage response cache operations by bounded outcome.",
+      "# TYPE socal_homepage_cache_operations_total counter",
+    );
+    for (const [outcome, value] of [...this.#homepageCacheOperations].sort()) {
+      lines.push(`socal_homepage_cache_operations_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_web_vital_duration_seconds Sampled first-party Web Vital duration.",
+      "# TYPE socal_web_vital_duration_seconds histogram",
+    );
+    this.#renderHistograms(lines, "socal_web_vital_duration_seconds", this.#webVitalDurations);
+    lines.push(
+      "# HELP socal_web_vital_cls_ratio Sampled first-party cumulative layout shift ratio.",
+      "# TYPE socal_web_vital_cls_ratio histogram",
+    );
+    this.#renderHistograms(lines, "socal_web_vital_cls_ratio", this.#webVitalCls);
     lines.push(
       "# HELP socal_listing_expiry_polls_total Listing expiry polls by bounded outcome.",
       "# TYPE socal_listing_expiry_polls_total counter",

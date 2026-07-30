@@ -62,10 +62,25 @@ try {
     throw new Error("Built API did not return a valid W3C traceparent");
   }
 
+  const webVitalResponse = await fetch(`${baseUrl}/v1/performance/web-vitals`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "LCP", value: 2_450, route: "homepage" }),
+  });
+  if (webVitalResponse.status !== 202) {
+    throw new Error("Built API did not accept the bounded Web Vital contract");
+  }
+
   const metricsResponse = await fetch(`${baseUrl}/metrics`);
   const metrics = await metricsResponse.text();
-  if (!metricsResponse.ok || !metrics.includes("socal_http_requests_total")) {
-    throw new Error("Built API did not expose HTTP RED metrics");
+  if (
+    !metricsResponse.ok ||
+    !metrics.includes("socal_http_requests_total") ||
+    !metrics.includes(
+      'socal_web_vital_duration_seconds_bucket{metric="LCP",route="homepage",le="2.5"} 1',
+    )
+  ) {
+    throw new Error("Built API did not expose HTTP RED and bounded Web Vital metrics");
   }
 
   const [openApiJsonResponse, openApiYamlResponse] = await Promise.all([
@@ -78,8 +93,8 @@ try {
     !openApiJsonResponse.ok ||
     !openApiYamlResponse.ok ||
     !String(openApiJson.openapi).startsWith("3.1.") ||
-    Object.keys(openApiJson.paths ?? {}).length !== 69 ||
-    Object.keys(openApiJson.components?.schemas ?? {}).length !== 177 ||
+    Object.keys(openApiJson.paths ?? {}).length !== 70 ||
+    Object.keys(openApiJson.components?.schemas ?? {}).length !== 181 ||
     !openApiYaml.startsWith("openapi: 3.1.") ||
     !openApiYamlResponse.headers.get("content-type")?.includes("application/yaml")
   ) {
@@ -87,7 +102,7 @@ try {
   }
 
   console.log(
-    "API runtime check passed: request ID, W3C trace, RED metrics, and canonical OpenAPI JSON/YAML.",
+    "API runtime check passed: request ID, W3C trace, RED/Web Vital metrics, and canonical OpenAPI JSON/YAML.",
   );
 } finally {
   child.kill();

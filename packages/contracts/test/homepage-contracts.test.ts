@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { homepageQuerySchema, homepageResponseSchema } from "../src";
+import {
+  homepageCacheEntryKey,
+  homepageCacheLayoutVersionKey,
+  homepageQuerySchema,
+  homepageResponseSchema,
+  webVitalReportSchema,
+} from "../src";
 
 const hash = "a".repeat(64);
 
@@ -12,6 +18,47 @@ describe("homepage public contracts", () => {
     });
     expect(() => homepageQuerySchema.parse({ locale: "fr", preview: true })).toThrow();
     expect(() => homepageQuerySchema.parse({ regionCode: "bad region" })).toThrow();
+  });
+
+  it("uses one encoded cross-process cache identity for every public dimension", () => {
+    expect(
+      homepageCacheEntryKey({
+        locale: "en-US",
+        regionCode: "US-CA:SOCAL",
+        device: "mobile",
+      }),
+    ).toBe("socal:homepage:v1:en-US:US-CA%3ASOCAL:mobile");
+    expect(
+      homepageCacheLayoutVersionKey({
+        locale: "en-US",
+        regionCode: "US-CA:SOCAL",
+      }),
+    ).toBe("socal:homepage:v1:en-US:US-CA%3ASOCAL:layout-version");
+  });
+
+  it("accepts only bounded Core Web Vitals without identifiers or free-form fields", () => {
+    expect(
+      webVitalReportSchema.parse({
+        name: "LCP",
+        value: 2_450,
+        route: "homepage",
+      }),
+    ).toEqual({ name: "LCP", value: 2_450, route: "homepage" });
+    expect(() =>
+      webVitalReportSchema.parse({
+        name: "CLS",
+        value: 11,
+        route: "homepage",
+      }),
+    ).toThrow();
+    expect(() =>
+      webVitalReportSchema.parse({
+        name: "LCP",
+        value: 2_450,
+        route: "homepage",
+        url: "/zh-Hans?query=private",
+      }),
+    ).toThrow();
   });
 
   it("accepts strict real-data modules without provider counts or private fields", () => {

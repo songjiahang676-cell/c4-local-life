@@ -187,3 +187,17 @@
   PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
 - 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
   robots 不得手工加入虚假 sitemap URL。
+
+## 20.21 PERF-001 缓存与 CWV 异常
+
+- 命中率异常先看 `socal_homepage_cache_operations_total` 的 miss/failed/bypassed，不打印或扫描完整
+  Redis 值。检查 API/Worker 是否使用相同 encoded-region key 和发布事件水位；不要临时关闭 strict
+  parse、放大 TTL 或缓存 partial。
+- Redis 不可用时 API/Web 应继续回源 canonical 数据；持续 failed 先修依赖，再观察 Outbox 重投。
+  允许删除 `socal:homepage:v1:*` 可重建派生 key，但不得修改 PostgreSQL 发布历史或业务 Listing。
+- 布局已发布但 CDN 短时陈旧时等待最多 30 秒 shared window 并核对下一请求；不要用浏览器长缓存、
+  Cookie vary 或任意 purge URL 扩大数据泄露面。
+- Web Vital 暴增时按固定 metric/route、样本量、版本和真实流量窗口分析，同时排除 bot/滥用；接口值
+  可被伪造，不能单独触发计费、账户、广告或风控动作。地址/HMAC/payload 不得写工单或日志。
+- JavaScript/HTML 预算失败需定位新增 chunk/客户端依赖和首屏内容；调整阈值必须有实测与评审，不能
+  为通过 CI 直接提高。生产 p75/p95 只有 RUM/RED Dashboard 接入后才可宣称达成。

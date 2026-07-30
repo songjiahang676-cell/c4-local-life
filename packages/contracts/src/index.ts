@@ -59,6 +59,10 @@ export type HomepageCitiesModule = components["schemas"]["HomepageCitiesModule"]
 export type HomepageListingFeedModule = components["schemas"]["HomepageListingFeedModule"];
 export type HomepageModule = components["schemas"]["HomepageModule"];
 export type HomepageResponse = components["schemas"]["HomepageResponse"];
+export type WebVitalName = components["schemas"]["WebVitalName"];
+export type WebVitalRoute = components["schemas"]["WebVitalRoute"];
+export type WebVitalReport = components["schemas"]["WebVitalReport"];
+export type WebVitalAcceptedResponse = components["schemas"]["WebVitalAcceptedResponse"];
 export type ListListingsQuery = NonNullable<operations["listListings"]["parameters"]["query"]>;
 export type ListListingRevisionsQuery = NonNullable<
   operations["listListingRevisions"]["parameters"]["query"]
@@ -1032,6 +1036,42 @@ export const homepageQuerySchema: z.ZodType<ValidatedHomepageQuery> = z
     device: z.enum(["desktop", "tablet", "mobile"]).default("desktop"),
   })
   .strict();
+
+function homepageCacheScope(input: { locale: Locale; regionCode: string }): string {
+  return `socal:homepage:v1:${input.locale}:${encodeURIComponent(input.regionCode)}`;
+}
+
+export function homepageCacheEntryKey(input: {
+  locale: Locale;
+  regionCode: string;
+  device: HomepageDevice;
+}): string {
+  return `${homepageCacheScope(input)}:${input.device}`;
+}
+
+export function homepageCacheLayoutVersionKey(input: {
+  locale: Locale;
+  regionCode: string;
+}): string {
+  return `${homepageCacheScope(input)}:layout-version`;
+}
+
+export const webVitalReportSchema: z.ZodType<WebVitalReport> = z
+  .object({
+    name: z.enum(["CLS", "FCP", "INP", "LCP", "TTFB"]),
+    value: z.number().finite().min(0).max(600_000),
+    route: z.enum(["homepage", "listing-list", "listing-detail", "search", "account", "other"]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.name === "CLS" && value.value > 10) {
+      context.addIssue({
+        code: "custom",
+        path: ["value"],
+        message: "CLS must not exceed 10",
+      });
+    }
+  });
 
 export const homepageModuleCachePolicySchema: z.ZodType<HomepageModuleCachePolicy> = z
   .object({

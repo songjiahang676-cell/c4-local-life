@@ -313,9 +313,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(69);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(177);
-    expect(operationIds).toHaveLength(79);
+    expect(Object.keys(contract.paths)).toHaveLength(70);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(181);
+    expect(operationIds).toHaveLength(80);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -352,8 +352,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(69);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(69);
+    expect(Object.keys(servedJson.paths)).toHaveLength(70);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(70);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
