@@ -6,19 +6,20 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：实现 `SEO-001` Metadata/canonical/hreflang/robots
-- 进度：7 个 G3 任务、53/101 个总任务完成
+- 进度：8 个 G3 任务、54/101 个总任务完成
 - 风险：canonical 必须只指向当前规范路由，hreflang 只能声明真实等价语言页；搜索/筛选/私有页面必须保持 noindex，不能把任意组合页扩散到索引
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target | Status      | Notes                                     |
-| ------- | -------------------- | ---------- | ------ | ----------- | ----------------------------------------- |
-| SEO-001 | @songjiahang676-cell | 2026-07-29 | SEO    | in progress | metadata/canonical/hreflang/robots matrix |
+| Task    | Owner                | Started    | Target | Status        | Notes                                                    |
+| ------- | -------------------- | ---------- | ------ | ------------- | -------------------------------------------------------- |
+| SEO-001 | @songjiahang676-cell | 2026-07-29 | SEO    | merge pending | protected checks passed；evidence head and merge pending |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-001 protected checks        | PR #40 / run `30502653322`            | 107 files / 473 real-service tests；Linux 24/24 E2E；four images passed    | 2026-07-29 |
 | SEO-001 local quality           | `pnpm ci:quality`                     | 81 files / 387 tests；9 typechecks/lints；8 builds passed                  | 2026-07-29 |
 | SEO-001 runtime/browser         | API runtime + production Playwright   | metadata/robots matrix；desktop/mobile Chromium 24/24 passed               | 2026-07-29 |
 | SEO-001 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |

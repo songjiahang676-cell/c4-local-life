@@ -52,7 +52,7 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 - [x] `WEB-001` 双语 SSR 列表/筛选/详情、公开投影边界、状态/推广标签和错误空态。
 - [x] `TAX-003` 严格首页布局白名单、版本草稿/预览/发布/追加回滚和原子缓存失效事件。
 - [x] `WEB-002` 首页聚合 API、canonical 公开投影、逐模块错误隔离、真实空态与双语响应式渲染。
-- [ ] `SEO-001` metadata/canonical/hreflang/robots 与搜索/私有 noindex 矩阵。
+- [x] `SEO-001` metadata/canonical/hreflang/robots 与搜索/私有 noindex 矩阵。
 - [ ] `SEO-002` sitemap/schema、`SEO-004` a11y、`PERF-001` 性能预算。
 
 ## G4 Interaction / Trust
