@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a fail-closed bilingual SEO metadata matrix with absolute canonical URLs, equivalent
+  `hreflang`/`x-default`, bounded Open Graph/Twitter fields, an explicit operator city-index
+  allowlist, noindex search/filter/private templates, and Web/Admin crawler policies.
 - Added a strict anonymous homepage aggregate and bilingual server-rendered module mapping backed
   only by published layout, privacy-safe trends, active cities, and region-scoped public Listings,
   with per-module failure isolation, honest empty states, deterministic data versions, bounded

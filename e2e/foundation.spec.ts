@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+const webBaseUrl = "http://127.0.0.1:3100";
 const apiBaseUrl = "http://127.0.0.1:4100/v1";
 const adminBaseUrl = "http://127.0.0.1:3101";
 
@@ -20,6 +21,22 @@ test("renders the localized public homepage at desktop and mobile widths", async
   await expect(page.getByText("鼎泰丰")).toHaveCount(0);
   await expect(page.getByText("首页广告位合作")).toHaveCount(0);
   await expect(page.getByRole("banner").getByRole("search")).toBeVisible();
+  await expect(page).toHaveTitle("南加州华人本地生活服务｜南加生活网");
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/zh-Hans`,
+  );
+  await expect(page.locator('link[rel="alternate"][hreflang="en-US"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/en-US`,
+  );
+  await expect(page.locator('link[rel="alternate"][hreflang="x-default"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/zh-Hans`,
+  );
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /index.*follow/);
+  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "website");
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary");
   const languageLink = page.getByRole("link", { name: /中文 \/ English/ });
   await expect(languageLink).toBeVisible();
   await expect(languageLink).toHaveAttribute("href", "/en-US");
@@ -47,6 +64,11 @@ test("renders bilingual public Listing filters and sponsored status from SSR dat
   await expect(page.getByText("Active")).toBeVisible();
   await expect(page.getByText("Verified organization")).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex.*follow/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/en-US/rentals`,
+  );
+  await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(0);
   await expect(page.getByRole("link", { name: "简体中文" })).toHaveAttribute(
     "href",
     "/zh-Hans/rentals",
@@ -75,6 +97,16 @@ test("renders the strict public Listing detail and generic invalid-filter recove
   await expect(page.getByRole("heading", { name: "Safety reminder" })).toBeVisible();
   await expect(page.getByText("Sponsored")).toBeVisible();
   await expect(page.getByText("Verified organization").first()).toBeVisible();
+  await expect(page).toHaveTitle("Synthetic public listing | SoCal Life");
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/en-US/rentals/synthetic-city/synthetic-public-listing-${listingId}`,
+  );
+  await expect(page.locator('link[rel="alternate"][hreflang="zh-Hans"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/zh-Hans/rentals/synthetic-city/synthetic-public-listing-${listingId}`,
+  );
+  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "article");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -84,6 +116,25 @@ test("renders the strict public Listing detail and generic invalid-filter recove
   await expect(page.getByRole("heading", { level: 1, name: "筛选条件无效" })).toBeVisible();
   await expect(page.getByText(/请检查价格范围/)).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex.*follow/);
+});
+
+test("indexes only an explicitly approved city aggregate route", async ({ page }) => {
+  const response = await page.goto("/en-US/rentals/synthetic-city");
+
+  expect(response?.ok()).toBe(true);
+  await expect(page).toHaveTitle("Synthetic City Rentals | SoCal Life");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Synthetic City Rentals" }),
+  ).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /index.*follow/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/en-US/rentals/synthetic-city`,
+  );
+  await expect(page.locator('link[rel="alternate"][hreflang="zh-Hans"]')).toHaveAttribute(
+    "href",
+    `${webBaseUrl}/zh-Hans/rentals/synthetic-city`,
+  );
 });
 
 test("completes the bilingual rental form and recovers its account-scoped autosave", async ({
@@ -1169,13 +1220,16 @@ test("renders and updates the private bilingual notification center", async ({ p
 test("serves API health, canonical OpenAPI, and sanitized validation errors", async ({
   request,
 }) => {
-  const [healthResponse, contractResponse, invalidResponse] = await Promise.all([
-    request.get(`${apiBaseUrl}/health/live`, {
-      headers: { "x-request-id": "playwright-foundation-smoke" },
-    }),
-    request.get("http://127.0.0.1:4100/docs/openapi.json"),
-    request.get(`${apiBaseUrl}/listings?unknown=not-allowed`),
-  ]);
+  const [healthResponse, contractResponse, invalidResponse, robotsResponse, adminRobotsResponse] =
+    await Promise.all([
+      request.get(`${apiBaseUrl}/health/live`, {
+        headers: { "x-request-id": "playwright-foundation-smoke" },
+      }),
+      request.get("http://127.0.0.1:4100/docs/openapi.json"),
+      request.get(`${apiBaseUrl}/listings?unknown=not-allowed`),
+      request.get("/robots.txt"),
+      request.get(`${adminBaseUrl}/robots.txt`),
+    ]);
 
   expect(healthResponse.ok()).toBe(true);
   expect(healthResponse.headers()["x-request-id"]).toBe("playwright-foundation-smoke");
@@ -1199,6 +1253,18 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
     detail: "Request validation failed",
   });
   expect(problem).not.toHaveProperty("stack");
+
+  const robots = await robotsResponse.text();
+  expect(robotsResponse.ok()).toBe(true);
+  expect(robots).toContain("Allow: /");
+  expect(robots).toContain("Disallow: /zh-Hans/account");
+  expect(robots).toContain("Disallow: /v1/");
+  expect(robots).toContain(`Host: ${webBaseUrl}`);
+  expect(robots).not.toContain("Sitemap:");
+
+  const adminRobots = await adminRobotsResponse.text();
+  expect(adminRobotsResponse.ok()).toBe(true);
+  expect(adminRobots).toContain("Disallow: /");
 });
 
 test("renders the no-store Admin login boundary without privileged navigation", async ({

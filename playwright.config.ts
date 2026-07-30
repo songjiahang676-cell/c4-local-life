@@ -49,6 +49,8 @@ export default defineConfig({
         HOSTNAME: "127.0.0.1",
         PORT: "3100",
         API_BASE_URL: "http://127.0.0.1:4200/v1",
+        PUBLIC_WEB_URL: webBaseUrl,
+        SEO_INDEXABLE_CITY_ROUTES: "rentals:synthetic-city",
       },
     },
     {

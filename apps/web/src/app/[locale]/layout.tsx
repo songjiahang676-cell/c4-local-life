@@ -1,9 +1,19 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-
-const locales = new Set(["zh-Hans", "en-US"]);
+import { isSupportedLocale, localeLayoutMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
   return [{ locale: "zh-Hans" }, { locale: "en-US" }];
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (!isSupportedLocale(locale)) notFound();
+  return localeLayoutMetadata(locale);
 }
 
 export default async function LocaleLayout({
@@ -14,7 +24,7 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }>) {
   const { locale } = await params;
-  if (!locales.has(locale)) notFound();
+  if (!isSupportedLocale(locale)) notFound();
 
   return (
     <div data-locale={locale} lang={locale}>

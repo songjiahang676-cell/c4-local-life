@@ -107,6 +107,11 @@ export type PublicListingDetailModel =
   | Readonly<{ kind: "not-found" }>
   | Readonly<{ kind: "unavailable" }>;
 
+export type PublicCityModel =
+  | Readonly<{ kind: "ready"; region: Region }>
+  | Readonly<{ kind: "not-found" }>
+  | Readonly<{ kind: "unavailable" }>;
+
 type RuntimeSchema<T> = Readonly<{
   safeParse(value: unknown): { success: true; data: T } | { success: false };
 }>;
@@ -536,6 +541,20 @@ export async function loadPublicListingDetail(
   if (response.kind === "ok") return { kind: "ready", listing: response.data.data };
   if (response.kind === "http" && response.status === 404) return { kind: "not-found" };
   return { kind: "unavailable" };
+}
+
+export async function loadPublicCity(locale: Locale, citySlug: string): Promise<PublicCityModel> {
+  const response = await requestPublicJson(
+    "regions",
+    { type: "CITY", activeOnly: "true" },
+    regionCollectionResponseSchema,
+    locale,
+  );
+  if (response.kind !== "ok") return { kind: "unavailable" };
+  const region = flattenTaxonomy(response.data.data).find(
+    (candidate) => candidate.active && candidate.type === "CITY" && candidate.slug === citySlug,
+  );
+  return region ? { kind: "ready", region } : { kind: "not-found" };
 }
 
 export function listingIdFromSlug(value: string): string | null {

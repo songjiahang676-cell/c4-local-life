@@ -475,11 +475,22 @@ export function PublicListingIndexView({
   citySlug?: string;
 }) {
   const text = copy[locale];
-  const title = type
+  const verticalTitle = type
     ? verticalLabel(locale, type)
     : locale === "zh-Hans"
       ? "全站公开信息"
       : "All public listings";
+  const cityName =
+    citySlug && model.kind === "ready"
+      ? (model.regionOptions.find((option) => option.value === model.filters.regionCode)?.label ??
+        citySlug)
+      : citySlug;
+  const title =
+    cityName && type
+      ? locale === "zh-Hans"
+        ? `${cityName}${verticalTitle}`
+        : `${cityName} ${verticalTitle}`
+      : verticalTitle;
   const intro = type
     ? verticalIntro[type][locale]
     : locale === "zh-Hans"
@@ -501,7 +512,7 @@ export function PublicListingIndexView({
           {citySlug ? (
             <>
               <span aria-hidden="true">/</span>
-              <span>{citySlug}</span>
+              <span>{cityName}</span>
             </>
           ) : null}
         </nav>
@@ -759,14 +770,6 @@ export function PublicListingDetailUnavailable({
       </main>
     </>
   );
-}
-
-export function publicVerticalTitle(locale: Locale, type: ListingType): string {
-  return `${verticalLabel(locale, type)} — ${copy[locale].brand}`;
-}
-
-export function publicSearchTitle(locale: Locale): string {
-  return `${copy[locale].search} — ${copy[locale].brand}`;
 }
 
 export function isPublicVertical(value: string): value is PublicVertical {

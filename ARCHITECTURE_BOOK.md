@@ -2481,12 +2481,33 @@ Stripe dispute 到达时冻结相关可退信用、通知 Finance，并保留必
 - SEO 变更灰度并跟踪自然流量之外的质量指标，避免靠薄内容换流量。
 
 `WEB-001` 先落实模板级安全基线：全站搜索及带任意筛选/cursor 的频道页为 `noindex,follow`，公开
-频道/城市与详情只生成描述性 title/description；完整 canonical、hreflang、Open Graph、结构化数据和
-sitemap 仍必须由 `SEO-001` 按质量白名单完成，不能将当前模板元数据误报为 SEO Gate 已关闭。页面具备
+频道/城市与详情只生成描述性 title/description。`SEO-001` 进一步统一绝对 canonical、中英
+`hreflang`/`x-default`、Open Graph/Twitter 与 robots；结构化数据和 sitemap 分片由独立 `SEO-002`
+完成，不能把后者误报为当前任务已关闭。页面具备
 skip link、main/nav/search/aside/article 语义地标、连续标题、原生 label、44px 控件、可见焦点、
 纯文字广告/状态标签、`bdi` 用户内容隔离以及 720/520px reflow。货币和日期使用 `Intl` 与
 `America/Los_Angeles`；用户正文保留原语言，不伪装机器翻译。axe、200% zoom 和屏幕阅读器人工基线
 仍由 `SEO-004` 验收。
+
+## 13.11 SEO-001 实施矩阵
+
+- `PUBLIC_WEB_URL` 是绝对 canonical、社交 URL 和 robots Host 的部署事实源；只接受无凭据的
+  HTTP(S) origin，本地无效配置回退到 localhost，生产无效配置还会强制 noindex；不从请求 Host
+  推断可信生产域名。
+- 首页和五类频道无查询根页为 `index,follow`，并声明真实存在的 `zh-Hans`、`en-US` 与
+  `x-default` 等价路径；任意未知/重复/筛选/cursor 参数都切换为 `noindex,follow`，canonical
+  永远移除 query。
+- 城市频道默认 `noindex,follow`。Growth/Ops 只有在内容达到最低有效供给并批准后，才可把精确
+  `<vertical>:<city-slug>` 加入 `SEO_INDEXABLE_CITY_ROUTES`；任一非法或越界白名单值会使整份配置
+  失败关闭为空集。
+- 详情只有匿名公共 Listing API 返回的 PUBLISHED、未过期投影可索引；错误垂类/UUID 返回 404，
+  非 canonical 城市/slug 永久跳转。title/summary 先 NFKC、移除控制/双向字符和 HTML-like 标签，
+  再按 code point 限长；用户正文、联系方式和私有字段不进入 metadata。
+- 全站搜索、占位入口、登录、账户、发布草稿和管理页面分别保持 `noindex,follow` 或
+  `noindex,nofollow`。Web `robots.txt` 禁止 BFF、健康检查和私有路径但允许抓取搜索页以读取
+  noindex；Admin `robots.txt` 全站禁止抓取。
+- sitemap、schema.org、索引质量后台与 Search Console 观测仍属于 `SEO-002`/后续运营任务；当前
+  robots 不伪造 sitemap 地址，也不为没有真实评价的页面生成评分。
 
 ---
 
@@ -3772,6 +3793,18 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - Prisma validate/generate、迁移安全、全仓质量、API runtime、架构检查和受保护 CI 均须真实通过；本地
   缺少 PostgreSQL 时明确记录 skip，不能把 skip 当作通过。
 
+## 18.33 SEO-001 元数据与爬虫验证增量
+
+- Web 单元测试覆盖可信 public origin 规范化、控制/双向字符和 HTML-like 标签清洗、code-point
+  限长、城市 allowlist 正常/非法失败关闭，以及首页、频道、城市、详情、搜索和私有模板矩阵。
+- 详情测试使用 strict 虚构公共 Listing 响应，断言 title/summary/发布时间可进入 meta，正文和
+  `<script>` 不进入；旧 city/title 路径的 canonical/hreflang 必须使用 API 返回的规范投影。
+- production standalone Playwright 在桌面和 Pixel 7 实际读取最终 HTML head，验证绝对 canonical、
+  `zh-Hans`/`en-US`/`x-default`、noindex 筛选、allowlisted 城市、article Open Graph、Twitter card
+  及 Web/Admin robots.txt；不能只断言 Metadata 对象。
+- 本任务不修改 OpenAPI、Prisma 或 migration。结构化数据/sitemap 测试由 `SEO-002` 负责；全仓
+  格式、类型、lint、单元/集成、八应用构建、API runtime、架构和四镜像保护门禁继续执行。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4040,6 +4073,18 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   但不得修改 PostgreSQL 已发布版本或清空业务事实。
 - Web 契约失败时比较 OpenAPI、生成类型与 API payload；不要放宽 strict parser、增加任意代理 URL、
   转发 Cookie 或把模块内部 DTO 直接暴露给浏览器。
+
+## 20.20 SEO metadata 与城市索引白名单
+
+- 部署前确认 `PUBLIC_WEB_URL` 是正式无凭据 HTTP(S) origin，并用生产响应核对 canonical、Open Graph
+  URL 与 robots Host 完全一致；不得信任请求 Host 动态拼接生产 canonical。
+- `SEO_INDEXABLE_CITY_ROUTES` 默认为空。只有 Growth/Ops 确认城市/垂类达到最低有效内容和翻译质量后，
+  才加入逗号分隔的 `vertical:city-slug`；先在 preview 验证双语页面、公开结果、canonical/hreflang
+  和无软 404，再灰度到 production。非法 token 会让整份白名单失败关闭。
+- 错误开放索引时立即从白名单移除并重部署，确认页面返回 `noindex,follow`；不要删除 canonical
+  PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
+- 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
+  robots 不得手工加入虚假 sitemap URL。
 
 ---
 
@@ -4419,6 +4464,20 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 发布事件消费者严格验证 Outbox envelope，并以 Redis Lua 原子处理新版本失效与重复/乱序 stale；
   指标只有固定 kind/outcome。OpenAPI、生成类型、单元/HTTP/Worker/Web、全量质量、生产 Chromium 与
   受保护 CI 有真实证据后方可标记 done。
+
+## 22.20 SEO-001 Metadata/canonical/hreflang/robots 验收
+
+- 首页、无查询频道根页及可用详情输出绝对同源 canonical、清洗限长的双语 title/description、
+  Open Graph/Twitter 和 `index,follow`；中英真实等价页声明 `zh-Hans`、`en-US`、`x-default`。
+- 任意查询参数、全站搜索、未批准城市聚合页为 `noindex,follow` 且 canonical 不含 query；
+  城市页仅由严格、有限的 `SEO_INDEXABLE_CITY_ROUTES` 精确白名单开放，非法配置整体失败关闭。
+- 详情元数据只从匿名公共 API 的 PUBLISHED、未过期安全投影读取 title/summary/时间；正文、PII、
+  精确坐标、联系方式、审核/风险和未知字段不进入 meta。错误 UUID/垂类 404，旧 slug 指向规范路径。
+- 占位、账户、消息、发布/编辑和 Admin 保持 `noindex,nofollow`。Web robots 禁止 BFF、健康和私有
+  路径且不伪造 sitemap；Admin robots 全站禁止抓取。
+- 单元测试覆盖文本清洗、可信 origin、allowlist 失败关闭和完整模板矩阵；生产 standalone Chromium
+  桌面/移动实际断言 title、canonical、hreflang、robots、Open Graph/Twitter 和 robots.txt。
+  OpenAPI、Prisma 与 migration 不变化；全量质量和受保护 CI 全绿后才可标记 done。
 
 ---
 
@@ -4925,6 +4984,11 @@ PROVIDER_FEATURED、AD、PRICE_METRIC、RESOURCE_PRODUCTS、PORTAL_LINKS 即使�
 通用占位 catchall；内部统一 builder 只接受 `JOB/RENTAL/TRANSFER/SECONDHAND/SERVICE` 注册表。
 详情当前使用完整 UUID 作为稳定 key 后缀，不用标题推断 ID；API 返回的 type、region slug 或 Listing
 slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[locale]/search`。
+
+`SEO-001` 将首页、无查询频道根页和公共详情收敛到绝对 canonical；只有无 query 的等价公开页声明
+`zh-Hans`/`en-US`/`x-default`。任意 query 与全站搜索为 `noindex,follow`，canonical 去除 query。
+城市聚合默认 noindex，只有精确列入 `SEO_INDEXABLE_CITY_ROUTES` 的 `vertical:city-slug` 才开放
+索引；当前通用占位 catchall 即使对应未来公开路由，也在真实 API/文案接入前保持 `noindex,nofollow`。
 
 ## 27.2 发布与账户
 

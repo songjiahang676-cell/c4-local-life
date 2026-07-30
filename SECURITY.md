@@ -186,3 +186,13 @@ scope revision 与当前版本双重乐观校验；已发布版本由数据库�
 并在首页 adapter 再次移除精确坐标、正文、联系方式、审核/风险和内部统计。模块依赖错误不会把 provider
 异常或私有字段反射给客户端；未实现的商家、师傅、广告、行情或商业入口必须隐藏，不能用 seed/fixture
 占位。首页 SSR 不转发 Cookie，响应保持 `no-store`，缓存失效日志和指标不含 scope、内容或资源 ID。
+
+## SEO metadata 与爬虫边界
+
+公开 metadata 只接受代码生成的同源路径和匿名公共 API 投影；`PUBLIC_WEB_URL` 会剥离 path/query/hash，
+拒绝非 HTTP(S) 与带凭据 URL，生产配置无效时所有原本可索引页面强制 noindex。用户 title/summary
+在进入 meta 前移除控制/双向字符和 HTML-like
+标签并按 code point 限长，正文、联系方式、精确位置、审核/风险和内部字段不会进入 title、
+description 或社交标签。任意 query、搜索、未批准城市和依赖故障都失败关闭为 noindex；城市索引
+白名单非法时整份失效，不能部分接受。robots 不替代后端鉴权：私有 Web/Admin/API 仍必须执行既有
+会话、权限、同源和数据投影边界。

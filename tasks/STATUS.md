@@ -5,20 +5,27 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `WEB-002` 受保护合并证据后进入 `SEO-001`
-- 进度：7 个 G3 任务、53/101 个总任务完成
-- 风险：生产 canonical/hreflang/structured data/sitemap、共享首页缓存与真实 SLO 仍分别属于 `SEO-001`/`SEO-002`/`PERF-001`；不得用测试 fixture 或本地延迟宣称生产结果
+- 目标：实现 `SEO-001` Metadata/canonical/hreflang/robots
+- 进度：8 个 G3 任务、54/101 个总任务完成
+- 风险：canonical 必须只指向当前规范路由，hreflang 只能声明真实等价语言页；搜索/筛选/私有页面必须保持 noindex，不能把任意组合页扩散到索引
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target   | Status                   | Notes                           |
-| ------- | -------------------- | ---------- | -------- | ------------------------ | ------------------------------- |
-| WEB-002 | @songjiahang676-cell | 2026-07-29 | homepage | local complete / PR next | protected evidence still needed |
+| Task    | Owner                | Started    | Target | Status        | Notes                                                    |
+| ------- | -------------------- | ---------- | ------ | ------------- | -------------------------------------------------------- |
+| SEO-001 | @songjiahang676-cell | 2026-07-29 | SEO    | merge pending | protected checks passed；evidence head and merge pending |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-001 protected checks        | PR #40 / run `30502653322`            | 107 files / 473 real-service tests；Linux 24/24 E2E；four images passed    | 2026-07-29 |
+| SEO-001 local quality           | `pnpm ci:quality`                     | 81 files / 387 tests；9 typechecks/lints；8 builds passed                  | 2026-07-29 |
+| SEO-001 runtime/browser         | API runtime + production Playwright   | metadata/robots matrix；desktop/mobile Chromium 24/24 passed               | 2026-07-29 |
+| SEO-001 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |
+| WEB-002 final main quality      | run `30500952462` / `f0726df`         | merged main quality + four non-root images passed                          | 2026-07-29 |
+| WEB-002 protected merge         | PR #39 / merge `f0726df`              | protected squash merge completed                                           | 2026-07-29 |
+| WEB-002 evidence head           | PR #39 / run `30500526588`            | final head quality、real services、22/22 E2E and four images passed        | 2026-07-29 |
 | WEB-002 protected checks        | PR #39 / run `30500065008`            | 106 files / 467 real-service tests；Linux 22/22 E2E；four images passed    | 2026-07-29 |
 | WEB-002 local quality           | `pnpm ci:quality` + runtime/E2E       | 381 tests、8 builds、API runtime、Chromium 22/22 passed                    | 2026-07-29 |
 | WEB-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；69 paths；177 schemas；36 JSON files passed          | 2026-07-29 |
@@ -245,9 +252,8 @@
   由 PR #36 / evidence-head run `30491148630` 合并为 `30be880`，final main run
   `30491653244` 全绿；`WEB-001` 已由 PR #37 / evidence-head run `30494632057` 受保护合并为
   `6532c81`，final main run `30495144658` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-002`。
-  `WEB-002` 的本地完整质量、API runtime 与 22/22 production Chromium 已通过；PR #39 run
-  `30500065008` 的 467 个真实服务测试、Linux E2E 与四镜像检查全绿，正在执行证据 head 复验；
-  合并后按强制序列进入 `SEO-001`。
+  `WEB-002` 已由 PR #39 / evidence-head run `30500526588` 受保护合并为 `f0726df`，final main run
+  `30500952462` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `SEO-001`。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
