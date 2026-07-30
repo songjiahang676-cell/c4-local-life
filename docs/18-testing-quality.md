@@ -393,5 +393,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   `credentials=omit` 无 URL/标识 payload。
 - `performance:check` 在生产 build 后限制最大/全部 gzip JS chunks；standalone Playwright 在桌面和
   Pixel 7 分别限制首页 HTML/脚本传输，并继续运行所有既有交互/SEO 场景。
+
+## 18.35 SEO-002 结构化数据与 Sitemap 验证增量
+
+- Web 单元测试用两页 strict canonical Listing fixture 验证 cursor 遍历、UUID 去重、未来/过期剔除、
+  locale/vertical/month 路径、双语 alternate、真实月份 index `lastmod` 和 allowlisted active 城市；
+  源记录预算故意压到 1 时必须 503/失败关闭而非截断。
+- XML serializer 测试拒绝跨 origin URL，并断言搜索 query、账户、过期资源和评分不进入输出。route
+  测试覆盖 index、静态/Listing 子分片、Content-Type、安全/计数 header 和非法 locale/resource 404。
+- schema.org 测试验证 exact-key `WebSite/SearchAction`、`BreadcrumbList`、当前 Job `JobPosting`，
+  额外评分字段、已过期或错误垂类失败关闭；恶意 HTML-like 文本不能突破 JSON-LD script 序列化。
+- production standalone Chromium 实际解析首页/详情 JSON-LD、robots sitemap 声明、index 与真实
+  静态/Listing XML；不只调用 builder。既有桌面/移动、HTML/JS 预算和私有 noindex 场景必须继续通过。
+- 本任务不修改 OpenAPI、Prisma 或 migration；全仓格式、生成契约、类型、lint、单元/真实服务集成、
+  八应用构建、API runtime、架构和四镜像保护门禁继续执行。
 - 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
   Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。

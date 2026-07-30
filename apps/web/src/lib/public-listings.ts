@@ -112,6 +112,18 @@ export type PublicCityModel =
   | Readonly<{ kind: "not-found" }>
   | Readonly<{ kind: "unavailable" }>;
 
+export type PublicCityCollectionModel =
+  Readonly<{ kind: "ready"; regions: readonly Region[] }> | Readonly<{ kind: "unavailable" }>;
+
+export type PublicListingSitemapPage =
+  | Readonly<{
+      kind: "ready";
+      items: readonly PublicListingSummaryView[];
+      nextCursor: string | null;
+      generatedAt: string;
+    }>
+  | Readonly<{ kind: "unavailable" }>;
+
 type RuntimeSchema<T> = Readonly<{
   safeParse(value: unknown): { success: true; data: T } | { success: false };
 }>;
@@ -543,7 +555,33 @@ export async function loadPublicListingDetail(
   return { kind: "unavailable" };
 }
 
-export async function loadPublicCity(locale: Locale, citySlug: string): Promise<PublicCityModel> {
+export async function loadPublicListingSitemapPage(
+  locale: Locale,
+  type: ListingType,
+  cursor?: string,
+): Promise<PublicListingSitemapPage> {
+  const response = await requestPublicJson(
+    "listings",
+    {
+      type,
+      cursor,
+      limit: 50,
+    },
+    listingCollectionSchema,
+    locale,
+  );
+  if (response.kind !== "ok" || response.data.data.some((listing) => listing.type !== type)) {
+    return { kind: "unavailable" };
+  }
+  return {
+    kind: "ready",
+    items: response.data.data,
+    nextCursor: response.data.page.hasMore ? (response.data.page.nextCursor ?? null) : null,
+    generatedAt: response.data.generatedAt,
+  };
+}
+
+export async function loadPublicCities(locale: Locale): Promise<PublicCityCollectionModel> {
   const response = await requestPublicJson(
     "regions",
     { type: "CITY", activeOnly: "true" },
@@ -551,9 +589,18 @@ export async function loadPublicCity(locale: Locale, citySlug: string): Promise<
     locale,
   );
   if (response.kind !== "ok") return { kind: "unavailable" };
-  const region = flattenTaxonomy(response.data.data).find(
-    (candidate) => candidate.active && candidate.type === "CITY" && candidate.slug === citySlug,
-  );
+  return {
+    kind: "ready",
+    regions: flattenTaxonomy(response.data.data).filter(
+      (candidate) => candidate.active && candidate.type === "CITY",
+    ),
+  };
+}
+
+export async function loadPublicCity(locale: Locale, citySlug: string): Promise<PublicCityModel> {
+  const response = await loadPublicCities(locale);
+  if (response.kind !== "ready") return response;
+  const region = response.regions.find((candidate) => candidate.slug === citySlug);
   return region ? { kind: "ready", region } : { kind: "not-found" };
 }
 

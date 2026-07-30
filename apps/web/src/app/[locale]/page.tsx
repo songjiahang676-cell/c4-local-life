@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { HomePage } from "@/components/home-page";
 import type { Locale } from "@socal/contracts";
 import { loadHomepage } from "@/lib/homepage";
-import { homepageSeoMetadata, isSupportedLocale } from "@/lib/seo";
+import { hasTrustedPublicOrigin, homepageSeoMetadata, isSupportedLocale } from "@/lib/seo";
 
 type HomepageRouteProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -18,10 +18,14 @@ export async function generateMetadata({ params, searchParams }: HomepageRoutePr
   );
 }
 
-export default async function Page({ params }: HomepageRouteProps) {
-  const { locale: rawLocale } = await params;
+export default async function Page({ params, searchParams }: HomepageRouteProps) {
+  const [{ locale: rawLocale }, query] = await Promise.all([params, searchParams]);
   if (!isSupportedLocale(rawLocale)) notFound();
   const locale: Locale = rawLocale;
   const model = await loadHomepage(locale);
-  return <HomePage locale={locale} model={model} />;
+  const includeStructuredData =
+    model.kind === "ready" &&
+    hasTrustedPublicOrigin() &&
+    !Object.values(query).some((value) => value !== undefined);
+  return <HomePage includeStructuredData={includeStructuredData} locale={locale} model={model} />;
 }

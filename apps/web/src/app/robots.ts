@@ -35,5 +35,6 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [...privatePaths],
     },
     host: publicWebOrigin().origin,
+    sitemap: new URL("/sitemap.xml", publicWebOrigin()).href,
   };
 }

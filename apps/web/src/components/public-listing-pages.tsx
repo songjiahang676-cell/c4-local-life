@@ -28,6 +28,13 @@ import {
   type PublicVertical,
   verticalLabel,
 } from "../lib/public-listings";
+import {
+  StructuredData,
+  breadcrumbStructuredData,
+  jobPostingStructuredData,
+  publicBreadcrumbItems,
+  type StructuredDataNode,
+} from "../lib/structured-data";
 
 const copy = {
   "zh-Hans": {
@@ -466,6 +473,7 @@ export function PublicListingIndexView({
   action,
   type,
   citySlug,
+  includeStructuredData = false,
 }: {
   locale: Locale;
   model: PublicListingIndexModel;
@@ -473,6 +481,7 @@ export function PublicListingIndexView({
   action: string;
   type?: ListingType;
   citySlug?: string;
+  includeStructuredData?: boolean;
 }) {
   const text = copy[locale];
   const verticalTitle = type
@@ -497,9 +506,26 @@ export function PublicListingIndexView({
       ? "搜索五类公开信息；所有结果均来自已发布且未过期的最小公开投影。"
       : "Search five public verticals. Results use only the minimal published, unexpired projection.";
   const hasMore = model.kind === "ready" && Boolean(model.nextCursor);
+  const breadcrumb =
+    includeStructuredData && type && model.kind === "ready"
+      ? breadcrumbStructuredData(
+          publicBreadcrumbItems(
+            locale,
+            type,
+            verticalTitle,
+            citySlug && cityName
+              ? {
+                  name: cityName,
+                  path: pathname,
+                }
+              : undefined,
+          ),
+        )
+      : null;
 
   return (
     <>
+      {breadcrumb ? <StructuredData nodes={breadcrumb} /> : null}
       <PublicSiteHeader locale={locale} pathname={pathname} />
       <main className="publicListingPage pageShell" id="main-content">
         <nav
@@ -507,14 +533,19 @@ export function PublicListingIndexView({
           aria-label={locale === "zh-Hans" ? "面包屑" : "Breadcrumb"}
         >
           <Link href={`/${locale}`}>{text.home}</Link>
-          <span aria-hidden="true">/</span>
-          <span aria-current="page">{title}</span>
-          {citySlug ? (
+          {citySlug && type ? (
             <>
               <span aria-hidden="true">/</span>
-              <span>{cityName}</span>
+              <Link href={publicVerticalPath(locale, type)}>{verticalTitle}</Link>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{cityName}</span>
             </>
-          ) : null}
+          ) : (
+            <>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{title}</span>
+            </>
+          )}
         </nav>
         <header className="publicListingHero">
           <div>
@@ -617,18 +648,33 @@ export function PublicListingDetailView({
   locale,
   listing,
   pathname,
+  includeStructuredData = false,
 }: {
   locale: Locale;
   listing: PublicListingView;
   pathname: string;
+  includeStructuredData?: boolean;
 }) {
   const text = copy[locale];
   const categoryName = locale === "zh-Hans" ? listing.category.nameZhHans : listing.category.nameEn;
   const regionName = locale === "zh-Hans" ? listing.region.nameZhHans : listing.region.nameEn;
   const attributes = publicAttributeEntries(locale, listing.attributes);
+  const structuredNodes: StructuredDataNode[] = [];
+  if (includeStructuredData) {
+    const breadcrumb = breadcrumbStructuredData(
+      publicBreadcrumbItems(locale, listing.type, verticalLabel(locale, listing.type), undefined, {
+        name: text.detail,
+        path: pathname,
+      }),
+    );
+    const jobPosting = jobPostingStructuredData(locale, listing, pathname);
+    if (breadcrumb) structuredNodes.push(breadcrumb);
+    if (jobPosting) structuredNodes.push(jobPosting);
+  }
 
   return (
     <>
+      {structuredNodes.length > 0 ? <StructuredData nodes={structuredNodes} /> : null}
       <PublicSiteHeader locale={locale} pathname={pathname} />
       <main className="publicDetailPage pageShell" id="main-content">
         <nav

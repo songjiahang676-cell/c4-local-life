@@ -17,6 +17,7 @@ import { QuickPublishItem } from "./icons/quick-publish-item";
 import { categoryEntries, primaryNavigation, quickPublishEntries } from "../data/homepage";
 import { localizedPath, ROUTES } from "../data/routes";
 import type { HomepageModel } from "../lib/homepage";
+import { StructuredData, websiteStructuredData } from "../lib/structured-data";
 import {
   formatListingPrice,
   publicListingPath,
@@ -322,13 +323,22 @@ function Footer({ locale }: { locale: Locale }) {
   );
 }
 
-export function HomePage({ locale, model }: { locale: Locale; model: HomepageModel }) {
+export function HomePage({
+  locale,
+  model,
+  includeStructuredData = false,
+}: {
+  locale: Locale;
+  model: HomepageModel;
+  includeStructuredData?: boolean;
+}) {
   const heroes = modulesOfKind(model, "HERO");
   const trending = modulesOfKind(model, "HOT_SEARCHES");
   const cities = modulesOfKind(model, "CITY_CHIPS");
   const listings = modulesOfKind(model, "LISTING_FEED");
   return (
     <>
+      {includeStructuredData ? <StructuredData nodes={websiteStructuredData(locale)} /> : null}
       <Header locale={locale} />
       <main className="pageShell homeLayout homepageRealData">
         <QuickPublish locale={locale} />

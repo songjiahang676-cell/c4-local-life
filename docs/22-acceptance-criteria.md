@@ -361,3 +361,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   可计算 API p95。CI/本地预算不得被表述为生产 LCP/INP/CLS/p95 实测。
 - OpenAPI/生成类型、单元/HTTP/Web/Worker、真实 Redis、全量质量、API runtime、Linux Chromium 与
   四镜像受保护门禁有真实证据后方可标记 done；Prisma/migration 不变化。
+
+## 22.22 SEO-002 结构化数据与 Sitemap 分片验收
+
+- 无 query 首页输出 strict 同源 `WebSite/SearchAction`；可索引频道/获批城市/详情输出与可见层级
+  一致的 `BreadcrumbList`。只有当前有效、字段完整的 Job 输出 `JobPosting`，且只用公开 summary、
+  雇主、用工形式和城市级位置；不含 rating、联系信息、精确地址、owner-only、审核/风险或推断字段。
+- JSON-LD exact-key runtime Schema 拒绝未知节点/字段、跨 origin URL、错误日期和越界文本，script
+  serializer 转义 HTML/行分隔边界。搜索、query、未批准城市、依赖错误及私有页不输出索引型 JSON-LD。
+- `/sitemap.xml` 只列实际有内容的 locale/vertical/published-month 子分片，Listing 分片 `lastmod`
+  来自该月最新 canonical `updatedAt`；静态分片只含双语首页、五频道和 active+allowlisted 城市。
+- Listing 子分片完整遍历 canonical cursor，再次过滤未来/过期、按 UUID 去重并输出 canonical/双语
+  alternate。搜索/query/账户/BFF/健康/Admin/占位、过期和下架资源不得出现。每片 10,000 源记录/
+  URL、200 页、15 秒、10 MB；超限、cursor 循环、来源/生产 origin 错误无缓存 503，禁止静默截断。
+- robots 仅声明真实 `/sitemap.xml`；成功 XML 也 no-store，失败日志/Server-Timing 不含 URL、cursor、
+  ID、内容或 provider error。单元/route 测试与 production Chromium 实际解析 JSON-LD、robots 和
+  XML；全仓质量、真实服务、API runtime、Linux Chromium 与四镜像保护门禁全绿后方可标记 done。
+- OpenAPI、Prisma、migration 与 canonical 数据形状不变化；PostgreSQL 仍是事实源，OpenSearch 不参与
+  sitemap 生成。

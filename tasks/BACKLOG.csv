@@ -63,7 +63,7 @@ WEB-002,G3,WEB,P0,首页模块化与真实数据 API,WEB-001;TAX-003,组件映�
 WEB-003,G3,WEB,P1,全局 Header/Region/Search suggestion,SEARCH-004;AUTH-003,地区/语言/账户响应式；键盘 combobox,docs/10-ui-ux-design-system.md,todo
 WEB-004,G2,WEB,P1,账户中心壳与权限缓存策略,AUTH-003,noindex/no-store；导航按能力；错误状态,docs/03-information-architecture.md,done
 SEO-001,G3,SEO,P0,Metadata/canonical/hreflang/robots,WEB-001,模板矩阵正确；搜索/私有 noindex,docs/13-seo-i18n-accessibility.md,done
-SEO-002,G3,SEO,P0,结构化数据与 sitemap 分片,SEO-001;LIST-005,只含真实可索引资源；过期移除；schema 验证,docs/13-seo-i18n-accessibility.md,todo
+SEO-002,G3,SEO,P0,结构化数据与 sitemap 分片,SEO-001;LIST-005,只含真实可索引资源；过期移除；schema 验证,docs/13-seo-i18n-accessibility.md,done
 SEO-003,G3,SEO,P1,i18n message/format/routing 基线,WEB-001,zh-Hans/en 等价；Intl；locale switch canonical,docs/13-seo-i18n-accessibility.md,todo
 SEO-004,G3,SEO,P0,可访问性自动/人工基线,WEB-001;FND-007,axe、键盘、focus、表单错误；WCAG AA 缺口表,docs/13-seo-i18n-accessibility.md,todo
 PERF-001,G3,PERF,P1,Web/API 缓存与性能预算,WEB-002;OBS-001,cache key/失效安全；CWV/API p95 预算监控,docs/15-performance-reliability.md,done

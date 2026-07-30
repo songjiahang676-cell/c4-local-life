@@ -118,3 +118,29 @@ skip link、main/nav/search/aside/article 语义地标、连续标题、原生 l
   noindex；Admin `robots.txt` 全站禁止抓取。
 - sitemap、schema.org、索引质量后台与 Search Console 观测仍属于 `SEO-002`/后续运营任务；当前
   robots 不伪造 sitemap 地址，也不为没有真实评价的页面生成评分。
+
+## 13.12 SEO-002 结构化数据与 Sitemap 实施矩阵
+
+- 首页只有无 query 的规范路径输出 `WebSite` 与真实可用的 `/[locale]/search?q={search_term_string}`
+  `SearchAction`；频道、获批城市和详情用 `BreadcrumbList` 表达页面可见的同源路径层级。带 query、
+  全站搜索、未批准城市、依赖错误和私有模板不输出索引型 JSON-LD。
+- `JobPosting` 只为匿名公共 API 当前返回的 PUBLISHED、已发布且未过期 Job 构建；必须存在页面可见的
+  summary、雇主和用工形式，只给城市/California/US 粒度位置。它不推断薪资、不读取正文联系方式、
+  owner-only/未知属性、精确坐标、审核/风险或评分；缺字段与到期记录直接省略整个 Job schema。
+- JSON-LD builder 与 renderer 执行 exact-key runtime Schema、同源 URL、日期顺序、文本/列表上限和
+  script-safe escaping。额外 `aggregateRating` 等未知键使整节点失败关闭，不能靠 TypeScript 类型替代
+  运行时验证。
+- `/sitemap.xml` 是动态 index；静态子分片按 locale，Listing 子分片按
+  `locale + vertical + published YYYY-MM`。索引只列出实际含当前 Listing 的月份，并用该月最新
+  `updatedAt` 作为 `lastmod`；静态分片不伪造修改时间。
+- Listing 子分片只分页读取 canonical `GET /listings` strict 投影，并再次检查 `publishedAt <= now <
+expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次最多读取/输出 10,000 条、200 页、
+  15 秒且 XML 不超过 10 MB；超限、cursor 循环、malformed/不可用来源或不可信生产 public origin 均
+  无缓存 503，不静默丢 URL。首期不创建另一份 sitemap 数据库或依赖 OpenSearch，因此状态变化无需
+  同步两份事实；每次读取都重新从 PostgreSQL 公开投影验证。
+- 静态分片仅含双语首页、五个已实现频道和同时通过 `SEO_INDEXABLE_CITY_ROUTES`、active Region API
+  校验的城市频道。搜索/query、账户、发布、BFF、健康检查、Admin 和未来占位路由不会出现。Web
+  robots 仅在这些真实端点完成后声明 `/sitemap.xml`。
+- 成功/失败响应均 `X-Robots-Tag: noindex`、`nosniff`；成功也 `no-store` 以避免到期记录被 CDN stale
+  保留。失败只写固定 `seo.sitemap_generation_failed`/scope 结构化事件与低基数 Server-Timing，
+  不记录 URL、cursor、Listing/用户 ID、内容或 provider error。

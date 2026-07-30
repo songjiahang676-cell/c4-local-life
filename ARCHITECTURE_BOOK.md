@@ -2521,6 +2521,32 @@ skip link、main/nav/search/aside/article 语义地标、连续标题、原生 l
 - sitemap、schema.org、索引质量后台与 Search Console 观测仍属于 `SEO-002`/后续运营任务；当前
   robots 不伪造 sitemap 地址，也不为没有真实评价的页面生成评分。
 
+## 13.12 SEO-002 结构化数据与 Sitemap 实施矩阵
+
+- 首页只有无 query 的规范路径输出 `WebSite` 与真实可用的 `/[locale]/search?q={search_term_string}`
+  `SearchAction`；频道、获批城市和详情用 `BreadcrumbList` 表达页面可见的同源路径层级。带 query、
+  全站搜索、未批准城市、依赖错误和私有模板不输出索引型 JSON-LD。
+- `JobPosting` 只为匿名公共 API 当前返回的 PUBLISHED、已发布且未过期 Job 构建；必须存在页面可见的
+  summary、雇主和用工形式，只给城市/California/US 粒度位置。它不推断薪资、不读取正文联系方式、
+  owner-only/未知属性、精确坐标、审核/风险或评分；缺字段与到期记录直接省略整个 Job schema。
+- JSON-LD builder 与 renderer 执行 exact-key runtime Schema、同源 URL、日期顺序、文本/列表上限和
+  script-safe escaping。额外 `aggregateRating` 等未知键使整节点失败关闭，不能靠 TypeScript 类型替代
+  运行时验证。
+- `/sitemap.xml` 是动态 index；静态子分片按 locale，Listing 子分片按
+  `locale + vertical + published YYYY-MM`。索引只列出实际含当前 Listing 的月份，并用该月最新
+  `updatedAt` 作为 `lastmod`；静态分片不伪造修改时间。
+- Listing 子分片只分页读取 canonical `GET /listings` strict 投影，并再次检查 `publishedAt <= now <
+  expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次最多读取/输出 10,000 条、200 页、
+  15 秒且 XML 不超过 10 MB；超限、cursor 循环、malformed/不可用来源或不可信生产 public origin 均
+  无缓存 503，不静默丢 URL。首期不创建另一份 sitemap 数据库或依赖 OpenSearch，因此状态变化无需
+  同步两份事实；每次读取都重新从 PostgreSQL 公开投影验证。
+- 静态分片仅含双语首页、五个已实现频道和同时通过 `SEO_INDEXABLE_CITY_ROUTES`、active Region API
+  校验的城市频道。搜索/query、账户、发布、BFF、健康检查、Admin 和未来占位路由不会出现。Web
+  robots 仅在这些真实端点完成后声明 `/sitemap.xml`。
+- 成功/失败响应均 `X-Robots-Tag: noindex`、`nosniff`；成功也 `no-store` 以避免到期记录被 CDN stale
+  保留。失败只写固定 `seo.sitemap_generation_failed`/scope 结构化事件与低基数 Server-Timing，
+  不记录 URL、cursor、Listing/用户 ID、内容或 provider error。
+
 ---
 
 <!-- source: docs\14-security-privacy-compliance.md -->
@@ -3853,6 +3879,20 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   `credentials=omit` 无 URL/标识 payload。
 - `performance:check` 在生产 build 后限制最大/全部 gzip JS chunks；standalone Playwright 在桌面和
   Pixel 7 分别限制首页 HTML/脚本传输，并继续运行所有既有交互/SEO 场景。
+
+## 18.35 SEO-002 结构化数据与 Sitemap 验证增量
+
+- Web 单元测试用两页 strict canonical Listing fixture 验证 cursor 遍历、UUID 去重、未来/过期剔除、
+  locale/vertical/month 路径、双语 alternate、真实月份 index `lastmod` 和 allowlisted active 城市；
+  源记录预算故意压到 1 时必须 503/失败关闭而非截断。
+- XML serializer 测试拒绝跨 origin URL，并断言搜索 query、账户、过期资源和评分不进入输出。route
+  测试覆盖 index、静态/Listing 子分片、Content-Type、安全/计数 header 和非法 locale/resource 404。
+- schema.org 测试验证 exact-key `WebSite/SearchAction`、`BreadcrumbList`、当前 Job `JobPosting`，
+  额外评分字段、已过期或错误垂类失败关闭；恶意 HTML-like 文本不能突破 JSON-LD script 序列化。
+- production standalone Chromium 实际解析首页/详情 JSON-LD、robots sitemap 声明、index 与真实
+  静态/Listing XML；不只调用 builder。既有桌面/移动、HTML/JS 预算和私有 noindex 场景必须继续通过。
+- 本任务不修改 OpenAPI、Prisma 或 migration；全仓格式、生成契约、类型、lint、单元/真实服务集成、
+  八应用构建、API runtime、架构和四镜像保护门禁继续执行。
 - 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
   Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。
 
@@ -4134,8 +4174,8 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   和无软 404，再灰度到 production。非法 token 会让整份白名单失败关闭。
 - 错误开放索引时立即从白名单移除并重部署，确认页面返回 `noindex,follow`；不要删除 canonical
   PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
-- 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
-  robots 不得手工加入虚假 sitemap URL。
+- 域名/slug 变更需同时验证永久跳转、等价语言路径、JSON-LD URL 和 sitemap；robots 的 Sitemap 行
+  只能由应用使用可信 `PUBLIC_WEB_URL` 生成，不得手工加入其他域名或占位 URL。
 
 ## 20.21 PERF-001 缓存与 CWV 异常
 
@@ -4150,6 +4190,22 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   可被伪造，不能单独触发计费、账户、广告或风控动作。地址/HMAC/payload 不得写工单或日志。
 - JavaScript/HTML 预算失败需定位新增 chunk/客户端依赖和首屏内容；调整阈值必须有实测与评审，不能
   为通过 CI 直接提高。生产 p75/p95 只有 RUM/RED Dashboard 接入后才可宣称达成。
+
+## 20.22 SEO-002 Sitemap 与结构化数据故障
+
+- 部署后请求 `/sitemap.xml`，确认 origin 与 canonical 一致、只有真实年月分片且 Listing 分片带
+  `lastmod`；再抽查两种 locale 的 static 与一个 Listing 子分片，确认 `Content-Type:
+application/xml`、`Cache-Control: no-store`、双语 alternate、无 query/账户/未来/过期 URL。
+- 503 时先检查 `PUBLIC_WEB_URL`、API readiness、固定 `seo.sitemap_generation_failed` scope 和
+  `Server-Timing`，再检查 canonical `/listings` cursor 是否循环或总量是否超过每次 10,000 条/
+  200 页/15 秒/10 MB。禁止临时放宽 strict parser、提高预算、静默截断、改读 OpenSearch 或把 seed
+  写入 sitemap。
+- 达到预算前应先新增可审查的 canonical 日期过滤/manifest 方案及 ADR（若引入新的派生存储），然后
+  做全量 URL 对账和回滚演练。当前失败关闭比漏报超限更安全；不要硬编码空月份或任意 cursor URL。
+- 城市分片缺失先核对 Region 仍 active 和 `SEO_INDEXABLE_CITY_ROUTES` 精确值。下线城市应先移出
+  allowlist 并验证 sitemap/页面 noindex；不要删除业务 Listing 或用 robots Disallow 隐藏错误。
+- JSON-LD 告警按页面可见字段复核。Job 已过期、summary/雇主/用工形式缺失或 Region 非 California
+  时应没有 `JobPosting`；不得为了富结果补造 salary、rating、电话、地址或 Organization URL。
 
 ---
 
@@ -4557,6 +4613,24 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   可计算 API p95。CI/本地预算不得被表述为生产 LCP/INP/CLS/p95 实测。
 - OpenAPI/生成类型、单元/HTTP/Web/Worker、真实 Redis、全量质量、API runtime、Linux Chromium 与
   四镜像受保护门禁有真实证据后方可标记 done；Prisma/migration 不变化。
+
+## 22.22 SEO-002 结构化数据与 Sitemap 分片验收
+
+- 无 query 首页输出 strict 同源 `WebSite/SearchAction`；可索引频道/获批城市/详情输出与可见层级
+  一致的 `BreadcrumbList`。只有当前有效、字段完整的 Job 输出 `JobPosting`，且只用公开 summary、
+  雇主、用工形式和城市级位置；不含 rating、联系信息、精确地址、owner-only、审核/风险或推断字段。
+- JSON-LD exact-key runtime Schema 拒绝未知节点/字段、跨 origin URL、错误日期和越界文本，script
+  serializer 转义 HTML/行分隔边界。搜索、query、未批准城市、依赖错误及私有页不输出索引型 JSON-LD。
+- `/sitemap.xml` 只列实际有内容的 locale/vertical/published-month 子分片，Listing 分片 `lastmod`
+  来自该月最新 canonical `updatedAt`；静态分片只含双语首页、五频道和 active+allowlisted 城市。
+- Listing 子分片完整遍历 canonical cursor，再次过滤未来/过期、按 UUID 去重并输出 canonical/双语
+  alternate。搜索/query/账户/BFF/健康/Admin/占位、过期和下架资源不得出现。每片 10,000 源记录/
+  URL、200 页、15 秒、10 MB；超限、cursor 循环、来源/生产 origin 错误无缓存 503，禁止静默截断。
+- robots 仅声明真实 `/sitemap.xml`；成功 XML 也 no-store，失败日志/Server-Timing 不含 URL、cursor、
+  ID、内容或 provider error。单元/route 测试与 production Chromium 实际解析 JSON-LD、robots 和
+  XML；全仓质量、真实服务、API runtime、Linux Chromium 与四镜像保护门禁全绿后方可标记 done。
+- OpenAPI、Prisma、migration 与 canonical 数据形状不变化；PostgreSQL 仍是事实源，OpenSearch 不参与
+  sitemap 生成。
 
 ---
 
@@ -5031,31 +5105,34 @@ PROVIDER_FEATURED、AD、PRICE_METRIC、RESOURCE_PRODUCTS、PORTAL_LINKS 即使�
 
 ## 27.1 公开 Web
 
-| Route                            | 模板/说明                | Auth | SEO            |
-| -------------------------------- | ------------------------ | ---- | -------------- |
-| `/`                              | locale 选择/重定向       | 否   | noindex 或短页 |
-| `/[locale]`                      | 地域化首页               | 否   | index          |
-| `/[locale]/search`               | 全站搜索                 | 否   | noindex        |
-| `/[locale]/jobs`                 | 招聘频道                 | 否   | index          |
-| `/[locale]/jobs/[city]`          | 城市招聘                 | 否   | 白名单 index   |
-| `/[locale]/jobs/[city]/[slugId]` | 招聘详情                 | 否   | 条件 index     |
-| `/[locale]/rentals...`           | 租房列表/详情            | 否   | 同上           |
-| `/[locale]/transfers...`         | 转让列表/详情            | 否   | 同上           |
-| `/[locale]/marketplace...`       | 二手列表/详情            | 否   | 同上           |
-| `/[locale]/services...`          | 服务信息列表/详情        | 否   | 同上           |
-| `/[locale]/providers`            | 师傅目录                 | 否   | index          |
-| `/[locale]/providers/[slugId]`   | 师傅档案                 | 否   | 条件 index     |
-| `/[locale]/businesses`           | 商家目录                 | 否   | index          |
-| `/[locale]/businesses/[slug]`    | 商家档案                 | 否   | 条件 index     |
-| `/[locale]/cities/[city]`        | 城市门户                 | 否   | index          |
-| `/[locale]/deals`                | 优惠（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/questions`            | 问答（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/community`            | 论坛（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/events`               | 活动（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/suppliers`            | 国内货源（Phase 2/3）    | 否   | Feature Flag   |
-| `/[locale]/help/*`               | 帮助与安全               | 否   | index          |
-| `/[locale]/policies/*`           | 条款/隐私/内容/广告/退款 | 否   | index          |
-| `/[locale]/about`                | 关于                     | 否   | index          |
+| Route                                         | 模板/说明                | Auth | SEO            |
+| --------------------------------------------- | ------------------------ | ---- | -------------- |
+| `/`                                           | locale 选择/重定向       | 否   | noindex 或短页 |
+| `/[locale]`                                   | 地域化首页               | 否   | index          |
+| `/[locale]/search`                            | 全站搜索                 | 否   | noindex        |
+| `/[locale]/jobs`                              | 招聘频道                 | 否   | index          |
+| `/[locale]/jobs/[city]`                       | 城市招聘                 | 否   | 白名单 index   |
+| `/[locale]/jobs/[city]/[slugId]`              | 招聘详情                 | 否   | 条件 index     |
+| `/[locale]/rentals...`                        | 租房列表/详情            | 否   | 同上           |
+| `/[locale]/transfers...`                      | 转让列表/详情            | 否   | 同上           |
+| `/[locale]/marketplace...`                    | 二手列表/详情            | 否   | 同上           |
+| `/[locale]/services...`                       | 服务信息列表/详情        | 否   | 同上           |
+| `/[locale]/providers`                         | 师傅目录                 | 否   | index          |
+| `/[locale]/providers/[slugId]`                | 师傅档案                 | 否   | 条件 index     |
+| `/[locale]/businesses`                        | 商家目录                 | 否   | index          |
+| `/[locale]/businesses/[slug]`                 | 商家档案                 | 否   | 条件 index     |
+| `/[locale]/cities/[city]`                     | 城市门户                 | 否   | index          |
+| `/[locale]/deals`                             | 优惠（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/questions`                         | 问答（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/community`                         | 论坛（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/events`                            | 活动（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/suppliers`                         | 国内货源（Phase 2/3）    | 否   | Feature Flag   |
+| `/[locale]/help/*`                            | 帮助与安全               | 否   | index          |
+| `/[locale]/policies/*`                        | 条款/隐私/内容/广告/退款 | 否   | index          |
+| `/[locale]/about`                             | 关于                     | 否   | index          |
+| `/sitemap.xml`                                | 动态 sitemap index       | 否   | noindex        |
+| `/sitemaps/[locale]/static.xml`               | 首页/频道/获批城市       | 否   | noindex        |
+| `/sitemaps/[locale]/[vertical]-[YYYY-MM].xml` | 当前 Listing 月分片      | 否   | noindex        |
 
 五类详情路由可由统一内部 route builder 生成，公开 URL 保持垂直清晰。
 
@@ -5068,6 +5145,12 @@ slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[loca
 `zh-Hans`/`en-US`/`x-default`。任意 query 与全站搜索为 `noindex,follow`，canonical 去除 query。
 城市聚合默认 noindex，只有精确列入 `SEO_INDEXABLE_CITY_ROUTES` 的 `vertical:city-slug` 才开放
 索引；当前通用占位 catchall 即使对应未来公开路由，也在真实 API/文案接入前保持 `noindex,nofollow`。
+
+`SEO-002` 增加 `/sitemap.xml` 和两类动态子分片。index 只为 canonical API 当前返回的真实
+PUBLISHED/未过期 Listing 创建 `locale + vertical + published YYYY-MM` 路径，并使用月内最新
+`updatedAt`；static 分片只列首页、五类频道及同时在 allowlist 和 active Region 中存在的城市。
+所有 XML 无缓存且自身 `X-Robots-Tag: noindex`，任意来源/预算/cursor/origin 错误返回 503；无 query、
+账户、BFF、健康、Admin 或未来占位路径。
 
 ## 27.2 发布与账户
 
