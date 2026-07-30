@@ -6,19 +6,20 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：实现 `PERF-001` Web/API 缓存与性能预算
-- 进度：8 个 G3 任务、54/101 个总任务完成
+- 进度：9 个 G3 任务、55/101 个总任务完成
 - 风险：共享缓存只能保存匿名公开投影并完整绑定 locale/region/device；Redis 故障必须回源 PostgreSQL，发布失效不得被乱序事件回滚；本地预算不能冒充生产 CWV/API p95
 
 ## 正在进行
 
-| Task     | Owner                | Started    | Target      | Status      | Notes                                                    |
-| -------- | -------------------- | ---------- | ----------- | ----------- | -------------------------------------------------------- |
-| PERF-001 | @songjiahang676-cell | 2026-07-29 | Performance | in progress | public cache safety、request coalescing、CWV/p95 budgets |
+| Task     | Owner                | Started    | Target      | Status    | Notes                                     |
+| -------- | -------------------- | ---------- | ----------- | --------- | ----------------------------------------- |
+| PERF-001 | @songjiahang676-cell | 2026-07-29 | Performance | validated | protected evidence-head and merge pending |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| PERF-001 protected checks       | PR #41 / run `30505661335`            | 111 files / 490 real-service tests；Linux 26/26 E2E；four images passed    | 2026-07-29 |
 | PERF-001 local quality          | `pnpm ci:quality`                     | 84 files / 402 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-29 |
 | PERF-001 runtime/browser        | API runtime + production Playwright   | RED/Web Vital/OpenAPI；desktop/mobile Chromium 26/26 passed                | 2026-07-29 |
 | PERF-001 architecture           | `scripts/check-architecture.sh`       | 101 tasks；62 models；70 paths；181 schemas；36 JSON files passed          | 2026-07-29 |
@@ -260,7 +261,8 @@
   `6532c81`，final main run `30495144658` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-002`。
   `WEB-002` 已由 PR #39 / evidence-head run `30500526588` 受保护合并为 `f0726df`，final main run
   `30500952462` 全绿；`SEO-001` 已由 PR #40 / evidence-head run `30503181356` 受保护合并为
-  `148a547`，final main run `30503597873` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `PERF-001`。
+  `148a547`，final main run `30503597873` 全绿；`PERF-001` 已在 PR #41 / run `30505661335`
+  通过受保护真实服务、Linux E2E 与四镜像门禁，正在等待 evidence-head 复验和受保护合并。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
