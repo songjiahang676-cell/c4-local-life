@@ -91,6 +91,7 @@ COPY --from=build --chown=node:node /workspace/apps/worker/node_modules ./apps/w
 COPY --from=build --chown=node:node /workspace/apps/worker/dist ./apps/worker/dist
 COPY --from=build --chown=node:node /workspace/apps/worker/package.json ./apps/worker/package.json
 COPY --from=build --chown=node:node /workspace/packages/config ./packages/config
+COPY --from=build --chown=node:node /workspace/packages/contracts ./packages/contracts
 COPY --from=build --chown=node:node /workspace/packages/database ./packages/database
 COPY --from=build --chown=node:node /workspace/packages/observability ./packages/observability
 USER node
