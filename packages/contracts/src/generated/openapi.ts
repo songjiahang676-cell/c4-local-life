@@ -609,6 +609,26 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/performance/web-vitals": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Record a bounded first-party Core Web Vital
+         * @description Accepts one sampled browser metric using only fixed route and metric enums. URLs, queries, identifiers, user-agent strings and free-form properties are not accepted. Values are operational telemetry, not trusted business or billing facts.
+         */
+        readonly post: operations["recordWebVital"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/listings": {
         readonly parameters: {
             readonly query?: never;
@@ -2411,6 +2431,20 @@ export interface components {
             /** Format: date-time */
             readonly generatedAt: string;
         };
+        /** @enum {string} */
+        readonly WebVitalName: "CLS" | "FCP" | "INP" | "LCP" | "TTFB";
+        /** @enum {string} */
+        readonly WebVitalRoute: "homepage" | "listing-list" | "listing-detail" | "search" | "account" | "other";
+        readonly WebVitalReport: {
+            readonly name: components["schemas"]["WebVitalName"];
+            /** @description Milliseconds for duration metrics and a unitless ratio for CLS. */
+            readonly value: number;
+            readonly route: components["schemas"]["WebVitalRoute"];
+        };
+        readonly WebVitalAcceptedResponse: {
+            /** @constant */
+            readonly accepted: true;
+        };
         readonly CursorPage: {
             readonly nextCursor?: string | null;
             readonly hasMore: boolean;
@@ -4177,8 +4211,8 @@ export interface operations {
             /** @description Available real-data homepage modules in published layout order */
             readonly 200: {
                 headers: {
-                    /** @description Shared caching remains disabled until PERF-001 validates production budgets. */
-                    readonly "Cache-Control"?: "no-store";
+                    /** @description Complete anonymous projections allow a short shared-cache window; partial dependency responses override this header with no-store. */
+                    readonly "Cache-Control"?: "public, max-age=0, s-maxage=30, stale-while-revalidate=30" | "no-store";
                     readonly [name: string]: unknown;
                 };
                 content: {
@@ -4187,6 +4221,33 @@ export interface operations {
             };
             readonly 400: components["responses"]["BadRequest"];
             readonly 503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    readonly recordWebVital: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["WebVitalReport"];
+            };
+        };
+        readonly responses: {
+            /** @description Metric accepted for bounded in-memory aggregation */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["WebVitalAcceptedResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 429: components["responses"]["TooManyRequests"];
         };
     };
     readonly listListings: {

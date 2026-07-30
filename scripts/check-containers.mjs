@@ -98,7 +98,7 @@ for (const workspacePackage of ["config", "contracts", "database", "observabilit
   }
 }
 const workerTargetSource = dockerfileSource.slice(workerTargetStart);
-for (const workspacePackage of ["config", "database", "observability"]) {
+for (const workspacePackage of ["config", "contracts", "database", "observability"]) {
   if (
     !workerTargetSource.includes(
       `/workspace/packages/${workspacePackage} ./packages/${workspacePackage}`,

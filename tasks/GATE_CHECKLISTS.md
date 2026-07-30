@@ -53,7 +53,9 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 - [x] `TAX-003` 严格首页布局白名单、版本草稿/预览/发布/追加回滚和原子缓存失效事件。
 - [x] `WEB-002` 首页聚合 API、canonical 公开投影、逐模块错误隔离、真实空态与双语响应式渲染。
 - [x] `SEO-001` metadata/canonical/hreflang/robots 与搜索/私有 noindex 矩阵。
-- [ ] `SEO-002` sitemap/schema、`SEO-004` a11y、`PERF-001` 性能预算。
+- [ ] `SEO-002` sitemap/schema。
+- [ ] `SEO-004` a11y。
+- [x] `PERF-001` 匿名缓存安全、请求合并、CWV/API 指标和可执行性能预算。
 
 ## G4 Interaction / Trust
 

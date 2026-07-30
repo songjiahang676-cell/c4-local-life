@@ -1680,7 +1680,7 @@ scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共
 
 ## 8.26 WEB-002 公共首页聚合契约
 
-- `GET /homepage` 是无认证、`no-store` 的聚合端点；只接受 `locale`、`regionCode` 和 `device`，
+- `GET /homepage` 是无认证聚合端点；只接受 `locale`、`regionCode` 和 `device`，
   unknown query key 返回 400。未找到对应已发布布局返回 503 Problem Details，不回退到草稿或 seed。
 - 响应固定包含布局版本、scope、设备、生成时间、`partial` 和按发布布局顺序排列的模块。当前公开
   discriminated union 只允许 HERO、HOT_SEARCHES、CITY_CHIPS、LISTING_FEED；尚无真实实现的商家、
@@ -1691,6 +1691,18 @@ scope 行锁、乐观并发、发布与追加式回滚。TAX-003 不新增公共
 - 单个数据源失败只省略对应模块并令 `partial=true`；真实空集合省略模块但不伪装为故障。Controller
   只做生成契约校验、缓存头和 Problem Details 映射，应用服务编排 Store 端口，数据库 adapter 独占
   Repository/Prisma 访问。
+
+## 8.27 PERF-001 缓存与性能遥测契约
+
+- 完整首页响应为 `public, max-age=0, s-maxage=30, stale-while-revalidate=30`；`partial=true`、
+  validation/provider/Redis 错误和 Problem Details 均为 `no-store`。
+- API/Worker 通过共享 helper 生成 `socal:homepage:v1:<locale>:<encoded-region>:<device>`；Redis
+  内容必须再次通过 `HomepageResponse` strict Schema 且与 key scope 相符，最大 1 MB。TTL 为所有
+  返回模块最小 TTL、包含 0 即不缓存、整体封顶 300 秒。
+- `POST /performance/web-vitals` 只接受 CLS/FCP/INP/LCP/TTFB、六个固定 route 类别和有限非负数值，
+  返回 no-store 202；unknown 字段、URL、标识和自由文本为 400，短窗口超限为 429。
+- Controller 只设置缓存/状态并委托应用服务；Redis adapter、请求合并和低基数指标不接触 Prisma，
+  CWV 数值不作为可信业务事实。
 
 ---
 
@@ -3095,9 +3107,9 @@ reconciliation 仍属于 `EVT-002`。
   taxonomy 解析 canonical code。每个上游调用固定 5 秒、禁 redirect、JSON 正文最多 1 MB。
 - OpenSearch/Search 不可用时，只有单垂类简单首屏额外读取 canonical PostgreSQL 列表；不对 q、价格、
   geo、cursor 或全站搜索降级，避免把故障扩大为多次错误查询。
-- 当前动态 SSR 与 API 均使用 `no-store`，先保证匿名投影不与 Session 混淆。公共 CDN/Next revalidate、
-  taxonomy 缓存、请求合并、Core Web Vitals 和具体 TTFB/LCP 预算由 `PERF-001` 在实测后决定，不能用
-  本地 fixture 延迟宣称生产 SLO。
+- 公共 Listing/Search 动态 SSR 仍按各端点既有缓存策略；首页由 `PERF-001` 只缓存 strict 匿名完整
+  投影。任何带 Session/Owner 字段、partial 或契约失败的响应不得进入共享缓存。生产 CWV/API p95
+  仍须用真实流量校准，不能用本地 fixture 延迟宣称生产 SLO。
 
 ## 15.12 首页配置缓存一致性
 
@@ -3111,11 +3123,25 @@ locale/region/version/contentHash 幂等处理并从 canonical PostgreSQL 重读
 - 当前 Web SSR 对首页聚合 API 只有一次匿名读取，固定 5 秒超时、禁 redirect、正文最大 1 MB，并用
   shared Zod contract 失败关闭；不会从浏览器并发请求十几个内部模块，也不转发 Cookie。
 - API 对支持的已启用模块并发读取且逐模块隔离；Listing feed 使用布局 limit 与当前 region scope，
-  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据，但在 `PERF-001` 完成共享缓存与实测预算前，
-  API 和 Web 都保持 `no-store`，不得宣称 CDN/Redis 命中率或生产 LCP。
+  热门词 limit 再收紧到 10。响应给出模块 TTL/tag 元数据；完整匿名响应启用短效共享缓存，
+  partial/错误保持 `no-store`，不得用测试命中率宣称生产 CDN/Redis 或 LCP 表现。
 - `homepage.layout.published` Worker 以 locale/region/version 为幂等键，在 Redis Lua 中原子推进版本
   水位并删除 desktop/tablet/mobile 派生 key。重复或乱序旧版本为 `stale`；Redis 丢失只丢可重建水位，
   不影响 PostgreSQL canonical 布局与业务数据。
+
+## 15.14 PERF-001 缓存与性能预算
+
+- API 缓存 key 完整绑定 locale/encoded-region/device，并与 Worker 失效 key 共用一个跨进程 helper。
+  Redis 条目最大 1 MB、必须 strict parse 且 scope 完全相符；组合 TTL 取模块最小值并封顶 300 秒。
+- 只有完整非 partial 响应写 Redis。miss 在 API 实例内请求合并；读/写/损坏/超时失败只记录固定
+  outcome 并回源，不把 Redis 提升为事实源。Web 同样仅缓存完整结果、最长 30 秒。
+- 完整 API 响应允许 30 秒 `s-maxage`/`stale-while-revalidate`，浏览器 `max-age=0`；partial、所有
+  Problem Details 与私有端点保持 `no-store`。CDN 最长短暂陈旧不替代 Outbox/Redis 主动失效。
+- CI 对 Web 生产 build 强制最大 gzip chunk 100 KB、所有 chunks 合计 500 KB；standalone Chromium
+  对首页初始 HTML 100 KB、脚本传输 350 KB 做独立桌面/移动预算。预算是回归上限，不是生产 CWV。
+- 首方 RUM 以默认 10% 可配置采样率提交固定 Web Vital/route/value；API p95 使用既有
+  `socal_http_request_duration_seconds`。LCP p75 2.5 秒、INP p75 200 毫秒、CLS p75 0.1 和 GET p95
+  300 毫秒仍为 Beta 校准目标，不将本地结果写成生产达成。
 
 ---
 
@@ -3415,6 +3441,18 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
 - locale、region、layout/module key、版本、content hash、query、Listing/用户 ID、正文、错误消息和
   provider detail 均不进入指标标签。HTTP RED 继续覆盖 `/v1/homepage`，正式 SLO/告警由 OBS-002
   结合生产流量设定。
+
+## 17.17 PERF-001 缓存与 Web Vitals 指标
+
+- `socal_homepage_cache_operations_total{outcome}` 只允许 hit/miss/coalesced/stored/bypassed/failed；
+  key、locale、region、device、版本、tag、内容和依赖错误不作为 label。
+- `socal_web_vital_duration_seconds{metric,route}` 的 metric 只允许 FCP/INP/LCP/TTFB，route 只允许
+  homepage/listing-list/listing-detail/search/account/other；`socal_web_vital_cls_ratio{route}`
+  独立保存无量纲 CLS，避免混合单位。
+- 客户端不发送 metric id、URL/query/slug、用户/会话/设备 ID、Cookie 或 User-Agent。服务端地址
+  HMAC 仅在内存短时限频且不导出。RUM 可被伪造，正式 Dashboard 必须同时展示样本量、流量过滤与窗口。
+- API GET p95/p99 继续从 route-level `socal_http_request_duration_seconds` 计算；不复制资源 ID
+  bucket，也不以单元测试或 CI 时延声称生产 SLO。
 
 ---
 
@@ -3805,6 +3843,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 本任务不修改 OpenAPI、Prisma 或 migration。结构化数据/sitemap 测试由 `SEO-002` 负责；全仓
   格式、类型、lint、单元/集成、八应用构建、API runtime、架构和四镜像保护门禁继续执行。
 
+## 18.34 PERF-001 缓存与性能预算验证增量
+
+- Contracts/单元测试覆盖三维 cache key 编码、strict scope/大小/TTL、0 TTL/partial 不缓存、损坏删除、
+  Redis 失败回源、并发 miss 合并和固定低基数 outcome；CI 使用真实 Redis 验证 expiry/poison cleanup。
+- HTTP/OpenAPI 测试覆盖完整首页短效共享 header、partial/错误 no-store，以及 Web Vital 202、
+  unknown/URL/越界 400、短期 HMAC 限频和无地址/错误文本指标。
+- Web 测试覆盖完整聚合最长 30 秒缓存、partial 不缓存、请求合并、固定 route 分类、采样丢弃和
+  `credentials=omit` 无 URL/标识 payload。
+- `performance:check` 在生产 build 后限制最大/全部 gzip JS chunks；standalone Playwright 在桌面和
+  Pixel 7 分别限制首页 HTML/脚本传输，并继续运行所有既有交互/SEO 场景。
+- 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
+  Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4085,6 +4136,20 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
   PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
 - 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
   robots 不得手工加入虚假 sitemap URL。
+
+## 20.21 PERF-001 缓存与 CWV 异常
+
+- 命中率异常先看 `socal_homepage_cache_operations_total` 的 miss/failed/bypassed，不打印或扫描完整
+  Redis 值。检查 API/Worker 是否使用相同 encoded-region key 和发布事件水位；不要临时关闭 strict
+  parse、放大 TTL 或缓存 partial。
+- Redis 不可用时 API/Web 应继续回源 canonical 数据；持续 failed 先修依赖，再观察 Outbox 重投。
+  允许删除 `socal:homepage:v1:*` 可重建派生 key，但不得修改 PostgreSQL 发布历史或业务 Listing。
+- 布局已发布但 CDN 短时陈旧时等待最多 30 秒 shared window 并核对下一请求；不要用浏览器长缓存、
+  Cookie vary 或任意 purge URL 扩大数据泄露面。
+- Web Vital 暴增时按固定 metric/route、样本量、版本和真实流量窗口分析，同时排除 bot/滥用；接口值
+  可被伪造，不能单独触发计费、账户、广告或风控动作。地址/HMAC/payload 不得写工单或日志。
+- JavaScript/HTML 预算失败需定位新增 chunk/客户端依赖和首屏内容；调整阈值必须有实测与评审，不能
+  为通过 CI 直接提高。生产 p75/p95 只有 RUM/RED Dashboard 接入后才可宣称达成。
 
 ---
 
@@ -4478,6 +4543,20 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 单元测试覆盖文本清洗、可信 origin、allowlist 失败关闭和完整模板矩阵；生产 standalone Chromium
   桌面/移动实际断言 title、canonical、hreflang、robots、Open Graph/Twitter 和 robots.txt。
   OpenAPI、Prisma 与 migration 不变化；全量质量和受保护 CI 全绿后才可标记 done。
+
+## 22.21 PERF-001 Web/API 缓存与性能预算验收
+
+- API/Worker 共享 locale/encoded-region/device key；只有 strict、scope 相符、≤1 MB、完整非 partial
+  首页写 Redis，TTL 为模块最小值且 ≤300 秒。损坏/错 scope/Redis 故障删除或回源，PostgreSQL 仍是
+  事实源；同实例并发 miss 只组合一次。
+- Web 只缓存完整聚合且 ≤30 秒；完整 API 为 browser max-age 0/shared 30 秒，partial、错误和私有
+  响应 no-store。发布事件原子失效三种设备 key，重复/乱序不会回退水位。
+- 浏览器按配置采样固定 CWV/route/value，省略凭据、URL/query/slug 和一切标识；API strict 202/400/
+  429，地址只做短时 HMAC 限频且不进入日志/指标。缓存和 CWV 指标仅有文档规定的低基数标签。
+- 构建后 gzip JS chunk 与生产 standalone HTML/脚本传输预算在桌面/移动自动执行；route-level RED
+  可计算 API p95。CI/本地预算不得被表述为生产 LCP/INP/CLS/p95 实测。
+- OpenAPI/生成类型、单元/HTTP/Web/Worker、真实 Redis、全量质量、API runtime、Linux Chromium 与
+  四镜像受保护门禁有真实证据后方可标记 done；Prisma/migration 不变化。
 
 ---
 
@@ -5545,3 +5624,15 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 schema；`home-page.tsx` 按受支持模块映射 Server Components，并保留双语、语义 HTML、键盘焦点、
 诚实空态与 canonical 发布/浏览入口。Worker 在既有 BullMQ 进程中消费最小化布局事件，用 Redis Lua
 原子推进派生缓存版本水位；没有新增进程、主数据库、消息系统、API 范式或不可逆迁移，因此不需要 ADR。
+
+## 30.14 PERF-001 缓存与性能实现边界
+
+`HomepageService` 只依赖 `HomepageCache` 端口；生产 `main.ts` 装配 ioredis adapter，测试可注入内存/
+失败 adapter。共享 Contracts 只提供确定性 cache identity；Worker 失效器与 API reader 不复制 key
+字符串。Redis entry 经过 strict response/schema/scope/size/TTL 校验，失败回源现有应用服务，未让
+Controller 或 Web 接触 Prisma。
+
+Web loader 以模块内 Map 做实例级完整响应短缓存与 promise 合并，不把 Cookie/Owner 投影或 partial
+响应保存到 Next/浏览器。`PerformanceModule` 只接收固定 Web Vital contract 并写已有 MetricsRegistry；
+未新增服务、主数据库、队列或分析事实库。公共 OpenAPI 从 69 paths / 177 schemas / 79 operationIds
+增量为 70 / 181 / 80；没有 Prisma/migration 变化或架构边界变化，因此不需要 ADR。

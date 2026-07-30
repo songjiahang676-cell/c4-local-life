@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { WebVitalsReporter } from "@/components/web-vitals-reporter";
 import { publicWebOrigin } from "@/lib/seo";
 import "./globals.css";
 
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-Hans">
-      <body>{children}</body>
+      <body>
+        {children}
+        <WebVitalsReporter />
+      </body>
     </html>
   );
 }

@@ -165,3 +165,15 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
 - locale、region、layout/module key、版本、content hash、query、Listing/用户 ID、正文、错误消息和
   provider detail 均不进入指标标签。HTTP RED 继续覆盖 `/v1/homepage`，正式 SLO/告警由 OBS-002
   结合生产流量设定。
+
+## 17.17 PERF-001 缓存与 Web Vitals 指标
+
+- `socal_homepage_cache_operations_total{outcome}` 只允许 hit/miss/coalesced/stored/bypassed/failed；
+  key、locale、region、device、版本、tag、内容和依赖错误不作为 label。
+- `socal_web_vital_duration_seconds{metric,route}` 的 metric 只允许 FCP/INP/LCP/TTFB，route 只允许
+  homepage/listing-list/listing-detail/search/account/other；`socal_web_vital_cls_ratio{route}`
+  独立保存无量纲 CLS，避免混合单位。
+- 客户端不发送 metric id、URL/query/slug、用户/会话/设备 ID、Cookie 或 User-Agent。服务端地址
+  HMAC 仅在内存短时限频且不导出。RUM 可被伪造，正式 Dashboard 必须同时展示样本量、流量过滤与窗口。
+- API GET p95/p99 继续从 route-level `socal_http_request_duration_seconds` 计算；不复制资源 ID
+  bucket，也不以单元测试或 CI 时延声称生产 SLO。

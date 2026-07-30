@@ -1,7 +1,7 @@
 import { type DynamicModule, Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import type { ApiEnvironment } from "@socal/config";
-import type { MetricsRegistry } from "@socal/observability";
+import { MetricsRegistry } from "@socal/observability";
 import { API_ENVIRONMENT } from "./common/api-environment.token";
 import { AuthorizationModule } from "./common/authorization/authorization.module";
 import { CsrfOriginGuard } from "./common/csrf-origin.guard";
@@ -16,6 +16,7 @@ import type { PasswordNotificationGateway } from "./modules/auth/password-notifi
 import type { PasswordStore } from "./modules/auth/password.store";
 import { HealthModule } from "./modules/health/health.module";
 import type { HomepageDataSource } from "./modules/homepage/homepage-data.source";
+import type { HomepageCache } from "./modules/homepage/homepage-cache";
 import { HomepageModule } from "./modules/homepage/homepage.module";
 import type { HomepageLayoutStore } from "./modules/homepage-layout/homepage-layout.store";
 import { ListingsModule } from "./modules/listings/listings.module";
@@ -27,6 +28,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import type { NotificationStore } from "./modules/notifications/notification.store";
 import type { OrganizationStore } from "./modules/organizations/organization.store";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { PerformanceModule } from "./modules/performance/performance.module";
 import { SearchModule } from "./modules/search/search.module";
 import type { SearchDiscoveryStore } from "./modules/search/search-discovery.store";
 import type { SearchStore } from "./modules/search/search.store";
@@ -57,6 +59,7 @@ export class AppModule {
     metrics?: MetricsRegistry,
     homepageLayoutStore?: HomepageLayoutStore,
     homepageDataSource?: HomepageDataSource,
+    homepageCache?: HomepageCache,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -72,11 +75,18 @@ export class AppModule {
         ),
         AdminModule.register(environment, mfaStore, moderationStore, metrics),
         HealthModule,
-        HomepageModule.register(environment, homepageLayoutStore, homepageDataSource, metrics),
+        HomepageModule.register(
+          environment,
+          homepageLayoutStore,
+          homepageDataSource,
+          metrics,
+          homepageCache,
+        ),
         ListingsModule.register(environment, listingStore, taxonomyStore),
         MediaModule.register(environment, mediaStore, mediaObjectStorage),
         NotificationsModule.register(environment, notificationStore),
         OrganizationsModule.register(environment, organizationStore),
+        PerformanceModule.register(metrics ?? new MetricsRegistry()),
         SearchModule.register(environment, searchStore, metrics, searchDiscoveryStore),
         TrustSafetyModule.register(environment, trustSafetyStore),
       ],

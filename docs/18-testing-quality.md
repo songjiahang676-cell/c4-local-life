@@ -382,3 +382,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   及 Web/Admin robots.txt；不能只断言 Metadata 对象。
 - 本任务不修改 OpenAPI、Prisma 或 migration。结构化数据/sitemap 测试由 `SEO-002` 负责；全仓
   格式、类型、lint、单元/集成、八应用构建、API runtime、架构和四镜像保护门禁继续执行。
+
+## 18.34 PERF-001 缓存与性能预算验证增量
+
+- Contracts/单元测试覆盖三维 cache key 编码、strict scope/大小/TTL、0 TTL/partial 不缓存、损坏删除、
+  Redis 失败回源、并发 miss 合并和固定低基数 outcome；CI 使用真实 Redis 验证 expiry/poison cleanup。
+- HTTP/OpenAPI 测试覆盖完整首页短效共享 header、partial/错误 no-store，以及 Web Vital 202、
+  unknown/URL/越界 400、短期 HMAC 限频和无地址/错误文本指标。
+- Web 测试覆盖完整聚合最长 30 秒缓存、partial 不缓存、请求合并、固定 route 分类、采样丢弃和
+  `credentials=omit` 无 URL/标识 payload。
+- `performance:check` 在生产 build 后限制最大/全部 gzip JS chunks；standalone Playwright 在桌面和
+  Pixel 7 分别限制首页 HTML/脚本传输，并继续运行所有既有交互/SEO 场景。
+- 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
+  Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。

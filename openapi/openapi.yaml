@@ -25,6 +25,8 @@ tags:
     description: Public search and query suggestions
   - name: Homepage
     description: Public modular homepage projection
+  - name: Performance
+    description: Bounded first-party performance telemetry
   - name: Listings
     description: Classified listing lifecycle and public views
   - name: Media
@@ -1082,8 +1084,14 @@ paths:
           description: Available real-data homepage modules in published layout order
           headers:
             Cache-Control:
-              description: Shared caching remains disabled until PERF-001 validates production budgets.
-              schema: { type: string, const: no-store }
+              description: >
+                Complete anonymous projections allow a short shared-cache window; partial
+                dependency responses override this header with no-store.
+              schema:
+                type: string
+                enum:
+                  - public, max-age=0, s-maxage=30, stale-while-revalidate=30
+                  - no-store
           content:
             application/json:
               schema:
@@ -1092,6 +1100,36 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /performance/web-vitals:
+    post:
+      tags: [Performance]
+      security: []
+      summary: Record a bounded first-party Core Web Vital
+      description: >
+        Accepts one sampled browser metric using only fixed route and metric enums.
+        URLs, queries, identifiers, user-agent strings and free-form properties are not accepted.
+        Values are operational telemetry, not trusted business or billing facts.
+      operationId: recordWebVital
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebVitalReport"
+      responses:
+        "202":
+          description: Metric accepted for bounded in-memory aggregation
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebVitalAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /listings:
     get:
       tags: [Listings]
@@ -4389,6 +4427,32 @@ components:
             $ref: "#/components/schemas/HomepageModule"
         partial: { type: boolean }
         generatedAt: { type: string, format: date-time }
+    WebVitalName:
+      type: string
+      enum: [CLS, FCP, INP, LCP, TTFB]
+    WebVitalRoute:
+      type: string
+      enum: [homepage, listing-list, listing-detail, search, account, other]
+    WebVitalReport:
+      type: object
+      required: [name, value, route]
+      additionalProperties: false
+      properties:
+        name:
+          $ref: "#/components/schemas/WebVitalName"
+        value:
+          type: number
+          minimum: 0
+          maximum: 600000
+          description: Milliseconds for duration metrics and a unitless ratio for CLS.
+        route:
+          $ref: "#/components/schemas/WebVitalRoute"
+    WebVitalAcceptedResponse:
+      type: object
+      required: [accepted]
+      additionalProperties: false
+      properties:
+        accepted: { type: boolean, const: true }
     CursorPage:
       type: object
       required: [hasMore]

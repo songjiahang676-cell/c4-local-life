@@ -101,6 +101,9 @@ describe("observability primitives", () => {
     runtime.metrics.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
     runtime.metrics.homepageModule({ kind: "LISTING_FEED", outcome: "success" });
     runtime.metrics.homepageCacheInvalidation("invalidated");
+    runtime.metrics.homepageCacheOperation("hit");
+    runtime.metrics.webVital({ name: "LCP", route: "homepage", value: 2_450 });
+    runtime.metrics.webVital({ name: "CLS", route: "listing-detail", value: 0.08 });
 
     const metrics = runtime.metrics.renderPrometheus();
     expect(metrics).toContain(
@@ -137,6 +140,13 @@ describe("observability primitives", () => {
       'socal_homepage_modules_total{kind="LISTING_FEED",outcome="success"} 1',
     );
     expect(metrics).toContain('socal_homepage_cache_invalidations_total{outcome="invalidated"} 1');
+    expect(metrics).toContain('socal_homepage_cache_operations_total{outcome="hit"} 1');
+    expect(metrics).toContain(
+      'socal_web_vital_duration_seconds_bucket{metric="LCP",route="homepage",le="2.5"} 1',
+    );
+    expect(metrics).toContain(
+      'socal_web_vital_cls_ratio_bucket{route="listing-detail",le="0.1"} 1',
+    );
     expect(metrics).not.toContain("person@example.com");
   });
 });

@@ -25,6 +25,7 @@
     "@socal/database": "workspace:*",
     "@socal/observability": "workspace:*",
     "fastify": "5.10.0",
+    "ioredis": "5.11.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "yaml": "2.9.0"

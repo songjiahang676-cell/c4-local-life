@@ -185,7 +185,16 @@ scope revision 与当前版本双重乐观校验；已发布版本由数据库�
 独立来源阈值及读取时二次敏感筛查；Listing 只允许当前地区、PUBLISHED 且未过期的 canonical 投影，
 并在首页 adapter 再次移除精确坐标、正文、联系方式、审核/风险和内部统计。模块依赖错误不会把 provider
 异常或私有字段反射给客户端；未实现的商家、师傅、广告、行情或商业入口必须隐藏，不能用 seed/fixture
-占位。首页 SSR 不转发 Cookie，响应保持 `no-store`，缓存失效日志和指标不含 scope、内容或资源 ID。
+占位。首页 SSR 不转发 Cookie。只有 strict、完整、非 partial 的匿名投影可进入按
+locale/region/device 隔离的短效 Web/Redis/CDN 缓存；partial、错误、错 scope、损坏或过大条目
+`no-store`/删除并回源。缓存失效日志和指标不含 scope、内容或资源 ID。
+
+## 性能遥测边界
+
+浏览器 CWV 只按可配置概率发送 CLS/FCP/INP/LCP/TTFB、固定页面类别和数值；请求使用
+`credentials=omit`，不发送 URL、query、slug、Cookie、User-Agent、用户/会话/设备 ID 或自由文本。
+API 只做低基数直方图聚合，并用进程随机 HMAC 对客户端地址做一分钟限频；原始地址、hash 和 metric
+payload 不写日志或指标。该匿名遥测可被伪造，只用于运维趋势，不能用于账号、计费、广告或风控结论。
 
 ## SEO metadata 与爬虫边界
 

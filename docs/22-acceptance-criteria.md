@@ -347,3 +347,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - 单元测试覆盖文本清洗、可信 origin、allowlist 失败关闭和完整模板矩阵；生产 standalone Chromium
   桌面/移动实际断言 title、canonical、hreflang、robots、Open Graph/Twitter 和 robots.txt。
   OpenAPI、Prisma 与 migration 不变化；全量质量和受保护 CI 全绿后才可标记 done。
+
+## 22.21 PERF-001 Web/API 缓存与性能预算验收
+
+- API/Worker 共享 locale/encoded-region/device key；只有 strict、scope 相符、≤1 MB、完整非 partial
+  首页写 Redis，TTL 为模块最小值且 ≤300 秒。损坏/错 scope/Redis 故障删除或回源，PostgreSQL 仍是
+  事实源；同实例并发 miss 只组合一次。
+- Web 只缓存完整聚合且 ≤30 秒；完整 API 为 browser max-age 0/shared 30 秒，partial、错误和私有
+  响应 no-store。发布事件原子失效三种设备 key，重复/乱序不会回退水位。
+- 浏览器按配置采样固定 CWV/route/value，省略凭据、URL/query/slug 和一切标识；API strict 202/400/
+  429，地址只做短时 HMAC 限频且不进入日志/指标。缓存和 CWV 指标仅有文档规定的低基数标签。
+- 构建后 gzip JS chunk 与生产 standalone HTML/脚本传输预算在桌面/移动自动执行；route-level RED
+  可计算 API p95。CI/本地预算不得被表述为生产 LCP/INP/CLS/p95 实测。
+- OpenAPI/生成类型、单元/HTTP/Web/Worker、真实 Redis、全量质量、API runtime、Linux Chromium 与
+  四镜像受保护门禁有真实证据后方可标记 done；Prisma/migration 不变化。

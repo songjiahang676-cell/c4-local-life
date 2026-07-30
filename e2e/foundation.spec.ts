@@ -45,6 +45,33 @@ test("renders the localized public homepage at desktop and mobile widths", async
   );
 });
 
+test("keeps the localized homepage within the initial HTML and JavaScript budgets", async ({
+  page,
+  request,
+}) => {
+  const documentResponse = await request.get("/en-US");
+  const html = await documentResponse.body();
+  expect(documentResponse.ok()).toBe(true);
+  expect(html.byteLength).toBeLessThanOrEqual(100_000);
+
+  const response = await page.goto("/en-US");
+  expect(response?.ok()).toBe(true);
+  await page.waitForLoadState("networkidle");
+  const javascriptBytes = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .map((entry) => entry as PerformanceResourceTiming)
+      .filter((entry) => entry.initiatorType === "script")
+      .reduce(
+        (total, entry) =>
+          total + (entry.encodedBodySize || entry.transferSize || entry.decodedBodySize),
+        0,
+      ),
+  );
+  expect(javascriptBytes).toBeGreaterThan(0);
+  expect(javascriptBytes).toBeLessThanOrEqual(350_000);
+});
+
 test("renders bilingual public Listing filters and sponsored status from SSR data", async ({
   page,
   request,
@@ -1241,8 +1268,8 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   };
   expect(contractResponse.ok()).toBe(true);
   expect(contract.openapi).toMatch(/^3\.1\./);
-  expect(Object.keys(contract.paths)).toHaveLength(69);
-  expect(Object.keys(contract.components.schemas)).toHaveLength(177);
+  expect(Object.keys(contract.paths)).toHaveLength(70);
+  expect(Object.keys(contract.components.schemas)).toHaveLength(181);
 
   const problem = (await invalidResponse.json()) as Record<string, unknown>;
   expect(invalidResponse.status()).toBe(400);

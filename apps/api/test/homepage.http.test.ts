@@ -109,10 +109,12 @@ class MemoryHomepageLayoutStore implements HomepageLayoutStore {
   }
 }
 
+let cityDependencyFails = false;
 const homepageDataSource: HomepageDataSource = {
   listTrending: () => Promise.resolve([]),
-  listCities: () =>
-    Promise.resolve([
+  listCities: () => {
+    if (cityDependencyFails) return Promise.reject(new Error("private city dependency detail"));
+    return Promise.resolve([
       {
         id: "76000000-0000-4000-8000-000000000001",
         code: "US-CA-IRVINE",
@@ -120,7 +122,8 @@ const homepageDataSource: HomepageDataSource = {
         type: "CITY",
         name: "Irvine",
       },
-    ]),
+    ]);
+  },
   listListings: () => Promise.resolve([]),
 };
 
@@ -150,14 +153,16 @@ describe("public homepage HTTP API", () => {
     await app.close();
   });
 
-  it("returns strict published modules and no shared cache", async () => {
+  it("returns strict published modules with the bounded anonymous shared-cache policy", async () => {
     const response = await server.inject({
       method: "GET",
       url: "/v1/homepage?locale=en-US&regionCode=US-CA-SOCAL&device=mobile",
     });
     const body = response.json<HomepageResponse>();
     expect(response.statusCode).toBe(200);
-    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["cache-control"]).toBe(
+      "public, max-age=0, s-maxage=30, stale-while-revalidate=30",
+    );
     expect(body.layout).toEqual({
       version: 1,
       locale: "en-US",
@@ -177,6 +182,19 @@ describe("public homepage HTTP API", () => {
     expect(response.statusCode).toBe(400);
     expect(response.headers["content-type"]).toContain("application/problem+json");
     expect(response.body).not.toContain("private@example.com");
+  });
+
+  it("keeps a dependency-partial response out of every shared cache", async () => {
+    cityDependencyFails = true;
+    const response = await server.inject({
+      method: "GET",
+      url: "/v1/homepage?locale=en-US&regionCode=US-CA-SOCAL&device=desktop",
+    });
+    cityDependencyFails = false;
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json<HomepageResponse>().partial).toBe(true);
+    expect(response.body).not.toContain("private city dependency detail");
   });
 
   it("maps a missing published scope to service unavailable", async () => {

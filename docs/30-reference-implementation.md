@@ -249,3 +249,15 @@ OpenSearch client 或 API 应用服务。`public-listing-routes.tsx` 只处理 l
 schema；`home-page.tsx` 按受支持模块映射 Server Components，并保留双语、语义 HTML、键盘焦点、
 诚实空态与 canonical 发布/浏览入口。Worker 在既有 BullMQ 进程中消费最小化布局事件，用 Redis Lua
 原子推进派生缓存版本水位；没有新增进程、主数据库、消息系统、API 范式或不可逆迁移，因此不需要 ADR。
+
+## 30.14 PERF-001 缓存与性能实现边界
+
+`HomepageService` 只依赖 `HomepageCache` 端口；生产 `main.ts` 装配 ioredis adapter，测试可注入内存/
+失败 adapter。共享 Contracts 只提供确定性 cache identity；Worker 失效器与 API reader 不复制 key
+字符串。Redis entry 经过 strict response/schema/scope/size/TTL 校验，失败回源现有应用服务，未让
+Controller 或 Web 接触 Prisma。
+
+Web loader 以模块内 Map 做实例级完整响应短缓存与 promise 合并，不把 Cookie/Owner 投影或 partial
+响应保存到 Next/浏览器。`PerformanceModule` 只接收固定 Web Vital contract 并写已有 MetricsRegistry；
+未新增服务、主数据库、队列或分析事实库。公共 OpenAPI 从 69 paths / 177 schemas / 79 operationIds
+增量为 70 / 181 / 80；没有 Prisma/migration 变化或架构边界变化，因此不需要 ADR。

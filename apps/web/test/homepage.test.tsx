@@ -2,7 +2,7 @@ import type { HomepageResponse } from "@socal/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HomePage } from "../src/components/home-page";
-import { loadHomepage } from "../src/lib/homepage";
+import { createHomepageLoader } from "../src/lib/homepage";
 
 const hash = "b".repeat(64);
 const response: HomepageResponse = {
@@ -141,7 +141,7 @@ describe("real-data homepage", () => {
         }),
       );
     });
-    vi.stubGlobal("fetch", fetchMock);
+    const loadHomepage = createHomepageLoader(fetchMock);
     await expect(loadHomepage("en-US")).resolves.toEqual({ kind: "ready", response });
     const [requestedUrl, requestInit] = fetchMock.mock.calls[0] ?? [];
     expect(String(requestedUrl)).toBe(
@@ -159,8 +159,7 @@ describe("real-data homepage", () => {
 
   it("fails closed on an invalid or oversized response", async () => {
     vi.stubEnv("API_BASE_URL", "http://api.example.invalid/v1");
-    vi.stubGlobal(
-      "fetch",
+    const loadHomepage = createHomepageLoader(
       vi.fn(() =>
         Promise.resolve(
           new Response('{"layout":{"version":2}}', {
@@ -171,5 +170,61 @@ describe("real-data homepage", () => {
       ),
     );
     await expect(loadHomepage("en-US")).resolves.toEqual({ kind: "unavailable" });
+  });
+
+  it("coalesces requests and caches only complete validated aggregates for at most 30 seconds", async () => {
+    vi.stubEnv("API_BASE_URL", "http://api.example.invalid/v1");
+    let resolveResponse: ((value: Response) => void) | undefined;
+    const request = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveResponse = resolve;
+        }),
+    );
+    let now = 1_000;
+    const loadHomepage = createHomepageLoader(request, () => now);
+    const first = loadHomepage("en-US");
+    const second = loadHomepage("en-US");
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    resolveResponse?.(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { kind: "ready", response },
+      { kind: "ready", response },
+    ]);
+    await expect(loadHomepage("en-US")).resolves.toEqual({ kind: "ready", response });
+    expect(request).toHaveBeenCalledOnce();
+
+    now += 30_001;
+    const next = loadHomepage("en-US");
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    resolveResponse?.(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await expect(next).resolves.toEqual({ kind: "ready", response });
+  });
+
+  it("does not cache dependency-partial aggregates", async () => {
+    vi.stubEnv("API_BASE_URL", "http://api.example.invalid/v1");
+    const partial = { ...response, partial: true };
+    const request = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(partial), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    const loadHomepage = createHomepageLoader(request, () => 1_000);
+    await loadHomepage("en-US");
+    await loadHomepage("en-US");
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });

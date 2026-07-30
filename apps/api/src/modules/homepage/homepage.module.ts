@@ -8,6 +8,7 @@ import type { HomepageLayoutStore } from "../homepage-layout/homepage-layout.sto
 import { DatabaseHomepageDataSource } from "./database-homepage-data.source";
 import { HOMEPAGE_DATA_SOURCE, type HomepageDataSource } from "./homepage-data.source";
 import { HomepageController } from "./homepage.controller";
+import { HOMEPAGE_CACHE, type HomepageCache } from "./homepage-cache";
 import { HomepageService } from "./homepage.service";
 
 @Module({})
@@ -17,6 +18,7 @@ export class HomepageModule {
     layoutStore?: HomepageLayoutStore,
     dataSource?: HomepageDataSource,
     metrics?: MetricsRegistry,
+    cache?: HomepageCache,
   ): DynamicModule {
     const dataSourceProviders: Provider[] = dataSource
       ? [{ provide: HOMEPAGE_DATA_SOURCE, useValue: dataSource }]
@@ -31,6 +33,7 @@ export class HomepageModule {
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...(metrics ? [{ provide: API_METRICS, useValue: metrics }] : []),
+        ...(cache ? [{ provide: HOMEPAGE_CACHE, useValue: cache }] : []),
         ...dataSourceProviders,
         HomepageService,
       ],

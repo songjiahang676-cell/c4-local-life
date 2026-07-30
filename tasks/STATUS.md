@@ -5,20 +5,27 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：实现 `SEO-001` Metadata/canonical/hreflang/robots
-- 进度：8 个 G3 任务、54/101 个总任务完成
-- 风险：canonical 必须只指向当前规范路由，hreflang 只能声明真实等价语言页；搜索/筛选/私有页面必须保持 noindex，不能把任意组合页扩散到索引
+- 目标：实现 `PERF-001` Web/API 缓存与性能预算
+- 进度：9 个 G3 任务、55/101 个总任务完成
+- 风险：共享缓存只能保存匿名公开投影并完整绑定 locale/region/device；Redis 故障必须回源 PostgreSQL，发布失效不得被乱序事件回滚；本地预算不能冒充生产 CWV/API p95
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target | Status        | Notes                                                    |
-| ------- | -------------------- | ---------- | ------ | ------------- | -------------------------------------------------------- |
-| SEO-001 | @songjiahang676-cell | 2026-07-29 | SEO    | merge pending | protected checks passed；evidence head and merge pending |
+| Task     | Owner                | Started    | Target      | Status    | Notes                                     |
+| -------- | -------------------- | ---------- | ----------- | --------- | ----------------------------------------- |
+| PERF-001 | @songjiahang676-cell | 2026-07-29 | Performance | validated | protected evidence-head and merge pending |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| PERF-001 protected checks       | PR #41 / run `30505661335`            | 111 files / 490 real-service tests；Linux 26/26 E2E；four images passed    | 2026-07-29 |
+| PERF-001 local quality          | `pnpm ci:quality`                     | 84 files / 402 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-29 |
+| PERF-001 runtime/browser        | API runtime + production Playwright   | RED/Web Vital/OpenAPI；desktop/mobile Chromium 26/26 passed                | 2026-07-29 |
+| PERF-001 architecture           | `scripts/check-architecture.sh`       | 101 tasks；62 models；70 paths；181 schemas；36 JSON files passed          | 2026-07-29 |
+| SEO-001 final main quality      | run `30503597873` / `148a547`         | merged main quality + four non-root images passed                          | 2026-07-29 |
+| SEO-001 protected merge         | PR #40 / merge `148a547`              | protected squash merge completed                                           | 2026-07-29 |
+| SEO-001 evidence head           | PR #40 / run `30503181356`            | final head real services、24/24 E2E and four images passed                 | 2026-07-29 |
 | SEO-001 protected checks        | PR #40 / run `30502653322`            | 107 files / 473 real-service tests；Linux 24/24 E2E；four images passed    | 2026-07-29 |
 | SEO-001 local quality           | `pnpm ci:quality`                     | 81 files / 387 tests；9 typechecks/lints；8 builds passed                  | 2026-07-29 |
 | SEO-001 runtime/browser         | API runtime + production Playwright   | metadata/robots matrix；desktop/mobile Chromium 24/24 passed               | 2026-07-29 |
@@ -253,7 +260,9 @@
   `30491653244` 全绿；`WEB-001` 已由 PR #37 / evidence-head run `30494632057` 受保护合并为
   `6532c81`，final main run `30495144658` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `WEB-002`。
   `WEB-002` 已由 PR #39 / evidence-head run `30500526588` 受保护合并为 `f0726df`，final main run
-  `30500952462` 全绿；现按 `IMPLEMENTATION_SEQUENCE.md` 执行 `SEO-001`。
+  `30500952462` 全绿；`SEO-001` 已由 PR #40 / evidence-head run `30503181356` 受保护合并为
+  `148a547`，final main run `30503597873` 全绿；`PERF-001` 已在 PR #41 / run `30505661335`
+  通过受保护真实服务、Linux E2E 与四镜像门禁，正在等待 evidence-head 复验和受保护合并。
   `MEDIA-003` 仍属于 G4 受限验证文件。
 - 需要生产品牌域名与资产权属确认。
 - 需要法律/运营确认高风险分类和数据保留期限。
