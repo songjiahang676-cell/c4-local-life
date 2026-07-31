@@ -21,7 +21,7 @@ export default async function AccountListingsPage({
   const english = locale === "en-US";
 
   return (
-    <main className="accountListingsPage pageShell">
+    <main className="accountListingsPage pageShell" id="main-content" tabIndex={-1}>
       <nav aria-label={english ? "Breadcrumb" : "面包屑"}>
         <Link href={`/${locale}`}>{english ? "Home" : "首页"}</Link>
         <span aria-hidden="true">/</span>

@@ -6,19 +6,22 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：完成 `SEO-004` axe、键盘/焦点、表单错误、200% reflow 与人工 WCAG 2.2 AA 基线，关闭 Gate 3
-- 进度：10 个 G3 任务、56/101 个总任务完成；`SEO-002` 已受保护合并并通过主分支终检
-- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；屏幕阅读器人工基线必须保留真实工具/步骤/结果，不能用 axe 代替或伪造
+- 进度：10 个 G3 任务、56/101 个总任务完成；`SEO-004` 自动化基线与本地完整质量门已通过
+- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能用 axe 代替或伪造
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target      | Status         | Notes                                   |
-| ------- | -------------------- | ---------- | ----------- | -------------- | --------------------------------------- |
-| SEO-004 | @songjiahang676-cell | 2026-07-30 | Gate 3 exit | implementation | axe/manual baseline and AA gap register |
+| Task    | Owner                | Started    | Target      | Status                  | Notes                                   |
+| ------- | -------------------- | ---------- | ----------- | ----------------------- | --------------------------------------- |
+| SEO-004 | @songjiahang676-cell | 2026-07-30 | Gate 3 exit | manual evidence pending | automated gate 34/34；A11Y-001/002 open |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-004 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-30 |
+| SEO-004 a11y/browser            | production Playwright                 | 34/34；axe 8/8；keyboard/error/320px/forced-colors passed                  | 2026-07-30 |
+| SEO-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI；101 tasks / 62 models / 70 paths / 181 schemas passed         | 2026-07-30 |
 | SEO-002 final main quality      | run `30605241894` / `f9507c2`         | merged main quality + Linux 26/26 E2E + four images passed                 | 2026-07-30 |
 | SEO-002 protected merge         | PR #42 / merge `f9507c2`              | protected squash merge completed                                           | 2026-07-30 |
 | SEO-002 evidence head           | PR #42 / run `30604847032`            | final head real services、Linux 26/26 E2E and four images passed           | 2026-07-30 |

@@ -200,9 +200,6 @@ function PublicSiteHeader({ locale, pathname }: { locale: Locale; pathname: stri
   const text = copy[locale];
   return (
     <>
-      <a className="publicSkipLink" href="#main-content">
-        {locale === "zh-Hans" ? "跳到主要内容" : "Skip to main content"}
-      </a>
       <header className="publicSiteHeader">
         <div className="publicHeaderTop pageShell">
           <Link
@@ -226,7 +223,7 @@ function PublicSiteHeader({ locale, pathname }: { locale: Locale; pathname: stri
               {text.search}
             </label>
             <input id="site-search" name="q" placeholder={text.searchPlaceholder} maxLength={120} />
-            <button type="submit">
+            <button aria-label={text.search} type="submit">
               <AppIcon icon={Search} size={18} />
               <span>{text.search}</span>
             </button>
@@ -527,7 +524,7 @@ export function PublicListingIndexView({
     <>
       {breadcrumb ? <StructuredData nodes={breadcrumb} /> : null}
       <PublicSiteHeader locale={locale} pathname={pathname} />
-      <main className="publicListingPage pageShell" id="main-content">
+      <main className="publicListingPage pageShell" id="main-content" tabIndex={-1}>
         <nav
           className="publicBreadcrumbs"
           aria-label={locale === "zh-Hans" ? "面包屑" : "Breadcrumb"}
@@ -676,7 +673,7 @@ export function PublicListingDetailView({
     <>
       {structuredNodes.length > 0 ? <StructuredData nodes={structuredNodes} /> : null}
       <PublicSiteHeader locale={locale} pathname={pathname} />
-      <main className="publicDetailPage pageShell" id="main-content">
+      <main className="publicDetailPage pageShell" id="main-content" tabIndex={-1}>
         <nav
           className="publicBreadcrumbs"
           aria-label={locale === "zh-Hans" ? "面包屑" : "Breadcrumb"}
@@ -806,7 +803,7 @@ export function PublicListingDetailUnavailable({
   return (
     <>
       <PublicSiteHeader locale={locale} pathname={pathname} />
-      <main className="publicDetailPage pageShell" id="main-content">
+      <main className="publicDetailPage pageShell" id="main-content" tabIndex={-1}>
         <section className="publicState card" role="alert">
           <AppIcon icon={ShieldCheck} size={28} />
           <h1>{text.unavailableTitle}</h1>

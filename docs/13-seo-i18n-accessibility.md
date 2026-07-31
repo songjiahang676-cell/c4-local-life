@@ -144,3 +144,17 @@ expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次�
 - 成功/失败响应均 `X-Robots-Tag: noindex`、`nosniff`；成功也 `no-store` 以避免到期记录被 CDN stale
   保留。失败只写固定 `seo.sitemap_generation_failed`/scope 结构化事件与低基数 Server-Timing，
   不记录 URL、cursor、Listing/用户 ID、内容或 provider error。
+
+## 13.13 SEO-004 可访问性基线
+
+- 所有当前 Web 模板从 locale layout 获得本地化 skip link；每个实际 `<main>` 提供唯一
+  `#main-content` 和程序化焦点目标。激活跳转后主内容获得可见焦点，不能只滚动页面。
+- 主要公开、发布、私有和 Admin 边界由固定 axe 4.12.1 在 production standalone Desktop Chrome 与
+  Pixel 7 扫描 WCAG 2.0/2.1/2.2 A/AA 标签；隐藏移动文字的按钮仍必须保留显式 accessible name。
+- 普通文字对比度至少 4.5:1；交互目标至少满足 WCAG 2.2 的 24 CSS px。表单错误使用 alert 摘要、
+  `aria-invalid`、`aria-describedby`，并把焦点移到第一处错误。
+- 320 CSS px reflow、forced colors、reduced motion 与横向页面溢出进入生产浏览器回归；该证据不等于
+  真实 200% 浏览器缩放或屏幕阅读器人工通过。
+- 实际工具、模板、结果和未关闭项只记录在
+  [`accessibility-baseline.md`](./accessibility-baseline.md)。真实 Narrator/Edge 与 200% zoom 未完成
+  前，`SEO-004` 和 Gate 3 必须保持未关闭。

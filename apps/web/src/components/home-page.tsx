@@ -340,7 +340,7 @@ export function HomePage({
     <>
       {includeStructuredData ? <StructuredData nodes={websiteStructuredData(locale)} /> : null}
       <Header locale={locale} />
-      <main className="pageShell homeLayout homepageRealData">
+      <main className="pageShell homeLayout homepageRealData" id="main-content" tabIndex={-1}>
         <QuickPublish locale={locale} />
         <div className="centerColumn">
           {model.kind === "unavailable" || heroes.length === 0 ? (

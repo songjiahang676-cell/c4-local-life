@@ -409,3 +409,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   八应用构建、API runtime、架构和四镜像保护门禁继续执行。
 - 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
   Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。
+
+## 18.36 SEO-004 可访问性验证增量
+
+- `@axe-core/playwright` 是根工作区固定直接依赖；`test:a11y` 构建生产应用后执行，
+  `test:a11y:ci` 复用 CI 构建。不得禁用规则、排除失败节点或把 incomplete 当作通过。
+- Desktop Chrome 与 Pixel 7 覆盖首页、列表/筛选、详情、发布初始/错误、私有账户和 Admin 登录；
+  每次扫描 WCAG 2.0/2.1/2.2 A/AA 标签，输出具体 rule 和 selector 以便修复。
+- 键盘测试从页面第一次 Tab 开始，验证本地化 skip link、可见焦点和 Enter 后主内容焦点；表单测试
+  验证 alert、首错焦点、`aria-invalid`/`aria-describedby` 及错误目标尺寸。
+- 320 CSS px、forced colors、reduced motion 与横向溢出自动回归；人工 200% browser zoom 和至少一种
+  主流屏幕阅读器必须留下工具/版本/路径/播报结果，axe 或 accessibility tree 不能替代。
+- 全仓质量、既有 production E2E、受保护真实服务与四镜像仍必须通过。完整矩阵和缺口 ID 见
+  [`accessibility-baseline.md`](./accessibility-baseline.md)。
