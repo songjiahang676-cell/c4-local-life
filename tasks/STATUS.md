@@ -5,20 +5,21 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `SEO-002` 受保护证据后进入 `SEO-004` 可访问性基线
-- 进度：10 个 G3 任务、56/101 个总任务本地完成；`SEO-002` 受保护证据待补
+- 目标：完成 `SEO-002` 证据头、受保护合并与主分支终检后进入 `SEO-004` 可访问性基线
+- 进度：10 个 G3 任务、56/101 个总任务本地完成；`SEO-002` 首次受保护证据已通过
 - 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；sitemap 月分片达到 10,000 条预算前需增加 canonical 日期过滤/manifest，不能静默截断或改信 OpenSearch
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target       | Status           | Notes                                 |
-| ------- | -------------------- | ---------- | ------------ | ---------------- | ------------------------------------- |
-| SEO-002 | @songjiahang676-cell | 2026-07-29 | protected CI | evidence pending | local quality/runtime/Chromium passed |
+| Task    | Owner                | Started    | Target          | Status                | Notes                                            |
+| ------- | -------------------- | ---------- | --------------- | --------------------- | ------------------------------------------------ |
+| SEO-002 | @songjiahang676-cell | 2026-07-29 | protected merge | evidence-head pending | protected real-service/Linux/image checks passed |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-002 protected checks        | PR #42 / run `30508293320`            | 112 files / 499 real-service tests；Linux 26/26 E2E；four images passed    | 2026-07-29 |
 | SEO-002 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-29 |
 | SEO-002 runtime/browser         | API runtime + production Playwright   | JSON-LD/robots/sitemaps；desktop/mobile Chromium 26/26 passed              | 2026-07-29 |
 | SEO-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks；62 models；70 paths；181 schemas；36 JSON files passed          | 2026-07-29 |
