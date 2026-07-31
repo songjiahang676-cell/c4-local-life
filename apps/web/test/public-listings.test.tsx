@@ -383,8 +383,8 @@ describe("SEO metadata matrix", () => {
         disallow: expect.arrayContaining(["/v1/", "/health/", "/zh-Hans/account", "/en-US/post"]),
       }),
       host: "https://www.socal.test",
+      sitemap: "https://www.socal.test/sitemap.xml",
     });
-    expect(webRobots()).not.toHaveProperty("sitemap");
   });
 });
 

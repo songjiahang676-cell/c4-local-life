@@ -205,3 +205,17 @@ payload 不写日志或指标。该匿名遥测可被伪造，只用于运维趋
 description 或社交标签。任意 query、搜索、未批准城市和依赖故障都失败关闭为 noindex；城市索引
 白名单非法时整份失效，不能部分接受。robots 不替代后端鉴权：私有 Web/Admin/API 仍必须执行既有
 会话、权限、同源和数据投影边界。
+
+## Sitemap 与结构化数据边界
+
+Sitemap 只从匿名 canonical Listing API 的 strict PUBLISHED 投影分页生成，按 locale、资源类型和发布
+年月分片，并在每次请求时重新检查发布时间与到期时间；不保存另一份业务事实或信任搜索索引。源记录、
+URL 或 XML 超预算、cursor 循环、API 故障以及不可信生产 `PUBLIC_WEB_URL` 都无缓存失败为 503，不能
+静默截断或回退到 seed/fixture。城市 URL 还需同时通过严格运营 allowlist 与 active Region API 校验；
+任意搜索/query、账户、BFF、健康检查和私有路径永不进入 sitemap。
+
+JSON-LD 只接受 exact-key 的 `WebSite`、`BreadcrumbList` 与 `JobPosting` 运行时 Schema、同源 URL 和
+有界文本，并在 script 序列化时转义 `<`、`>`、`&` 与行分隔符。招聘 Schema 只为当前有效 Job 输出
+页面已显示的 summary、雇主、用工形式和城市级位置，不包含电话、邮箱、精确地址、owner-only 属性、
+审核/风险、薪资推断或评分；字段不完整、未来发布或已过期即不输出。结构化数据与 robots 都不是权限
+控制，底层公开投影和私有接口仍执行原有授权与最小化策略。

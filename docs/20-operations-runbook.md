@@ -185,8 +185,8 @@
   和无软 404，再灰度到 production。非法 token 会让整份白名单失败关闭。
 - 错误开放索引时立即从白名单移除并重部署，确认页面返回 `noindex,follow`；不要删除 canonical
   PostgreSQL Listing、阻止搜索爬虫读取 noindex，或用 robots Disallow 代替页面级撤回。
-- 域名/slug 变更需同时验证永久跳转和等价语言路径。结构化数据/sitemap 尚未由 `SEO-002` 验收前，
-  robots 不得手工加入虚假 sitemap URL。
+- 域名/slug 变更需同时验证永久跳转、等价语言路径、JSON-LD URL 和 sitemap；robots 的 Sitemap 行
+  只能由应用使用可信 `PUBLIC_WEB_URL` 生成，不得手工加入其他域名或占位 URL。
 
 ## 20.21 PERF-001 缓存与 CWV 异常
 
@@ -201,3 +201,19 @@
   可被伪造，不能单独触发计费、账户、广告或风控动作。地址/HMAC/payload 不得写工单或日志。
 - JavaScript/HTML 预算失败需定位新增 chunk/客户端依赖和首屏内容；调整阈值必须有实测与评审，不能
   为通过 CI 直接提高。生产 p75/p95 只有 RUM/RED Dashboard 接入后才可宣称达成。
+
+## 20.22 SEO-002 Sitemap 与结构化数据故障
+
+- 部署后请求 `/sitemap.xml`，确认 origin 与 canonical 一致、只有真实年月分片且 Listing 分片带
+  `lastmod`；再抽查两种 locale 的 static 与一个 Listing 子分片，确认 `Content-Type:
+application/xml`、`Cache-Control: no-store`、双语 alternate、无 query/账户/未来/过期 URL。
+- 503 时先检查 `PUBLIC_WEB_URL`、API readiness、固定 `seo.sitemap_generation_failed` scope 和
+  `Server-Timing`，再检查 canonical `/listings` cursor 是否循环或总量是否超过每次 10,000 条/
+  200 页/15 秒/10 MB。禁止临时放宽 strict parser、提高预算、静默截断、改读 OpenSearch 或把 seed
+  写入 sitemap。
+- 达到预算前应先新增可审查的 canonical 日期过滤/manifest 方案及 ADR（若引入新的派生存储），然后
+  做全量 URL 对账和回滚演练。当前失败关闭比漏报超限更安全；不要硬编码空月份或任意 cursor URL。
+- 城市分片缺失先核对 Region 仍 active 和 `SEO_INDEXABLE_CITY_ROUTES` 精确值。下线城市应先移出
+  allowlist 并验证 sitemap/页面 noindex；不要删除业务 Listing 或用 robots Disallow 隐藏错误。
+- JSON-LD 告警按页面可见字段复核。Job 已过期、summary/雇主/用工形式缺失或 Region 非 California
+  时应没有 `JobPosting`；不得为了富结果补造 salary、rating、电话、地址或 Organization URL。

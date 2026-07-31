@@ -37,6 +37,25 @@ test("renders the localized public homepage at desktop and mobile widths", async
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /index.*follow/);
   await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "website");
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary");
+  const homepageStructuredData = await page
+    .locator('script[data-structured-data][type="application/ld+json"]')
+    .evaluateAll((scripts): unknown[] =>
+      scripts.map((script): unknown => JSON.parse(script.textContent ?? "{}") as unknown),
+    );
+  expect(homepageStructuredData).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        inLanguage: "zh-Hans",
+        potentialAction: expect.objectContaining({
+          "@type": "SearchAction",
+          target: `${webBaseUrl}/zh-Hans/search?q={search_term_string}`,
+        }),
+      }),
+    ]),
+  );
+  expect(JSON.stringify(homepageStructuredData)).not.toContain("aggregateRating");
   const languageLink = page.getByRole("link", { name: /中文 \/ English/ });
   await expect(languageLink).toBeVisible();
   await expect(languageLink).toHaveAttribute("href", "/en-US");
@@ -134,6 +153,22 @@ test("renders the strict public Listing detail and generic invalid-filter recove
     `${webBaseUrl}/zh-Hans/rentals/synthetic-city/synthetic-public-listing-${listingId}`,
   );
   await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "article");
+  const detailStructuredData = await page
+    .locator('script[data-structured-data][type="application/ld+json"]')
+    .evaluateAll((scripts): unknown[] =>
+      scripts.map((script): unknown => JSON.parse(script.textContent ?? "{}") as unknown),
+    );
+  expect(detailStructuredData).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+      }),
+    ]),
+  );
+  expect(detailStructuredData).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ "@type": "JobPosting" })]),
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
@@ -1247,16 +1282,27 @@ test("renders and updates the private bilingual notification center", async ({ p
 test("serves API health, canonical OpenAPI, and sanitized validation errors", async ({
   request,
 }) => {
-  const [healthResponse, contractResponse, invalidResponse, robotsResponse, adminRobotsResponse] =
-    await Promise.all([
-      request.get(`${apiBaseUrl}/health/live`, {
-        headers: { "x-request-id": "playwright-foundation-smoke" },
-      }),
-      request.get("http://127.0.0.1:4100/docs/openapi.json"),
-      request.get(`${apiBaseUrl}/listings?unknown=not-allowed`),
-      request.get("/robots.txt"),
-      request.get(`${adminBaseUrl}/robots.txt`),
-    ]);
+  const [
+    healthResponse,
+    contractResponse,
+    invalidResponse,
+    robotsResponse,
+    sitemapIndexResponse,
+    staticSitemapResponse,
+    rentalSitemapResponse,
+    adminRobotsResponse,
+  ] = await Promise.all([
+    request.get(`${apiBaseUrl}/health/live`, {
+      headers: { "x-request-id": "playwright-foundation-smoke" },
+    }),
+    request.get("http://127.0.0.1:4100/docs/openapi.json"),
+    request.get(`${apiBaseUrl}/listings?unknown=not-allowed`),
+    request.get("/robots.txt"),
+    request.get("/sitemap.xml"),
+    request.get("/sitemaps/en-US/static.xml"),
+    request.get("/sitemaps/en-US/rentals-2026-07.xml"),
+    request.get(`${adminBaseUrl}/robots.txt`),
+  ]);
 
   expect(healthResponse.ok()).toBe(true);
   expect(healthResponse.headers()["x-request-id"]).toBe("playwright-foundation-smoke");
@@ -1287,7 +1333,29 @@ test("serves API health, canonical OpenAPI, and sanitized validation errors", as
   expect(robots).toContain("Disallow: /zh-Hans/account");
   expect(robots).toContain("Disallow: /v1/");
   expect(robots).toContain(`Host: ${webBaseUrl}`);
-  expect(robots).not.toContain("Sitemap:");
+  expect(robots).toContain(`Sitemap: ${webBaseUrl}/sitemap.xml`);
+
+  const sitemapIndex = await sitemapIndexResponse.text();
+  expect(sitemapIndexResponse.ok()).toBe(true);
+  expect(sitemapIndexResponse.headers()["content-type"]).toContain("application/xml");
+  expect(sitemapIndex.match(/<sitemap>/g)).toHaveLength(12);
+  expect(sitemapIndex).toContain(
+    `<loc>${webBaseUrl}/sitemaps/en-US/rentals-2026-07.xml</loc><lastmod>`,
+  );
+  expect(sitemapIndex).not.toContain("/search");
+
+  const staticSitemap = await staticSitemapResponse.text();
+  expect(staticSitemapResponse.ok()).toBe(true);
+  expect(staticSitemap).toContain(`<loc>${webBaseUrl}/en-US</loc>`);
+  expect(staticSitemap).toContain(`<loc>${webBaseUrl}/en-US/rentals/synthetic-city</loc>`);
+  expect(staticSitemap).not.toContain("/account");
+
+  const rentalSitemap = await rentalSitemapResponse.text();
+  expect(rentalSitemapResponse.ok()).toBe(true);
+  expect(rentalSitemap).toContain(
+    `${webBaseUrl}/en-US/rentals/synthetic-city/synthetic-public-listing-91000000-0000-4000-8000-000000000001`,
+  );
+  expect(rentalSitemap).not.toContain("?q=");
 
   const adminRobots = await adminRobotsResponse.text();
   expect(adminRobotsResponse.ok()).toBe(true);

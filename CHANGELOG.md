@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added strict schema.org `WebSite`, `BreadcrumbList`, and current-Job-only `JobPosting`
+  projections plus a canonical, no-store sitemap index partitioned by locale, Listing type, and
+  publication month, with active-city validation, expiry removal, bounded cursor/URL/XML budgets,
+  same-origin XML/JSON-LD serialization, and fail-closed source/origin handling.
 - Added a fail-open, strictly scoped homepage Redis/Web cache with shared API/Worker keys,
   request coalescing, partial-response bypass, poison cleanup, bounded shared-cache headers,
   low-cardinality cache metrics, sampled identifier-free Core Web Vitals, and enforced

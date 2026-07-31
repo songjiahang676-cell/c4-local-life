@@ -302,7 +302,14 @@ Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字
 `SEO_INDEXABLE_CITY_ROUTES` 的 `<vertical>:<city-slug>` 才开放索引。详情元数据只读取匿名公共 API
 返回的 PUBLISHED、未过期安全投影，并清洗/限制标题和摘要，正文绝不进入 meta。占位/账户/发布页为
 `noindex,nofollow`；Web robots 禁止 BFF、健康检查和私有路径，Admin robots 全站禁止抓取。结构化数据
-与仅含真实可索引资源的 sitemap 分片仍由独立 `SEO-002` 完成。
+与 sitemap 由 `SEO-002` 接续完成：首页仅在规范无查询页输出 strict `WebSite/SearchAction`，公开频道、
+获批城市和详情输出可见路径一致的 `BreadcrumbList`，只有字段完整且仍有效的招聘详情输出
+`JobPosting`。运行时 Schema 拒绝额外键和伪造评分，JSON 序列化转义 script 边界。`/sitemap.xml`
+只枚举实际有内容的语言/垂类/发布年月分片；子分片从 canonical `GET /listings` 全量 cursor 读取，
+再次剔除未来发布和已过期记录，超过 10,000 个源记录/URL、200 页、15 秒或 10 MB、cursor 异常、
+来源不可用及生产 origin 不可信都返回无缓存 503，不会静默截断。静态分片只有首页、五类频道和 API
+一次确认仍 active 的
+运营白名单城市；搜索、query、账户、联系方式和精确地址不进入 sitemap，robots 才据此公布真实索引。
 
 `PERF-001` 已把首页缓存接到现有派生状态边界：API 与 Worker 共享 locale/region/device 缓存键，
 只有 strict、完整、非 partial 的匿名投影会写入 Redis，TTL 取模块最小值并封顶 300 秒；损坏、错

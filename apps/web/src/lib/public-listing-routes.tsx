@@ -18,7 +18,7 @@ import {
   verticalLabel,
   verticalSlug,
 } from "./public-listings";
-import { isSeoCityRouteApproved, publicPageMetadata } from "./seo";
+import { hasTrustedPublicOrigin, isSeoCityRouteApproved, publicPageMetadata } from "./seo";
 
 export type PublicVerticalRouteProps = Readonly<{
   params: Promise<{
@@ -174,6 +174,11 @@ export async function renderPublicVerticalRoute(
       <PublicListingIndexView
         action={publicVerticalPath(locale, type)}
         citySlug={citySlug}
+        includeStructuredData={
+          hasTrustedPublicOrigin() &&
+          !hasQueryParameters(searchParams) &&
+          (!citySlug || isSeoCityRouteApproved(vertical, citySlug))
+        }
         locale={locale}
         model={model}
         pathname={pathname}
@@ -209,7 +214,14 @@ export async function renderPublicVerticalRoute(
   ) {
     permanentRedirect(canonical);
   }
-  return <PublicListingDetailView locale={locale} listing={model.listing} pathname={canonical} />;
+  return (
+    <PublicListingDetailView
+      includeStructuredData={hasTrustedPublicOrigin() && !hasQueryParameters(searchParams)}
+      locale={locale}
+      listing={model.listing}
+      pathname={canonical}
+    />
+  );
 }
 
 export async function publicSearchMetadata(props: PublicSearchRouteProps): Promise<Metadata> {

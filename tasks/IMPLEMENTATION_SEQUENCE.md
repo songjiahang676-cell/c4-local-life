@@ -63,6 +63,8 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 7. `WEB-002` homepage module API + component refactor。
 8. `SEO-001` metadata/canonical/hreflang/robots；结构化数据和 sitemap 由独立 `SEO-002` 验收。
 9. `PERF-001` cache and Web performance budgets。
+10. `SEO-002` strict schema.org + canonical locale/vertical/month sitemap partitions。
+11. `SEO-004` automated/manual accessibility baseline and Gate evidence。
 
 ## Gate 4 — Interaction / Trust
 

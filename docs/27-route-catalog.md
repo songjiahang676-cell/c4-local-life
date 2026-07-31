@@ -4,31 +4,34 @@
 
 ## 27.1 公开 Web
 
-| Route                            | 模板/说明                | Auth | SEO            |
-| -------------------------------- | ------------------------ | ---- | -------------- |
-| `/`                              | locale 选择/重定向       | 否   | noindex 或短页 |
-| `/[locale]`                      | 地域化首页               | 否   | index          |
-| `/[locale]/search`               | 全站搜索                 | 否   | noindex        |
-| `/[locale]/jobs`                 | 招聘频道                 | 否   | index          |
-| `/[locale]/jobs/[city]`          | 城市招聘                 | 否   | 白名单 index   |
-| `/[locale]/jobs/[city]/[slugId]` | 招聘详情                 | 否   | 条件 index     |
-| `/[locale]/rentals...`           | 租房列表/详情            | 否   | 同上           |
-| `/[locale]/transfers...`         | 转让列表/详情            | 否   | 同上           |
-| `/[locale]/marketplace...`       | 二手列表/详情            | 否   | 同上           |
-| `/[locale]/services...`          | 服务信息列表/详情        | 否   | 同上           |
-| `/[locale]/providers`            | 师傅目录                 | 否   | index          |
-| `/[locale]/providers/[slugId]`   | 师傅档案                 | 否   | 条件 index     |
-| `/[locale]/businesses`           | 商家目录                 | 否   | index          |
-| `/[locale]/businesses/[slug]`    | 商家档案                 | 否   | 条件 index     |
-| `/[locale]/cities/[city]`        | 城市门户                 | 否   | index          |
-| `/[locale]/deals`                | 优惠（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/questions`            | 问答（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/community`            | 论坛（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/events`               | 活动（Phase 2）          | 否   | Feature Flag   |
-| `/[locale]/suppliers`            | 国内货源（Phase 2/3）    | 否   | Feature Flag   |
-| `/[locale]/help/*`               | 帮助与安全               | 否   | index          |
-| `/[locale]/policies/*`           | 条款/隐私/内容/广告/退款 | 否   | index          |
-| `/[locale]/about`                | 关于                     | 否   | index          |
+| Route                                         | 模板/说明                | Auth | SEO            |
+| --------------------------------------------- | ------------------------ | ---- | -------------- |
+| `/`                                           | locale 选择/重定向       | 否   | noindex 或短页 |
+| `/[locale]`                                   | 地域化首页               | 否   | index          |
+| `/[locale]/search`                            | 全站搜索                 | 否   | noindex        |
+| `/[locale]/jobs`                              | 招聘频道                 | 否   | index          |
+| `/[locale]/jobs/[city]`                       | 城市招聘                 | 否   | 白名单 index   |
+| `/[locale]/jobs/[city]/[slugId]`              | 招聘详情                 | 否   | 条件 index     |
+| `/[locale]/rentals...`                        | 租房列表/详情            | 否   | 同上           |
+| `/[locale]/transfers...`                      | 转让列表/详情            | 否   | 同上           |
+| `/[locale]/marketplace...`                    | 二手列表/详情            | 否   | 同上           |
+| `/[locale]/services...`                       | 服务信息列表/详情        | 否   | 同上           |
+| `/[locale]/providers`                         | 师傅目录                 | 否   | index          |
+| `/[locale]/providers/[slugId]`                | 师傅档案                 | 否   | 条件 index     |
+| `/[locale]/businesses`                        | 商家目录                 | 否   | index          |
+| `/[locale]/businesses/[slug]`                 | 商家档案                 | 否   | 条件 index     |
+| `/[locale]/cities/[city]`                     | 城市门户                 | 否   | index          |
+| `/[locale]/deals`                             | 优惠（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/questions`                         | 问答（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/community`                         | 论坛（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/events`                            | 活动（Phase 2）          | 否   | Feature Flag   |
+| `/[locale]/suppliers`                         | 国内货源（Phase 2/3）    | 否   | Feature Flag   |
+| `/[locale]/help/*`                            | 帮助与安全               | 否   | index          |
+| `/[locale]/policies/*`                        | 条款/隐私/内容/广告/退款 | 否   | index          |
+| `/[locale]/about`                             | 关于                     | 否   | index          |
+| `/sitemap.xml`                                | 动态 sitemap index       | 否   | noindex        |
+| `/sitemaps/[locale]/static.xml`               | 首页/频道/获批城市       | 否   | noindex        |
+| `/sitemaps/[locale]/[vertical]-[YYYY-MM].xml` | 当前 Listing 月分片      | 否   | noindex        |
 
 五类详情路由可由统一内部 route builder 生成，公开 URL 保持垂直清晰。
 
@@ -41,6 +44,12 @@ slug 与请求不一致时永久跳转 canonical。全站搜索固定为 `/[loca
 `zh-Hans`/`en-US`/`x-default`。任意 query 与全站搜索为 `noindex,follow`，canonical 去除 query。
 城市聚合默认 noindex，只有精确列入 `SEO_INDEXABLE_CITY_ROUTES` 的 `vertical:city-slug` 才开放
 索引；当前通用占位 catchall 即使对应未来公开路由，也在真实 API/文案接入前保持 `noindex,nofollow`。
+
+`SEO-002` 增加 `/sitemap.xml` 和两类动态子分片。index 只为 canonical API 当前返回的真实
+PUBLISHED/未过期 Listing 创建 `locale + vertical + published YYYY-MM` 路径，并使用月内最新
+`updatedAt`；static 分片只列首页、五类频道及同时在 allowlist 和 active Region 中存在的城市。
+所有 XML 无缓存且自身 `X-Robots-Tag: noindex`，任意来源/预算/cursor/origin 错误返回 503；无 query、
+账户、BFF、健康、Admin 或未来占位路径。
 
 ## 27.2 发布与账户
 
