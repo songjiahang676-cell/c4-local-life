@@ -63,7 +63,10 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 `EVT-001` 已实现有界 batch、短租约、`SKIP LOCKED` 多实例并发领取、指数退避 + eventId 确定性 jitter、
 最大 attempts 和 BullMQ eventId jobId。每次确认都匹配 claim attempt，避免旧 worker 覆盖新租约；
 PENDING 事件年龄和 publish/retry/failed/stale 结果直接进入低基数指标。DLQ 管理、人工重放和跨系统
-reconciliation 仍属于 `EVT-002`。
+reconciliation 由 `EVT-002` 实现：失败事件证据落 PostgreSQL，Admin replay/reconciliation 请求先写
+durable job，再由 Worker 以短租约和逐项幂等结果异步处理。reconciliation 默认 dry-run，每次最多
+500 条；重放最多 100 个明确目标。现有 Outbox dispatcher 继续负责发布，恢复工具不创建第二条消息
+管道，也不在 HTTP 请求内同步处理队列。
 
 ## 15.6 数据库可靠性
 

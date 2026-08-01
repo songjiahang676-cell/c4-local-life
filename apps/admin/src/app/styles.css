@@ -604,6 +604,142 @@ button:disabled {
   justify-self: start;
 }
 
+.queueOperationsWorkspace {
+  display: grid;
+  gap: 16px;
+}
+
+.queueFilters,
+.queueOperationForms form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.queueFilters label,
+.queueOperationForms label {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+}
+
+.queueFilters input,
+.queueFilters select,
+.queueOperationForms input {
+  width: 100%;
+  border: 1px solid #b8c5d6;
+  border-radius: 9px;
+  background: #fff;
+  color: #18253b;
+  padding: 10px 12px;
+}
+
+.queueEvidence {
+  min-width: 0;
+}
+
+.queueTableScroll {
+  overflow-x: auto;
+  border-radius: 9px;
+  outline-offset: 4px;
+}
+
+.queueTableScroll table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: collapse;
+}
+
+.queueTableScroll th,
+.queueTableScroll td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.queueTableScroll th {
+  color: #52647c;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueTableScroll code {
+  overflow-wrap: anywhere;
+}
+
+.queueEvidence footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 14px;
+  color: #637188;
+  font-size: 13px;
+}
+
+.queueOperationForms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.queueOperationForms form {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+
+.queueOperationForms h3,
+.queueJobStatus h3 {
+  margin: 0;
+}
+
+.queueOperationForms .confirmationCheck {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  font-weight: 500;
+}
+
+.queueOperationForms .confirmationCheck input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.stepUpWarning {
+  border-left: 4px solid #b66b13;
+  background: #fff5df;
+  color: #70420c;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.queueJobStatus dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.queueJobStatus dl > div {
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 11px;
+}
+
+.queueJobStatus dt {
+  color: #637188;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.queueJobStatus dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 860px) {
   .adminShell {
     grid-template-columns: 1fr;
@@ -665,7 +801,10 @@ button:disabled {
 
   .snapshotGrid,
   .evidenceGrid,
-  .actionPanel form {
+  .actionPanel form,
+  .queueFilters,
+  .queueOperationForms,
+  .queueJobStatus dl {
     grid-template-columns: 1fr;
   }
 

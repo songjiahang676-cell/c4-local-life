@@ -125,3 +125,14 @@ DRY_RUN/ENFORCE、MEDIUM/HIGH 和 TEXT/IMAGE/CONTACT 信号。UI 不计算阈值
 `DUPLICATE_CONTENT` 原因要求修改或拒绝；没有候选时界面隐藏该选项，服务端仍独立拒绝伪造原因。
 批准继续使用 `CONTENT_POLICY_COMPLIANT`。所有读取、键盘/焦点、中英移动布局、MFA/recent-auth、
 ETag、幂等、no-store 与通用错误边界沿用 ADMIN-002，不新增前端权限推断。
+
+## 28.12 EVT-002 队列恢复工作台
+
+System 工作区显示 Outbox/Queue 最小失败证据，可按固定来源、事件类型和失败码筛选并稳定翻页；不显示
+payload、内容、用户、原始错误、request hash 或内部审计字段。READ_ONLY_AUDITOR 只能查看，只有当前
+PLATFORM_ADMIN + recent-MFA 可提交重放/对账。
+
+重放要求选择明确目标、填写稳定 reasonCode 并显式确认已核对原因与代码版本；对账默认 dry-run，repair
+另有确认。所有写入经同源精确 BFF、后端 Policy、strict DTO 与新 `Idempotency-Key` 创建异步 Admin job，
+页面只轮询聚合进度；失败不会在浏览器展开原始 provider/handler detail。中英文共用语义表格、可见
+label/focus、移动横向容器和明确 loading/error/empty 状态，前端禁用不替代后端授权。

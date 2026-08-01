@@ -53,6 +53,60 @@ describe("AdminConsole", () => {
     expect(screen.queryByText("126")).not.toBeInTheDocument();
   });
 
+  it("shows queue evidence to read-only auditors without enabling mutation controls", async () => {
+    const queueEvidence = {
+      data: [],
+      page: { hasMore: false, nextCursor: null },
+      generatedAt: "2026-08-01T08:00:00.000Z",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              operator: {
+                id: "10000000-0000-4000-8000-000000000002",
+                displayName: "Synthetic Auditor",
+                avatarUrl: null,
+                locale: "en-US",
+                status: "ACTIVE",
+                verificationBadges: [],
+              },
+              roles: ["READ_ONLY_AUDITOR"],
+              navigation: [
+                { key: "system", href: "/admin/system/health" },
+                { key: "audit", href: "/admin/audit" },
+              ],
+              security: {
+                mfaRequired: true,
+                mfaEnrolled: true,
+                authenticationStrength: "MFA",
+                mfaVerifiedAt: "2026-08-01T08:00:00.000Z",
+                stepUpExpiresAt: "2026-08-01T08:10:00.000Z",
+                privilegedActionsAllowed: true,
+                sensitiveActionsAllowed: true,
+              },
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(queueEvidence), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AdminConsole activePath="/admin/system/health" />);
+
+    expect(await screen.findByRole("heading", { name: "队列恢复与对账" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建重放批次" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "创建对账任务" })).toBeDisabled();
+  });
+
   it("blocks role navigation behind required MFA enrollment", async () => {
     vi.stubGlobal(
       "fetch",

@@ -42,8 +42,8 @@
   Sharp 解码/方向校正/去 metadata、三个确定性 WebP 变体和 lifecycleVersion 幂等终态。
 - `NOTIF-001` 已接 Listing 状态通知消费者：严格 envelope、eventId 幂等投影、canonical recipient、
   风险分支和有界结果指标。
-- 仍需搜索等其他领域真实幂等消费者、通知 provider adapter，以及 `EVT-002` 的
-  DLQ/replay/reconciliation 工具。
+- 仍需搜索等其他领域真实幂等消费者和通知 provider adapter；DLQ/replay/reconciliation 由 30.15 的
+  `EVT-002` 控制面提供。
 
 ### `packages/database`
 
@@ -261,3 +261,16 @@ Web loader 以模块内 Map 做实例级完整响应短缓存与 promise 合并�
 响应保存到 Next/浏览器。`PerformanceModule` 只接收固定 Web Vital contract 并写已有 MetricsRegistry；
 未新增服务、主数据库、队列或分析事实库。公共 OpenAPI 从 69 paths / 177 schemas / 79 operationIds
 增量为 70 / 181 / 80；没有 Prisma/migration 变化或架构边界变化，因此不需要 ADR。
+
+## 30.15 EVT-002 队列恢复实现边界
+
+`QueueOperationsController/Service` 只做 strict contract、Policy、actor/filter cursor 和幂等应用编排；
+`QueueOperationsStore` 是 API 端口，生产 adapter 调用 Database Repository，Controller 不导入 Prisma。
+Repository 在 PostgreSQL 保存 additive Admin job、item 和最小 DLQ 证据；Worker 的既有 BullMQ 进程领取
+job，复用 EVT-001 publisher/Outbox，而不是新增队列或服务。队列重放在 retry 或重建前都核对 canonical
+Outbox 与规范化 payload hash，并拒绝已由其他批次持有的证据。
+
+Admin 只经四条精确 BFF/API 路径查看失败、创建 replay/reconciliation 和读取 aggregate job。公共
+OpenAPI 从 70 paths / 181 schemas / 80 operationIds 增量为 74 / 188 / 84；Prisma 从 62 增至 65 models。
+PostgreSQL 仍是 canonical，Redis/BullMQ 仍可重建；没有改变进程、数据库、REST 版本或消息范式，因此
+不需要新增 ADR。

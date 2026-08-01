@@ -879,8 +879,14 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 Outbox 进入 BullMQ 后即标记 PUBLISHED，而不是等待消费者完成。`eventId` 同时作为 BullMQ `jobId` 和
 消费者幂等键；Redis 或进程故障窗口允许重复投递，消费者必须用 eventId/业务版本做条件更新，不能假设
-exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED，
-受控重放和 reconciliation 由 `EVT-002` 提供。
+exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED。
+
+`EVT-002` 增加 `admin_jobs`、`admin_job_items` 与 `queue_dead_letters`。Admin job 以
+`actor + type + Idempotency-Key + request hash` 去重，短租约领取，逐项结果一次写定；进程恢复后从逐项
+结果重算批次汇总，避免重复执行已完成目标。DLQ 只保存 event/aggregate 标识、队列名、固定失败码、
+attempt、时间和 canonical payload hash，不复制 payload 或原始异常。Outbox 重放只把 canonical FAILED
+事件恢复为 PENDING；BullMQ job 丢失时也必须从 PostgreSQL Outbox 重建并校验 type/aggregate/hash，
+不能把 DLQ/Redis 提升为事实源。
 
 ## 6.6 版本与历史
 
@@ -3027,6 +3033,22 @@ Idempotency-Key 或请求哈希。
 - Outbox 只发送版本定位信息和内容 hash；日志、指标和事件不得包含配置正文或 PII。未来写入口必须
   叠加 Admin MFA、近期认证、Policy、审计和速率限制。
 
+## 14.31 EVT-002 队列处置威胁和缓解
+
+- 越权/误操作：只读失败证据要求当前 PLATFORM_ADMIN 或 READ_ONLY_AUDITOR + MFA；重放与修复只允许
+  PLATFORM_ADMIN 且 MFA 在十分钟内验证。浏览器只经精确 BFF allowlist，后端 Policy 始终权威。
+- 重放放大/参数替换：写入必须带 actor/type 绑定的 `Idempotency-Key` 与规范 request hash；同键变更
+  返回 409。目标数量、对账数量、原因码和工单引用有严格边界，UI 还要求显式确认，但不以 UI 代替授权。
+- PII/错误泄漏：DLQ、Admin API、Audit 和结构日志不保存/返回 payload、原始异常、联系方式、内容或
+  provider detail；失败只使用固定 bounded code 与 SHA-256 payload hash。列表 cursor 绑定 actor 和
+  全部筛选并作 HMAC/定长校验，篡改或跨筛选重放失败。
+- 事实源反转/旧代码重放：无论 BullMQ job 仍存在或需要重建，均先从 PostgreSQL Outbox 读取 canonical
+  事件，并核对 type、aggregate、occurredAt 与规范化 payload hash；现存队列信封还必须逐字段匹配后才
+  允许 retry。不从 Redis/DLQ payload 写回业务表。对账默认 dry-run，
+  repair 只修复可重建的 DLQ 证据。
+- 崩溃/重复投递：批次短租约可恢复，item 唯一键与条件更新保证目标幂等；Worker 正常关闭等待在途
+  DLQ 落库，异常窗口由 reconciliation 补录。每次申请和完成均追加最小 AuditLog。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3096,7 +3118,10 @@ SLO 不包含用户网络和明确排除的第三方时延，但用户旅程仍�
 `EVT-001` 已实现有界 batch、短租约、`SKIP LOCKED` 多实例并发领取、指数退避 + eventId 确定性 jitter、
 最大 attempts 和 BullMQ eventId jobId。每次确认都匹配 claim attempt，避免旧 worker 覆盖新租约；
 PENDING 事件年龄和 publish/retry/failed/stale 结果直接进入低基数指标。DLQ 管理、人工重放和跨系统
-reconciliation 仍属于 `EVT-002`。
+reconciliation 由 `EVT-002` 实现：失败事件证据落 PostgreSQL，Admin replay/reconciliation 请求先写
+durable job，再由 Worker 以短租约和逐项幂等结果异步处理。reconciliation 默认 dry-run，每次最多
+500 条；重放最多 100 个明确目标。现有 Outbox dispatcher 继续负责发布，恢复工具不创建第二条消息
+管道，也不在 HTTP 请求内同步处理队列。
 
 ## 15.6 数据库可靠性
 
@@ -3493,6 +3518,15 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
   HMAC 仅在内存短时限频且不导出。RUM 可被伪造，正式 Dashboard 必须同时展示样本量、流量过滤与窗口。
 - API GET p95/p99 继续从 route-level `socal_http_request_duration_seconds` 计算；不复制资源 ID
   bucket，也不以单元测试或 CI 时延声称生产 SLO。
+
+## 17.18 EVT-002 队列处置指标
+
+`socal_queue_admin_operations_total{operation,outcome}` 只允许固定 operation（`DEAD_LETTER`、
+`QUEUE_REPLAY`、`QUEUE_RECONCILIATION`、`CONTROL_PLANE`）和固定 outcome（recorded/completed/stale/succeeded/skipped/
+failed/poll_failed）。既有 `socal_worker_jobs_total`/duration、Outbox outcome 和 oldest-pending-age 继续
+提供消费、重试与积压信号。job/event/user ID、队列 payload、失败文本、reason/ticket、cursor、筛选值和
+provider detail 均不进入 metric label；正式 waiting/active/delayed/failed Dashboard 与告警阈值仍由
+`OBS-002` 结合 Beta 流量固化。
 
 ---
 
@@ -3923,6 +3957,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 全仓质量、既有 production E2E、受保护真实服务与四镜像仍必须通过。完整矩阵和缺口 ID 见
   [`accessibility-baseline.md`](./docs/accessibility-baseline.md)。
 
+## 18.37 EVT-002 队列恢复验证增量
+
+- Repository 真实 PostgreSQL 测试覆盖失败证据分页、精确幂等/变更冲突、目标状态、短租约恢复、逐项
+  一次写定、批次聚合与 Audit；空库 baseline 还验证 hash、计数、lifecycle 和唯一约束负例。
+- API/Contracts 测试覆盖四个 OpenAPI 路径、严格 DTO、guest/普通账号/auditor/stale-MFA/admin 矩阵、
+  actor/filter cursor 篡改、无效目标、409 retry conflict 和只返回聚合 job 状态。
+- Worker 单元测试覆盖 terminal 判定、非法 envelope、失败证据脱敏、Outbox 恢复、BullMQ retry、
+  canonical mismatch、重复 item、dry-run 与 repair reconciliation；正常关闭等待在途 DLQ 写入。
+- Admin 测试覆盖双语、筛选提交、选择/确认、recent-MFA 禁用和 dry-run 默认；完整质量、真实 PostgreSQL/
+  Redis、API runtime、Linux Chromium 与四镜像受保护门禁全绿后方可标记完成。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4074,6 +4119,25 @@ Gate 6 稳定后再规划优惠、问答、论坛、活动、供应商、订阅�
 - Redis 恢复后先启动少量 Worker，监控积压和 provider 限额，再扩容。
 - 重复 job 预期存在，检查幂等而非清空队列。
 - DLQ 重放要按错误原因、代码版本和批次执行。
+
+### 20.7.1 受控 DLQ/Outbox 处置
+
+1. 用 `GET /v1/admin/system/queue/dead-letters` 按 source、eventType、failureCode 查看最小失败证据；
+   READ_ONLY_AUDITOR 可读但不能处置。不得从应用日志或 Redis 导出 payload 作为批量输入。
+2. 先确认 PostgreSQL canonical 资源状态、当前 handler 代码版本、失败原因和关联 incident ticket。
+   重放按同一原因分批，单批最多 100 个明确 ID；不要选择仍在 active/delayed 的任务。
+   `REPLAY_PENDING` 表示已有批次持有该证据，不得加入第二批；Worker 会在 retry 前再次核对 canonical
+   Outbox 与现存 BullMQ 信封，任何 type/aggregate/occurredAt/payload hash 漂移均失败关闭。
+3. PLATFORM_ADMIN 在十分钟 recent-MFA 内显式确认后调用 `POST /queue/replay-batches`，携带新的
+   `Idempotency-Key`、固定 reasonCode 和可选 ticketRef。网络重试复用同键/同正文；409 时不得改正文
+   强行复用键。
+4. 用 `GET /v1/admin/system/jobs/{jobId}` 观察 aggregate succeeded/skipped/failed。PARTIAL/FAILED 时
+   停止扩大批次，修复代码或 canonical 数据后创建新批次；不得直接覆盖计数或删除审计行。
+5. Redis 恢复或怀疑漂移时，先以 `POST /queue/reconciliation-runs` 创建 `dryRun=true`、有界
+   `maxItems` 作业；审核结果后再用新幂等键和显式确认执行 repair。repair 只补录/关闭派生 DLQ 证据，
+   不修改 canonical 业务数据。
+6. 监控 `socal_queue_admin_operations_total`、Worker duration/outcome、Outbox oldest age 与 failed jobs。
+   处置结束记录批次 ID、原因、代码版本、结果和剩余失败；日志/工单不得粘贴 payload、原始错误或 PII。
 
 ## 20.8 支付/webhook 事故
 
@@ -4672,6 +4736,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - [`accessibility-baseline.md`](./docs/accessibility-baseline.md) 的阻塞缺口清零、全仓质量、Linux E2E、
   真实服务和四镜像保护门禁全绿后，才可把 `SEO-004`/Gate 3 标记完成。OpenAPI、Prisma 与 migration
   不变化。
+
+## 22.24 EVT-002 队列 DLQ/replay/reconciliation 验收
+
+- 终态 BullMQ 失败写入 PostgreSQL 最小证据，只含标识、固定 code、attempt、时间和 payload hash；不含
+  payload、原始异常或 PII。正常关闭等待在途写入，丢失窗口可由 reconciliation 修复。
+- 失败列表按稳定时间/UUID cursor 分页并绑定 actor/筛选；读权限允许 MFA auditor/admin，写权限只允许
+  recent-MFA PLATFORM_ADMIN。guest、普通账号、stale MFA、篡改 cursor 和跨筛选重放均失败关闭。
+- Replay/Reconciliation 是有界 durable Admin job；actor/type/key/hash 精确重试，同键变更 409，短租约
+  可恢复，逐项结果幂等且汇总可重算。请求/完成均有最小 AuditLog，响应不泄露 reason、ticket、actor、
+  request hash 或 item 错误详情。
+- Outbox 只从 FAILED 恢复 PENDING；`REPLAY_PENDING` 不能进入第二批。BullMQ 现存或缺失 job 均先与
+  canonical Outbox 核对 event type、aggregate、occurredAt 与规范化 payload hash，缺失时才从该事件
+  重建。对账默认 dry-run，repair 只修复派生 DLQ 证据，PostgreSQL 业务表仍权威。
+- OpenAPI/生成类型、Prisma/additive migration/回滚说明、Contracts/API/Worker/Admin/真实 PostgreSQL、
+  全仓质量、API runtime、Linux Chromium 与四镜像受保护门禁均有真实证据后方可标记 done。
 
 ---
 
@@ -5398,6 +5477,17 @@ DRY_RUN/ENFORCE、MEDIUM/HIGH 和 TEXT/IMAGE/CONTACT 信号。UI 不计算阈值
 批准继续使用 `CONTENT_POLICY_COMPLIANT`。所有读取、键盘/焦点、中英移动布局、MFA/recent-auth、
 ETag、幂等、no-store 与通用错误边界沿用 ADMIN-002，不新增前端权限推断。
 
+## 28.12 EVT-002 队列恢复工作台
+
+System 工作区显示 Outbox/Queue 最小失败证据，可按固定来源、事件类型和失败码筛选并稳定翻页；不显示
+payload、内容、用户、原始错误、request hash 或内部审计字段。READ_ONLY_AUDITOR 只能查看，只有当前
+PLATFORM_ADMIN + recent-MFA 可提交重放/对账。
+
+重放要求选择明确目标、填写稳定 reasonCode 并显式确认已核对原因与代码版本；对账默认 dry-run，repair
+另有确认。所有写入经同源精确 BFF、后端 Policy、strict DTO 与新 `Idempotency-Key` 创建异步 Admin job，
+页面只轮询聚合进度；失败不会在浏览器展开原始 provider/handler detail。中英文共用语义表格、可见
+label/focus、移动横向容器和明确 loading/error/empty 状态，前端禁用不替代后端授权。
+
 ---
 
 <!-- source: docs\29-migration-and-launch.md -->
@@ -5541,8 +5631,8 @@ Feature Flag 维度：环境、城市、listing type、用户 cohort、组织、
   Sharp 解码/方向校正/去 metadata、三个确定性 WebP 变体和 lifecycleVersion 幂等终态。
 - `NOTIF-001` 已接 Listing 状态通知消费者：严格 envelope、eventId 幂等投影、canonical recipient、
   风险分支和有界结果指标。
-- 仍需搜索等其他领域真实幂等消费者、通知 provider adapter，以及 `EVT-002` 的
-  DLQ/replay/reconciliation 工具。
+- 仍需搜索等其他领域真实幂等消费者和通知 provider adapter；DLQ/replay/reconciliation 由 30.15 的
+  `EVT-002` 控制面提供。
 
 ### `packages/database`
 
@@ -5760,3 +5850,16 @@ Web loader 以模块内 Map 做实例级完整响应短缓存与 promise 合并�
 响应保存到 Next/浏览器。`PerformanceModule` 只接收固定 Web Vital contract 并写已有 MetricsRegistry；
 未新增服务、主数据库、队列或分析事实库。公共 OpenAPI 从 69 paths / 177 schemas / 79 operationIds
 增量为 70 / 181 / 80；没有 Prisma/migration 变化或架构边界变化，因此不需要 ADR。
+
+## 30.15 EVT-002 队列恢复实现边界
+
+`QueueOperationsController/Service` 只做 strict contract、Policy、actor/filter cursor 和幂等应用编排；
+`QueueOperationsStore` 是 API 端口，生产 adapter 调用 Database Repository，Controller 不导入 Prisma。
+Repository 在 PostgreSQL 保存 additive Admin job、item 和最小 DLQ 证据；Worker 的既有 BullMQ 进程领取
+job，复用 EVT-001 publisher/Outbox，而不是新增队列或服务。队列重放在 retry 或重建前都核对 canonical
+Outbox 与规范化 payload hash，并拒绝已由其他批次持有的证据。
+
+Admin 只经四条精确 BFF/API 路径查看失败、创建 replay/reconciliation 和读取 aggregate job。公共
+OpenAPI 从 70 paths / 181 schemas / 80 operationIds 增量为 74 / 188 / 84；Prisma 从 62 增至 65 models。
+PostgreSQL 仍是 canonical，Redis/BullMQ 仍可重建；没有改变进程、数据库、REST 版本或消息范式，因此
+不需要新增 ADR。

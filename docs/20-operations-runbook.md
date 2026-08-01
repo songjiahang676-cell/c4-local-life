@@ -59,6 +59,25 @@
 - 重复 job 预期存在，检查幂等而非清空队列。
 - DLQ 重放要按错误原因、代码版本和批次执行。
 
+### 20.7.1 受控 DLQ/Outbox 处置
+
+1. 用 `GET /v1/admin/system/queue/dead-letters` 按 source、eventType、failureCode 查看最小失败证据；
+   READ_ONLY_AUDITOR 可读但不能处置。不得从应用日志或 Redis 导出 payload 作为批量输入。
+2. 先确认 PostgreSQL canonical 资源状态、当前 handler 代码版本、失败原因和关联 incident ticket。
+   重放按同一原因分批，单批最多 100 个明确 ID；不要选择仍在 active/delayed 的任务。
+   `REPLAY_PENDING` 表示已有批次持有该证据，不得加入第二批；Worker 会在 retry 前再次核对 canonical
+   Outbox 与现存 BullMQ 信封，任何 type/aggregate/occurredAt/payload hash 漂移均失败关闭。
+3. PLATFORM_ADMIN 在十分钟 recent-MFA 内显式确认后调用 `POST /queue/replay-batches`，携带新的
+   `Idempotency-Key`、固定 reasonCode 和可选 ticketRef。网络重试复用同键/同正文；409 时不得改正文
+   强行复用键。
+4. 用 `GET /v1/admin/system/jobs/{jobId}` 观察 aggregate succeeded/skipped/failed。PARTIAL/FAILED 时
+   停止扩大批次，修复代码或 canonical 数据后创建新批次；不得直接覆盖计数或删除审计行。
+5. Redis 恢复或怀疑漂移时，先以 `POST /queue/reconciliation-runs` 创建 `dryRun=true`、有界
+   `maxItems` 作业；审核结果后再用新幂等键和显式确认执行 repair。repair 只补录/关闭派生 DLQ 证据，
+   不修改 canonical 业务数据。
+6. 监控 `socal_queue_admin_operations_total`、Worker duration/outcome、Outbox oldest age 与 failed jobs。
+   处置结束记录批次 ID、原因、代码版本、结果和剩余失败；日志/工单不得粘贴 payload、原始错误或 PII。
+
 ## 20.8 支付/webhook 事故
 
 - 若签名/重复/履约异常，暂停新商业化订单而非影响免费功能。

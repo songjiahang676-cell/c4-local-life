@@ -5,14 +5,15 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `SEO-004` axe、键盘/焦点、表单错误、200% reflow 与人工 WCAG 2.2 AA 基线，关闭 Gate 3
-- 进度：10 个 G3 任务、56/101 个总任务完成；`SEO-004` 自动化基线与本地完整质量门已通过
-- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能用 axe 代替或伪造
+- 目标：完成 `EVT-002` 受控队列恢复并补齐 `SEO-004` 人工 WCAG 证据，关闭 Gate 3
+- 进度：10 个 G3 任务、56/101 个总任务完成；`EVT-002` 实现与本地验证进行中，`SEO-004` 自动化基线已通过
+- 风险：本地 PostgreSQL 凭据不可用且没有 Redis/OpenSearch/ClamAV 与四镜像；Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，均不能伪造通过
 
 ## 正在进行
 
 | Task    | Owner                | Started    | Target      | Status                  | Notes                                   |
 | ------- | -------------------- | ---------- | ----------- | ----------------------- | --------------------------------------- |
+| EVT-002 | @songjiahang676-cell | 2026-08-01 | Gate 3      | implementation/testing  | DLQ/replay/reconciliation control plane |
 | SEO-004 | @songjiahang676-cell | 2026-07-30 | Gate 3 exit | manual evidence pending | automated gate 34/34；A11Y-001/002 open |
 
 ## Gate Evidence

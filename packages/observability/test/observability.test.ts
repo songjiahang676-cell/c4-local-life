@@ -83,6 +83,8 @@ describe("observability primitives", () => {
     });
     runtime.metrics.mediaProcessing("ready");
     runtime.metrics.notificationEvent("created");
+    runtime.metrics.queueAdminOperation("DEAD_LETTER", "recorded");
+    runtime.metrics.queueAdminOperation("QUEUE_REPLAY", "succeeded");
     runtime.metrics.moderationDuplicateReview("false_positive", 2);
     runtime.metrics.searchIndex({
       operation: "delete",
@@ -114,6 +116,12 @@ describe("observability primitives", () => {
     );
     expect(metrics).toContain('socal_media_processing_total{outcome="ready"} 1');
     expect(metrics).toContain('socal_notification_events_total{outcome="created"} 1');
+    expect(metrics).toContain(
+      'socal_queue_admin_operations_total{operation="DEAD_LETTER",outcome="recorded"} 1',
+    );
+    expect(metrics).toContain(
+      'socal_queue_admin_operations_total{operation="QUEUE_REPLAY",outcome="succeeded"} 1',
+    );
     expect(metrics).toContain(
       'socal_moderation_duplicate_reviews_total{outcome="false_positive"} 2',
     );

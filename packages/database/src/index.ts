@@ -212,6 +212,24 @@ export {
   type OutboxEventRepositoryOptions,
 } from "./repositories/outbox-event.repository";
 export {
+  QueueOperationsRepository,
+  type CanonicalOutboxEvent,
+  type ClaimedQueueAdminJob,
+  type CreateQueueAdminJobResult,
+  type CreateQueueReconciliationJobInput,
+  type CreateQueueReplayJobInput,
+  type ListQueueDeadLettersInput,
+  type ListQueueDeadLettersResult,
+  type QueueAdminJobItem,
+  type QueueAdminJobProjection,
+  type QueueDeadLetterCursor,
+  type QueueDeadLetterInternal,
+  type QueueDeadLetterProjection,
+  type QueueOperationsRepositoryOptions,
+  type QueueReplayTarget,
+  type RecordQueueDeadLetterInput,
+} from "./repositories/queue-operations.repository";
+export {
   ListingSearchRepository,
   type ListingSearchProjection,
   type ListingSearchRecord,

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a durable, audited queue recovery control plane with PII-minimized Outbox/BullMQ failure
+  evidence, actor-scoped idempotent replay batches, dry-run-first reconciliation, canonical-event
+  verification, lease/item crash recovery, recent-MFA Admin controls, and bilingual operations UI.
 - Added a fixed axe/Playwright WCAG 2.2 AA gate for public discovery, publishing, private-account,
   and Admin boundaries across desktop/mobile, plus site-wide skip targets, visible forced-color
   focus, reduced-motion handling, form-error associations, 24px error targets, contrast repairs,

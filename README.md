@@ -323,6 +323,11 @@ scope、过大条目或 Redis 故障均删除/忽略并回源 PostgreSQL，单�
 与实际脚本传输。首方 CWV 以可配置采样率上报固定 metric/route/数值，不发送 URL、query、Cookie 或
 标识；API p95 继续由 route-level RED histogram 计算。所有目标仍是 Beta 前须用真实流量校准的预算。
 
+`EVT-002` 已实现队列恢复控制面：终态 BullMQ 失败仅以固定 code/hash/标识写入 PostgreSQL 最小 DLQ
+证据；Admin 可按受控筛选查看、以 actor-scoped 幂等批次重放，或先 dry-run 再修复派生证据。所有写入
+要求 PLATFORM_ADMIN + recent-MFA 并追加 Audit，Worker 以短租约和逐项幂等恢复；缺失 Redis job 只从
+canonical Outbox 重建并核对事件/aggregate/payload hash，不从 DLQ 或 Redis 反写业务事实。
+
 ## 七、规划容量与服务目标
 
 以下是首期设计目标，不是现有实测数据：10 万注册用户、50 万有效/历史信息、1 万 DAU、持续 100 RPS/峰值 500 RPS；公共 API p95 读取小于 300ms、写入小于 700ms；搜索更新 p95 60 秒内；公开服务可用性 99.9%；RPO 15 分钟、RTO 2 小时。

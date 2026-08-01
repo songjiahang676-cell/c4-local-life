@@ -8,6 +8,7 @@ import type {
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ModerationWorkspace } from "./moderation-workspace";
+import { QueueOperationsWorkspace } from "./queue-operations-workspace";
 
 type Locale = "zh-Hans" | "en-US";
 type SessionState =
@@ -606,6 +607,7 @@ export function AdminConsole({ activePath }: { activePath: string }) {
   const activeNavigation = session.navigation.find((item) => item.href === activePath);
   const moderationActive =
     activeNavigation?.key === "moderation" && activePath === "/admin/moderation/listings";
+  const systemActive = activeNavigation?.key === "system" && activePath === "/admin/system/health";
   return (
     <div className="adminShell">
       <aside>
@@ -640,9 +642,11 @@ export function AdminConsole({ activePath }: { activePath: string }) {
             <h1>
               {moderationActive
                 ? text.nav.moderation
-                : activeNavigation
-                  ? text.placeholder
-                  : text.overview}
+                : systemActive
+                  ? text.nav.system
+                  : activeNavigation
+                    ? text.placeholder
+                    : text.overview}
             </h1>
           </div>
           <div className="operator">
@@ -681,6 +685,13 @@ export function AdminConsole({ activePath }: { activePath: string }) {
         </section>
         {moderationActive ? (
           <ModerationWorkspace locale={locale} canAct={session.security.sensitiveActionsAllowed} />
+        ) : systemActive ? (
+          <QueueOperationsWorkspace
+            locale={locale}
+            canAct={
+              session.security.sensitiveActionsAllowed && session.roles.includes("PLATFORM_ADMIN")
+            }
+          />
         ) : (
           <div className="adminGrid">
             <section className="panel">

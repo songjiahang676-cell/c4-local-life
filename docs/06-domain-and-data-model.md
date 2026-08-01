@@ -196,8 +196,14 @@ Repository 参数化名称/slug/code/归一化别名查询，API 应用层组树
 
 Outbox 进入 BullMQ 后即标记 PUBLISHED，而不是等待消费者完成。`eventId` 同时作为 BullMQ `jobId` 和
 消费者幂等键；Redis 或进程故障窗口允许重复投递，消费者必须用 eventId/业务版本做条件更新，不能假设
-exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED，
-受控重放和 reconciliation 由 `EVT-002` 提供。
+exactly-once。Redis 不可用时事件保留 PENDING 并在租约/指数退避后重试；达到上限或无效事件进入 FAILED。
+
+`EVT-002` 增加 `admin_jobs`、`admin_job_items` 与 `queue_dead_letters`。Admin job 以
+`actor + type + Idempotency-Key + request hash` 去重，短租约领取，逐项结果一次写定；进程恢复后从逐项
+结果重算批次汇总，避免重复执行已完成目标。DLQ 只保存 event/aggregate 标识、队列名、固定失败码、
+attempt、时间和 canonical payload hash，不复制 payload 或原始异常。Outbox 重放只把 canonical FAILED
+事件恢复为 PENDING；BullMQ job 丢失时也必须从 PostgreSQL Outbox 重建并校验 type/aggregate/hash，
+不能把 DLQ/Redis 提升为事实源。
 
 ## 6.6 版本与历史
 

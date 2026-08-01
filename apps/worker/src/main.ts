@@ -11,6 +11,7 @@ import {
   organizationInvitationNotificationEventTypes,
 } from "@socal/database/notification";
 import { OutboxEventRepository } from "@socal/database/outbox";
+import { QueueOperationsRepository } from "@socal/database/queue-operations";
 import {
   createObservabilityRuntime,
   shutdownTracing,
@@ -39,6 +40,8 @@ import { S3MediaProcessingStorage } from "./media/s3-media-processing.storage";
 import { SharpImageTransformer } from "./media/sharp-image-transformer";
 import { BullMqOutboxPublisher } from "./outbox/bullmq-outbox.publisher";
 import { OutboxDispatcher } from "./outbox/outbox-dispatcher";
+import { recordTerminalJobFailure } from "./queue-operations/queue-failure-recorder";
+import { QueueOperationsDispatcher } from "./queue-operations/queue-operations-dispatcher";
 import {
   ListingIndexHandler,
   ListingSearchProjectionError,
@@ -89,6 +92,10 @@ const outboxRepository = new OutboxEventRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
+const queueOperationsRepository = new QueueOperationsRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
 const mediaRepository = new MediaAssetRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
@@ -122,6 +129,11 @@ const mediaProcessing = new MediaProcessingHandler(
   },
 );
 const outboxQueue = new Queue(environment.OUTBOX_QUEUE_NAME, { connection });
+const outboxPublisher = new BullMqOutboxPublisher(outboxQueue, {
+  maximumPayloadBytes: environment.OUTBOX_MAX_PAYLOAD_BYTES,
+  jobAttempts: environment.OUTBOX_JOB_ATTEMPTS,
+  priorityEventTypes: urgentListingSearchEventTypes,
+});
 const openSearchClient = createOpenSearchClient({
   node: environment.OPENSEARCH_NODE,
   ...(environment.OPENSEARCH_USERNAME
@@ -139,11 +151,7 @@ const listingIndex = new OpenSearchListingIndex(
 );
 const outboxDispatcher = new OutboxDispatcher({
   repository: outboxRepository,
-  publisher: new BullMqOutboxPublisher(outboxQueue, {
-    maximumPayloadBytes: environment.OUTBOX_MAX_PAYLOAD_BYTES,
-    jobAttempts: environment.OUTBOX_JOB_ATTEMPTS,
-    priorityEventTypes: urgentListingSearchEventTypes,
-  }),
+  publisher: outboxPublisher,
   observability: runtimeState.observability,
   configuration: {
     batchSize: environment.OUTBOX_BATCH_SIZE,
@@ -154,6 +162,19 @@ const outboxDispatcher = new OutboxDispatcher({
     retryMaximumSeconds: environment.OUTBOX_RETRY_MAX_SECONDS,
     priorityEventTypes: urgentListingSearchEventTypes,
   },
+});
+const queueOperationsDispatcher = new QueueOperationsDispatcher({
+  repository: queueOperationsRepository,
+  queue: {
+    getJob: (id) => outboxQueue.getJob(id),
+    getJobs: (types, start, end, asc) =>
+      outboxQueue.getJobs(types as Parameters<typeof outboxQueue.getJobs>[0], start, end, asc),
+  },
+  publisher: outboxPublisher,
+  observability: runtimeState.observability,
+  pollIntervalMilliseconds: Math.max(1_000, environment.OUTBOX_POLL_INTERVAL_MS),
+  leaseSeconds: Math.max(60, environment.OUTBOX_LEASE_SECONDS),
+  queueName: environment.OUTBOX_QUEUE_NAME,
 });
 const listingExpiryDispatcher = new ListingExpiryDispatcher({
   repository: listingRepository,
@@ -290,6 +311,35 @@ const worker = new Worker(
 worker.on("error", () =>
   runtimeState.observability?.logger.error("worker.queue.error", { errorCode: "QUEUE_ERROR" }),
 );
+const deadLetterWrites = new Set<Promise<void>>();
+worker.on("failed", (job, error) => {
+  if (!job) return;
+  const write = recordTerminalJobFailure({
+    repository: queueOperationsRepository,
+    queueName: environment.OUTBOX_QUEUE_NAME,
+    job,
+    error,
+  })
+    .then((outcome) => {
+      if (outcome !== "recorded") return;
+      runtimeState.observability?.metrics.queueAdminOperation("DEAD_LETTER", "recorded");
+      runtimeState.observability?.logger.warn("worker.queue.dead_letter_recorded", {
+        jobId: job.id,
+        jobName: job.name,
+        attempt: job.attemptsMade,
+        errorCode: "JOB_TERMINAL_FAILURE",
+      });
+    })
+    .catch(() => {
+      runtimeState.observability?.logger.error("worker.queue.dead_letter_record_failed", {
+        jobId: job.id,
+        jobName: job.name,
+        errorCode: "DEAD_LETTER_RECORD_FAILED",
+      });
+    });
+  deadLetterWrites.add(write);
+  void write.finally(() => deadLetterWrites.delete(write));
+});
 
 function sendHealthResponse(
   response: ServerResponse,
@@ -343,11 +393,13 @@ async function shutdown(signal: string): Promise<void> {
   logEvent("worker.shutdown.started", { signal });
   await listingExpiryDispatcher.stop();
   await listingIndexReconciler.stop();
+  await queueOperationsDispatcher.stop();
   await outboxDispatcher.stop();
   await new Promise<void>((resolve, reject) => {
     healthServer.close((error) => (error ? reject(error) : resolve()));
   });
   await worker.close();
+  await Promise.allSettled(deadLetterWrites);
   await outboxQueue.close();
   mediaStorage.close();
   await mediaRepository.close();
@@ -355,6 +407,7 @@ async function shutdown(signal: string): Promise<void> {
   await listingSearchRepository.close();
   await notificationRepository.close();
   await outboxRepository.close();
+  await queueOperationsRepository.close();
   await openSearchClient.close();
   await connection.quit();
   await shutdownTracing();
@@ -365,6 +418,7 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 outboxDispatcher.start();
+queueOperationsDispatcher.start();
 listingExpiryDispatcher.start();
 listingIndexReconciler.start();
 logEvent("worker.started", {

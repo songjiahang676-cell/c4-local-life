@@ -93,8 +93,8 @@ try {
     !openApiJsonResponse.ok ||
     !openApiYamlResponse.ok ||
     !String(openApiJson.openapi).startsWith("3.1.") ||
-    Object.keys(openApiJson.paths ?? {}).length !== 70 ||
-    Object.keys(openApiJson.components?.schemas ?? {}).length !== 181 ||
+    Object.keys(openApiJson.paths ?? {}).length !== 74 ||
+    Object.keys(openApiJson.components?.schemas ?? {}).length !== 188 ||
     !openApiYaml.startsWith("openapi: 3.1.") ||
     !openApiYamlResponse.headers.get("content-type")?.includes("application/yaml")
   ) {

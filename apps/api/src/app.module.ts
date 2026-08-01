@@ -8,6 +8,7 @@ import { CsrfOriginGuard } from "./common/csrf-origin.guard";
 import { AdminModule } from "./modules/admin/admin.module";
 import type { ModerationStore } from "./modules/admin/moderation.store";
 import type { MfaStore } from "./modules/admin/mfa.store";
+import type { QueueOperationsStore } from "./modules/admin/queue-operations.store";
 import { AuthModule } from "./modules/auth/auth.module";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
@@ -60,6 +61,7 @@ export class AppModule {
     homepageLayoutStore?: HomepageLayoutStore,
     homepageDataSource?: HomepageDataSource,
     homepageCache?: HomepageCache,
+    queueOperationsStore?: QueueOperationsStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -73,7 +75,7 @@ export class AppModule {
           passwordStore,
           passwordNotificationGateway,
         ),
-        AdminModule.register(environment, mfaStore, moderationStore, metrics),
+        AdminModule.register(environment, mfaStore, moderationStore, metrics, queueOperationsStore),
         HealthModule,
         HomepageModule.register(
           environment,
