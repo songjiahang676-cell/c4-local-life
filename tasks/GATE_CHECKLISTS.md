@@ -56,7 +56,7 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 - [x] `SEO-002` strict schema.org、真实资源 locale/vertical/month sitemap、过期移除与失败关闭。
 - [ ] `SEO-004` a11y。
 - [x] `PERF-001` 匿名缓存安全、请求合并、CWV/API 指标和可执行性能预算。
-- [ ] `EVT-002` 受控 DLQ/Outbox 重放、dry-run 对账、权限审计和 PII 最小化。
+- [x] `EVT-002` 受控 DLQ/Outbox 重放、dry-run 对账、权限审计和 PII 最小化。
 
 ## G4 Interaction / Trust
 
