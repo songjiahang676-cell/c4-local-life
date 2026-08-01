@@ -19,6 +19,7 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-004 protected checks        | PR #43 / run `30607163890`            | 112 files / 499 real-service tests; Linux 34/34 E2E; four images passed    | 2026-07-31 |
 | SEO-004 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-30 |
 | SEO-004 a11y/browser            | production Playwright                 | 34/34；axe 8/8；keyboard/error/320px/forced-colors passed                  | 2026-07-30 |
 | SEO-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI；101 tasks / 62 models / 70 paths / 181 schemas passed         | 2026-07-30 |
