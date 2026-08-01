@@ -28,6 +28,9 @@ export default async function LocaleLayout({
 
   return (
     <div data-locale={locale} lang={locale}>
+      <a className="publicSkipLink" href="#main-content">
+        {locale === "zh-Hans" ? "跳到主要内容" : "Skip to main content"}
+      </a>
       {children}
     </div>
   );

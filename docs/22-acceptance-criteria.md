@@ -379,3 +379,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   XML；全仓质量、真实服务、API runtime、Linux Chromium 与四镜像保护门禁全绿后方可标记 done。
 - OpenAPI、Prisma、migration 与 canonical 数据形状不变化；PostgreSQL 仍是事实源，OpenSearch 不参与
   sitemap 生成。
+
+## 22.23 SEO-004 可访问性基线验收
+
+- 固定 axe 在 production standalone Desktop Chrome/Pixel 7 对首页、公共列表/详情、发布初始/错误、
+  私有账户和 Admin 边界执行 WCAG 2.0/2.1/2.2 A/AA，0 violation；禁止 rule/selector 排除。
+- 所有当前 Web 模板有本地化 skip link 和唯一可聚焦 main target；首次 Tab、焦点轮廓、Enter 跳转、
+  原生键盘顺序、forced colors 与 reduced motion 通过。
+- 发布错误有 alert 摘要、字段 label、`aria-invalid`、`aria-describedby`、首错焦点和至少 24px 的
+  错误链接目标；状态不只依赖颜色或图标。
+- 320 CSS px 自动 reflow 无横向页面滚动；真实浏览器 200% zoom 与 Narrator/Edge 人工检查必须记录
+  工具、路径、步骤和实际结果。未运行不得用 axe/ARIA tree 替代。
+- [`accessibility-baseline.md`](./accessibility-baseline.md) 的阻塞缺口清零、全仓质量、Linux E2E、
+  真实服务和四镜像保护门禁全绿后，才可把 `SEO-004`/Gate 3 标记完成。OpenAPI、Prisma 与 migration
+  不变化。

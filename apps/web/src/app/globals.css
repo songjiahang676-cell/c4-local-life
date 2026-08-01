@@ -2,11 +2,11 @@
   --blue: #1267ed;
   --blue-strong: #0759de;
   --blue-soft: #eef5ff;
-  --orange: #ff6637;
+  --orange: #c84618;
   --orange-soft: #fff1ec;
   --green: #13b87a;
   --ink: #172033;
-  --muted: #737e91;
+  --muted: #5f6b7d;
   --line: #e6ebf3;
   --surface: #ffffff;
   --background: #f5f7fb;
@@ -659,7 +659,7 @@ a {
   font-size: 10px;
 }
 .priceText {
-  color: #ff5034;
+  color: #c62d16;
   white-space: nowrap;
 }
 .lowerGrid {
@@ -1088,7 +1088,7 @@ a {
   font-size: 10px;
 }
 .footerLegal {
-  color: #7d8694;
+  color: #5f6978;
   font-size: 9px;
   white-space: nowrap;
 }
@@ -1999,7 +1999,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #3279e8;
+  color: var(--blue);
 }
 
 .footerHelp span {
@@ -2271,6 +2271,12 @@ input:focus-visible {
 .draftErrorSummary a {
   color: #734000;
   text-decoration: underline;
+}
+
+.draftErrorSummary a {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .draftErrorSummary {
@@ -2922,6 +2928,11 @@ input:focus-visible {
 
 .publicSkipLink:focus {
   transform: translateY(0);
+}
+
+#main-content:focus-visible {
+  outline: 3px solid rgba(18, 103, 237, 0.55);
+  outline-offset: 4px;
 }
 
 .publicSiteHeader {
@@ -4032,5 +4043,23 @@ input:focus-visible {
   .accountOrganizations li {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .publicSkipLink:focus-visible,
+  #main-content:focus-visible {
+    outline: 3px solid CanvasText;
   }
 }

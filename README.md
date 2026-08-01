@@ -95,10 +95,14 @@ OpenAPI 唯一事实源、服务路由和契约校验规则见 [`docs/08-api-and
 ```bash
 pnpm test:e2e:install
 pnpm test:e2e
+pnpm test:a11y
 ```
 
 `test:e2e` 会构建应用并运行桌面与移动端首页/API smoke；CI 在质量构建后使用
-`pnpm test:e2e:ci` 复用构建产物。详情见 [`docs/18-testing-quality.md`](./docs/18-testing-quality.md)。
+`pnpm test:e2e:ci` 复用构建产物。`test:a11y` 对当前主要 Web/Admin 模板执行双设备 axe、键盘、
+焦点、错误关联、强制颜色和 320px reflow 基线；人工检查和未关闭项见
+[`docs/accessibility-baseline.md`](./docs/accessibility-baseline.md)。详情见
+[`docs/18-testing-quality.md`](./docs/18-testing-quality.md)。
 
 ## 五、事实源优先级
 

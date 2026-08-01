@@ -83,7 +83,7 @@ export default async function LandingPage({
   const english = locale === "en-US";
 
   return (
-    <main className="landingPage pageShell">
+    <main className="landingPage pageShell" id="main-content" tabIndex={-1}>
       <Link className="landingBack" href={`/${locale}`}>
         <AppIcon icon={ArrowLeft} size={17} /> {english ? "Back to home" : "返回首页"}
       </Link>

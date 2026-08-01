@@ -19,6 +19,8 @@
     "test:e2e": "pnpm build && node scripts/prepare-standalone-runtime.mjs && playwright test",
     "test:e2e:ci": "node scripts/prepare-standalone-runtime.mjs && playwright test",
     "test:e2e:install": "playwright install chromium",
+    "test:a11y": "pnpm build && node scripts/prepare-standalone-runtime.mjs && playwright test e2e/accessibility.spec.ts",
+    "test:a11y:ci": "node scripts/prepare-standalone-runtime.mjs && playwright test e2e/accessibility.spec.ts",
     "ci:workflow:check": "node scripts/check-ci-workflows.mjs",
     "governance:check": "node scripts/check-repository-governance.mjs",
     "config:check": "tsx scripts/check-runtime-config.ts",
@@ -51,6 +53,7 @@
     "check:architecture": "bash scripts/check-architecture.sh"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.61.1",
     "@redocly/cli": "2.40.0",

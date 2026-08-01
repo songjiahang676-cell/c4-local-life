@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a fixed axe/Playwright WCAG 2.2 AA gate for public discovery, publishing, private-account,
+  and Admin boundaries across desktop/mobile, plus site-wide skip targets, visible forced-color
+  focus, reduced-motion handling, form-error associations, 24px error targets, contrast repairs,
+  narrow reflow coverage, and an explicit human-screen-reader/zoom gap register.
 - Added strict schema.org `WebSite`, `BreadcrumbList`, and current-Job-only `JobPosting`
   projections plus a canonical, no-store sitemap index partitioned by locale, Listing type, and
   publication month, with active-city validation, expiry removal, bounded cursor/URL/XML budgets,

@@ -5,20 +5,27 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `SEO-002` 证据头、受保护合并与主分支终检后进入 `SEO-004` 可访问性基线
-- 进度：10 个 G3 任务、56/101 个总任务本地完成；`SEO-002` 首次受保护证据已通过
-- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；sitemap 月分片达到 10,000 条预算前需增加 canonical 日期过滤/manifest，不能静默截断或改信 OpenSearch
+- 目标：完成 `SEO-004` axe、键盘/焦点、表单错误、200% reflow 与人工 WCAG 2.2 AA 基线，关闭 Gate 3
+- 进度：10 个 G3 任务、56/101 个总任务完成；`SEO-004` 自动化基线与本地完整质量门已通过
+- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能用 axe 代替或伪造
 
 ## 正在进行
 
-| Task    | Owner                | Started    | Target          | Status                | Notes                                            |
-| ------- | -------------------- | ---------- | --------------- | --------------------- | ------------------------------------------------ |
-| SEO-002 | @songjiahang676-cell | 2026-07-29 | protected merge | evidence-head pending | protected real-service/Linux/image checks passed |
+| Task    | Owner                | Started    | Target      | Status                  | Notes                                   |
+| ------- | -------------------- | ---------- | ----------- | ----------------------- | --------------------------------------- |
+| SEO-004 | @songjiahang676-cell | 2026-07-30 | Gate 3 exit | manual evidence pending | automated gate 34/34；A11Y-001/002 open |
 
 ## Gate Evidence
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-004 protected checks        | PR #43 / run `30607163890`            | 112 files / 499 real-service tests; Linux 34/34 E2E; four images passed    | 2026-07-31 |
+| SEO-004 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-30 |
+| SEO-004 a11y/browser            | production Playwright                 | 34/34；axe 8/8；keyboard/error/320px/forced-colors passed                  | 2026-07-30 |
+| SEO-004 runtime/architecture    | API runtime + architecture checker    | RED/OpenAPI；101 tasks / 62 models / 70 paths / 181 schemas passed         | 2026-07-30 |
+| SEO-002 final main quality      | run `30605241894` / `f9507c2`         | merged main quality + Linux 26/26 E2E + four images passed                 | 2026-07-30 |
+| SEO-002 protected merge         | PR #42 / merge `f9507c2`              | protected squash merge completed                                           | 2026-07-30 |
+| SEO-002 evidence head           | PR #42 / run `30604847032`            | final head real services、Linux 26/26 E2E and four images passed           | 2026-07-30 |
 | SEO-002 protected checks        | PR #42 / run `30508293320`            | 112 files / 499 real-service tests；Linux 26/26 E2E；four images passed    | 2026-07-29 |
 | SEO-002 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-29 |
 | SEO-002 runtime/browser         | API runtime + production Playwright   | JSON-LD/robots/sitemaps；desktop/mobile Chromium 26/26 passed              | 2026-07-29 |

@@ -2536,7 +2536,7 @@ skip link、main/nav/search/aside/article 语义地标、连续标题、原生 l
   `locale + vertical + published YYYY-MM`。索引只列出实际含当前 Listing 的月份，并用该月最新
   `updatedAt` 作为 `lastmod`；静态分片不伪造修改时间。
 - Listing 子分片只分页读取 canonical `GET /listings` strict 投影，并再次检查 `publishedAt <= now <
-  expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次最多读取/输出 10,000 条、200 页、
+expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次最多读取/输出 10,000 条、200 页、
   15 秒且 XML 不超过 10 MB；超限、cursor 循环、malformed/不可用来源或不可信生产 public origin 均
   无缓存 503，不静默丢 URL。首期不创建另一份 sitemap 数据库或依赖 OpenSearch，因此状态变化无需
   同步两份事实；每次读取都重新从 PostgreSQL 公开投影验证。
@@ -2546,6 +2546,20 @@ skip link、main/nav/search/aside/article 语义地标、连续标题、原生 l
 - 成功/失败响应均 `X-Robots-Tag: noindex`、`nosniff`；成功也 `no-store` 以避免到期记录被 CDN stale
   保留。失败只写固定 `seo.sitemap_generation_failed`/scope 结构化事件与低基数 Server-Timing，
   不记录 URL、cursor、Listing/用户 ID、内容或 provider error。
+
+## 13.13 SEO-004 可访问性基线
+
+- 所有当前 Web 模板从 locale layout 获得本地化 skip link；每个实际 `<main>` 提供唯一
+  `#main-content` 和程序化焦点目标。激活跳转后主内容获得可见焦点，不能只滚动页面。
+- 主要公开、发布、私有和 Admin 边界由固定 axe 4.12.1 在 production standalone Desktop Chrome 与
+  Pixel 7 扫描 WCAG 2.0/2.1/2.2 A/AA 标签；隐藏移动文字的按钮仍必须保留显式 accessible name。
+- 普通文字对比度至少 4.5:1；交互目标至少满足 WCAG 2.2 的 24 CSS px。表单错误使用 alert 摘要、
+  `aria-invalid`、`aria-describedby`，并把焦点移到第一处错误。
+- 320 CSS px reflow、forced colors、reduced motion 与横向页面溢出进入生产浏览器回归；该证据不等于
+  真实 200% 浏览器缩放或屏幕阅读器人工通过。
+- 实际工具、模板、结果和未关闭项只记录在
+  [`accessibility-baseline.md`](./docs/accessibility-baseline.md)。真实 Narrator/Edge 与 200% zoom 未完成
+  前，`SEO-004` 和 Gate 3 必须保持未关闭。
 
 ---
 
@@ -3896,6 +3910,19 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - 本任务不修改 Prisma 或 migration；本地无 Redis 时集成测试明确 skip，受保护 CI 必须提供真实
   Redis、全量测试、API runtime、Linux Chromium 和四个非 root 镜像后才可完成。
 
+## 18.36 SEO-004 可访问性验证增量
+
+- `@axe-core/playwright` 是根工作区固定直接依赖；`test:a11y` 构建生产应用后执行，
+  `test:a11y:ci` 复用 CI 构建。不得禁用规则、排除失败节点或把 incomplete 当作通过。
+- Desktop Chrome 与 Pixel 7 覆盖首页、列表/筛选、详情、发布初始/错误、私有账户和 Admin 登录；
+  每次扫描 WCAG 2.0/2.1/2.2 A/AA 标签，输出具体 rule 和 selector 以便修复。
+- 键盘测试从页面第一次 Tab 开始，验证本地化 skip link、可见焦点和 Enter 后主内容焦点；表单测试
+  验证 alert、首错焦点、`aria-invalid`/`aria-describedby` 及错误目标尺寸。
+- 320 CSS px、forced colors、reduced motion 与横向溢出自动回归；人工 200% browser zoom 和至少一种
+  主流屏幕阅读器必须留下工具/版本/路径/播报结果，axe 或 accessibility tree 不能替代。
+- 全仓质量、既有 production E2E、受保护真实服务与四镜像仍必须通过。完整矩阵和缺口 ID 见
+  [`accessibility-baseline.md`](./docs/accessibility-baseline.md)。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4631,6 +4658,20 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   XML；全仓质量、真实服务、API runtime、Linux Chromium 与四镜像保护门禁全绿后方可标记 done。
 - OpenAPI、Prisma、migration 与 canonical 数据形状不变化；PostgreSQL 仍是事实源，OpenSearch 不参与
   sitemap 生成。
+
+## 22.23 SEO-004 可访问性基线验收
+
+- 固定 axe 在 production standalone Desktop Chrome/Pixel 7 对首页、公共列表/详情、发布初始/错误、
+  私有账户和 Admin 边界执行 WCAG 2.0/2.1/2.2 A/AA，0 violation；禁止 rule/selector 排除。
+- 所有当前 Web 模板有本地化 skip link 和唯一可聚焦 main target；首次 Tab、焦点轮廓、Enter 跳转、
+  原生键盘顺序、forced colors 与 reduced motion 通过。
+- 发布错误有 alert 摘要、字段 label、`aria-invalid`、`aria-describedby`、首错焦点和至少 24px 的
+  错误链接目标；状态不只依赖颜色或图标。
+- 320 CSS px 自动 reflow 无横向页面滚动；真实浏览器 200% zoom 与 Narrator/Edge 人工检查必须记录
+  工具、路径、步骤和实际结果。未运行不得用 axe/ARIA tree 替代。
+- [`accessibility-baseline.md`](./docs/accessibility-baseline.md) 的阻塞缺口清零、全仓质量、Linux E2E、
+  真实服务和四镜像保护门禁全绿后，才可把 `SEO-004`/Gate 3 标记完成。OpenAPI、Prisma 与 migration
+  不变化。
 
 ---
 

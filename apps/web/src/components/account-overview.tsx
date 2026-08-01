@@ -104,7 +104,7 @@ export function AccountOverview({ locale }: { locale: AccountLocale }) {
 
   if (status === "loading") {
     return (
-      <main className="accountOverview pageShell">
+      <main className="accountOverview pageShell" id="main-content" tabIndex={-1}>
         <p aria-live="polite" className="accountOverviewStatus">
           {text.checking}
         </p>
@@ -113,7 +113,7 @@ export function AccountOverview({ locale }: { locale: AccountLocale }) {
   }
   if (status === "unauthenticated") {
     return (
-      <main className="accountOverview pageShell">
+      <main className="accountOverview pageShell" id="main-content" tabIndex={-1}>
         <section className="card accountOverviewGate">
           <h1>{text.authTitle}</h1>
           <p>{text.authBody}</p>
@@ -129,7 +129,7 @@ export function AccountOverview({ locale }: { locale: AccountLocale }) {
   }
   if (status === "unavailable" || !session) {
     return (
-      <main className="accountOverview pageShell">
+      <main className="accountOverview pageShell" id="main-content" tabIndex={-1}>
         <div className="accountOverviewError" role="alert">
           <p>{text.unavailable}</p>
           <button onClick={() => void refresh()} type="button">
@@ -144,7 +144,7 @@ export function AccountOverview({ locale }: { locale: AccountLocale }) {
   const organizations = session.organizations ?? [];
 
   return (
-    <main className="accountOverview pageShell">
+    <main className="accountOverview pageShell" id="main-content" tabIndex={-1}>
       <nav aria-label={text.breadcrumb}>
         <Link href={`/${locale}`}>{text.home}</Link>
         <span aria-hidden="true">/</span>
