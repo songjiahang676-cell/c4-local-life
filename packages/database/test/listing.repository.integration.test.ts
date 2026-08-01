@@ -947,7 +947,11 @@ integration("ListingRepository safe PostgreSQL projections", () => {
     await database.withRollback(async (transaction) => {
       const fixture = await createFixture(transaction);
       const repository = new ListingRepository(transaction);
-      const occurredAt = new Date("2026-08-01T12:00:00.000Z");
+      const listingTimestamp = await transaction.listing.findUniqueOrThrow({
+        where: { id: fixture.publishedListingId },
+        select: { updatedAt: true },
+      });
+      const occurredAt = new Date(listingTimestamp.updatedAt.getTime() + 1_000);
 
       await expect(
         repository.transitionOwner({
@@ -980,7 +984,7 @@ integration("ListingRepository safe PostgreSQL projections", () => {
         }),
       ).resolves.toEqual({ kind: "already_archived", version: 2 });
 
-      const deletedAt = new Date("2026-08-01T12:01:00.000Z");
+      const deletedAt = new Date(occurredAt.getTime() + 60_000);
       await expect(
         repository.transitionOwner({
           actorUserId: fixture.ownerId,

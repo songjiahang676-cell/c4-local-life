@@ -78,7 +78,6 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
     const queueEventId = randomUUID();
     const aggregateId = randomUUID();
     const now = new Date("2026-08-01T09:00:00.000Z");
-    let jobId: string | undefined;
     try {
       await database.client.user.create({
         data: { id: actorId, email: `${actorId}@example.invalid` },
@@ -136,7 +135,6 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
       expect(retry.kind).toBe("exact_retry");
       expect(conflict).toEqual({ kind: "idempotency_conflict" });
       if (created.kind !== "created") throw new Error("Expected created replay job");
-      jobId = created.job.id;
       await expect(
         repository.createReplayJob({
           ...input,
@@ -146,6 +144,7 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
         }),
       ).resolves.toEqual({ kind: "invalid_targets" });
       expect(created.job.estimatedItems).toBe(2);
+      await expect(database.client.adminJob.count({ where: { actorId } })).resolves.toBe(1);
       await expect(
         database.client.adminJobItem.count({ where: { jobId: created.job.id } }),
       ).resolves.toBe(2);
@@ -161,12 +160,17 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
         }),
       ).resolves.toMatchObject({ actorId, requestId: "queue-request-1" });
     } finally {
-      if (jobId) {
-        await database.client.auditLog.deleteMany({ where: { targetId: jobId } });
-        await database.client.adminJobItem.deleteMany({ where: { jobId } });
-        await database.client.adminJob.deleteMany({ where: { id: jobId } });
+      const actorJobs = await database.client.adminJob.findMany({
+        where: { actorId },
+        select: { id: true },
+      });
+      const actorJobIds = actorJobs.map((job) => job.id);
+      if (actorJobIds.length > 0) {
+        await database.client.auditLog.deleteMany({ where: { targetId: { in: actorJobIds } } });
+        await database.client.adminJobItem.deleteMany({ where: { jobId: { in: actorJobIds } } });
       }
       await database.client.queueDeadLetter.deleteMany({ where: { eventId: queueEventId } });
+      await database.client.adminJob.deleteMany({ where: { id: { in: actorJobIds } } });
       await database.client.outboxEvent.deleteMany({ where: { id: outboxId } });
       await database.client.user.deleteMany({ where: { id: actorId } });
     }
@@ -176,7 +180,7 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
     const repository = new QueueOperationsRepository(database.client);
     const actorId = randomUUID();
     const outboxId = randomUUID();
-    const now = new Date("2026-08-01T10:00:00.000Z");
+    const now = new Date("2000-01-01T10:00:00.000Z");
     let jobId: string | undefined;
     try {
       await database.client.user.create({
@@ -240,11 +244,16 @@ integration("QueueOperationsRepository with PostgreSQL", () => {
       await expect(repository.resetFailedOutboxEvent(outboxId, now)).resolves.toBe("replayed");
       await expect(repository.resetFailedOutboxEvent(outboxId, now)).resolves.toBe("skipped");
     } finally {
-      if (jobId) {
-        await database.client.auditLog.deleteMany({ where: { targetId: jobId } });
-        await database.client.adminJobItem.deleteMany({ where: { jobId } });
-        await database.client.adminJob.deleteMany({ where: { id: jobId } });
+      const actorJobs = await database.client.adminJob.findMany({
+        where: { actorId },
+        select: { id: true },
+      });
+      const actorJobIds = actorJobs.map((job) => job.id);
+      if (actorJobIds.length > 0) {
+        await database.client.auditLog.deleteMany({ where: { targetId: { in: actorJobIds } } });
+        await database.client.adminJobItem.deleteMany({ where: { jobId: { in: actorJobIds } } });
       }
+      await database.client.adminJob.deleteMany({ where: { id: { in: actorJobIds } } });
       await database.client.outboxEvent.deleteMany({ where: { id: outboxId } });
       await database.client.user.deleteMany({ where: { id: actorId } });
     }
