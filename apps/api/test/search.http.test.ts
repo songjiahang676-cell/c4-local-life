@@ -146,11 +146,15 @@ describe("public search HTTP API", () => {
 
   it("exports bounded search metrics without query, cursor, or identifiers as labels", async () => {
     store.results.push(searchStoreResult());
-    await server.inject({ method: "GET", url: "/v1/search?q=private-query&sort=NEWEST" });
+    await server.inject({
+      method: "GET",
+      url: "/v1/search?q=private-query&sort=NEWEST",
+      headers: { "accept-language": "en-US" },
+    });
     const response = await server.inject({ method: "GET", url: "/metrics" });
 
     expect(response.body).toContain(
-      'socal_search_queries_total{outcome="empty",sort="NEWEST",geo="false"} 1',
+      'socal_search_queries_total{outcome="empty",sort="NEWEST",geo="false",locale="en-US"} 1',
     );
     expect(response.body).not.toContain("private-query");
     expect(response.body).not.toContain("memory-pit");

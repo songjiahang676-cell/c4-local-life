@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "socal-search-relevance-v1",
+  "classification": "SYNTHETIC",
+  "locales": ["zh-Hans", "en-US"],
+  "cutoff": 10,
+  "thresholds": {
+    "ndcgAt10": 0.85,
+    "mrr": 0.9,
+    "recallAt10": 0.9,
+    "maximumZeroResultRate": 0.05
+  },
+  "documents": [
+    {
+      "id": "96000000-0000-4000-8000-000000000001",
+      "locale": "en-US",
+      "type": "RENTAL",
+      "slug": "synthetic-irvine-apartment",
+      "title": "Irvine apartment 尔湾 公寓",
+      "summary": "Synthetic two-bedroom apartment evaluation document.",
+      "body": "Fictional rental text created only for repeatable search quality evaluation.",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000001",
+        "slug": "rentals",
+        "nameZhHans": "租房",
+        "nameEn": "Rentals",
+        "aliases": ["apartment", "公寓", "Irvine apartment", "尔湾 公寓"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000001",
+        "code": "US-CA-ORANGE-IRVINE",
+        "slug": "irvine",
+        "nameZhHans": "尔湾",
+        "nameEn": "Irvine",
+        "aliases": ["Irvine", "尔湾"]
+      },
+      "qualityScore": 0.95,
+      "publishedAt": "2026-07-31T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000002",
+      "locale": "zh-Hans",
+      "type": "RENTAL",
+      "slug": "synthetic-irvine-shared-room",
+      "title": "合租 房间 Irvine shared room",
+      "summary": "纯合成的尔湾合租房间搜索评估文档。",
+      "body": "本内容仅用于可重复的搜索质量测试，不代表真实房源。",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000001",
+        "slug": "rentals",
+        "nameZhHans": "租房",
+        "nameEn": "Rentals",
+        "aliases": ["apartment", "公寓", "Irvine apartment", "尔湾 公寓"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000001",
+        "code": "US-CA-ORANGE-IRVINE",
+        "slug": "irvine",
+        "nameZhHans": "尔湾",
+        "nameEn": "Irvine",
+        "aliases": ["Irvine", "尔湾"]
+      },
+      "qualityScore": 0.75,
+      "publishedAt": "2026-07-30T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000003",
+      "locale": "zh-Hans",
+      "type": "SERVICE",
+      "slug": "synthetic-monterey-park-movers",
+      "title": "蒙市 搬家 Monterey Park movers",
+      "summary": "纯合成的搬家服务搜索评估文档。",
+      "body": "本内容由测试团队编写，只验证中英文地点和服务词的排序。",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000002",
+        "slug": "moving-services",
+        "nameZhHans": "搬家服务",
+        "nameEn": "Moving Services",
+        "aliases": ["movers", "搬家"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000002",
+        "code": "US-CA-LA-MONTEREY-PARK",
+        "slug": "monterey-park",
+        "nameZhHans": "蒙特利公园",
+        "nameEn": "Monterey Park",
+        "aliases": ["蒙市", "Monterey Park"]
+      },
+      "qualityScore": 0.88,
+      "publishedAt": "2026-07-29T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000004",
+      "locale": "zh-Hans",
+      "type": "SERVICE",
+      "slug": "synthetic-san-gabriel-nanny",
+      "title": "圣盖博 月嫂 San Gabriel nanny",
+      "summary": "纯合成的家庭服务搜索评估文档。",
+      "body": "本内容不描述真实服务者，只用于验证双语查询命中。",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000003",
+        "slug": "family-care",
+        "nameZhHans": "家庭照护",
+        "nameEn": "Family Care",
+        "aliases": ["nanny", "月嫂"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000003",
+        "code": "US-CA-LA-SAN-GABRIEL",
+        "slug": "san-gabriel",
+        "nameZhHans": "圣盖博",
+        "nameEn": "San Gabriel",
+        "aliases": ["San Gabriel", "圣盖博"]
+      },
+      "qualityScore": 0.86,
+      "publishedAt": "2026-07-28T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000005",
+      "locale": "zh-Hans",
+      "type": "SECONDHAND",
+      "slug": "synthetic-los-angeles-used-furniture",
+      "title": "洛杉矶 二手家具 Los Angeles used furniture",
+      "summary": "纯合成的二手家具搜索评估文档。",
+      "body": "本内容没有真实卖家或商品，仅用于固定语料的排序测试。",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000004",
+        "slug": "used-furniture",
+        "nameZhHans": "二手家具",
+        "nameEn": "Used Furniture",
+        "aliases": ["furniture", "二手家具"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000004",
+        "code": "US-CA-LA-LOS-ANGELES",
+        "slug": "los-angeles",
+        "nameZhHans": "洛杉矶",
+        "nameEn": "Los Angeles",
+        "aliases": ["Los Angeles", "洛杉矶"]
+      },
+      "qualityScore": 0.84,
+      "publishedAt": "2026-07-27T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000006",
+      "locale": "en-US",
+      "type": "JOB",
+      "slug": "synthetic-orange-county-software-engineer",
+      "title": "橙县 软件工程师 Orange County software engineer",
+      "summary": "Synthetic engineering role evaluation document.",
+      "body": "Fictional job text authored only to exercise bilingual relevance ranking.",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000005",
+        "slug": "software-jobs",
+        "nameZhHans": "软件工作",
+        "nameEn": "Software Jobs",
+        "aliases": ["software engineer", "软件工程师"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000005",
+        "code": "US-CA-ORANGE-COUNTY",
+        "slug": "orange-county",
+        "nameZhHans": "橙县",
+        "nameEn": "Orange County",
+        "aliases": ["Orange County", "橙县"]
+      },
+      "qualityScore": 0.9,
+      "publishedAt": "2026-07-26T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000007",
+      "locale": "en-US",
+      "type": "SERVICE",
+      "slug": "synthetic-irvine-house-cleaning",
+      "title": "尔湾 保洁 Irvine house cleaning",
+      "summary": "Synthetic home cleaning evaluation document.",
+      "body": "Fictional service text used only for deterministic search evaluation.",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000006",
+        "slug": "house-cleaning",
+        "nameZhHans": "房屋保洁",
+        "nameEn": "House Cleaning",
+        "aliases": ["cleaning", "保洁"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000001",
+        "code": "US-CA-ORANGE-IRVINE",
+        "slug": "irvine",
+        "nameZhHans": "尔湾",
+        "nameEn": "Irvine",
+        "aliases": ["Irvine", "尔湾"]
+      },
+      "qualityScore": 0.87,
+      "publishedAt": "2026-07-25T12:00:00.000Z"
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000008",
+      "locale": "en-US",
+      "type": "SERVICE",
+      "slug": "synthetic-arcadia-math-tutor",
+      "title": "亚凯迪亚 家教 Arcadia math tutor",
+      "summary": "Synthetic mathematics tutoring evaluation document.",
+      "body": "Fictional tutoring text created only for bilingual search quality checks.",
+      "category": {
+        "id": "96100000-0000-4000-8000-000000000007",
+        "slug": "tutoring",
+        "nameZhHans": "家教",
+        "nameEn": "Tutoring",
+        "aliases": ["tutor", "家教"]
+      },
+      "region": {
+        "id": "96200000-0000-4000-8000-000000000006",
+        "code": "US-CA-LA-ARCADIA",
+        "slug": "arcadia",
+        "nameZhHans": "亚凯迪亚",
+        "nameEn": "Arcadia",
+        "aliases": ["Arcadia", "亚凯迪亚"]
+      },
+      "qualityScore": 0.85,
+      "publishedAt": "2026-07-24T12:00:00.000Z"
+    }
+  ],
+  "queries": [
+    {
+      "id": "zh-irvine-apartment",
+      "locale": "zh-Hans",
+      "query": "尔湾 公寓",
+      "judgments": [
+        { "documentId": "96000000-0000-4000-8000-000000000001", "grade": 3 },
+        { "documentId": "96000000-0000-4000-8000-000000000002", "grade": 2 }
+      ]
+    },
+    {
+      "id": "zh-irvine-shared-room",
+      "locale": "zh-Hans",
+      "query": "合租 房间",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000002", "grade": 3 }]
+    },
+    {
+      "id": "zh-monterey-park-movers",
+      "locale": "zh-Hans",
+      "query": "蒙市 搬家",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000003", "grade": 3 }]
+    },
+    {
+      "id": "zh-san-gabriel-nanny",
+      "locale": "zh-Hans",
+      "query": "圣盖博 月嫂",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000004", "grade": 3 }]
+    },
+    {
+      "id": "zh-los-angeles-used-furniture",
+      "locale": "zh-Hans",
+      "query": "洛杉矶 二手家具",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000005", "grade": 3 }]
+    },
+    {
+      "id": "zh-orange-county-software-engineer",
+      "locale": "zh-Hans",
+      "query": "橙县 软件工程师",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000006", "grade": 3 }]
+    },
+    {
+      "id": "zh-irvine-house-cleaning",
+      "locale": "zh-Hans",
+      "query": "尔湾 保洁",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000007", "grade": 3 }]
+    },
+    {
+      "id": "zh-arcadia-tutor",
+      "locale": "zh-Hans",
+      "query": "亚凯迪亚 家教",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000008", "grade": 3 }]
+    },
+    {
+      "id": "en-irvine-apartment",
+      "locale": "en-US",
+      "query": "Irvine apartment",
+      "judgments": [
+        { "documentId": "96000000-0000-4000-8000-000000000001", "grade": 3 },
+        { "documentId": "96000000-0000-4000-8000-000000000002", "grade": 2 }
+      ]
+    },
+    {
+      "id": "en-irvine-shared-room",
+      "locale": "en-US",
+      "query": "Irvine shared room",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000002", "grade": 3 }]
+    },
+    {
+      "id": "en-monterey-park-movers",
+      "locale": "en-US",
+      "query": "Monterey Park movers",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000003", "grade": 3 }]
+    },
+    {
+      "id": "en-san-gabriel-nanny",
+      "locale": "en-US",
+      "query": "San Gabriel nanny",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000004", "grade": 3 }]
+    },
+    {
+      "id": "en-los-angeles-used-furniture",
+      "locale": "en-US",
+      "query": "Los Angeles used furniture",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000005", "grade": 3 }]
+    },
+    {
+      "id": "en-orange-county-software-engineer",
+      "locale": "en-US",
+      "query": "Orange County software engineer",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000006", "grade": 3 }]
+    },
+    {
+      "id": "en-irvine-house-cleaning",
+      "locale": "en-US",
+      "query": "Irvine house cleaning",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000007", "grade": 3 }]
+    },
+    {
+      "id": "en-arcadia-math-tutor",
+      "locale": "en-US",
+      "query": "Arcadia math tutor",
+      "judgments": [{ "documentId": "96000000-0000-4000-8000-000000000008", "grade": 3 }]
+    }
+  ]
+}

@@ -161,8 +161,9 @@ OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/s
 漂移失败为 503，不用宽松转换掩盖泄漏。OpenSearch transport/查询超时返回 504，不可用返回 503，
 因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
 
-`socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
-分类/地区、坐标和金额均不记录。SEARCH-004 负责的同义词、建议和热门查询隐私见下一节；
+`socal_search_queries_total{outcome,sort,geo,locale}` 只接受固定低基数枚举；locale 只允许
+`zh-Hans`/`en-US`，query、cursor、PIT、资源 ID、分类/地区、坐标和金额均不记录。SEARCH-004 负责的
+同义词、建议和热门查询隐私见下一节；
 SEARCH-005 才负责全量重建与 alias 回滚。
 
 ## 9.14 SEARCH-004 同义词、建议与热门查询隐私
@@ -201,3 +202,19 @@ index。任何 mapping `_meta` 漂移都会中止，不允许原地放宽 strict
 旧 source，再原子恢复两个 alias；已接受的回滚即使跨过窗口截止时间也持续双写 target 直到完成。API
 只公开 phase、索引名、数量和固定失败 code，不公开扫描 cursor、摘要、Listing 内容、PII、query 或
 provider 原始错误。
+
+## 9.16 SEARCH-006 双语相关性评估与运行期面板
+
+`datasets/search-relevance/v1.json` 是版本化的离线基线：8 条纯合成公共文档、各 8 条 `zh-Hans`/
+`en-US` 查询和 1–3 级 judgments。JSON Schema 与运行时解析器共同拒绝未知字段、重复 ID、未知文档、
+控制/双向字符和 contact-like 文本；语料不来自用户、生产库或外部抓取。`evaluateSearchRelevance`
+固定计算 NDCG@10、MRR、Recall@10 和零结果率，并同时检查整体及两个 locale 达到数据集内审核门槛。
+真实 OpenSearch 集成测试使用生产索引定义和查询 adapter 生成排名；离线 ideal-run 单测只验证公式，
+不能替代真实节点结果。
+
+运行期 `socal_search_queries_total` 增加唯一的新维度 `locale=zh-Hans|en-US`，仍只含固定低基数枚举。
+`infra/observability/dashboards/search-quality.json` 从该 counter 与既有 route RED/index/rebuild 指标展示
+双语样本量、零结果率、`/v1/search` p95、timeout/unavailable、索引 freshness 和恢复失败。面板不含
+query、hash、cursor、PIT、分类/地区/Listing/用户 ID、坐标、金额或 provider detail；分母使用实际
+请求量，不能把 CI 合成分数发布为生产指标。生产数据源绑定、OpenSearch cluster exporter、Beta SLO/
+告警阈值和访问控制仍由 `OBS-002` 完成。

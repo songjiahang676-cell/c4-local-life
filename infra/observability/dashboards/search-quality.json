@@ -1,0 +1,138 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "description": "Public empty-result share split only by the fixed supported locale. Query text and filters are never labels.",
+      "fieldConfig": {
+        "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (locale) (rate(socal_search_queries_total{outcome=\"empty\"}[15m])) / clamp_min(sum by (locale) (rate(socal_search_queries_total[15m])), 0.000001)",
+          "legendFormat": "{{locale}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Zero-result rate by locale",
+      "type": "timeseries"
+    },
+    {
+      "description": "Route-level RED latency. This is observed runtime traffic, not CI or offline relevance timing.",
+      "fieldConfig": {
+        "defaults": { "min": 0, "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(socal_http_request_duration_seconds_bucket{route=\"/v1/search\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Search request p95 latency",
+      "type": "timeseries"
+    },
+    {
+      "description": "Observed request sample volume by the two supported locales; use it when interpreting rates.",
+      "fieldConfig": {
+        "defaults": { "min": 0, "unit": "reqps" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (locale) (rate(socal_search_queries_total[15m]))",
+          "legendFormat": "{{locale}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Search request volume by locale",
+      "type": "timeseries"
+    },
+    {
+      "description": "Timeout and unavailable outcomes divided by all public search attempts.",
+      "fieldConfig": {
+        "defaults": { "max": 1, "min": 0, "unit": "percentunit" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(socal_search_queries_total{outcome=~\"timeout|unavailable\"}[5m])) / clamp_min(sum(rate(socal_search_queries_total[5m])), 0.000001)",
+          "legendFormat": "dependency error rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Search timeout and unavailable rate",
+      "type": "timeseries"
+    },
+    {
+      "description": "Canonical event-to-index freshness split by bounded urgent/normal priority.",
+      "fieldConfig": {
+        "defaults": { "min": 0, "unit": "s" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, priority) (rate(socal_search_index_freshness_seconds_bucket[15m])))",
+          "legendFormat": "{{priority}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Search index freshness p95",
+      "type": "timeseries"
+    },
+    {
+      "description": "Recoverable rebuild and reconciliation failures. Inspect the search operations runbook before intervention.",
+      "fieldConfig": {
+        "defaults": { "min": 0, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 15 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum by (phase) (increase(socal_search_rebuild_operations_total{outcome=\"failed\"}[1h]))",
+          "legendFormat": "rebuild {{phase}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(socal_search_reconciliation_total{outcome=\"failed\"}[1h]))",
+          "legendFormat": "reconciliation",
+          "refId": "B"
+        }
+      ],
+      "title": "Search recovery failures",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 40,
+  "tags": ["socal", "search", "quality-contract"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SoCal Life / Search Quality",
+  "uid": "socal-search-quality",
+  "version": 1
+}

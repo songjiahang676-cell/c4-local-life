@@ -100,7 +100,12 @@ describe("observability primitives", () => {
     });
     runtime.metrics.searchReconciliation("deleted");
     runtime.metrics.searchRebuild("validate", "failed");
-    runtime.metrics.searchQuery({ outcome: "success", sort: "DISTANCE", geo: true });
+    runtime.metrics.searchQuery({
+      outcome: "success",
+      sort: "DISTANCE",
+      geo: true,
+      locale: "en-US",
+    });
     runtime.metrics.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
     runtime.metrics.homepageModule({ kind: "LISTING_FEED", outcome: "success" });
     runtime.metrics.homepageCacheInvalidation("invalidated");
@@ -143,7 +148,7 @@ describe("observability primitives", () => {
       'socal_search_rebuild_operations_total{phase="validate",outcome="failed"} 1',
     );
     expect(metrics).toContain(
-      'socal_search_queries_total{outcome="success",sort="DISTANCE",geo="true"} 1',
+      'socal_search_queries_total{outcome="success",sort="DISTANCE",geo="true",locale="en-US"} 1',
     );
     expect(metrics).toContain(
       'socal_search_discovery_events_total{operation="sample",outcome="rejected_sensitive"} 1',
