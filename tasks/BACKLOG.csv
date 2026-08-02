@@ -57,7 +57,7 @@ SEARCH-002,G3,SEARCH,P0,索引 Worker、下架优先和对账,SEARCH-001;EVT-001
 SEARCH-003,G3,SEARCH,P0,搜索查询、facets、cursor、geo,SEARCH-001;API-002,过滤/排序稳定；公开状态；timeout/limits,openapi/openapi.yaml;docs/09-search-and-ranking.md,done
 SEARCH-004,G3,SEARCH,P1,同义词、建议和热门搜索隐私,SEARCH-003,版本词典；低频敏感 query 不展示；bot 过滤,docs/09-search-and-ranking.md,done
 SEARCH-005,G3,SEARCH,P1,全量重建与 alias 切换,SEARCH-002;EVT-002,新索引→追赶→校验→切换→回滚演练,docs/20-operations-runbook.md,done
-SEARCH-006,G3,SEARCH,P1,相关性评估集和 Dashboard,SEARCH-003;OBS-001,中英 query set；NDCG/MRR/零结果追踪,docs/09-search-and-ranking.md,todo
+SEARCH-006,G3,SEARCH,P1,相关性评估集和 Dashboard,SEARCH-003;OBS-001,中英 query set；NDCG/MRR/零结果追踪,docs/09-search-and-ranking.md,done
 WEB-001,G3,WEB,P0,公开列表/详情/筛选页面,LIST-005;SEARCH-003,SSR、移动、中英、状态/广告标签、错误空态,docs/03-information-architecture.md,done
 WEB-002,G3,WEB,P0,首页模块化与真实数据 API,WEB-001;TAX-003,组件映射；模块错误隔离；无真实数据隐藏,docs/26-homepage-component-map.md,done
 WEB-003,G3,WEB,P1,全局 Header/Region/Search suggestion,SEARCH-004;AUTH-003,地区/语言/账户响应式；键盘 combobox,docs/10-ui-ux-design-system.md,todo
