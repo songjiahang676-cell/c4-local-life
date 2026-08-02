@@ -172,6 +172,9 @@ function publicPrice(value: unknown): SearchListingResult["price"] {
 }
 
 function publicAttributes(value: unknown): Readonly<Record<string, string | number | boolean>> {
+  // OpenSearch omits an empty array when `_source` is filtered to `attributes.*`.
+  // A missing filtered field therefore represents the canonical empty attribute list.
+  if (value === undefined) return {};
   if (!Array.isArray(value) || value.length > 100) throw new SearchProjectionError();
   const result: Record<string, string | number | boolean> = {};
   for (const rawAttribute of value) {

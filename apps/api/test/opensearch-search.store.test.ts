@@ -159,6 +159,16 @@ describe("OpenSearch public search adapter", () => {
     expect(serialized).not.toContain("indexedAt");
   });
 
+  it("maps an omitted filtered empty attribute list to an empty public object", () => {
+    const source = indexedSource();
+    delete source.attributes;
+
+    expect(parseSearchListingResult(source, null).attributes).toEqual({});
+    expect(() => parseSearchListingResult({ ...source, attributes: null }, null)).toThrow(
+      SearchProjectionError,
+    );
+  });
+
   it("parses bounded hits and fixed facets while failing closed on drift or partial results", () => {
     const response = {
       took: 12,
