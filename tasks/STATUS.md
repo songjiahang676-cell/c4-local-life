@@ -6,7 +6,7 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：补齐 `SEO-004` 人工 WCAG 证据，关闭 Gate 3
-- 进度：11 个 G3 任务、57/101 个总任务完成；`EVT-002` 受保护真实服务门禁已通过，`SEO-004` 自动化基线已通过
+- 进度：12 个 G3 任务、58/101 个总任务完成；`EVT-002`、`SEARCH-005` 受保护真实服务门禁已通过，`SEO-004` 自动化基线已通过
 - 风险：Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能伪造通过
 
 ## 正在进行
@@ -19,6 +19,9 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEARCH-005 protected checks     | PR #45 / run `30727688616`            | 122 files / 541 real-service tests；Linux 34/34 E2E；four images passed    | 2026-08-01 |
+| SEARCH-005 local quality        | `pnpm ci:quality`                     | 448 passed / 93 service-skipped tests；9 checks；8 builds；budgets passed  | 2026-08-01 |
+| SEARCH-005 architecture         | `scripts/check-architecture.sh`       | 101 tasks / 66 models / 77 paths / 192 schemas / 36 JSON files passed      | 2026-08-01 |
 | EVT-002 protected checks        | PR #44 / run `30723998056`            | 117 files / 524 real-service tests；Linux 34/34 E2E；four images passed    | 2026-08-01 |
 | EVT-002 local quality           | `pnpm ci:quality`                     | 89 files / 433 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-08-01 |
 | EVT-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks / 65 models / 74 paths / 188 schemas / 36 JSON files passed      | 2026-08-01 |

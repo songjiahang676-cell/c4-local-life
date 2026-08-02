@@ -433,3 +433,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   canonical mismatch、重复 item、dry-run 与 repair reconciliation；正常关闭等待在途 DLQ 写入。
 - Admin 测试覆盖双语、筛选提交、选择/确认、recent-MFA 禁用和 dry-run 默认；完整质量、真实 PostgreSQL/
   Redis、API runtime、Linux Chromium 与四镜像受保护门禁全绿后方可标记完成。
+
+## 18.38 SEARCH-005 重建与回滚验证增量
+
+- Repository 真实 PostgreSQL 测试覆盖 actor/type/key 并发幂等、并行 operation 拒绝、Search/Queue job
+  领取隔离、短租约 phase 恢复、source/target 双写目标、切换/回滚完成和四类 Audit 证据；baseline/
+  upgrade 检查新表、唯一索引、phase/name/hash/window 约束和旧数据保留。
+- API/Contracts 测试覆盖三条 OpenAPI 路径、严格 DTO、guest/primary/stale/auditor/admin 权限矩阵、同键
+  变更、并发重建、窗口外回滚、exact retry 和响应 PII/cursor/hash 最小化。
+- Worker 单元测试覆盖候选名称、回填到追赶、逐版本 mismatch 失败关闭、原子切换参数、临时依赖重试及
+  alias + candidate/rollback 多目标写入。真实 OpenSearch 测试创建随机候选，证明无 alias、版本枚举、
+  read/write 一次切换和旧 source 回滚；完整托管门禁不得静默跳过 PostgreSQL/OpenSearch。

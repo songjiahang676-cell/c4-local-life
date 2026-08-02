@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a recoverable PostgreSQL-backed Listing index rebuild control plane with stable-cursor
+  backfill, continuous candidate/rollback dual writes, full canonical version validation, atomic
+  read/write alias switching, retained-source rollback windows, recent-MFA Admin APIs, durable
+  audit evidence, bounded telemetry, and fail-closed mapping/drift handling.
 - Added a durable, audited queue recovery control plane with PII-minimized Outbox/BullMQ failure
   evidence, actor-scoped idempotent replay batches, dry-run-first reconciliation, canonical-event
   verification, lease/item crash recovery, recent-MFA Admin controls, and bilingual operations UI.

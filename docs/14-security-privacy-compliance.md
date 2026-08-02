@@ -475,3 +475,16 @@ Idempotency-Key 或请求哈希。
   repair 只修复可重建的 DLQ 证据。
 - 崩溃/重复投递：批次短租约可恢复，item 唯一键与条件更新保证目标幂等；Worker 正常关闭等待在途
   DLQ 落库，异常窗口由 reconciliation 补录。每次申请和完成均追加最小 AuditLog。
+
+## 14.32 SEARCH-005 索引重建威胁和缓解
+
+- 未授权切换/回滚：读取只允许 MFA-bound PLATFORM_ADMIN/READ_ONLY_AUDITOR；创建和回滚只允许 recent-
+  MFA PLATFORM_ADMIN。后端 Policy、同源 CSRF 和 actor/type/key/hash 幂等均在 API 执行，前端不可代替。
+- 错索引/竞态切换：候选索引必须无 alias 且 `_meta` 精确匹配；切换要求 expected source，read/write
+  alias 必须共享唯一 write index并通过单次原子 action 更新。切换阶段 source/target 都继续写入。
+- 不完整或被污染投影：回填仅从 PostgreSQL 重载公开 DTO；切换前全量比较有序 ID/version 数量和摘要，
+  mismatch 失败关闭。不能以索引回写 PostgreSQL、跳过校验、降低 strict mapping 或强制降低版本。
+- 回滚数据丢失：观察窗口持续写旧 source；已接受回滚即使跨过截止时间也持续写 target，重新全量校验
+  后才能原子恢复。SEARCH-005 不自动删除物理索引。
+- 信息泄漏/高基数遥测：响应只返回 phase、索引名、计数和固定 code；日志/指标/Audit 不包含 Listing
+  内容、PII、query、cursor、摘要或 provider error，metric label 只使用固定 phase/outcome。

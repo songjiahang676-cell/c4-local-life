@@ -2265,6 +2265,107 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /admin/system/search/rebuilds:
+    post:
+      tags: [Admin]
+      summary: Create a recoverable Listing search index rebuild
+      description: |
+        Creates a durable PostgreSQL-backed operation that builds a new physical index, catches up
+        canonical Listing versions, validates the complete projection, and atomically switches the
+        read/write aliases. Requires a recent-MFA PLATFORM_ADMIN session.
+      operationId: createSearchIndexRebuild
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSearchIndexRebuildRequest"
+      responses:
+        "202":
+          description: Search index rebuild accepted
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchIndexOperationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/system/search/rebuilds/{operationId}:
+    get:
+      tags: [Admin]
+      summary: Get privacy-minimized search rebuild status
+      operationId: getSearchIndexOperation
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current durable rebuild or rollback state
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchIndexOperationResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/system/search/rebuilds/{operationId}/rollback:
+    post:
+      tags: [Admin]
+      summary: Roll back a switched Listing search alias within its observation window
+      description: |
+        Creates a separate audited rollback job. The retained source index is continuously updated
+        during the rollback window and is fully revalidated before the atomic alias switch.
+      operationId: createSearchIndexRollback
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSearchIndexRollbackRequest"
+      responses:
+        "202":
+          description: Search index rollback accepted
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchIndexOperationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
   /admin/moderation/cases/{caseId}:
     get:
       tags: [Admin]
@@ -3105,6 +3206,104 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminJob"
+    CreateSearchIndexRebuildRequest:
+      type: object
+      required: [reasonCode]
+      additionalProperties: false
+      properties:
+        reasonCode:
+          { type: string, minLength: 2, maxLength: 80, pattern: "^[A-Z][A-Z0-9_.-]{1,79}$" }
+        ticketRef:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 120,
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$",
+          }
+        rollbackWindowHours: { type: integer, minimum: 1, maximum: 168, default: 24 }
+    CreateSearchIndexRollbackRequest:
+      type: object
+      required: [reasonCode]
+      additionalProperties: false
+      properties:
+        reasonCode:
+          { type: string, minLength: 2, maxLength: 80, pattern: "^[A-Z][A-Z0-9_.-]{1,79}$" }
+        ticketRef:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 120,
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$",
+          }
+    SearchIndexOperation:
+      type: object
+      required:
+        [
+          id,
+          jobId,
+          parentOperationId,
+          type,
+          jobStatus,
+          phase,
+          schemaVersion,
+          sourceIndex,
+          targetIndex,
+          rollbackUntil,
+          failureCode,
+          canonicalCount,
+          targetCount,
+          createdAt,
+          startedAt,
+          completedAt,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        jobId: { type: string, format: uuid }
+        parentOperationId: { type: [string, "null"], format: uuid }
+        type: { type: string, enum: [SEARCH_INDEX_REBUILD, SEARCH_INDEX_ROLLBACK] }
+        jobStatus: { type: string, enum: [PENDING, RUNNING, SUCCEEDED, PARTIAL, FAILED] }
+        phase:
+          {
+            type: string,
+            enum:
+              [
+                PENDING,
+                BACKFILLING,
+                CATCHING_UP,
+                VALIDATING,
+                SWITCHING,
+                OBSERVING,
+                SUCCEEDED,
+                FAILED,
+                ROLLED_BACK,
+              ],
+          }
+        schemaVersion: { type: integer, minimum: 1 }
+        sourceIndex:
+          { type: [string, "null"], minLength: 2, maxLength: 255, pattern: "^[a-z][a-z0-9_-]+$" }
+        targetIndex:
+          { type: [string, "null"], minLength: 2, maxLength: 255, pattern: "^[a-z][a-z0-9_-]+$" }
+        rollbackUntil: { type: [string, "null"], format: date-time }
+        failureCode:
+          {
+            type: [string, "null"],
+            minLength: 2,
+            maxLength: 120,
+            pattern: "^[A-Z][A-Z0-9_.-]{1,119}$",
+          }
+        canonicalCount: { type: [integer, "null"], minimum: 0 }
+        targetCount: { type: [integer, "null"], minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+    SearchIndexOperationResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/SearchIndexOperation"
     MyProfileResponse:
       type: object
       required: [data]

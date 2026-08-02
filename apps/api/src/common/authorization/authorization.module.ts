@@ -82,6 +82,8 @@ export function createPolicyService(): PolicyService {
   policies.register(adminPolicyActions.moderationAct, requireModeratorRecentMfaPolicy);
   policies.register(adminPolicyActions.queueOperationsRead, requireQueueOperationsReadPolicy);
   policies.register(adminPolicyActions.queueOperationsAct, requireQueueOperationsActPolicy);
+  policies.register(adminPolicyActions.searchOperationsRead, requireQueueOperationsReadPolicy);
+  policies.register(adminPolicyActions.searchOperationsAct, requireQueueOperationsActPolicy);
   policies.register(
     organizationPolicyActions.profileRead,
     ownerOrOrganizationPolicy({

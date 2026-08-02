@@ -1293,6 +1293,66 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/admin/system/search/rebuilds": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Create a recoverable Listing search index rebuild
+         * @description Creates a durable PostgreSQL-backed operation that builds a new physical index, catches up
+         *     canonical Listing versions, validates the complete projection, and atomically switches the
+         *     read/write aliases. Requires a recent-MFA PLATFORM_ADMIN session.
+         */
+        readonly post: operations["createSearchIndexRebuild"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/system/search/rebuilds/{operationId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get privacy-minimized search rebuild status */
+        readonly get: operations["getSearchIndexOperation"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/system/search/rebuilds/{operationId}/rollback": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Roll back a switched Listing search alias within its observation window
+         * @description Creates a separate audited rollback job. The retained source index is continuously updated
+         *     during the rollback window and is fully revalidated before the atomic alias switch.
+         */
+        readonly post: operations["createSearchIndexRollback"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/admin/moderation/cases/{caseId}": {
         readonly parameters: {
             readonly query?: never;
@@ -1692,6 +1752,47 @@ export interface components {
         };
         readonly AdminJobResponse: {
             readonly data: components["schemas"]["AdminJob"];
+        };
+        readonly CreateSearchIndexRebuildRequest: {
+            readonly reasonCode: string;
+            readonly ticketRef?: string;
+            /** @default 24 */
+            readonly rollbackWindowHours: number;
+        };
+        readonly CreateSearchIndexRollbackRequest: {
+            readonly reasonCode: string;
+            readonly ticketRef?: string;
+        };
+        readonly SearchIndexOperation: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly jobId: string;
+            /** Format: uuid */
+            readonly parentOperationId: string | null;
+            /** @enum {string} */
+            readonly type: "SEARCH_INDEX_REBUILD" | "SEARCH_INDEX_ROLLBACK";
+            /** @enum {string} */
+            readonly jobStatus: "PENDING" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
+            /** @enum {string} */
+            readonly phase: "PENDING" | "BACKFILLING" | "CATCHING_UP" | "VALIDATING" | "SWITCHING" | "OBSERVING" | "SUCCEEDED" | "FAILED" | "ROLLED_BACK";
+            readonly schemaVersion: number;
+            readonly sourceIndex: string | null;
+            readonly targetIndex: string | null;
+            /** Format: date-time */
+            readonly rollbackUntil: string | null;
+            readonly failureCode: string | null;
+            readonly canonicalCount: number | null;
+            readonly targetCount: number | null;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly startedAt: string | null;
+            /** Format: date-time */
+            readonly completedAt: string | null;
+        };
+        readonly SearchIndexOperationResponse: {
+            readonly data: components["schemas"]["SearchIndexOperation"];
         };
         readonly MyProfileResponse: {
             readonly data: components["schemas"]["MyProfile"];
@@ -5559,6 +5660,97 @@ export interface operations {
             readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
             readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly createSearchIndexRebuild: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateSearchIndexRebuildRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Search index rebuild accepted */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SearchIndexOperationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly getSearchIndexOperation: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly operationId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Current durable rebuild or rollback state */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SearchIndexOperationResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
+        };
+    };
+    readonly createSearchIndexRollback: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path: {
+                readonly operationId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateSearchIndexRollbackRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Search index rollback accepted */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["SearchIndexOperationResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
         };
     };
     readonly getModerationCase: {

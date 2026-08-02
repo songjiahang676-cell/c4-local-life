@@ -25,6 +25,9 @@ type SearchIndexOperation = "upsert" | "delete";
 type SearchIndexOutcome = "applied" | "stale" | "missing" | "failed";
 type SearchIndexPriority = "urgent" | "normal";
 type SearchReconciliationOutcome = "current" | "upserted" | "deleted" | "failed";
+type SearchRebuildPhase =
+  "prepare" | "backfill" | "catch_up" | "validate" | "switch" | "rollback" | "observation";
+type SearchRebuildOutcome = "completed" | "retry" | "failed" | "stale";
 type SearchQueryOutcome =
   "success" | "empty" | "invalid_cursor" | "expired_cursor" | "timeout" | "unavailable";
 type SearchQuerySort = "RELEVANCE" | "NEWEST" | "PRICE_ASC" | "PRICE_DESC" | "DISTANCE";
@@ -129,6 +132,7 @@ export class MetricsRegistry {
   readonly #moderationDuplicateReviews = new Map<ModerationDuplicateReviewOutcome, number>();
   readonly #searchIndexEvents = new Map<string, number>();
   readonly #searchIndexFreshness = new Map<string, Histogram>();
+  readonly #searchRebuildOperations = new Map<string, number>();
   readonly #searchReconciliations = new Map<SearchReconciliationOutcome, number>();
   readonly #searchQueries = new Map<string, number>();
   readonly #searchDiscoveryEvents = new Map<string, number>();
@@ -228,6 +232,10 @@ export class MetricsRegistry {
 
   searchReconciliation(outcome: SearchReconciliationOutcome): void {
     this.#searchReconciliations.set(outcome, (this.#searchReconciliations.get(outcome) ?? 0) + 1);
+  }
+
+  searchRebuild(phase: SearchRebuildPhase, outcome: SearchRebuildOutcome): void {
+    increment(this.#searchRebuildOperations, labelKey({ phase, outcome }));
   }
 
   searchQuery(input: { outcome: SearchQueryOutcome; sort: SearchQuerySort; geo: boolean }): void {
@@ -394,6 +402,13 @@ export class MetricsRegistry {
     );
     for (const [outcome, value] of [...this.#searchReconciliations].sort()) {
       lines.push(`socal_search_reconciliation_total${labels({ outcome })} ${value}`);
+    }
+    lines.push(
+      "# HELP socal_search_rebuild_operations_total Recoverable Listing index rebuild stages by bounded outcome.",
+      "# TYPE socal_search_rebuild_operations_total counter",
+    );
+    for (const [key, value] of [...this.#searchRebuildOperations].sort()) {
+      lines.push(`socal_search_rebuild_operations_total${labels(parseLabelKey(key))} ${value}`);
     }
     lines.push(
       "# HELP socal_search_queries_total Public search queries by bounded outcome, sort, and geo mode.",

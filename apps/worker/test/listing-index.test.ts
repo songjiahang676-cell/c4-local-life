@@ -47,6 +47,7 @@ function fakeClient(
           },
         }),
       ),
+      updateAliases: vi.fn(() => Promise.resolve()),
     },
   };
 }
@@ -169,6 +170,6 @@ describe("Listing index contract", () => {
     aliasDrift.aliases[names.writeAlias] = {};
     await expect(
       new ListingIndexManager(fakeClient(names.physical, aliasDrift), prefix).ensure(),
-    ).rejects.toThrow(/alias contract/);
+    ).rejects.toThrow(/aliases/);
   });
 });

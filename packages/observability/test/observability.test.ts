@@ -99,6 +99,7 @@ describe("observability primitives", () => {
       freshnessSeconds: 900,
     });
     runtime.metrics.searchReconciliation("deleted");
+    runtime.metrics.searchRebuild("validate", "failed");
     runtime.metrics.searchQuery({ outcome: "success", sort: "DISTANCE", geo: true });
     runtime.metrics.searchDiscovery({ operation: "sample", outcome: "rejected_sensitive" });
     runtime.metrics.homepageModule({ kind: "LISTING_FEED", outcome: "success" });
@@ -138,6 +139,9 @@ describe("observability primitives", () => {
       'socal_search_index_freshness_seconds_count{operation="upsert",priority="normal"}',
     );
     expect(metrics).toContain('socal_search_reconciliation_total{outcome="deleted"} 1');
+    expect(metrics).toContain(
+      'socal_search_rebuild_operations_total{phase="validate",outcome="failed"} 1',
+    );
     expect(metrics).toContain(
       'socal_search_queries_total{outcome="success",sort="DISTANCE",geo="true"} 1',
     );

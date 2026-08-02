@@ -44,6 +44,8 @@ export const adminPolicyActions = {
   moderationAct: "admin:moderation:act",
   queueOperationsRead: "admin:queue:read",
   queueOperationsAct: "admin:queue:act",
+  searchOperationsRead: "admin:search:read",
+  searchOperationsAct: "admin:search:act",
 } as const;
 
 export const organizationPolicyActions = {

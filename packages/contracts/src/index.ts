@@ -1,4 +1,6 @@
 import { z } from "zod";
+
+export const listingSearchIndexSchemaVersion = 1 as const;
 import type { components, operations, paths } from "./generated/openapi";
 
 export type OpenApiComponents = components;
@@ -94,6 +96,12 @@ export type CreateQueueReconciliationRunRequest =
   components["schemas"]["CreateQueueReconciliationRunRequest"];
 export type AdminJob = components["schemas"]["AdminJob"];
 export type AdminJobResponse = components["schemas"]["AdminJobResponse"];
+export type CreateSearchIndexRebuildRequest =
+  components["schemas"]["CreateSearchIndexRebuildRequest"];
+export type CreateSearchIndexRollbackRequest =
+  components["schemas"]["CreateSearchIndexRollbackRequest"];
+export type SearchIndexOperation = components["schemas"]["SearchIndexOperation"];
+export type SearchIndexOperationResponse = components["schemas"]["SearchIndexOperationResponse"];
 export type CreateReportRequest = components["schemas"]["CreateReportRequest"];
 export type ReportReceiptResponse = components["schemas"]["ReportReceiptResponse"];
 export type CreateModerationAppealRequest = components["schemas"]["CreateModerationAppealRequest"];
@@ -1440,6 +1448,21 @@ export const createQueueReconciliationRunRequestSchema: z.ZodType<CreateQueueRec
       ticketRef: queueTicketReferenceSchema.optional(),
     })
     .strict();
+
+export const createSearchIndexRebuildRequestSchema: z.ZodType<CreateSearchIndexRebuildRequest> = z
+  .object({
+    reasonCode: queueFailureCodeSchema.max(80),
+    ticketRef: queueTicketReferenceSchema.optional(),
+    rollbackWindowHours: z.number().int().min(1).max(168).default(24),
+  })
+  .strict();
+
+export const createSearchIndexRollbackRequestSchema: z.ZodType<CreateSearchIndexRollbackRequest> = z
+  .object({
+    reasonCode: queueFailureCodeSchema.max(80),
+    ticketRef: queueTicketReferenceSchema.optional(),
+  })
+  .strict();
 
 const moderationReasonByAction = {
   APPROVE: ["CONTENT_POLICY_COMPLIANT"],

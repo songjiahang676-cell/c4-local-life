@@ -300,6 +300,8 @@ enum OutboxStatus {
 enum AdminJobType {
   QUEUE_REPLAY
   QUEUE_RECONCILIATION
+  SEARCH_INDEX_REBUILD
+  SEARCH_INDEX_ROLLBACK
 }
 
 enum AdminJobStatus {
@@ -326,6 +328,18 @@ enum QueueDeadLetterStatus {
   OPEN
   REPLAY_PENDING
   RESOLVED
+}
+
+enum SearchIndexOperationPhase {
+  PENDING
+  BACKFILLING
+  CATCHING_UP
+  VALIDATING
+  SWITCHING
+  OBSERVING
+  SUCCEEDED
+  FAILED
+  ROLLED_BACK
 }
 
 model User {
@@ -1636,11 +1650,41 @@ model AdminJob {
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   actor           User           @relation("AdminJobActor", fields: [actorId], references: [id], onDelete: Restrict)
   items           AdminJobItem[]
+  searchOperation SearchIndexOperation?
 
   @@unique([actorId, type, idempotencyKey])
   @@index([status, availableAt, id])
   @@index([actorId, createdAt(sort: Desc)])
   @@map("admin_jobs")
+}
+
+model SearchIndexOperation {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  jobId               String                    @unique @map("job_id") @db.Uuid
+  parentOperationId   String?                   @map("parent_operation_id") @db.Uuid
+  phase               SearchIndexOperationPhase @default(PENDING)
+  schemaVersion       Int                       @map("schema_version")
+  sourceIndex         String?                   @map("source_index") @db.VarChar(255)
+  targetIndex         String?                   @map("target_index") @db.VarChar(255)
+  scanCursor          String?                   @map("scan_cursor") @db.Uuid
+  rollbackWindowHours Int                       @default(24) @map("rollback_window_hours")
+  canonicalCount      Int?                      @map("canonical_count")
+  targetCount         Int?                      @map("target_count")
+  canonicalDigest     String?                   @map("canonical_digest") @db.Char(64)
+  targetDigest        String?                   @map("target_digest") @db.Char(64)
+  aliasSwitchedAt     DateTime?                 @map("alias_switched_at") @db.Timestamptz(6)
+  rollbackUntil       DateTime?                 @map("rollback_until") @db.Timestamptz(6)
+  rolledBackAt        DateTime?                 @map("rolled_back_at") @db.Timestamptz(6)
+  failureCode         String?                   @map("failure_code") @db.VarChar(120)
+  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  job                 AdminJob                  @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  parentOperation     SearchIndexOperation?     @relation("SearchIndexRollback", fields: [parentOperationId], references: [id], onDelete: Restrict)
+  rollbackOperations  SearchIndexOperation[]    @relation("SearchIndexRollback")
+
+  @@index([phase, updatedAt, id])
+  @@index([parentOperationId, createdAt(sort: Desc)])
+  @@map("search_index_operations")
 }
 
 model AdminJobItem {

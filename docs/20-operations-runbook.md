@@ -236,3 +236,32 @@ application/xml`、`Cache-Control: no-store`、双语 alternate、无 query/账�
   allowlist 并验证 sitemap/页面 noindex；不要删除业务 Listing 或用 robots Disallow 隐藏错误。
 - JSON-LD 告警按页面可见字段复核。Job 已过期、summary/雇主/用工形式缺失或 Region 非 California
   时应没有 `JobPosting`；不得为了富结果补造 salary、rating、电话、地址或 Organization URL。
+
+## 20.23 SEARCH-005 全量索引重建、切换与回滚
+
+1. 先保存 incident/ticket 编号并确认 PostgreSQL、Outbox 和 Worker 可用；禁止从现有 OpenSearch 文档
+   反向恢复业务表。使用 recent-MFA `PLATFORM_ADMIN` 会话和新的 `Idempotency-Key` 调用
+   `POST /v1/admin/system/search/rebuilds`，只提交固定 `reasonCode`、可选 `ticketRef` 和 1–168 小时的
+   `rollbackWindowHours`。同一 actor/type/key 的精确重试返回同一 operation；变更请求返回 409；已有
+   重建或仍在观察窗口时拒绝第二个重建。
+2. 用 `GET /v1/admin/system/search/rebuilds/{operationId}` 观察 `PENDING → BACKFILLING →
+CATCHING_UP → VALIDATING → SWITCHING → OBSERVING`。Worker 创建 operation UUID 派生的新物理索引，
+   不给候选索引挂 alias；回填用稳定 Listing UUID cursor 并从 PostgreSQL 重载公开投影。每个写入同时
+   使用 external version 写当前 alias 与候选索引，重复批次、进程退出和过期租约均可安全恢复。
+3. `VALIDATING` 会刷新候选索引并按 ID 顺序比较 PostgreSQL 应公开的全部 `id + contentVersion` 与候选
+   索引；数量和滚动 SHA-256 任一不等即以固定 `SEARCH_INDEX_VALIDATION_MISMATCH` 失败，alias 不变。
+   日志、响应和工单不得包含 Listing 标题、正文、query、坐标、联系方式、完整文档、扫描 cursor 或
+   摘要值。
+4. `SWITCHING` 一次性 remove/add read/write alias，并要求两者只指向同一 write index；切换前后都重验
+   mapping `_meta`。切换阶段同时写 source/target，消除 alias 已切但数据库状态尚未提交的崩溃窗口。
+   `socal_search_rebuild_operations_total{phase,outcome}` 的 `retry` 表示临时依赖故障，Worker 会在租约
+   到期后重试；`failed` 表示契约或全量校验失败，必须开新 operation，不能就地放宽 mapping/校验。
+5. `OBSERVING` 期间旧 source 索引继续接收每个 Listing 变更，不自动删除。需要回滚时，在
+   `rollbackUntil` 前用新 `Idempotency-Key` 调用
+   `POST /v1/admin/system/search/rebuilds/{operationId}/rollback`。回滚是独立审计 job，先重新全量校验旧
+   索引，再原子恢复两个 alias；完成后父 operation 为 `ROLLED_BACK`。即使观察窗口在已接受回滚期间
+   到期，回滚 target 仍继续双写直至完成。
+6. 观察窗口正常结束后 phase 变为 `SUCCEEDED`，旧索引仍保留。物理清理由单独、经审批的容量/保留任务
+   执行；SEARCH-005 不删除任何索引。回滚应用或数据库 migration 前先停 Search Admin API/dispatcher，
+   导出 `admin_jobs`、`search_index_operations` 与 AuditLog 证据，并核对 alias；优先按 migration 的
+   `ROLLBACK.md` roll forward 修复。

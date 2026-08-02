@@ -106,6 +106,12 @@ export default defineConfig({
           import.meta.url,
         ),
       ),
+      "@socal/database/search-index-operations": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/search-index-operation.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/media": fileURLToPath(
         new URL("./packages/database/src/repositories/media-asset.repository.ts", import.meta.url),
       ),
