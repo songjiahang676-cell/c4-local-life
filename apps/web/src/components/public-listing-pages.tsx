@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { ListingType, Locale, PublicListingView } from "@socal/contracts";
 import { AppIcon } from "./icons/app-icon";
+import { GlobalSiteHeader } from "./global-site-header";
 import {
   PUBLIC_VERTICALS,
   formatListingDate,
@@ -38,12 +39,8 @@ import {
 
 const copy = {
   "zh-Hans": {
-    brand: "南加生活网",
-    brandSubtitle: "SOCAL LIFE",
     home: "首页",
     search: "全站搜索",
-    searchPlaceholder: "搜索职位、房源、转让、二手或服务",
-    language: "English",
     filters: "筛选条件",
     query: "关键词",
     allTypes: "全部类型",
@@ -99,12 +96,8 @@ const copy = {
     listingLanguage: "内容语言",
   },
   "en-US": {
-    brand: "SoCal Life",
-    brandSubtitle: "南加生活网",
     home: "Home",
     search: "Search",
-    searchPlaceholder: "Search jobs, rentals, transfers, items, or services",
-    language: "简体中文",
     filters: "Filters",
     query: "Keywords",
     allTypes: "All types",
@@ -190,63 +183,6 @@ const verticalIntro: Readonly<Record<ListingType, Readonly<Record<Locale, string
     "en-US": "Find local services. Verify credentials, estimates, and insurance before hiring.",
   },
 };
-
-function switchLocalePath(locale: Locale, pathname: string): string {
-  const target = locale === "zh-Hans" ? "en-US" : "zh-Hans";
-  return pathname.replace(`/${locale}`, `/${target}`);
-}
-
-function PublicSiteHeader({ locale, pathname }: { locale: Locale; pathname: string }) {
-  const text = copy[locale];
-  return (
-    <>
-      <header className="publicSiteHeader">
-        <div className="publicHeaderTop pageShell">
-          <Link
-            className="publicBrand"
-            href={`/${locale}`}
-            aria-label={`${text.brand} ${text.home}`}
-          >
-            <span aria-hidden="true">SL</span>
-            <span>
-              <strong>{text.brand}</strong>
-              <small>{text.brandSubtitle}</small>
-            </span>
-          </Link>
-          <form
-            action={publicSearchPath(locale)}
-            aria-label={text.search}
-            className="publicHeaderSearch"
-            role="search"
-          >
-            <label className="srOnly" htmlFor="site-search">
-              {text.search}
-            </label>
-            <input id="site-search" name="q" placeholder={text.searchPlaceholder} maxLength={120} />
-            <button aria-label={text.search} type="submit">
-              <AppIcon icon={Search} size={18} />
-              <span>{text.search}</span>
-            </button>
-          </form>
-          <Link className="publicLocaleSwitch" href={switchLocalePath(locale, pathname)}>
-            {text.language}
-          </Link>
-        </div>
-        <nav
-          className="publicNav pageShell"
-          aria-label={locale === "zh-Hans" ? "主要导航" : "Primary"}
-        >
-          <Link href={`/${locale}`}>{text.home}</Link>
-          {Object.entries(PUBLIC_VERTICALS).map(([slug, type]) => (
-            <Link href={`/${locale}/${slug}`} key={type}>
-              {verticalLabel(locale, type)}
-            </Link>
-          ))}
-        </nav>
-      </header>
-    </>
-  );
-}
 
 function optionLabel(label: string, count?: number): string {
   return count === undefined ? label : `${label} (${count})`;
@@ -519,11 +455,21 @@ export function PublicListingIndexView({
           ),
         )
       : null;
+  const selectedRegion =
+    model.kind === "ready" && model.filters.regionCode
+      ? model.regionOptions.find((option) => option.value === model.filters.regionCode)
+      : undefined;
 
   return (
     <>
       {breadcrumb ? <StructuredData nodes={breadcrumb} /> : null}
-      <PublicSiteHeader locale={locale} pathname={pathname} />
+      <GlobalSiteHeader
+        locale={locale}
+        pathname={pathname}
+        {...(selectedRegion
+          ? { initialRegion: { code: selectedRegion.value, name: selectedRegion.label } }
+          : {})}
+      />
       <main className="publicListingPage pageShell" id="main-content" tabIndex={-1}>
         <nav
           className="publicBreadcrumbs"
@@ -672,7 +618,11 @@ export function PublicListingDetailView({
   return (
     <>
       {structuredNodes.length > 0 ? <StructuredData nodes={structuredNodes} /> : null}
-      <PublicSiteHeader locale={locale} pathname={pathname} />
+      <GlobalSiteHeader
+        initialRegion={{ code: listing.region.code, name: regionName }}
+        locale={locale}
+        pathname={pathname}
+      />
       <main className="publicDetailPage pageShell" id="main-content" tabIndex={-1}>
         <nav
           className="publicBreadcrumbs"
@@ -802,7 +752,7 @@ export function PublicListingDetailUnavailable({
   const text = copy[locale];
   return (
     <>
-      <PublicSiteHeader locale={locale} pathname={pathname} />
+      <GlobalSiteHeader locale={locale} pathname={pathname} />
       <main className="publicDetailPage pageShell" id="main-content" tabIndex={-1}>
         <section className="publicState card" role="alert">
           <AppIcon icon={ShieldCheck} size={28} />

@@ -488,3 +488,14 @@ Idempotency-Key 或请求哈希。
   后才能原子恢复。SEARCH-005 不自动删除物理索引。
 - 信息泄漏/高基数遥测：响应只返回 phase、索引名、计数和固定 code；日志/指标/Audit 不包含 Listing
   内容、PII、query、cursor、摘要或 provider error，metric label 只使用固定 phase/outcome。
+
+## 14.33 WEB-003 全局 Header 威胁和缓解
+
+- Cookie/身份扩散：公开地区与搜索建议请求固定 `credentials: omit` 和 `no-store`；只有同源 Session 检查
+  使用浏览器 Cookie。Header 不显示 display name、邮箱、电话、角色或组织，只显示通用账户入口。
+- 恶意发现响应：客户端对顶层键、数量、类型、locale、时间、地区代码、slug、长度、重复值、控制字符和
+  双向字符执行有界 strict 校验；任何漂移或损坏均清空数据并显示不泄漏 provider detail 的通用失败态。
+- 陈旧建议/竞态：每次查询变化立即清空旧结果并进入 loading，防抖请求使用 AbortController；关闭列表或
+  新请求后旧响应不能恢复为可选项，用户仍可提交普通 GET 搜索。
+- 键盘与导航劫持：建议仅产生同源搜索参数，不接受任意 URL；地区值只接受受限代码。combobox 使用原生
+  键盘事件、稳定 active descendant、Escape 关闭和可见焦点，不以鼠标交互替代访问控制或搜索授权。

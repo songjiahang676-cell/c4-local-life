@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CircleHelp, Languages, MapPin, Search, User, UserPlus, Zap } from "lucide-react";
+import { CircleHelp, MapPin, Search, Zap } from "lucide-react";
 import type {
   HomepageCitiesModule,
   HomepageHeroModule,
@@ -12,9 +12,9 @@ import type {
 } from "@socal/contracts";
 import { AppIcon } from "./icons/app-icon";
 import { CategoryShortcut } from "./icons/category-shortcut";
-import { IconButton } from "./icons/icon-button";
+import { GlobalSiteHeader } from "./global-site-header";
 import { QuickPublishItem } from "./icons/quick-publish-item";
-import { categoryEntries, primaryNavigation, quickPublishEntries } from "../data/homepage";
+import { categoryEntries, quickPublishEntries } from "../data/homepage";
 import { localizedPath, ROUTES } from "../data/routes";
 import type { HomepageModel } from "../lib/homepage";
 import { StructuredData, websiteStructuredData } from "../lib/structured-data";
@@ -26,13 +26,7 @@ import {
 } from "../lib/public-listings";
 
 type Copy = Readonly<{
-  brandHome: string;
-  region: string;
   search: string;
-  signIn: string;
-  register: string;
-  accountActions: string;
-  primaryNav: string;
   quickPublish: string;
   allPublish: string;
   directories: string;
@@ -51,13 +45,7 @@ type Copy = Readonly<{
 
 const copy: Readonly<Record<Locale, Copy>> = {
   "zh-Hans": {
-    brandHome: "南加生活网首页",
-    region: "南加州",
     search: "搜索",
-    signIn: "登录",
-    register: "注册",
-    accountActions: "账户操作",
-    primaryNav: "主导航",
     quickPublish: "快速发布",
     allPublish: "查看全部发布类型",
     directories: "信息分类",
@@ -74,13 +62,7 @@ const copy: Readonly<Record<Locale, Copy>> = {
     help: "帮助中心",
   },
   "en-US": {
-    brandHome: "SoCal Life home",
-    region: "Southern California",
     search: "Search",
-    signIn: "Sign in",
-    register: "Register",
-    accountActions: "Account actions",
-    primaryNav: "Primary navigation",
     quickPublish: "Post information",
     allPublish: "View all posting options",
     directories: "Browse categories",
@@ -105,55 +87,6 @@ function modulesOfKind<K extends HomepageModule["kind"]>(
   if (model.kind !== "ready") return [];
   return model.response.modules.filter(
     (module): module is Extract<HomepageModule, { kind: K }> => module.kind === kind,
-  );
-}
-
-function Header({ locale }: { locale: Locale }) {
-  const labels = copy[locale];
-  const path = (route: string) => localizedPath(locale, route);
-  return (
-    <header className="siteHeader">
-      <div className="headerTop pageShell">
-        <Link className="brand" href={path(ROUTES.home)} aria-label={labels.brandHome}>
-          <span className="brandMark">
-            <AppIcon icon={MapPin} size={25} />
-          </span>
-          <span>
-            <strong>{locale === "zh-Hans" ? "南加生活网" : "SoCal Life"}</strong>
-            <small>SOCAL LIFE</small>
-          </span>
-        </Link>
-        <span className="locationButton" aria-label={labels.region}>
-          <AppIcon icon={MapPin} size={21} />
-          <span>
-            <strong>{labels.region}</strong>
-            <small>America/Los_Angeles</small>
-          </span>
-        </span>
-        <form action={path(ROUTES.classified)} className="searchBar" role="search">
-          <input aria-label={labels.search} name="q" placeholder={labels.search} />
-          <button type="submit">
-            <AppIcon icon={Search} size={17} /> {labels.search}
-          </button>
-        </form>
-        <div className="headerActions" aria-label={labels.accountActions}>
-          <Link className="languageAction" href={locale === "en-US" ? "/zh-Hans" : "/en-US"}>
-            <AppIcon icon={Languages} size={16} /> 中文 / English
-          </Link>
-          <IconButton href={path(ROUTES.login)} icon={User} label={labels.signIn} />
-          <Link className="registerButton" href={path(ROUTES.register)}>
-            <AppIcon icon={UserPlus} size={16} /> {labels.register}
-          </Link>
-        </div>
-      </div>
-      <nav className="primaryNav pageShell" aria-label={labels.primaryNav}>
-        {primaryNavigation(locale).map(([label, href], index) => (
-          <Link className={index === 0 ? "active" : ""} href={path(href)} key={href}>
-            {label}
-          </Link>
-        ))}
-      </nav>
-    </header>
   );
 }
 
@@ -339,7 +272,7 @@ export function HomePage({
   return (
     <>
       {includeStructuredData ? <StructuredData nodes={websiteStructuredData(locale)} /> : null}
-      <Header locale={locale} />
+      <GlobalSiteHeader locale={locale} pathname={`/${locale}`} />
       <main className="pageShell homeLayout homepageRealData" id="main-content" tabIndex={-1}>
         <QuickPublish locale={locale} />
         <div className="centerColumn">

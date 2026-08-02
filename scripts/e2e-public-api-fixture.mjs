@@ -222,6 +222,40 @@ const server = createServer((request, response) => {
     send(response, 200, { data: [region] });
     return;
   }
+  if (url.pathname === "/v1/auth/session") {
+    send(response, 401, { title: "Unauthorized", status: 401 });
+    return;
+  }
+  if (url.pathname === "/v1/search/suggestions") {
+    const locale = url.searchParams.get("locale") === "en-US" ? "en-US" : "zh-Hans";
+    const query = url.searchParams.get("q");
+    const suggestions = [
+      ...(query
+        ? [
+            {
+              type: "QUERY",
+              label: locale === "en-US" ? "Synthetic rentals" : "测试租房",
+              value: locale === "en-US" ? "Synthetic rentals" : "测试租房",
+              locale,
+            },
+          ]
+        : []),
+      {
+        type: "CATEGORY",
+        label: locale === "en-US" ? "Synthetic rentals" : "测试租房",
+        value: "synthetic-rental",
+        locale,
+      },
+      {
+        type: "REGION",
+        label: region.name[locale],
+        value: region.code,
+        locale,
+      },
+    ];
+    send(response, 200, { data: suggestions, generatedAt: publishedAt });
+    return;
+  }
   if (url.pathname === "/v1/homepage") {
     const locale = url.searchParams.get("locale") === "en-US" ? "en-US" : "zh-Hans";
     send(response, 200, homepage(locale));

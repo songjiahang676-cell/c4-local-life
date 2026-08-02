@@ -458,3 +458,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   坐标/金额/provider detail 不进入指标；离线分数不得导出为生产时序。
 - OpenAPI、Prisma 和 migration 保持不变；完整质量、API runtime、Linux Chromium、真实服务和四个
   non-root 镜像受保护门禁继续执行。生产 Dashboard provisioning、cluster exporter 和告警归 OBS-002。
+
+## 18.40 WEB-003 全局 Header 验证增量
+
+- parser 单测覆盖合法双语建议/地区，以及未知顶层字段、重复项、错误 locale、控制/双向字符和越界值；
+  malformed 数据失败关闭，不能继续渲染旧建议。
+- 组件测试覆盖匿名地区/建议不携带 Cookie、Session 仅同源读取、通用账户入口不暴露 display name、
+  loading/empty/unavailable、地区选择、上下方向键、Enter、Escape 和连续请求竞态。
+- Web BFF 契约测试只允许公开 GET `/v1/search/suggestions`，拒绝 mutation 与未列入白名单的搜索路径；
+  OpenAPI、Prisma 和 migration 保持不变。
+- production Chromium 在桌面和移动项目验证真实 Header 地区、建议 listbox、active descendant、Enter、
+  Escape、账户入口和页面无横向溢出；全仓质量、Linux E2E、真实服务和四镜像保护门禁全绿后才可完成。

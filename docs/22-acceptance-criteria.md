@@ -438,3 +438,14 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - CI/离线分数不伪装成生产指标，生产数据源/权限/cluster exporter/SLO/告警仍明确由 OBS-002 交付。
   OpenAPI、Prisma、migration 不变化；全仓质量、真实 OpenSearch、API runtime、Linux Chromium 和四镜像
   受保护门禁全绿后方可标记 done。
+
+## 22.27 WEB-003 全局 Header/Region/Search suggestion 验收
+
+- 首页、公开列表、搜索和详情页复用同一双语响应式 Header，含品牌、当前频道、语言、地区、搜索和账户
+  入口；桌面/移动保持 44px 触控目标、可见焦点和页面无横向溢出。
+- active CITY 地区与建议响应通过 strict、有界、去重 parser；公开读取不携带 Cookie，失败提供诚实状态，
+  Session 只同源 no-store 且全局 UI 不显示 display name 或其他 PII。
+- 搜索建议使用可访问 combobox/listbox，支持上下方向键、Enter、Escape、active descendant、节制 live
+  region、查询防抖和旧响应取消；建议失败不阻止普通 GET 搜索。
+- BFF 仅放行契约内 GET suggestions；单元/组件/production Chromium 覆盖中英文、桌面/移动、错误态和
+  键盘路径。OpenAPI、Prisma、migration 不变化；全仓与受保护真实服务/镜像门禁全绿后方可标记 done。
