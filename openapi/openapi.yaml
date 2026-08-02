@@ -2128,6 +2128,143 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /admin/system/queue/dead-letters:
+    get:
+      tags: [Admin]
+      summary: List privacy-minimized queue dead-letter evidence
+      description: |
+        Lists failed Outbox records and terminal queue failures without event payloads, aggregate
+        identifiers, raw errors, or other copied PII. Requires an MFA-bound PLATFORM_ADMIN or
+        READ_ONLY_AUDITOR session.
+      operationId: listQueueDeadLetters
+      parameters:
+        - name: source
+          in: query
+          schema: { type: string, enum: [OUTBOX, QUEUE] }
+        - name: eventType
+          in: query
+          schema:
+            { type: string, minLength: 1, maxLength: 120, pattern: "^[a-z][a-z0-9.-]{0,119}$" }
+        - name: failureCode
+          in: query
+          schema:
+            { type: string, minLength: 2, maxLength: 120, pattern: "^[A-Z][A-Z0-9_.-]{1,119}$" }
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Bounded dead-letter evidence ordered by most recent failure
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueDeadLetterCollection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/system/queue/replay-batches:
+    post:
+      tags: [Admin]
+      summary: Create a controlled queue replay batch
+      description: |
+        Enqueues an explicit, bounded replay batch. The request is idempotency-bound to the current
+        PLATFORM_ADMIN and requires recent MFA. Processing is asynchronous and item-idempotent.
+      operationId: createQueueReplayBatch
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQueueReplayBatchRequest"
+      responses:
+        "202":
+          description: Replay batch accepted
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminJobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /admin/system/queue/reconciliation-runs:
+    post:
+      tags: [Admin]
+      summary: Create a bounded queue reconciliation run
+      description: |
+        Compares PostgreSQL queue evidence with BullMQ state. Dry-run is supported; repair mode is
+        limited to rebuilding derived evidence and never treats Redis as canonical.
+      operationId: createQueueReconciliationRun
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQueueReconciliationRunRequest"
+      responses:
+        "202":
+          description: Reconciliation run accepted
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminJobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/system/jobs/{jobId}:
+    get:
+      tags: [Admin]
+      summary: Get a controlled Admin job status
+      operationId: getAdminJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current job status and aggregate item outcomes
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminJobResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /admin/moderation/cases/{caseId}:
     get:
       tags: [Admin]
@@ -2853,6 +2990,121 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/AdminMfaVerification"
+    QueueDeadLetter:
+      type: object
+      required:
+        [id, eventId, source, queueName, eventType, attemptCount, failureCode, status, failedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        source: { type: string, enum: [OUTBOX, QUEUE] }
+        queueName: { type: string, minLength: 1, maxLength: 80 }
+        eventType:
+          { type: string, minLength: 1, maxLength: 120, pattern: "^[a-z][a-z0-9.-]{0,119}$" }
+        attemptCount: { type: integer, minimum: 1 }
+        failureCode:
+          { type: string, minLength: 2, maxLength: 120, pattern: "^[A-Z][A-Z0-9_.-]{1,119}$" }
+        status: { type: string, enum: [OPEN, REPLAY_PENDING, RESOLVED] }
+        failedAt: { type: string, format: date-time }
+    QueueDeadLetterCollection:
+      type: object
+      required: [data, page, generatedAt]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/QueueDeadLetter"
+        page:
+          $ref: "#/components/schemas/CursorPage"
+        generatedAt: { type: string, format: date-time }
+    QueueReplayTarget:
+      type: object
+      required: [source, targetId]
+      additionalProperties: false
+      properties:
+        source: { type: string, enum: [OUTBOX, QUEUE] }
+        targetId:
+          type: string
+          format: uuid
+          description: Outbox event ID for OUTBOX, queue dead-letter ID for QUEUE.
+    CreateQueueReplayBatchRequest:
+      type: object
+      required: [targets, reasonCode]
+      additionalProperties: false
+      properties:
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/QueueReplayTarget"
+        reasonCode:
+          { type: string, minLength: 2, maxLength: 80, pattern: "^[A-Z][A-Z0-9_.-]{1,79}$" }
+        ticketRef:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 120,
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$",
+          }
+    CreateQueueReconciliationRunRequest:
+      type: object
+      required: [dryRun, maxItems, reasonCode]
+      additionalProperties: false
+      properties:
+        dryRun: { type: boolean }
+        maxItems: { type: integer, minimum: 1, maximum: 500 }
+        reasonCode:
+          { type: string, minLength: 2, maxLength: 80, pattern: "^[A-Z][A-Z0-9_.-]{1,79}$" }
+        ticketRef:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 120,
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$",
+          }
+    AdminJob:
+      type: object
+      required:
+        [
+          id,
+          type,
+          status,
+          dryRun,
+          estimatedItems,
+          processedItems,
+          succeededItems,
+          skippedItems,
+          failedItems,
+          createdAt,
+          startedAt,
+          completedAt,
+        ]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [QUEUE_REPLAY, QUEUE_RECONCILIATION] }
+        status: { type: string, enum: [PENDING, RUNNING, SUCCEEDED, PARTIAL, FAILED] }
+        dryRun: { type: boolean }
+        estimatedItems: { type: integer, minimum: 0 }
+        processedItems: { type: integer, minimum: 0 }
+        succeededItems: { type: integer, minimum: 0 }
+        skippedItems: { type: integer, minimum: 0 }
+        failedItems: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+    AdminJobResponse:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminJob"
     MyProfileResponse:
       type: object
       required: [data]

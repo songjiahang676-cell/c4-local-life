@@ -12,6 +12,10 @@ type WorkerObservation = {
 };
 
 type OutboxDispatchOutcome = "published" | "retry" | "failed" | "stale";
+type QueueAdminOperationType =
+  "QUEUE_REPLAY" | "QUEUE_RECONCILIATION" | "DEAD_LETTER" | "CONTROL_PLANE";
+type QueueAdminOperationOutcome =
+  "recorded" | "completed" | "succeeded" | "skipped" | "failed" | "stale" | "poll_failed";
 type MediaProcessingOutcome = "ready" | "rejected" | "stale";
 type ListingExpiryOutcome = "expired" | "idle";
 type NotificationEventOutcome =
@@ -118,6 +122,7 @@ export class MetricsRegistry {
   readonly #workerJobs = new Map<string, number>();
   readonly #workerDurations = new Map<string, Histogram>();
   readonly #outboxDispatches = new Map<OutboxDispatchOutcome, number>();
+  readonly #queueAdminOperations = new Map<string, number>();
   readonly #mediaProcessing = new Map<MediaProcessingOutcome, number>();
   readonly #listingExpiryPolls = new Map<ListingExpiryOutcome, number>();
   readonly #notificationEvents = new Map<NotificationEventOutcome, number>();
@@ -174,6 +179,13 @@ export class MetricsRegistry {
 
   outboxPollFailed(): void {
     this.#outboxPollFailures += 1;
+  }
+
+  queueAdminOperation(
+    operation: QueueAdminOperationType,
+    outcome: QueueAdminOperationOutcome,
+  ): void {
+    increment(this.#queueAdminOperations, labelKey({ operation, outcome }));
   }
 
   setOutboxOldestPendingAgeSeconds(value: number): void {
@@ -333,6 +345,13 @@ export class MetricsRegistry {
       "# HELP socal_outbox_oldest_pending_age_seconds Age of the oldest pending outbox event.",
       "# TYPE socal_outbox_oldest_pending_age_seconds gauge",
       `socal_outbox_oldest_pending_age_seconds ${this.#outboxOldestPendingAgeSeconds}`,
+      "# HELP socal_queue_admin_operations_total Controlled replay, reconciliation, and dead-letter outcomes.",
+      "# TYPE socal_queue_admin_operations_total counter",
+    );
+    for (const [key, value] of [...this.#queueAdminOperations].sort()) {
+      lines.push(`socal_queue_admin_operations_total${labels(parseLabelKey(key))} ${value}`);
+    }
+    lines.push(
       "# HELP socal_media_processing_total Media processing terminal and stale outcomes.",
       "# TYPE socal_media_processing_total counter",
     );

@@ -39,7 +39,10 @@ const navigationByRole: Readonly<Record<PlatformRole, readonly AdminNavigationIt
     { key: "system", href: "/admin/system/health" },
     { key: "audit", href: "/admin/audit" },
   ],
-  READ_ONLY_AUDITOR: [{ key: "audit", href: "/admin/audit" }],
+  READ_ONLY_AUDITOR: [
+    { key: "system", href: "/admin/system/health" },
+    { key: "audit", href: "/admin/audit" },
+  ],
 };
 
 function orderedRoles(roles: readonly PlatformRole[]): PlatformRole[] {

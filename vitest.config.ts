@@ -100,6 +100,12 @@ export default defineConfig({
       "@socal/database/outbox": fileURLToPath(
         new URL("./packages/database/src/repositories/outbox-event.repository.ts", import.meta.url),
       ),
+      "@socal/database/queue-operations": fileURLToPath(
+        new URL(
+          "./packages/database/src/repositories/queue-operations.repository.ts",
+          import.meta.url,
+        ),
+      ),
       "@socal/database/media": fileURLToPath(
         new URL("./packages/database/src/repositories/media-asset.repository.ts", import.meta.url),
       ),

@@ -24,6 +24,10 @@ import { MemoryTaxonomyStore } from "./support/memory-taxonomy.store";
 import { MemoryMfaStore } from "./support/memory-mfa.store";
 import { memoryModerationCaseId, MemoryModerationStore } from "./support/memory-moderation.store";
 import {
+  memoryQueueDeadLetterId,
+  MemoryQueueOperationsStore,
+} from "./support/memory-queue-operations.store";
+import {
   MemoryListingStore,
   memoryListingCategoryId,
   memoryListingRegionCode,
@@ -95,6 +99,7 @@ describe("canonical OpenAPI contract", () => {
     authSessionStore.registerSubject(buildActiveSubject({ id: contractAdminId }));
     authSessionStore.registerPlatformRole(contractUserId, "READ_ONLY_AUDITOR");
     authSessionStore.registerPlatformRole(contractUserId, "MODERATOR");
+    authSessionStore.registerPlatformRole(contractUserId, "PLATFORM_ADMIN");
     authSessionStore.registerOrganization(contractUserId, {
       id: contractOrganizationId,
       type: "MERCHANT",
@@ -284,6 +289,7 @@ describe("canonical OpenAPI contract", () => {
       taxonomyStore,
       mfaStore: new MemoryMfaStore(),
       moderationStore: new MemoryModerationStore(),
+      queueOperationsStore: new MemoryQueueOperationsStore(),
       trustSafetyStore: new MemoryTrustSafetyStore(),
       passwordStore,
       passwordNotificationGateway: passwordNotifications,
@@ -313,9 +319,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(70);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(181);
-    expect(operationIds).toHaveLength(80);
+    expect(Object.keys(contract.paths)).toHaveLength(74);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(188);
+    expect(operationIds).toHaveLength(84);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -352,8 +358,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(70);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(70);
+    expect(Object.keys(servedJson.paths)).toHaveLength(74);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(74);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -1034,6 +1040,62 @@ describe("canonical OpenAPI contract", () => {
     expect(ajv.validate(actionSchema ?? false, action.json()), ajv.errorsText(ajv.errors)).toBe(
       true,
     );
+  });
+
+  it("validates controlled queue evidence, replay, reconciliation, and job status", async () => {
+    const primary = await sessions.issueSession(contractUserId, {});
+    const elevated = await sessions.elevateWithMfa(primary.token, {});
+    if (!elevated) throw new Error("Expected an MFA-bound contract session");
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${elevated.token}`;
+    const deadLetters = await server.inject({
+      method: "GET",
+      url: "/v1/admin/system/queue/dead-letters?limit=20",
+      headers: { cookie },
+    });
+    const replay = await server.inject({
+      method: "POST",
+      url: "/v1/admin/system/queue/replay-batches",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+        "idempotency-key": "contract-queue-replay-0001",
+      },
+      payload: {
+        targets: [{ source: "QUEUE", targetId: memoryQueueDeadLetterId }],
+        reasonCode: "CONTRACT_RECOVERY",
+      },
+    });
+    const reconciliation = await server.inject({
+      method: "POST",
+      url: "/v1/admin/system/queue/reconciliation-runs",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+        "idempotency-key": "contract-queue-reconciliation-0001",
+      },
+      payload: { dryRun: true, maxItems: 20, reasonCode: "CONTRACT_DRIFT_CHECK" },
+    });
+    const jobId = replay.json<{ data: { id: string } }>().data.id;
+    const job = await server.inject({
+      method: "GET",
+      url: `/v1/admin/system/jobs/${jobId}`,
+      headers: { cookie },
+    });
+    const checks = [
+      [deadLetters, "/admin/system/queue/dead-letters", "get", "200"],
+      [replay, "/admin/system/queue/replay-batches", "post", "202"],
+      [reconciliation, "/admin/system/queue/reconciliation-runs", "post", "202"],
+      [job, "/admin/system/jobs/{jobId}", "get", "200"],
+    ] as const;
+    for (const [response, path, method, status] of checks) {
+      const schema =
+        contract.paths[path]?.[method]?.responses[status]?.content?.["application/json"]?.schema;
+      expect(response.statusCode).toBe(Number(status));
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    }
   });
 
   it("validates Admin MFA enrollment, activation, and recovery verification against the contract", async () => {

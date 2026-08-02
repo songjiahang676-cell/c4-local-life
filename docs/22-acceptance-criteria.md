@@ -393,3 +393,18 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - [`accessibility-baseline.md`](./accessibility-baseline.md) 的阻塞缺口清零、全仓质量、Linux E2E、
   真实服务和四镜像保护门禁全绿后，才可把 `SEO-004`/Gate 3 标记完成。OpenAPI、Prisma 与 migration
   不变化。
+
+## 22.24 EVT-002 队列 DLQ/replay/reconciliation 验收
+
+- 终态 BullMQ 失败写入 PostgreSQL 最小证据，只含标识、固定 code、attempt、时间和 payload hash；不含
+  payload、原始异常或 PII。正常关闭等待在途写入，丢失窗口可由 reconciliation 修复。
+- 失败列表按稳定时间/UUID cursor 分页并绑定 actor/筛选；读权限允许 MFA auditor/admin，写权限只允许
+  recent-MFA PLATFORM_ADMIN。guest、普通账号、stale MFA、篡改 cursor 和跨筛选重放均失败关闭。
+- Replay/Reconciliation 是有界 durable Admin job；actor/type/key/hash 精确重试，同键变更 409，短租约
+  可恢复，逐项结果幂等且汇总可重算。请求/完成均有最小 AuditLog，响应不泄露 reason、ticket、actor、
+  request hash 或 item 错误详情。
+- Outbox 只从 FAILED 恢复 PENDING；`REPLAY_PENDING` 不能进入第二批。BullMQ 现存或缺失 job 均先与
+  canonical Outbox 核对 event type、aggregate、occurredAt 与规范化 payload hash，缺失时才从该事件
+  重建。对账默认 dry-run，repair 只修复派生 DLQ 证据，PostgreSQL 业务表仍权威。
+- OpenAPI/生成类型、Prisma/additive migration/回滚说明、Contracts/API/Worker/Admin/真实 PostgreSQL、
+  全仓质量、API runtime、Linux Chromium 与四镜像受保护门禁均有真实证据后方可标记 done。

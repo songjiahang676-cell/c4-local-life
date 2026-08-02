@@ -46,17 +46,23 @@ const exactApiMethods: Readonly<Record<string, readonly string[]>> = {
   "admin/mfa/enrollment/verify": ["POST"],
   "admin/mfa/verify": ["POST"],
   "admin/moderation/cases": ["GET"],
+  "admin/system/queue/dead-letters": ["GET"],
+  "admin/system/queue/replay-batches": ["POST"],
+  "admin/system/queue/reconciliation-runs": ["POST"],
 };
 
 const moderationCasePath =
   /^admin\/moderation\/cases\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const moderationActionPath =
   /^admin\/moderation\/cases\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/actions$/i;
+const adminJobPath =
+  /^admin\/system\/jobs\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isAllowedAdminApiPath(method: string, path: string): boolean {
   const exactMethods = exactApiMethods[path];
   if (exactMethods?.includes(method)) return true;
   if (method === "GET" && moderationCasePath.test(path)) return true;
+  if (method === "GET" && adminJobPath.test(path)) return true;
   return method === "POST" && moderationActionPath.test(path);
 }
 

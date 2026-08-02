@@ -13,6 +13,8 @@ import {
   requireMfaActorPermissionPolicy,
   requireModeratorMfaPolicy,
   requireModeratorRecentMfaPolicy,
+  requireQueueOperationsActPolicy,
+  requireQueueOperationsReadPolicy,
   requireRecentMfaActorPermissionPolicy,
 } from "./policy";
 import { RequestContextAccessor } from "./request-context";
@@ -78,6 +80,8 @@ export function createPolicyService(): PolicyService {
   policies.register(adminPolicyActions.sensitiveAccess, requireRecentMfaActorPermissionPolicy);
   policies.register(adminPolicyActions.moderationRead, requireModeratorMfaPolicy);
   policies.register(adminPolicyActions.moderationAct, requireModeratorRecentMfaPolicy);
+  policies.register(adminPolicyActions.queueOperationsRead, requireQueueOperationsReadPolicy);
+  policies.register(adminPolicyActions.queueOperationsAct, requireQueueOperationsActPolicy);
   policies.register(
     organizationPolicyActions.profileRead,
     ownerOrOrganizationPolicy({

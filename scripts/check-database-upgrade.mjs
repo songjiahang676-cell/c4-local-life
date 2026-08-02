@@ -571,6 +571,24 @@ try {
             AND NOT tgisinternal
        ) AS owner_triggers`,
   );
+  const queueOperationsStorage = await upgrade.query(
+    `SELECT
+       to_regclass('public.admin_jobs')::text AS admin_jobs,
+       to_regclass('public.admin_job_items')::text AS admin_job_items,
+       to_regclass('public.queue_dead_letters')::text AS queue_dead_letters,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'admin_jobs_actor_id_type_idempotency_key_key'
+       ) AS actor_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'queue_dead_letters_queue_name_event_id_key'
+       ) AS queue_event_idempotency`,
+  );
   if (
     sentinel.rowCount !== 1 ||
     enumValue.rowCount !== 1 ||
@@ -632,6 +650,11 @@ try {
     organizationMembershipLifecycle.rows[0].owner_transfers !== "organization_owner_transfers" ||
     organizationMembershipLifecycle.rows[0].membership_columns !== 2 ||
     organizationMembershipLifecycle.rows[0].owner_triggers !== 2 ||
+    queueOperationsStorage.rows[0].admin_jobs !== "admin_jobs" ||
+    queueOperationsStorage.rows[0].admin_job_items !== "admin_job_items" ||
+    queueOperationsStorage.rows[0].queue_dead_letters !== "queue_dead_letters" ||
+    !queueOperationsStorage.rows[0].actor_idempotency ||
+    !queueOperationsStorage.rows[0].queue_event_idempotency ||
     moderationSentinelSnapshot.rowCount !== 1 ||
     moderationSentinelSnapshot.rows[0].listing_version !== 3 ||
     moderationSentinelSnapshot.rows[0].snapshot.sensitiveFieldsRedacted !== true ||
@@ -670,6 +693,7 @@ try {
       trustSafetyStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
+      queueOperationsStorage: true,
       moderationSnapshotBackfilledAndRedacted: true,
     }),
   );

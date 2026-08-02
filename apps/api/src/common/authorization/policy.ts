@@ -42,6 +42,8 @@ export const adminPolicyActions = {
   sensitiveAccess: "admin:sensitive:access",
   moderationRead: "admin:moderation:read",
   moderationAct: "admin:moderation:act",
+  queueOperationsRead: "admin:queue:read",
+  queueOperationsAct: "admin:queue:act",
 } as const;
 
 export const organizationPolicyActions = {
@@ -241,6 +243,31 @@ export function requireModeratorRecentMfaPolicy(input: PolicyEvaluationInput): P
   if (!moderator.allowed) return moderator;
   const { actor } = input.context;
   return actor.kind === "authenticated" && actor.recentMfa
+    ? allowPolicy()
+    : denyPolicy("INSUFFICIENT_PERMISSION");
+}
+
+export function requireQueueOperationsReadPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const mfa = requireMfaActorPermissionPolicy({
+    ...input,
+    action: adminPolicyActions.privilegedAccess,
+  });
+  if (!mfa.allowed) return mfa;
+  const { actor } = input.context;
+  if (
+    actor.kind === "guest" ||
+    !actor.platformRoles.some((role) => role === "PLATFORM_ADMIN" || role === "READ_ONLY_AUDITOR")
+  ) {
+    return denyPolicy("INSUFFICIENT_PERMISSION");
+  }
+  return allowPolicy();
+}
+
+export function requireQueueOperationsActPolicy(input: PolicyEvaluationInput): PolicyDecision {
+  const recentMfa = requireRecentMfaActorPermissionPolicy(input);
+  if (!recentMfa.allowed) return recentMfa;
+  const { actor } = input.context;
+  return actor.kind === "authenticated" && actor.platformRoles.includes("PLATFORM_ADMIN")
     ? allowPolicy()
     : denyPolicy("INSUFFICIENT_PERMISSION");
 }

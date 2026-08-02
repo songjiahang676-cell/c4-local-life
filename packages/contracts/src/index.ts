@@ -86,6 +86,14 @@ export type ModerationCaseCollection = components["schemas"]["ModerationCaseColl
 export type ModerationCaseDetailResponse = components["schemas"]["ModerationCaseDetailResponse"];
 export type ModerationActionRequest = components["schemas"]["ModerationActionRequest"];
 export type ModerationActionResponse = components["schemas"]["ModerationActionResponse"];
+export type QueueDeadLetter = components["schemas"]["QueueDeadLetter"];
+export type QueueDeadLetterCollection = components["schemas"]["QueueDeadLetterCollection"];
+export type QueueReplayTarget = components["schemas"]["QueueReplayTarget"];
+export type CreateQueueReplayBatchRequest = components["schemas"]["CreateQueueReplayBatchRequest"];
+export type CreateQueueReconciliationRunRequest =
+  components["schemas"]["CreateQueueReconciliationRunRequest"];
+export type AdminJob = components["schemas"]["AdminJob"];
+export type AdminJobResponse = components["schemas"]["AdminJobResponse"];
 export type CreateReportRequest = components["schemas"]["CreateReportRequest"];
 export type ReportReceiptResponse = components["schemas"]["ReportReceiptResponse"];
 export type CreateModerationAppealRequest = components["schemas"]["CreateModerationAppealRequest"];
@@ -104,6 +112,9 @@ export type AppealModerationActionRequest = components["schemas"]["AppealModerat
 export type TrustSafetyActionResponse = components["schemas"]["TrustSafetyActionResponse"];
 export type ListModerationCasesQuery = NonNullable<
   operations["listModerationCases"]["parameters"]["query"]
+>;
+export type ListQueueDeadLettersQuery = NonNullable<
+  operations["listQueueDeadLetters"]["parameters"]["query"]
 >;
 export type ListReportModerationCasesQuery = NonNullable<
   operations["listReportModerationCases"]["parameters"]["query"]
@@ -1362,6 +1373,73 @@ export const listModerationCasesQuerySchema: z.ZodType<ListModerationCasesQuery>
     limit: z.coerce.number().int().min(1).max(50).default(20),
   })
   .strict();
+
+const queueFailureCodeSchema = z
+  .string()
+  .min(2)
+  .max(120)
+  .regex(/^[A-Z][A-Z0-9_.-]{1,119}$/);
+
+const queueEventTypeSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z][a-z0-9.-]{0,119}$/);
+
+const queueTicketReferenceSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$/);
+
+export const listQueueDeadLettersQuerySchema: z.ZodType<ListQueueDeadLettersQuery> = z
+  .object({
+    source: z.enum(["OUTBOX", "QUEUE"]).optional(),
+    eventType: queueEventTypeSchema.optional(),
+    failureCode: queueFailureCodeSchema.optional(),
+    cursor: z.string().max(512).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .strict();
+
+const queueReplayTargetSchema: z.ZodType<QueueReplayTarget> = z
+  .object({
+    source: z.enum(["OUTBOX", "QUEUE"]),
+    targetId: z.uuid(),
+  })
+  .strict();
+
+export const createQueueReplayBatchRequestSchema: z.ZodType<CreateQueueReplayBatchRequest> = z
+  .object({
+    targets: z.array(queueReplayTargetSchema).min(1).max(100),
+    reasonCode: queueFailureCodeSchema.max(80),
+    ticketRef: queueTicketReferenceSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    for (const [index, target] of value.targets.entries()) {
+      const key = `${target.source}:${target.targetId}`;
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          path: ["targets", index],
+          message: "Replay targets must be unique",
+        });
+      }
+      seen.add(key);
+    }
+  });
+
+export const createQueueReconciliationRunRequestSchema: z.ZodType<CreateQueueReconciliationRunRequest> =
+  z
+    .object({
+      dryRun: z.boolean(),
+      maxItems: z.number().int().min(1).max(500),
+      reasonCode: queueFailureCodeSchema.max(80),
+      ticketRef: queueTicketReferenceSchema.optional(),
+    })
+    .strict();
 
 const moderationReasonByAction = {
   APPROVE: ["CONTENT_POLICY_COMPLIANT"],

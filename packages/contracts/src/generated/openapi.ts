@@ -1212,6 +1212,87 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/admin/system/queue/dead-letters": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /**
+         * List privacy-minimized queue dead-letter evidence
+         * @description Lists failed Outbox records and terminal queue failures without event payloads, aggregate
+         *     identifiers, raw errors, or other copied PII. Requires an MFA-bound PLATFORM_ADMIN or
+         *     READ_ONLY_AUDITOR session.
+         */
+        readonly get: operations["listQueueDeadLetters"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/system/queue/replay-batches": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Create a controlled queue replay batch
+         * @description Enqueues an explicit, bounded replay batch. The request is idempotency-bound to the current
+         *     PLATFORM_ADMIN and requires recent MFA. Processing is asynchronous and item-idempotent.
+         */
+        readonly post: operations["createQueueReplayBatch"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/system/queue/reconciliation-runs": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        /**
+         * Create a bounded queue reconciliation run
+         * @description Compares PostgreSQL queue evidence with BullMQ state. Dry-run is supported; repair mode is
+         *     limited to rebuilding derived evidence and never treats Redis as canonical.
+         */
+        readonly post: operations["createQueueReconciliationRun"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/admin/system/jobs/{jobId}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get a controlled Admin job status */
+        readonly get: operations["getAdminJob"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/admin/moderation/cases/{caseId}": {
         readonly parameters: {
             readonly query?: never;
@@ -1546,6 +1627,71 @@ export interface components {
         };
         readonly AdminMfaVerificationResponse: {
             readonly data: components["schemas"]["AdminMfaVerification"];
+        };
+        readonly QueueDeadLetter: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly eventId: string;
+            /** @enum {string} */
+            readonly source: "OUTBOX" | "QUEUE";
+            readonly queueName: string;
+            readonly eventType: string;
+            readonly attemptCount: number;
+            readonly failureCode: string;
+            /** @enum {string} */
+            readonly status: "OPEN" | "REPLAY_PENDING" | "RESOLVED";
+            /** Format: date-time */
+            readonly failedAt: string;
+        };
+        readonly QueueDeadLetterCollection: {
+            readonly data: readonly components["schemas"]["QueueDeadLetter"][];
+            readonly page: components["schemas"]["CursorPage"];
+            /** Format: date-time */
+            readonly generatedAt: string;
+        };
+        readonly QueueReplayTarget: {
+            /** @enum {string} */
+            readonly source: "OUTBOX" | "QUEUE";
+            /**
+             * Format: uuid
+             * @description Outbox event ID for OUTBOX, queue dead-letter ID for QUEUE.
+             */
+            readonly targetId: string;
+        };
+        readonly CreateQueueReplayBatchRequest: {
+            readonly targets: readonly components["schemas"]["QueueReplayTarget"][];
+            readonly reasonCode: string;
+            readonly ticketRef?: string;
+        };
+        readonly CreateQueueReconciliationRunRequest: {
+            readonly dryRun: boolean;
+            readonly maxItems: number;
+            readonly reasonCode: string;
+            readonly ticketRef?: string;
+        };
+        readonly AdminJob: {
+            /** Format: uuid */
+            readonly id: string;
+            /** @enum {string} */
+            readonly type: "QUEUE_REPLAY" | "QUEUE_RECONCILIATION";
+            /** @enum {string} */
+            readonly status: "PENDING" | "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
+            readonly dryRun: boolean;
+            readonly estimatedItems: number;
+            readonly processedItems: number;
+            readonly succeededItems: number;
+            readonly skippedItems: number;
+            readonly failedItems: number;
+            /** Format: date-time */
+            readonly createdAt: string;
+            /** Format: date-time */
+            readonly startedAt: string | null;
+            /** Format: date-time */
+            readonly completedAt: string | null;
+        };
+        readonly AdminJobResponse: {
+            readonly data: components["schemas"]["AdminJob"];
         };
         readonly MyProfileResponse: {
             readonly data: components["schemas"]["MyProfile"];
@@ -5294,6 +5440,125 @@ export interface operations {
             readonly 400: components["responses"]["BadRequest"];
             readonly 401: components["responses"]["Unauthorized"];
             readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly listQueueDeadLetters: {
+        readonly parameters: {
+            readonly query?: {
+                readonly source?: "OUTBOX" | "QUEUE";
+                readonly eventType?: string;
+                readonly failureCode?: string;
+                readonly cursor?: components["parameters"]["Cursor"];
+                readonly limit?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Bounded dead-letter evidence ordered by most recent failure */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["QueueDeadLetterCollection"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+        };
+    };
+    readonly createQueueReplayBatch: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateQueueReplayBatchRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Replay batch accepted */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminJobResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+            readonly 422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    readonly createQueueReconciliationRun: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header: {
+                readonly "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["CreateQueueReconciliationRunRequest"];
+            };
+        };
+        readonly responses: {
+            /** @description Reconciliation run accepted */
+            readonly 202: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminJobResponse"];
+                };
+            };
+            readonly 400: components["responses"]["BadRequest"];
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 409: components["responses"]["Conflict"];
+        };
+    };
+    readonly getAdminJob: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly jobId: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Current job status and aggregate item outcomes */
+            readonly 200: {
+                headers: {
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AdminJobResponse"];
+                };
+            };
+            readonly 401: components["responses"]["Unauthorized"];
+            readonly 403: components["responses"]["Forbidden"];
+            readonly 404: components["responses"]["NotFound"];
         };
     };
     readonly getModerationCase: {

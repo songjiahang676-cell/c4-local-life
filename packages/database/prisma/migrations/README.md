@@ -354,6 +354,19 @@ outcome is also one-way. No raw contact value is stored in the new tables.
   tables do not break previous readers. Exceptional pre-production physical removal requires stopped
   writers and an evidence export as documented in the migration-local `ROLLBACK.md`.
 
+## `20260801010000_queue_operations_control_plane`
+
+Adds durable, actor/idempotency-bound Admin jobs and item-level outcomes for controlled queue replay
+and reconciliation, plus minimal queue dead-letter evidence. Dead-letter rows contain identifiers,
+bounded codes, attempt counts and a payload hash only; they do not duplicate event payloads or raw
+provider/handler errors.
+
+- Roll forward: apply before enabling the queue-operations Admin API and Worker dispatcher; verify
+  exact retries, changed-input conflicts, recent-MFA authorization, lease recovery, item idempotency,
+  bounded replay/reconciliation and absence of raw PII in API/log/audit projections.
+- Rollback: disable the endpoints and dispatcher while retaining all additive audit evidence.
+  Exceptional stopped-writer physical recovery is documented in the migration-local `ROLLBACK.md`.
+
 ## Roll-forward and recovery
 
 - Production migrations are forward-only. Correct a released migration with a new reviewed

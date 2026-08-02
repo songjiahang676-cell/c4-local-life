@@ -155,6 +155,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("canonical sitemap partitions", () => {
@@ -243,6 +244,8 @@ describe("canonical sitemap partitions", () => {
   });
 
   it("serves a bounded language/resource index and validates approved real city shards", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-29T14:00:00.000Z"));
     vi.stubEnv("PUBLIC_WEB_URL", "https://www.socal.test");
     vi.stubEnv("SEO_INDEXABLE_CITY_ROUTES", "rentals:synthetic-city");
     vi.stubGlobal("fetch", sitemapFetch());

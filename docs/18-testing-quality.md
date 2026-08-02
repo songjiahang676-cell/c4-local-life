@@ -422,3 +422,14 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   主流屏幕阅读器必须留下工具/版本/路径/播报结果，axe 或 accessibility tree 不能替代。
 - 全仓质量、既有 production E2E、受保护真实服务与四镜像仍必须通过。完整矩阵和缺口 ID 见
   [`accessibility-baseline.md`](./accessibility-baseline.md)。
+
+## 18.37 EVT-002 队列恢复验证增量
+
+- Repository 真实 PostgreSQL 测试覆盖失败证据分页、精确幂等/变更冲突、目标状态、短租约恢复、逐项
+  一次写定、批次聚合与 Audit；空库 baseline 还验证 hash、计数、lifecycle 和唯一约束负例。
+- API/Contracts 测试覆盖四个 OpenAPI 路径、严格 DTO、guest/普通账号/auditor/stale-MFA/admin 矩阵、
+  actor/filter cursor 篡改、无效目标、409 retry conflict 和只返回聚合 job 状态。
+- Worker 单元测试覆盖 terminal 判定、非法 envelope、失败证据脱敏、Outbox 恢复、BullMQ retry、
+  canonical mismatch、重复 item、dry-run 与 repair reconciliation；正常关闭等待在途 DLQ 写入。
+- Admin 测试覆盖双语、筛选提交、选择/确认、recent-MFA 禁用和 dry-run 默认；完整质量、真实 PostgreSQL/
+  Redis、API runtime、Linux Chromium 与四镜像受保护门禁全绿后方可标记完成。

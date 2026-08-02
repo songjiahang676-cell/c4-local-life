@@ -7,12 +7,16 @@ import { AdminSessionController } from "./admin-session.controller";
 import { AdminSessionService } from "./admin-session.service";
 import { DatabaseModerationStore } from "./database-moderation.store";
 import { DatabaseMfaStore } from "./database-mfa.store";
+import { DatabaseQueueOperationsStore } from "./database-queue-operations.store";
 import { MfaController } from "./mfa.controller";
 import { MfaService } from "./mfa.service";
 import { ModerationController } from "./moderation.controller";
 import { ModerationService } from "./moderation.service";
 import { MODERATION_STORE, type ModerationStore } from "./moderation.store";
 import { MFA_STORE, type MfaStore } from "./mfa.store";
+import { QueueOperationsController } from "./queue-operations.controller";
+import { QueueOperationsService } from "./queue-operations.service";
+import { QUEUE_OPERATIONS_STORE, type QueueOperationsStore } from "./queue-operations.store";
 
 @Module({})
 export class AdminModule {
@@ -21,6 +25,7 @@ export class AdminModule {
     mfaStore?: MfaStore,
     moderationStore?: ModerationStore,
     metrics?: MetricsRegistry,
+    queueOperationsStore?: QueueOperationsStore,
   ): DynamicModule {
     const storeProviders: Provider[] = mfaStore
       ? [{ provide: MFA_STORE, useValue: mfaStore }]
@@ -31,17 +36,30 @@ export class AdminModule {
           DatabaseModerationStore,
           { provide: MODERATION_STORE, useExisting: DatabaseModerationStore },
         ];
+    const queueOperationsStoreProviders: Provider[] = queueOperationsStore
+      ? [{ provide: QUEUE_OPERATIONS_STORE, useValue: queueOperationsStore }]
+      : [
+          DatabaseQueueOperationsStore,
+          { provide: QUEUE_OPERATIONS_STORE, useExisting: DatabaseQueueOperationsStore },
+        ];
     return {
       module: AdminModule,
-      controllers: [AdminSessionController, MfaController, ModerationController],
+      controllers: [
+        AdminSessionController,
+        MfaController,
+        ModerationController,
+        QueueOperationsController,
+      ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
         ...(metrics ? [{ provide: API_METRICS, useValue: metrics }] : []),
         ...storeProviders,
         ...moderationStoreProviders,
+        ...queueOperationsStoreProviders,
         AdminSessionService,
         MfaService,
         ModerationService,
+        QueueOperationsService,
       ],
       exports: [MfaService],
     };

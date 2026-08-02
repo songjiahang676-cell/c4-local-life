@@ -54,6 +54,9 @@
       "outbox": [
         "src/repositories/outbox-event.repository.ts"
       ],
+      "queue-operations": [
+        "src/repositories/queue-operations.repository.ts"
+      ],
       "media": [
         "src/repositories/media-asset.repository.ts"
       ],
@@ -143,6 +146,11 @@
       "types": "./src/repositories/outbox-event.repository.ts",
       "require": "./dist/src/repositories/outbox-event.repository.js",
       "default": "./dist/src/repositories/outbox-event.repository.js"
+    },
+    "./queue-operations": {
+      "types": "./src/repositories/queue-operations.repository.ts",
+      "require": "./dist/src/repositories/queue-operations.repository.js",
+      "default": "./dist/src/repositories/queue-operations.repository.js"
     },
     "./media": {
       "types": "./src/repositories/media-asset.repository.ts",

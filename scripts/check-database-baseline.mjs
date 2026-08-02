@@ -63,6 +63,10 @@ try {
     "20260730040000_remaining_verticals_baseline",
     "20260730050000_report_appeal_workflow",
     "20260730060000_listing_revision_workflow",
+    "20260730070000_listing_duplicate_detection",
+    "20260730080000_search_discovery_privacy",
+    "20260730090000_homepage_layout_versions",
+    "20260801010000_queue_operations_control_plane",
   ];
   const completedMigrations = new Set(
     migrations.rows.filter((row) => row.finished_at).map((row) => row.migration_name),
@@ -101,7 +105,10 @@ try {
             to_regclass('public.moderation_case_snapshots') AS moderation_case_snapshots,
             to_regclass('public.moderation_appeals') AS moderation_appeals,
             to_regclass('public.listing_revisions') AS listing_revisions,
-            to_regclass('public.notification_templates') AS notification_templates`,
+            to_regclass('public.notification_templates') AS notification_templates,
+            to_regclass('public.admin_jobs') AS admin_jobs,
+            to_regclass('public.admin_job_items') AS admin_job_items,
+            to_regclass('public.queue_dead_letters') AS queue_dead_letters`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -788,6 +795,50 @@ try {
     !organizationMembershipLifecycle.rows[0]?.pending_invitation_index
   ) {
     throw new Error("Organization membership lifecycle controls are missing");
+  }
+
+  const queueOperationsStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'admin_jobs_actor_id_type_idempotency_key_key'
+       ) AS actor_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'admin_job_items_job_id_source_target_id_key'
+       ) AS item_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'queue_dead_letters_queue_name_event_id_key'
+       ) AS queue_event_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND constraint_type = 'CHECK'
+            AND constraint_name IN (
+              'admin_jobs_request_hash_check',
+              'admin_jobs_counts_check',
+              'admin_jobs_lifecycle_check',
+              'admin_job_items_lifecycle_check',
+              'queue_dead_letters_payload_hash_check',
+              'queue_dead_letters_lifecycle_check'
+            )
+       ) AS safety_checks`,
+  );
+  if (
+    !queueOperationsStorage.rows[0]?.actor_idempotency ||
+    !queueOperationsStorage.rows[0]?.item_idempotency ||
+    !queueOperationsStorage.rows[0]?.queue_event_idempotency ||
+    queueOperationsStorage.rows[0]?.safety_checks !== 6
+  ) {
+    throw new Error("Queue operations control-plane constraints are missing");
   }
 
   await client.query("BEGIN");
@@ -1521,6 +1572,85 @@ try {
      )`,
     "23514",
   );
+  await expectSqlState(
+    "admin job request hash bound",
+    `INSERT INTO admin_jobs (
+       id, type, actor_id, idempotency_key, request_hash, reason_code, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000070',
+       'QUEUE_REPLAY',
+       '00000000-0000-4000-8000-000000000001',
+       'baseline-invalid-job-hash',
+       'not-a-hash',
+       'INCIDENT_RECOVERY',
+       now()
+     )`,
+    "23514",
+  );
+  await client.query(
+    `INSERT INTO admin_jobs (
+       id, type, actor_id, idempotency_key, request_hash, reason_code,
+       estimated_items, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000071',
+       'QUEUE_REPLAY',
+       '00000000-0000-4000-8000-000000000001',
+       'baseline-queue-replay',
+       repeat('a', 64),
+       'INCIDENT_RECOVERY',
+       1,
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "admin job outcome count coherence",
+    `UPDATE admin_jobs
+        SET processed_items = 1,
+            succeeded_items = 1,
+            failed_items = 1
+      WHERE id = '00000000-0000-4000-8000-000000000071'`,
+    "23514",
+  );
+  await expectSqlState(
+    "admin job item lifecycle coherence",
+    `INSERT INTO admin_job_items (
+       id, job_id, source, target_id, status, completed_at, error_code
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000072',
+       '00000000-0000-4000-8000-000000000071',
+       'OUTBOX',
+       '00000000-0000-4000-8000-000000000022',
+       'SUCCEEDED',
+       now(),
+       'RAW_ERROR_MUST_NOT_BE_STORED'
+     )`,
+    "23514",
+  );
+  await expectSqlState(
+    "queue dead-letter payload hash bound",
+    `INSERT INTO queue_dead_letters (
+       id, event_id, queue_name, event_type, aggregate_type, aggregate_id,
+       attempt_count, failure_code, payload_hash, first_failed_at, last_failed_at, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000073',
+       '00000000-0000-4000-8000-000000000022',
+       'domain-events',
+       'listing.submitted',
+       'LISTING',
+       '00000000-0000-4000-8000-000000000004',
+       3,
+       'JOB_TERMINAL_FAILURE',
+       'invalid',
+       now(),
+       now(),
+       now()
+     )`,
+    "23514",
+  );
   await client.query(
     `INSERT INTO media_assets (
        id, owner_id, purpose, kind, bucket, object_key, mime_type, byte_size,
@@ -1656,6 +1786,7 @@ try {
       trustSafetyStorage: true,
       notificationStorage: true,
       organizationMembershipLifecycle: true,
+      queueOperationsStorage: true,
       remainingVerticalStorage: true,
       negativeCases: savepointSequence,
     }),

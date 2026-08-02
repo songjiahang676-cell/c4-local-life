@@ -5,9 +5,9 @@
 ## 当前 Gate
 
 - Gate：G3 Search / Homepage / SEO
-- 目标：完成 `SEO-004` axe、键盘/焦点、表单错误、200% reflow 与人工 WCAG 2.2 AA 基线，关闭 Gate 3
-- 进度：10 个 G3 任务、56/101 个总任务完成；`SEO-004` 自动化基线与本地完整质量门已通过
-- 风险：本地没有 PostgreSQL/Redis/OpenSearch/ClamAV 与四镜像；Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能用 axe 代替或伪造
+- 目标：补齐 `SEO-004` 人工 WCAG 证据，关闭 Gate 3
+- 进度：11 个 G3 任务、57/101 个总任务完成；`EVT-002` 受保护真实服务门禁已通过，`SEO-004` 自动化基线已通过
+- 风险：Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能伪造通过
 
 ## 正在进行
 
@@ -19,6 +19,9 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| EVT-002 protected checks        | PR #44 / run `30723998056`            | 117 files / 524 real-service tests；Linux 34/34 E2E；four images passed    | 2026-08-01 |
+| EVT-002 local quality           | `pnpm ci:quality`                     | 89 files / 433 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-08-01 |
+| EVT-002 architecture            | `scripts/check-architecture.sh`       | 101 tasks / 65 models / 74 paths / 188 schemas / 36 JSON files passed      | 2026-08-01 |
 | SEO-004 protected checks        | PR #43 / run `30607163890`            | 112 files / 499 real-service tests; Linux 34/34 E2E; four images passed    | 2026-07-31 |
 | SEO-004 local quality           | `pnpm ci:quality`                     | 85 files / 411 tests；9 typechecks/lints；8 builds；budgets passed         | 2026-07-30 |
 | SEO-004 a11y/browser            | production Playwright                 | 34/34；axe 8/8；keyboard/error/320px/forced-colors passed                  | 2026-07-30 |

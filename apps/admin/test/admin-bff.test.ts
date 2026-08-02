@@ -10,6 +10,10 @@ describe("Admin API proxy allowlist", () => {
     expect(isAllowedAdminApiPath("GET", "admin/moderation/cases")).toBe(true);
     expect(isAllowedAdminApiPath("GET", `admin/moderation/cases/${id}`)).toBe(true);
     expect(isAllowedAdminApiPath("POST", `admin/moderation/cases/${id}/actions`)).toBe(true);
+    expect(isAllowedAdminApiPath("GET", "admin/system/queue/dead-letters")).toBe(true);
+    expect(isAllowedAdminApiPath("POST", "admin/system/queue/replay-batches")).toBe(true);
+    expect(isAllowedAdminApiPath("POST", "admin/system/queue/reconciliation-runs")).toBe(true);
+    expect(isAllowedAdminApiPath("GET", `admin/system/jobs/${id}`)).toBe(true);
   });
 
   it("fails closed for malformed UUIDs, method confusion, and unrelated Admin paths", () => {
@@ -18,6 +22,8 @@ describe("Admin API proxy allowlist", () => {
     expect(isAllowedAdminApiPath("GET", "admin/moderation/cases/not-a-uuid")).toBe(false);
     expect(isAllowedAdminApiPath("GET", `admin/moderation/cases/${id}/actions`)).toBe(false);
     expect(isAllowedAdminApiPath("GET", "admin/users")).toBe(false);
+    expect(isAllowedAdminApiPath("POST", `admin/system/jobs/${id}`)).toBe(false);
+    expect(isAllowedAdminApiPath("GET", "admin/system/jobs/not-a-uuid")).toBe(false);
     expect(isAllowedAdminApiPath("GET", "admin/../../auth/session")).toBe(false);
   });
 });

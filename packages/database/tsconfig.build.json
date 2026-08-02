@@ -25,6 +25,7 @@
     "src/repositories/trust-safety.repository.ts",
     "src/repositories/notification.repository.ts",
     "src/repositories/outbox-event.repository.ts",
+    "src/repositories/queue-operations.repository.ts",
     "src/repositories/media-asset.repository.ts",
     "src/taxonomy.ts",
     "generated/prisma/**/*.ts"

@@ -177,3 +177,12 @@ source hash、IP、User-Agent、region、locale、dictionary version、count 或
   HMAC 仅在内存短时限频且不导出。RUM 可被伪造，正式 Dashboard 必须同时展示样本量、流量过滤与窗口。
 - API GET p95/p99 继续从 route-level `socal_http_request_duration_seconds` 计算；不复制资源 ID
   bucket，也不以单元测试或 CI 时延声称生产 SLO。
+
+## 17.18 EVT-002 队列处置指标
+
+`socal_queue_admin_operations_total{operation,outcome}` 只允许固定 operation（`DEAD_LETTER`、
+`QUEUE_REPLAY`、`QUEUE_RECONCILIATION`、`CONTROL_PLANE`）和固定 outcome（recorded/completed/stale/succeeded/skipped/
+failed/poll_failed）。既有 `socal_worker_jobs_total`/duration、Outbox outcome 和 oldest-pending-age 继续
+提供消费、重试与积压信号。job/event/user ID、队列 payload、失败文本、reason/ticket、cursor、筛选值和
+provider detail 均不进入 metric label；正式 waiting/active/delayed/failed Dashboard 与告警阈值仍由
+`OBS-002` 结合 Beta 流量固化。

@@ -459,3 +459,19 @@ Idempotency-Key 或请求哈希。
   只能追加。
 - Outbox 只发送版本定位信息和内容 hash；日志、指标和事件不得包含配置正文或 PII。未来写入口必须
   叠加 Admin MFA、近期认证、Policy、审计和速率限制。
+
+## 14.31 EVT-002 队列处置威胁和缓解
+
+- 越权/误操作：只读失败证据要求当前 PLATFORM_ADMIN 或 READ_ONLY_AUDITOR + MFA；重放与修复只允许
+  PLATFORM_ADMIN 且 MFA 在十分钟内验证。浏览器只经精确 BFF allowlist，后端 Policy 始终权威。
+- 重放放大/参数替换：写入必须带 actor/type 绑定的 `Idempotency-Key` 与规范 request hash；同键变更
+  返回 409。目标数量、对账数量、原因码和工单引用有严格边界，UI 还要求显式确认，但不以 UI 代替授权。
+- PII/错误泄漏：DLQ、Admin API、Audit 和结构日志不保存/返回 payload、原始异常、联系方式、内容或
+  provider detail；失败只使用固定 bounded code 与 SHA-256 payload hash。列表 cursor 绑定 actor 和
+  全部筛选并作 HMAC/定长校验，篡改或跨筛选重放失败。
+- 事实源反转/旧代码重放：无论 BullMQ job 仍存在或需要重建，均先从 PostgreSQL Outbox 读取 canonical
+  事件，并核对 type、aggregate、occurredAt 与规范化 payload hash；现存队列信封还必须逐字段匹配后才
+  允许 retry。不从 Redis/DLQ payload 写回业务表。对账默认 dry-run，
+  repair 只修复可重建的 DLQ 证据。
+- 崩溃/重复投递：批次短租约可恢复，item 唯一键与条件更新保证目标幂等；Worker 正常关闭等待在途
+  DLQ 落库，异常窗口由 reconciliation 补录。每次申请和完成均追加最小 AuditLog。
