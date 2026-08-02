@@ -135,11 +135,13 @@ hash、阈值值和审核员均不得成为标签。运行期误杀率只使用�
 
 ## 17.13 SEARCH-003 查询结果指标
 
-`socal_search_queries_total{outcome,sort,geo}` 的 outcome 只允许 success、empty、invalid_cursor、
-expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false。HTTP RED
+`socal_search_queries_total{outcome,sort,geo,locale}` 的 outcome 只允许 success、empty、invalid_cursor、
+expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false，locale 只允许
+zh-Hans/en-US。HTTP RED
 histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可变 bucket。query、cursor、PIT、
 Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
-零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
+零结果率和 SEARCH-006 Dashboard 从运行期 counter/RED histogram 计算；正式告警/SLO 仍属于 OBS-002，
+不能用测试计数或离线相关性分数伪造生产指标。
 
 ## 17.14 SEARCH-004 发现隐私指标
 
@@ -194,3 +196,17 @@ switch/rollback/observation，outcome 只允许 completed/retry/failed/stale。�
 job type、phase、固定 error code/type 和 stale lease；不记录索引文档、query、cursor、校验摘要、actor、
 reason/ticket 或 provider 文本。Dashboard 应联合现有索引 freshness、Outbox oldest age、OpenSearch health
 和 Admin Audit 判断卡点；生产阈值由 `OBS-002` 用 Beta 基线确定，不能从 CI 耗时推断。
+
+## 17.20 SEARCH-006 搜索质量 Dashboard
+
+版本化 Grafana 契约位于 `infra/observability/dashboards/search-quality.json`，包含：
+
+- 15 分钟双语零结果率及对应请求样本量；
+- 5 分钟 `/v1/search` route-level p95 和 timeout/unavailable 比率；
+- 15 分钟 urgent/normal 索引 freshness p95；
+- 1 小时 rebuild/reconciliation 失败增量。
+
+比率分母使用 `clamp_min` 防止无流量除零；面板查询仅允许已由代码发出的指标和固定 outcome/sort/geo/
+locale/route/priority/phase 标签。NDCG/MRR/Recall 是带 `SYNTHETIC` 分类的离线门禁报告，不写入
+Prometheus，不与生产流量曲线拼接。`OBS-002` 必须在 Beta 样本基础上补数据源、权限、集群 exporter、
+正式 SLO/告警和 runbook 链接。

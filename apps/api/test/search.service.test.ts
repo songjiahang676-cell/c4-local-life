@@ -90,7 +90,7 @@ describe("SearchService", () => {
     });
     expect(store.closed).toEqual(["memory-pit-1"]);
     expect(metrics.renderPrometheus()).toContain(
-      'socal_search_queries_total{outcome="success",sort="RELEVANCE",geo="false"} 2',
+      'socal_search_queries_total{outcome="success",sort="RELEVANCE",geo="false",locale="zh-Hans"} 2',
     );
   });
 
@@ -202,7 +202,7 @@ describe("SearchService", () => {
     );
     expect(store.closed).toEqual(["memory-pit-1"]);
     expect(metrics.renderPrometheus()).toContain(
-      'socal_search_queries_total{outcome="timeout",sort="NEWEST",geo="false"} 1',
+      'socal_search_queries_total{outcome="timeout",sort="NEWEST",geo="false",locale="zh-Hans"} 1',
     );
   });
 });

@@ -46,6 +46,7 @@ export class SearchService {
     const fingerprint = searchCriteriaFingerprint(criteria);
     const sort = criteria.sort ?? "RELEVANCE";
     const geo = criteria.latitude !== undefined && criteria.longitude !== undefined;
+    const locale = context?.locale ?? "zh-Hans";
     let snapshotId: string | undefined;
     try {
       let snapshotAt: string;
@@ -103,6 +104,7 @@ export class SearchService {
         outcome: visibleHits.length === 0 ? "empty" : "success",
         sort,
         geo,
+        locale,
       });
       await this.discovery?.captureSuccessfulQuery({
         query: criteria.q,
@@ -135,6 +137,7 @@ export class SearchService {
                 : "unavailable",
         sort,
         geo,
+        locale,
       });
       throw error;
     }

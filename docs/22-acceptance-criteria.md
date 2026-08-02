@@ -426,3 +426,15 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - Prisma additive migration、检查约束、租约/并发/失败/回滚 repository 测试、API 授权与契约测试、Worker
   重建/校验/双写测试、真实 PostgreSQL 与 OpenSearch 重建/切换/回滚演练、全仓质量及受保护 CI 均有真实
   证据后方可标记 done；未执行的真实依赖演练不得以 mock 结果代替。
+
+## 22.26 SEARCH-006 相关性评估与 Dashboard 验收
+
+- 版本化数据集明确标为 `SYNTHETIC`，至少各 8 条 zh-Hans/en-US 查询，分级 judgments 只引用固定合成
+  corpus；Schema/runtime 双重验证拒绝未知/重复引用、控制字符、双向字符和 contact-like 文本。
+- NDCG@10、MRR、Recall@10、零结果率对 overall 和两个 locale 分别计算并达到数据集审核门槛；真实
+  OpenSearch 必须用生产 analyzer/mapping/query adapter 生成排名，ideal fixture 只能证明公式正确。
+- 运行期指标能按固定 locale 计算零结果率和样本量，Dashboard 能展示 `/v1/search` p95、依赖失败、
+  索引 freshness 与恢复失败；query/cursor/PIT/ID/筛选/坐标/金额/provider detail 不进入 labels。
+- CI/离线分数不伪装成生产指标，生产数据源/权限/cluster exporter/SLO/告警仍明确由 OBS-002 交付。
+  OpenAPI、Prisma、migration 不变化；全仓质量、真实 OpenSearch、API runtime、Linux Chromium 和四镜像
+  受保护门禁全绿后方可标记 done。

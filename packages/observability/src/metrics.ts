@@ -31,6 +31,7 @@ type SearchRebuildOutcome = "completed" | "retry" | "failed" | "stale";
 type SearchQueryOutcome =
   "success" | "empty" | "invalid_cursor" | "expired_cursor" | "timeout" | "unavailable";
 type SearchQuerySort = "RELEVANCE" | "NEWEST" | "PRICE_ASC" | "PRICE_DESC" | "DISTANCE";
+type SearchQueryLocale = "zh-Hans" | "en-US";
 type SearchDiscoveryOperation = "dictionary" | "sample" | "suggestions" | "trending" | "retention";
 type SearchDiscoveryOutcome =
   | "success"
@@ -238,13 +239,19 @@ export class MetricsRegistry {
     increment(this.#searchRebuildOperations, labelKey({ phase, outcome }));
   }
 
-  searchQuery(input: { outcome: SearchQueryOutcome; sort: SearchQuerySort; geo: boolean }): void {
+  searchQuery(input: {
+    outcome: SearchQueryOutcome;
+    sort: SearchQuerySort;
+    geo: boolean;
+    locale: SearchQueryLocale;
+  }): void {
     increment(
       this.#searchQueries,
       labelKey({
         outcome: input.outcome,
         sort: input.sort,
         geo: input.geo ? "true" : "false",
+        locale: input.locale,
       }),
     );
   }
@@ -411,7 +418,7 @@ export class MetricsRegistry {
       lines.push(`socal_search_rebuild_operations_total${labels(parseLabelKey(key))} ${value}`);
     }
     lines.push(
-      "# HELP socal_search_queries_total Public search queries by bounded outcome, sort, and geo mode.",
+      "# HELP socal_search_queries_total Public search queries by bounded outcome, sort, geo mode, and locale.",
       "# TYPE socal_search_queries_total counter",
     );
     for (const [key, value] of [...this.#searchQueries].sort()) {

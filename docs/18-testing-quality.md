@@ -444,3 +444,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - Worker 单元测试覆盖候选名称、回填到追赶、逐版本 mismatch 失败关闭、原子切换参数、临时依赖重试及
   alias + candidate/rollback 多目标写入。真实 OpenSearch 测试创建随机候选，证明无 alias、版本枚举、
   read/write 一次切换和旧 source 回滚；完整托管门禁不得静默跳过 PostgreSQL/OpenSearch。
+
+## 18.39 SEARCH-006 相关性与 Dashboard 验证增量
+
+- JSON Schema 与 strict runtime parser 验证 8 条纯合成文档、16 条平衡中英 query、judgment 文档引用、
+  1–3 grade、唯一 ID、门槛和 contact/control/bidi 负例；禁止生产、用户或抓取数据进入 fixture。
+- 公式单测覆盖 ideal ranking、graded gain 倒序、全零结果、缺失/重复 query run、重复/未知文档；报告
+  同时包含 overall 与 zh-Hans/en-US 的 NDCG@10、MRR、Recall@10、零结果率，并对每个 scope 判门槛。
+- 托管 CI 在随机严格索引中使用生产 v1 analyzer/mapping、公开 query adapter 与同一数据集产生排名；
+  没有 `OPENSEARCH_INTEGRATION_URL` 时只明确 skip，不能把 ideal-run 单测当作真实相关性通过。
+- Dashboard contract 测试锁定零结果、样本量、route p95、timeout/unavailable、freshness 和 recovery
+  面板，只允许已发出的 metric 与固定标签。locale 指标只允许两值，query/cursor/PIT/资源 ID/筛选/
+  坐标/金额/provider detail 不进入指标；离线分数不得导出为生产时序。
+- OpenAPI、Prisma 和 migration 保持不变；完整质量、API runtime、Linux Chromium、真实服务和四个
+  non-root 镜像受保护门禁继续执行。生产 Dashboard provisioning、cluster exporter 和告警归 OBS-002。

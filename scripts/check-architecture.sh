@@ -75,6 +75,11 @@ if validator_for:
     homepage_schema = json_docs[homepage_schema_path]
     homepage_seed = json_docs[homepage_seed_path]
     validator_for(homepage_schema)(homepage_schema).validate(homepage_seed)
+    relevance_schema_path = root / 'schemas/search-relevance.schema.json'
+    relevance_dataset_path = root / 'datasets/search-relevance/v1.json'
+    relevance_schema = json_docs[relevance_schema_path]
+    relevance_dataset = json_docs[relevance_dataset_path]
+    validator_for(relevance_schema)(relevance_schema).validate(relevance_dataset)
 
 # YAML: parse all files and reject duplicate mapping keys when PyYAML is available.
 yaml_docs: dict[Path, object] = {}

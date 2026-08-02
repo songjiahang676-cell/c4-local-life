@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.invalid/socal/search-relevance.schema.json",
+  "title": "SoCal Life synthetic search relevance dataset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "datasetId",
+    "classification",
+    "locales",
+    "cutoff",
+    "thresholds",
+    "documents",
+    "queries"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "datasetId": { "$ref": "#/$defs/identifier" },
+    "classification": { "const": "SYNTHETIC" },
+    "locales": {
+      "type": "array",
+      "prefixItems": [{ "const": "zh-Hans" }, { "const": "en-US" }],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "cutoff": { "const": 10 },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ndcgAt10", "mrr", "recallAt10", "maximumZeroResultRate"],
+      "properties": {
+        "ndcgAt10": { "$ref": "#/$defs/ratio" },
+        "mrr": { "$ref": "#/$defs/ratio" },
+        "recallAt10": { "$ref": "#/$defs/ratio" },
+        "maximumZeroResultRate": { "$ref": "#/$defs/ratio" }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/document" }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/query" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,63}$"
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "locale": {
+      "enum": ["zh-Hans", "en-US"]
+    },
+    "ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u202A-\\u202E\\u2066-\\u2069]+$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 120
+    },
+    "taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "slug", "nameZhHans", "nameEn", "aliases"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "slug": { "$ref": "#/$defs/slug" },
+        "nameZhHans": { "$ref": "#/$defs/text" },
+        "nameEn": { "$ref": "#/$defs/text" },
+        "aliases": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "code", "slug", "nameZhHans", "nameEn", "aliases"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(?:-[A-Z0-9]+){2,5}$",
+          "maxLength": 80
+        },
+        "slug": { "$ref": "#/$defs/slug" },
+        "nameZhHans": { "$ref": "#/$defs/text" },
+        "nameEn": { "$ref": "#/$defs/text" },
+        "aliases": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "locale",
+        "type",
+        "slug",
+        "title",
+        "summary",
+        "body",
+        "category",
+        "region",
+        "qualityScore",
+        "publishedAt"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "locale": { "$ref": "#/$defs/locale" },
+        "type": { "enum": ["RENTAL", "JOB", "TRANSFER", "SECONDHAND", "SERVICE"] },
+        "slug": { "$ref": "#/$defs/slug" },
+        "title": { "$ref": "#/$defs/text" },
+        "summary": { "$ref": "#/$defs/text" },
+        "body": { "$ref": "#/$defs/text" },
+        "category": { "$ref": "#/$defs/taxonomy" },
+        "region": { "$ref": "#/$defs/region" },
+        "qualityScore": { "$ref": "#/$defs/ratio" },
+        "publishedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentId", "grade"],
+      "properties": {
+        "documentId": { "$ref": "#/$defs/uuid" },
+        "grade": { "type": "integer", "minimum": 1, "maximum": 3 }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "locale", "query", "judgments"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "locale": { "$ref": "#/$defs/locale" },
+        "query": {
+          "allOf": [{ "$ref": "#/$defs/text" }, { "type": "string", "maxLength": 120 }]
+        },
+        "judgments": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/judgment" }
+        }
+      }
+    }
+  }
+}
