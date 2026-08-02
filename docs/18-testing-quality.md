@@ -469,3 +469,16 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   OpenAPI、Prisma 和 migration 保持不变。
 - production Chromium 在桌面和移动项目验证真实 Header 地区、建议 listbox、active descendant、Enter、
   Escape、账户入口和页面无横向溢出；全仓质量、Linux E2E、真实服务和四镜像保护门禁全绿后才可完成。
+
+## 18.41 SEO-003 i18n 验证增量
+
+- 纯函数单测锁定两个标准 locale、`/en` 别名、精确首 segment 切换、非 locale 路径回退和
+  已 locale 输入防加倍；绝对/`//`/query/hash/反斜杠/重复斜杠/控制/双向字符均为负例。
+- Catalog 测试比较中英顶层与复数 key，并验证 `Intl.PluralRules`、`NumberFormat`、
+  `DateTimeFormat`、`RelativeTimeFormat` 与默认 Los Angeles 时区。金额测试包含小数补齐和
+  超界精度拒绝，防止重新引入 `Number(amount)`。
+- production standalone Chromium 桌面/移动项目要求 `/en` 308 保留路径/query，`/zh-Hans`
+  与 `/en-US` 的文档/局部 `lang` 一致，客户端伪造的内部 locale header 被路径值覆盖，
+  列表/发布/账户深层语言链接输出标准对等路由。
+- 不增加 OpenAPI、Prisma 或 migration；完整质量、性能预算、Linux Chromium、真实依赖与四个
+  non-root 镜像的受保护门禁全绿后才可标记 done。

@@ -6,7 +6,7 @@
 
 - Gate：G3 Search / Homepage / SEO
 - 目标：补齐 `SEO-004` 人工 WCAG 证据，关闭 Gate 3
-- 进度：14 个 G3 任务、60/101 个总任务完成；`EVT-002`、`SEARCH-005`、`SEARCH-006`、`WEB-003` 受保护真实服务门禁已通过，`SEO-004` 自动化基线已通过
+- 进度：15 个 G3 任务、61/101 个总任务完成；`EVT-002`、`SEARCH-005`、`SEARCH-006`、`WEB-003`、`SEO-003` 受保护真实服务门禁已通过，`SEO-004` 自动化基线已通过
 - 风险：Narrator/200% zoom 人工基线因 Windows 自动化 URL 置信度保护待重试，不能伪造通过
 
 ## 正在进行
@@ -19,6 +19,10 @@
 
 | Evidence                        | Link/Artifact                         | Result                                                                     | Date       |
 | ------------------------------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------- |
+| SEO-003 protected checks        | PR #48 / run `30732802397`            | 127 files / 568 real-service tests；Linux 38/38 E2E；four images passed    | 2026-08-01 |
+| SEO-003 local browser           | `pnpm test:e2e:ci`                    | production Chromium desktop/mobile 38/38 passed                            | 2026-08-01 |
+| SEO-003 local quality           | `pnpm ci:quality`                     | 474 passed / 94 service-skipped tests；9 checks；8 builds；budgets passed  | 2026-08-01 |
+| SEO-003 architecture            | `scripts/check-architecture.sh`       | 101 tasks / 66 models / 77 paths / 192 schemas / 39 JSON files passed      | 2026-08-01 |
 | WEB-003 protected checks        | PR #47 / run `30731100524`            | 126 files / 555 real-service tests；Linux 36/36 E2E；four images passed    | 2026-08-01 |
 | WEB-003 local browser           | `pnpm test:e2e:ci`                    | production Chromium desktop/mobile 36/36 passed                            | 2026-08-01 |
 | WEB-003 local quality           | `pnpm ci:quality`                     | 461 passed / 94 service-skipped tests；9 checks；8 builds；budgets passed  | 2026-08-01 |

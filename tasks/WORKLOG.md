@@ -1231,3 +1231,25 @@ Observability: No new server metric or log cardinality was introduced。The Head
 Docs: Updated UI/UX design-system、security/privacy、testing strategy、acceptance criteria、implementation sequence、Backlog、Gate checklist、status and this worklog；OpenAPI、Prisma、migration guidance and ADRs required no change
 
 Known gaps: PR #47 remains draft and stacked on `codex/search-006` until its parent chain is resolved。`SEO-003` still owns the complete message/Intl/document-language/routing baseline，and `SEO-004` still requires real Narrator/Edge speech plus interactive 200% zoom evidence；Gate 3 remains open。Production brand/domain、approved city content and observed traffic/SLO evidence remain external deployment inputs and are not fabricated here
+
+## SEO-003 — i18n message/format/routing 基线
+
+Task: SEO-003 i18n message/format/routing 基线
+
+Changed: Added one typed bilingual domain message catalog with compile-time zh-Hans/en-US key parity and plural-aware count formatting；centralized exact locale parsing、`/en` to `/en-US` permanent aliasing、safe localized path construction、canonical locale switching and document-language propagation；added locale-aware number、date、relative-time and fixed-decimal currency helpers；migrated the shared Header、account listings/notifications、listing projection and all five post/new entry points；added strict proxy/header spoof protection、unit tests and production Chromium coverage
+
+Contracts: OpenAPI remains 77 paths / 192 schemas / 87 operationIds；Prisma remains 66 models；no public API、generated contract、JSON Schema or database shape changed。The internal locale request header is overwritten by the path-aware Next proxy and is not a public trust boundary
+
+Migrations: None；Prisma and all 30 migrations are unchanged。Rollback removes the i18n catalog/proxy and restores the prior local path/format helpers；PostgreSQL canonical data、Redis、OpenSearch and object storage are unaffected
+
+Security: Locale/path helpers reject absolute and protocol-relative URLs、duplicate slashes、query/hash injection、backslashes、control characters and bidi controls；the server overwrites a client-supplied internal locale header；currency formatting parses fixed-decimal text into `BigInt` minor units without IEEE-754 business-value conversion；no URL、query、header、cookie、identity or raw PII telemetry was added
+
+Tests run: Targeted Web i18n/routing/component suites passed 67/67。Root `pnpm ci:quality` passed workflow/governance/runtime/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、96 local-passed / 31 explicitly service-skipped files with 474 passed / 94 skipped tests、8 production builds and the 17-chunk Web budget at largest 84,734 / 100,000 and total 305,482 / 500,000 gzip bytes。`pnpm observability:check` passed。Local production Chromium passed 38/38 across desktop and Pixel 7。`bash scripts/check-architecture.sh` passed with 101 tasks / 66 Prisma models / 77 OpenAPI paths / 192 schemas / 39 JSON files。Protected PR #48 run `30732802397` passed 127/127 files and 568/568 tests with zero skips against real PostgreSQL、Redis、OpenSearch and ClamAV；30-migration fresh baseline、28-migration prior-baseline upgrade after 2 migrations with sentinel preservation and 47 negative cases；coverage 74.65% statements、78.50% lines、77.56% functions and 66.69% branches；8 Linux builds；17-chunk Web budget at largest 84,732 / 100,000 and total 305,584 / 500,000 gzip bytes；built API runtime；Linux Chromium 38/38；and all four non-root Web/Admin/API/Worker image health checks
+
+Not run: Local disposable PostgreSQL、Redis、OpenSearch、ClamAV and four-image smoke remain unavailable because Docker/service endpoints are absent；all 94 local service skips were reported rather than called passes。Narrator/Edge speech and actual interactive 200% browser zoom belong to the still-open `SEO-004` manual matrix and were not represented by automated emulation
+
+Observability: No new server log、metric、trace attribute or high-cardinality dimension was introduced。Locale formatting and switching remain deterministic presentation behavior；the existing bounded Search locale metric and dashboards remain authoritative
+
+Docs: Updated README、CHANGELOG、SEO/i18n/accessibility、security/privacy、testing、acceptance and route catalog chapters；regenerated `ARCHITECTURE_BOOK.md`；updated Backlog、Gate checklist、project status and this worklog。OpenAPI、Prisma、migration guidance and ADRs required no change
+
+Known gaps: PR #48 remains draft and stacked on `codex/web-003`。`SEO-004` still requires real Narrator/Edge speech and actual interactive 200% zoom evidence，so Gate 3 remains open and Gate 4 work does not start。Production brand/domain ownership、approved translations and locale-specific editorial review remain external Beta inputs rather than fabricated completion evidence

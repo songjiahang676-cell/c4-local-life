@@ -449,3 +449,17 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   region、查询防抖和旧响应取消；建议失败不阻止普通 GET 搜索。
 - BFF 仅放行契约内 GET suggestions；单元/组件/production Chromium 覆盖中英文、桌面/移动、错误态和
   键盘路径。OpenAPI、Prisma、migration 不变化；全仓与受保护真实服务/镜像门禁全绿后方可标记 done。
+
+## 22.28 SEO-003 i18n message/format/routing 验收
+
+- `zh-Hans` 与 `en-US` 为唯一标准 locale；公开、发布和账户路由具有等价模板。`/en`
+  仅 308 到保留后缀/query 的 `/en-US`，内部 locale switch 在深层路由上保留同一资源并且不改写
+  slug 内文本。
+- 服务器首屏的 `<html lang>` 与路径 locale 一致；伪造内部 header 不能改变文档语言，
+  locale layout 的局部 `lang` 和 skip link 与根文档一致。
+- common/search/listings 强类型目录的中英 key 等价；计数、数字、日期、相对时间和货币使用
+  `Intl` 或等价标准 API，UTC 时间按 `America/Los_Angeles` 显示，固定小数金额不经 IEEE
+  浮点转换。
+- 路由输入负例、catalog/Intl 单测和 production Chromium 桌面/移动契约均通过；
+  OpenAPI、Prisma 与 migration 不变化，全仓、真实服务、Linux E2E 与四镜像保护门禁全绿后
+  方可标记 done。

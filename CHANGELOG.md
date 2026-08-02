@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a typed bilingual Web i18n baseline with canonical `zh-Hans`/`en-US` route builders,
+  permanent `/en` alias normalization, trustworthy path-derived document language, equivalent
+  common/search/listing message keys, plural/date/relative-time/number formatting, fixed-decimal
+  currency display without business-value float conversion, and desktop/mobile production tests.
 - Added a recoverable PostgreSQL-backed Listing index rebuild control plane with stable-cursor
   backfill, continuous candidate/rollback dual writes, full canonical version validation, atomic
   read/write alias switching, retained-source rollback windows, recent-MFA Admin APIs, durable

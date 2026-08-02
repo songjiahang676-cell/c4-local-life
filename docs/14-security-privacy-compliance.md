@@ -499,3 +499,16 @@ Idempotency-Key 或请求哈希。
   新请求后旧响应不能恢复为可选项，用户仍可提交普通 GET 搜索。
 - 键盘与导航劫持：建议仅产生同源搜索参数，不接受任意 URL；地区值只接受受限代码。combobox 使用原生
   键盘事件、稳定 active descendant、Escape 关闭和可见焦点，不以鼠标交互替代访问控制或搜索授权。
+
+## 14.34 SEO-003 locale 路由威胁和缓解
+
+- Header 伪造：文档语言的内部 request header 每次都由 Proxy 根据路径重建，客户端传入
+  `zh-Hans`、`en-US` 或任意字符串都不是信任边界。根 layout 只接受精确白名单值，其他值
+  回退为默认 locale。
+- Open redirect/注入：`/en` 别名只在同一 `NextURL` clone 内替换 pathname；路由 builder 拒绝
+  scheme/host、protocol-relative、query/hash、反斜杠、重复斜杠、控制与双向控制字符，不将用户
+  文本解析为导航目标。
+- 开放重定向链/重复内容：别名只单跳到标准 `/en-US`，内部 builder 拒绝已含 locale 的
+  输入，locale switch 只替换第一 segment，防止加倍 locale 或改写 slug 内同名文本。
+- 隐私/日志：Proxy 不写 cookie，不记录 URL、query、header 或语言偏好；这个路由层没有新的
+  PII 采集或高基数指标。

@@ -158,3 +158,21 @@ expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次�
 - 实际工具、模板、结果和未关闭项只记录在
   [`accessibility-baseline.md`](./accessibility-baseline.md)。真实 Narrator/Edge 与 200% zoom 未完成
   前，`SEO-004` 和 Gate 3 必须保持未关闭。
+
+## 13.14 SEO-003 i18n message/format/routing 基线
+
+- Web 只使用标准 `zh-Hans` 和 `en-US` locale，默认为 `zh-Hans`。`/en` 是仅用于兼容的
+  展示别名，必须以 308 保留后缀路径和 query 转到 `/en-US`；canonical、hreflang、内部链接和
+  locale switch 始终输出标准 locale。
+- 语言切换只替换第一个精确 locale segment，保留后续资源路径；绝对 URL、protocol-relative
+  路径、query/hash、反斜杠、重复斜杠、控制字符和双向控制字符均失败关闭。不依据
+  `Accept-Language` 静默改变 URL。
+- root layout 从请求路径派生的内部 locale header 输出文档级 `<html lang>`。Proxy 每次覆盖
+  客户端同名 header，因此客户端不能伪造文档语言；locale layout 仍在局部边界输出同值
+  `lang` 和本地化 skip link。
+- common/search/listings 资源使用强类型中英 key 等价目录；参数化计数使用
+  `Intl.PluralRules` 和 `Intl.NumberFormat`，不拼接翻译片段。日期/相对时间统一使用
+  `Intl` 与 `America/Los_Angeles`；固定小数金额先保留字符串精度，用 `BigInt` 和
+  `formatToParts` 显示，不先转 IEEE 浮点数。
+- 单元测试覆盖 locale/catalog/Intl/路径篡改负例；production Chromium 在桌面和移动端
+  验证别名转向、双语文档 `lang`、伪造 header 覆盖与深层 locale switch。
