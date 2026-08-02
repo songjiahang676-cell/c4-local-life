@@ -4,7 +4,7 @@ import { isAllowedWebApiPath } from "../src/app/v1/[...path]/route";
 describe("public Web API proxy allowlist", () => {
   const id = "11111111-1111-4111-8111-111111111111";
 
-  it("allows only the account, notification, form, draft, submission, taxonomy and media routes", () => {
+  it("allows only the account, notification, search-discovery, form, draft, submission, taxonomy and media routes", () => {
     expect(isAllowedWebApiPath("GET", "auth/session")).toBe(true);
     expect(isAllowedWebApiPath("GET", "me/listings")).toBe(true);
     expect(isAllowedWebApiPath("POST", "me/listings/actions")).toBe(true);
@@ -12,6 +12,7 @@ describe("public Web API proxy allowlist", () => {
     expect(isAllowedWebApiPath("GET", "notifications")).toBe(true);
     expect(isAllowedWebApiPath("PUT", `notifications/${id}/read`)).toBe(true);
     expect(isAllowedWebApiPath("GET", "categories")).toBe(true);
+    expect(isAllowedWebApiPath("GET", "search/suggestions")).toBe(true);
     expect(isAllowedWebApiPath("GET", `categories/${id}/form-schema`)).toBe(true);
     expect(isAllowedWebApiPath("POST", "listings")).toBe(true);
     expect(isAllowedWebApiPath("PATCH", `listings/${id}`)).toBe(true);
@@ -29,6 +30,8 @@ describe("public Web API proxy allowlist", () => {
 
   it("fails closed for over-broad, malformed and method-confused routes", () => {
     expect(isAllowedWebApiPath("GET", "admin/session")).toBe(false);
+    expect(isAllowedWebApiPath("POST", "search/suggestions")).toBe(false);
+    expect(isAllowedWebApiPath("GET", "search/trending")).toBe(false);
     expect(isAllowedWebApiPath("DELETE", "me/listings/actions")).toBe(false);
     expect(isAllowedWebApiPath("DELETE", `listings/${id}`)).toBe(false);
     expect(isAllowedWebApiPath("POST", `listings/${id}`)).toBe(false);

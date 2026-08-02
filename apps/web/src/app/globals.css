@@ -54,6 +54,353 @@ a {
   box-shadow: var(--shadow);
 }
 
+.globalSiteHeader {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+
+.globalHeaderTop,
+.globalPrimaryNav {
+  width: min(1360px, calc(100% - 32px));
+}
+
+.globalHeaderTop {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 215px minmax(440px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.globalBrand {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.globalBrand > span:first-child {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, #ff9f27, var(--orange));
+  border-radius: 13px;
+  box-shadow: 0 8px 22px rgba(255, 112, 54, 0.2);
+}
+
+.globalBrand strong,
+.globalBrand small {
+  display: block;
+}
+
+.globalBrand strong {
+  overflow: hidden;
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.globalBrand small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.globalHeaderSearch {
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(220px, 1fr) auto;
+  align-items: stretch;
+  border: 2px solid var(--blue);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.globalRegionPicker {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding-inline: 11px 6px;
+  color: var(--blue-strong);
+  border-right: 1px solid #cbdcfb;
+}
+
+.globalRegionPicker select {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding-right: 4px;
+  color: var(--ink);
+  background: #fff;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.globalSearchCombobox {
+  min-width: 0;
+  position: relative;
+}
+
+.globalSearchCombobox > input {
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: 0 15px;
+  color: var(--ink);
+  background: #fff;
+  border: 0;
+  outline: 0;
+}
+
+.globalSearchCombobox > input::placeholder {
+  color: #77839a;
+}
+
+.globalHeaderSearch > button {
+  min-width: 104px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding-inline: 17px;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.globalSearchSuggestions {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  left: -1px;
+  right: -1px;
+  max-height: min(360px, 60vh);
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #cbdcfb;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(23, 32, 51, 0.16);
+}
+
+.globalSearchSuggestions li {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.globalSearchSuggestions li[aria-selected="true"] {
+  color: var(--blue-strong);
+  background: #eef5ff;
+  outline: 2px solid rgba(18, 103, 237, 0.28);
+}
+
+.globalSearchSuggestions li > span {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.globalSearchSuggestions li > small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.globalSearchState {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  left: -1px;
+  right: -1px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 10px 13px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid #cbdcfb;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(23, 32, 51, 0.12);
+  font-size: 13px;
+}
+
+.globalHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.globalHeaderActions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  font-weight: 750;
+}
+
+.globalLanguageAction,
+.globalAccountAction {
+  color: var(--blue-strong);
+  border: 1px solid #cbdcfb;
+}
+
+.globalRegisterAction {
+  color: #fff;
+  background: var(--blue);
+}
+
+.globalPrimaryNav {
+  min-height: 46px;
+  display: flex;
+  align-items: stretch;
+  gap: 34px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.globalPrimaryNav a {
+  min-height: 44px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-weight: 750;
+}
+
+.globalPrimaryNav a.active {
+  color: var(--blue);
+}
+
+.globalPrimaryNav a.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--blue);
+}
+
+.globalBrand:focus-visible,
+.globalHeaderActions a:focus-visible,
+.globalPrimaryNav a:focus-visible,
+.globalHeaderSearch > button:focus-visible,
+.globalRegionPicker select:focus-visible,
+.globalSearchCombobox > input:focus-visible {
+  outline: 3px solid rgba(18, 103, 237, 0.48);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1120px) {
+  .globalHeaderTop {
+    grid-template-columns: 200px minmax(380px, 1fr) auto;
+    gap: 12px;
+  }
+
+  .globalLanguageAction span,
+  .globalRegisterAction span {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .globalSiteHeader {
+    position: static;
+  }
+
+  .globalHeaderTop,
+  .globalPrimaryNav {
+    width: min(100% - 20px, 760px);
+  }
+
+  .globalHeaderTop {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-block: 9px;
+  }
+
+  .globalHeaderSearch {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .globalPrimaryNav {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 560px) {
+  .globalBrand strong {
+    font-size: 17px;
+  }
+
+  .globalBrand > span:first-child {
+    width: 41px;
+    height: 41px;
+  }
+
+  .globalHeaderActions a {
+    width: 44px;
+    padding-inline: 0;
+  }
+
+  .globalHeaderActions span {
+    display: none;
+  }
+
+  .globalHeaderSearch {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .globalRegionPicker {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 1px solid #cbdcfb;
+  }
+
+  .globalHeaderSearch > button {
+    min-width: 48px;
+    padding-inline: 0;
+  }
+
+  .globalHeaderSearch > button span {
+    display: none;
+  }
+
+  .globalSearchSuggestions {
+    right: -50px;
+  }
+}
+
 .siteHeader {
   position: sticky;
   top: 0;

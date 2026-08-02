@@ -67,6 +67,9 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 11. `SEO-004` automated/manual accessibility baseline and Gate evidence。
 12. `EVT-002` controlled DLQ replay/reconciliation、Admin Policy/audit and PII-minimized evidence。
 13. `SEARCH-005` durable rebuild/catch-up/validation、atomic alias switch and retained-source rollback。
+14. `SEARCH-006` bilingual relevance evaluation set、quality thresholds and privacy-safe Dashboard contract。
+15. `WEB-003` shared responsive Header、RegionPicker and keyboard search suggestions。
+16. `SEO-003` complete i18n message/format/routing baseline；`SEO-004` remains open until manual evidence is complete。
 
 ## Gate 4 — Interaction / Trust
 

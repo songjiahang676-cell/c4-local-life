@@ -16,7 +16,7 @@ test("renders the localized public homepage at desktop and mobile widths", async
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "最新租房" })).toBeVisible();
   await expect(page.getByText("Synthetic public listing")).toBeVisible();
-  await expect(page.getByText("测试城市")).toBeVisible();
+  await expect(page.getByRole("link", { name: "测试城市", exact: true })).toBeVisible();
   await expect(page.getByText("256,893")).toHaveCount(0);
   await expect(page.getByText("鼎泰丰")).toHaveCount(0);
   await expect(page.getByText("首页广告位合作")).toHaveCount(0);
@@ -64,6 +64,41 @@ test("renders the localized public homepage at desktop and mobile widths", async
   );
 });
 
+test("operates the global region and search suggestion header with a keyboard", async ({
+  page,
+}) => {
+  const response = await page.goto("/en-US");
+  expect(response?.ok()).toBe(true);
+
+  const banner = page.getByRole("banner");
+  const region = banner.getByRole("combobox", {
+    name: "Choose search region",
+    exact: true,
+  });
+  await expect(region).toContainText("Synthetic City");
+  await region.selectOption("US-CA-SYNTHETIC");
+
+  const search = banner.getByRole("combobox", { name: "Search", exact: true });
+  await search.fill("rent");
+  const listbox = page.getByRole("listbox", { name: "Search suggestions" });
+  await expect(listbox).toBeVisible();
+  await expect(listbox.getByRole("option")).toHaveCount(3);
+  await search.press("ArrowDown");
+  await expect(search).toHaveAttribute("aria-activedescendant", /option-0$/);
+  await search.press("Enter");
+  await expect(search).toHaveValue("Synthetic rentals");
+  await expect(listbox).toBeHidden();
+
+  await search.fill("test");
+  await expect(listbox).toBeVisible();
+  await search.press("Escape");
+  await expect(listbox).toBeHidden();
+  await expect(page.getByRole("link", { name: "Register" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+});
+
 test("keeps the localized homepage within the initial HTML and JavaScript budgets", async ({
   page,
   request,
@@ -75,7 +110,12 @@ test("keeps the localized homepage within the initial HTML and JavaScript budget
 
   const response = await page.goto("/en-US");
   expect(response?.ok()).toBe(true);
-  await page.waitForLoadState("networkidle");
+  await expect(
+    page.getByRole("banner").getByRole("combobox", {
+      name: "Choose search region",
+      exact: true,
+    }),
+  ).toContainText("Synthetic City");
   const javascriptBytes = await page.evaluate(() =>
     performance
       .getEntriesByType("resource")
@@ -115,7 +155,7 @@ test("renders bilingual public Listing filters and sponsored status from SSR dat
     `${webBaseUrl}/en-US/rentals`,
   );
   await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "简体中文" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "中文 / English" })).toHaveAttribute(
     "href",
     "/zh-Hans/rentals",
   );
