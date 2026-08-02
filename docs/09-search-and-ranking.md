@@ -183,3 +183,21 @@ BUSINESS/PROVIDER 实体建议在相应信任档案任务完成前不进入契�
 生成的 64 位十六进制摘要，不保存 IP/User-Agent。相同 query/source/UTC day 只能贡献一次；任何公开
 近期建议或热门词都要求至少 5 个不同来源，读取时再次做敏感词筛查。样本默认 30 天到期，数据库强制
 不超过 90 天，过期行按有界批次清理；低频行始终内部可见性且绝不进入响应。
+
+## 9.15 SEARCH-005 可恢复全量重建与 alias 回滚
+
+重建由 PostgreSQL `AdminJob/SearchIndexOperation` 驱动，不以进程内状态或 OpenSearch task 作为唯一
+证据。Worker 创建 operation UUID 派生、无 alias 的候选索引，按稳定 Listing UUID cursor 从 canonical
+PostgreSQL 重载严格公开投影，并再做一轮追赶。正常 Listing 事件使用 external version 同时写当前
+write alias 与候选索引；切换阶段同时写 source/target，保证 alias 已切而 durable completion 尚未提交
+时仍可安全回滚。
+
+切换前刷新候选索引，按 ID 顺序比较 PostgreSQL 应公开集合与候选索引全部 `id + contentVersion` 的
+数量和滚动 SHA-256；遗漏、额外文档、旧版本或索引领先都会失败关闭。read/write alias 只能在一次
+`updateAliases` 中从精确 expected source 切到已验证 target，并在提交后再次确认两者共享唯一 write
+index。任何 mapping `_meta` 漂移都会中止，不允许原地放宽 strict mapping。
+
+观察窗口内旧 source 索引继续双写且不自动删除。回滚是独立幂等 Admin job，先重新全量校验仍在双写的
+旧 source，再原子恢复两个 alias；已接受的回滚即使跨过窗口截止时间也持续双写 target 直到完成。API
+只公开 phase、索引名、数量和固定失败 code，不公开扫描 cursor、摘要、Listing 内容、PII、query 或
+provider 原始错误。

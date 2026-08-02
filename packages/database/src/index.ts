@@ -230,6 +230,15 @@ export {
   type RecordQueueDeadLetterInput,
 } from "./repositories/queue-operations.repository";
 export {
+  SearchIndexOperationRepository,
+  type ClaimedSearchIndexOperation,
+  type CreateSearchIndexOperationResult,
+  type CreateSearchIndexRebuildInput,
+  type CreateSearchIndexRollbackInput,
+  type SearchIndexOperationProjection,
+  type SearchIndexOperationRepositoryOptions,
+} from "./repositories/search-index-operation.repository";
+export {
   ListingSearchRepository,
   type ListingSearchProjection,
   type ListingSearchRecord,

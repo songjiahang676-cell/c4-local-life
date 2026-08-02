@@ -186,3 +186,11 @@ failed/poll_failed）。既有 `socal_worker_jobs_total`/duration、Outbox outco
 提供消费、重试与积压信号。job/event/user ID、队列 payload、失败文本、reason/ticket、cursor、筛选值和
 provider detail 均不进入 metric label；正式 waiting/active/delayed/failed Dashboard 与告警阈值仍由
 `OBS-002` 结合 Beta 流量固化。
+
+## 17.19 SEARCH-005 重建与切换指标
+
+`socal_search_rebuild_operations_total{phase,outcome}` 的 phase 只允许 prepare/backfill/catch_up/validate/
+switch/rollback/observation，outcome 只允许 completed/retry/failed/stale。日志事件只记录 operation/job UUID、
+job type、phase、固定 error code/type 和 stale lease；不记录索引文档、query、cursor、校验摘要、actor、
+reason/ticket 或 provider 文本。Dashboard 应联合现有索引 freshness、Outbox oldest age、OpenSearch health
+和 Admin Audit 判断卡点；生产阈值由 `OBS-002` 用 Beta 基线确定，不能从 CI 耗时推断。

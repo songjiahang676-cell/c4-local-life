@@ -1,6 +1,7 @@
 import type { opensearchtypes } from "@opensearch-project/opensearch";
+import { listingSearchIndexSchemaVersion } from "@socal/contracts";
 
-export const listingIndexSchemaVersion = 1;
+export const listingIndexSchemaVersion = listingSearchIndexSchemaVersion;
 
 export type ListingIndexNames = Readonly<{
   physical: string;
@@ -101,6 +102,14 @@ export function listingIndexNames(prefix: string): ListingIndexNames {
   };
 }
 
+export function listingRebuildIndexName(prefix: string, operationId: string): string {
+  const compactId = operationId.replaceAll("-", "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(compactId)) {
+    throw new Error("Search rebuild operation ID must be a UUID");
+  }
+  return `${listingIndexNames(prefix).physical}_r${compactId.slice(0, 16)}`;
+}
+
 const bilingualText = {
   type: "text",
   analyzer: "socal_bilingual_index",
@@ -129,8 +138,11 @@ const bilingualText = {
   },
 } as const;
 
-export function buildListingIndexDefinition(names: ListingIndexNames): ListingIndexDefinition {
-  return {
+export function buildListingIndexDefinition(
+  names: ListingIndexNames,
+  options: { includeAliases?: boolean } = {},
+): ListingIndexDefinition {
+  const definition: ListingIndexDefinition = {
     settings: {
       number_of_shards: 1,
       number_of_replicas: 1,
@@ -334,9 +346,12 @@ export function buildListingIndexDefinition(names: ListingIndexNames): ListingIn
         indexedAt: { type: "date", format: "strict_date_time" },
       },
     },
-    aliases: {
+  };
+  if (options.includeAliases !== false) {
+    definition.aliases = {
       [names.readAlias]: {},
       [names.writeAlias]: { is_write_index: true },
-    },
-  };
+    };
+  }
+  return definition;
 }

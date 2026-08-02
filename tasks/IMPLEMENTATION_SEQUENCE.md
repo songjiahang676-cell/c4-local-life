@@ -66,6 +66,7 @@ Gate 验收：`docs/22-acceptance-criteria.md#221-gate-0-验收`。
 10. `SEO-002` strict schema.org + canonical locale/vertical/month sitemap partitions。
 11. `SEO-004` automated/manual accessibility baseline and Gate evidence。
 12. `EVT-002` controlled DLQ replay/reconciliation、Admin Policy/audit and PII-minimized evidence。
+13. `SEARCH-005` durable rebuild/catch-up/validation、atomic alias switch and retained-source rollback。
 
 ## Gate 4 — Interaction / Trust
 

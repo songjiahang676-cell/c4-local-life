@@ -136,3 +136,12 @@ PLATFORM_ADMIN + recent-MFA 可提交重放/对账。
 另有确认。所有写入经同源精确 BFF、后端 Policy、strict DTO 与新 `Idempotency-Key` 创建异步 Admin job，
 页面只轮询聚合进度；失败不会在浏览器展开原始 provider/handler detail。中英文共用语义表格、可见
 label/focus、移动横向容器和明确 loading/error/empty 状态，前端禁用不替代后端授权。
+
+## 28.13 SEARCH-005 索引恢复控制面
+
+Admin API 提供精确的重建创建、operation 读取和父 operation 回滚路径。PLATFORM_ADMIN + recent-MFA
+提交新的 Idempotency-Key、reasonCode、可选 ticketRef/回滚窗口；READ_ONLY_AUDITOR 仅能读取 phase、
+source/target、数量、窗口和固定失败码。响应不返回 cursor、摘要、Listing 内容、actor 或 provider 错误。
+
+当前可通过受控 API/运行手册操作；后续若增加可视化面板，必须只调用同一 BFF/API、保留显式确认和
+双语/键盘/移动状态，不新增直连 OpenSearch/Prisma 的快捷路径，也不能以 UI 禁用替代 Policy。

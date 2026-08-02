@@ -12,6 +12,19 @@ export type ListingIndexWriter = ListingIndexReader & {
   remove(listingId: string, version: number): Promise<ListingIndexMutationOutcome>;
 };
 
+export type ListingIndexVersionPage = Readonly<{
+  items: readonly Readonly<{ id: string; version: number }>[];
+  nextCursor: string | null;
+}>;
+
+type ListingIndexVersionSearchResponse = Readonly<{
+  hits: Readonly<{
+    hits: readonly Readonly<{
+      _source?: Readonly<{ id?: string; contentVersion?: number }>;
+    }>[];
+  }>;
+}>;
+
 function isVersionConflict(error: unknown): boolean {
   return error instanceof errors.ResponseError && error.statusCode === 409;
 }
@@ -84,5 +97,99 @@ export class OpenSearchListingIndex implements ListingIndexWriter {
       if (isMissing(error)) return null;
       throw error;
     }
+  }
+}
+
+export class RebuildAwareListingIndex implements ListingIndexWriter {
+  constructor(
+    private readonly client: Client,
+    private readonly primary: ListingIndexWriter,
+    private readonly secondaryTargets: (now: Date) => Promise<readonly string[]>,
+  ) {}
+
+  version(listingId: string): Promise<number | null> {
+    return this.primary.version(listingId);
+  }
+
+  async upsert(
+    document: ListingSearchDocument,
+    version: number,
+  ): Promise<ListingIndexMutationOutcome> {
+    const primary = await this.primary.upsert(document, version);
+    const secondary = await Promise.all(
+      (await this.secondaryTargets(new Date())).map((target) =>
+        new OpenSearchListingIndex(this.client, target, target).upsert(document, version),
+      ),
+    );
+    return this.#combinedOutcome(primary, secondary);
+  }
+
+  async remove(listingId: string, version: number): Promise<ListingIndexMutationOutcome> {
+    const primary = await this.primary.remove(listingId, version);
+    const secondary = await Promise.all(
+      (await this.secondaryTargets(new Date())).map((target) =>
+        new OpenSearchListingIndex(this.client, target, target).remove(listingId, version),
+      ),
+    );
+    return this.#combinedOutcome(primary, secondary);
+  }
+
+  #combinedOutcome(
+    primary: ListingIndexMutationOutcome,
+    secondary: readonly ListingIndexMutationOutcome[],
+  ): ListingIndexMutationOutcome {
+    const outcomes = [primary, ...secondary];
+    if (outcomes.includes("applied")) return "applied";
+    if (outcomes.includes("stale")) return "stale";
+    return "missing";
+  }
+}
+
+export class OpenSearchListingIndexCatalog {
+  constructor(private readonly client: Client) {}
+
+  writer(index: string): ListingIndexWriter {
+    return new OpenSearchListingIndex(this.client, index, index);
+  }
+
+  async refresh(index: string): Promise<void> {
+    await this.client.indices.refresh({ index });
+  }
+
+  async listVersions(input: {
+    index: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<ListingIndexVersionPage> {
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+      throw new RangeError("Listing index version page limit must be between 1 and 1000");
+    }
+    const response = await this.client.search<ListingIndexVersionSearchResponse>({
+      index: input.index,
+      body: {
+        size: input.limit,
+        query: { match_all: {} },
+        sort: [{ id: { order: "asc" } }],
+        ...(input.afterId ? { search_after: [input.afterId] } : {}),
+        _source: ["id", "contentVersion"],
+      },
+    });
+    const items = response.body.hits.hits.map((hit) => {
+      const source = hit._source;
+      if (
+        !source ||
+        typeof source.id !== "string" ||
+        typeof source.contentVersion !== "number" ||
+        !Number.isInteger(source.contentVersion) ||
+        source.contentVersion < 1
+      ) {
+        throw new Error("Listing index contains an invalid version projection");
+      }
+      return { id: source.id, version: source.contentVersion };
+    });
+    return {
+      items,
+      nextCursor: items.length === input.limit ? (items.at(-1)?.id ?? null) : null,
+    };
   }
 }

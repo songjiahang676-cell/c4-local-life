@@ -190,6 +190,9 @@ describe("runtime configuration", () => {
     expect(environment.OPENSEARCH_INDEX_PREFIX).toBe("socal_local");
     expect(environment.SEARCH_RECONCILIATION_BATCH_SIZE).toBe(100);
     expect(environment.SEARCH_RECONCILIATION_INTERVAL_MS).toBe(300_000);
+    expect(environment.SEARCH_REBUILD_BATCH_SIZE).toBe(250);
+    expect(environment.SEARCH_REBUILD_POLL_INTERVAL_MS).toBe(5_000);
+    expect(environment.SEARCH_REBUILD_LEASE_SECONDS).toBe(300);
 
     expect(() =>
       parseWorkerEnvironment({

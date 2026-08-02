@@ -282,7 +282,9 @@ reconciliation 扫描 Listing 版本并修复缺失、落后或应删除的文�
 分别返回 504、410、503，详情与发布链路不依赖搜索。`SEARCH-004` 已加入双人审核、不可变和可追加回滚
 的版本词典，cursor v2 固定词典版本；`GET /v1/search/suggestions` 与 `/v1/search/trending` 只消费
 active taxonomy 或至少五个独立 HMAC 来源的非 bot、非敏感、有效结果查询，热门响应不暴露 count。
-查询样本默认 30 天且数据库硬上限 90 天。原子索引重建仍由后续 `SEARCH-005` 负责。
+查询样本默认 30 天且数据库硬上限 90 天。`SEARCH-005` 已实现 PostgreSQL durable Admin job 驱动的
+新物理索引回填/追赶、全量 `id + contentVersion` 对账、read/write alias 原子切换和保留旧索引回滚；
+候选及回滚窗口持续 external-version 双写，校验失败不会改变 alias。
 
 `WEB-001` 已将五类公共频道和全站搜索落地为真实 SSR 页面：`/[locale]/jobs`、`rentals`、
 `transfers`、`marketplace`、`services` 与 `/search` 共用严格的搜索响应、taxonomy 和公开详情
@@ -327,6 +329,12 @@ scope、过大条目或 Redis 故障均删除/忽略并回源 PostgreSQL，单�
 证据；Admin 可按受控筛选查看、以 actor-scoped 幂等批次重放，或先 dry-run 再修复派生证据。所有写入
 要求 PLATFORM_ADMIN + recent-MFA 并追加 Audit，Worker 以短租约和逐项幂等恢复；缺失 Redis job 只从
 canonical Outbox 重建并核对事件/aggregate/payload hash，不从 DLQ 或 Redis 反写业务事实。
+
+`SEARCH-005` 使用同一模块化单体控制面提供 recent-MFA Admin 重建/状态/回滚 API。Worker 每次领取一个
+短租约阶段，候选索引不带 alias，回填和追赶始终从 PostgreSQL 重载公开投影；切换前全量比较 canonical
+与候选的有序版本集合，read/write alias 只在一次原子 action 中切换。观察窗口内旧 source 继续双写且
+不自动删除；回滚是独立审计 job，重新校验旧 source 后恢复 alias。日志和响应不含 Listing 内容、PII、
+query、扫描 cursor、摘要或 provider 原始错误。
 
 ## 七、规划容量与服务目标
 

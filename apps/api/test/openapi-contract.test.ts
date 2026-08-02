@@ -28,6 +28,10 @@ import {
   MemoryQueueOperationsStore,
 } from "./support/memory-queue-operations.store";
 import {
+  memorySearchRebuildId,
+  MemorySearchIndexOperationsStore,
+} from "./support/memory-search-index-operations.store";
+import {
   MemoryListingStore,
   memoryListingCategoryId,
   memoryListingRegionCode,
@@ -90,6 +94,7 @@ describe("canonical OpenAPI contract", () => {
   let otpDelivery: CapturingOtpDeliveryGateway;
   let passwordStore: MemoryPasswordStore;
   let passwordNotifications: CapturingPasswordNotificationGateway;
+  let searchIndexOperationsStore: MemorySearchIndexOperationsStore;
   const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
 
   beforeAll(async () => {
@@ -276,6 +281,7 @@ describe("canonical OpenAPI contract", () => {
         },
       ]),
     );
+    searchIndexOperationsStore = new MemorySearchIndexOperationsStore();
     app = await createApiApplication(environment, {
       logger: false,
       authSessionStore,
@@ -290,6 +296,7 @@ describe("canonical OpenAPI contract", () => {
       mfaStore: new MemoryMfaStore(),
       moderationStore: new MemoryModerationStore(),
       queueOperationsStore: new MemoryQueueOperationsStore(),
+      searchIndexOperationsStore,
       trustSafetyStore: new MemoryTrustSafetyStore(),
       passwordStore,
       passwordNotificationGateway: passwordNotifications,
@@ -319,9 +326,9 @@ describe("canonical OpenAPI contract", () => {
     );
 
     expect(contract.openapi).toMatch(/^3\.1\./);
-    expect(Object.keys(contract.paths)).toHaveLength(74);
-    expect(Object.keys(contract.components.schemas)).toHaveLength(188);
-    expect(operationIds).toHaveLength(84);
+    expect(Object.keys(contract.paths)).toHaveLength(77);
+    expect(Object.keys(contract.components.schemas)).toHaveLength(192);
+    expect(operationIds).toHaveLength(87);
     expect(new Set(operationIds).size).toBe(operationIds.length);
   });
 
@@ -358,8 +365,8 @@ describe("canonical OpenAPI contract", () => {
     expect(jsonResponse.statusCode).toBe(200);
     expect(yamlResponse.statusCode).toBe(200);
     expect(yamlResponse.headers["content-type"]).toContain("application/yaml");
-    expect(Object.keys(servedJson.paths)).toHaveLength(74);
-    expect(Object.keys(servedYaml.paths)).toHaveLength(74);
+    expect(Object.keys(servedJson.paths)).toHaveLength(77);
+    expect(Object.keys(servedYaml.paths)).toHaveLength(77);
     expect(servedJson.info.version).toBe(contract.info.version);
   });
 
@@ -1093,6 +1100,56 @@ describe("canonical OpenAPI contract", () => {
       const schema =
         contract.paths[path]?.[method]?.responses[status]?.content?.["application/json"]?.schema;
       expect(response.statusCode).toBe(Number(status));
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
+    }
+  });
+
+  it("validates recoverable search rebuild, status, and rollback projections", async () => {
+    const primary = await sessions.issueSession(contractUserId, {});
+    const elevated = await sessions.elevateWithMfa(primary.token, {});
+    if (!elevated) throw new Error("Expected an MFA-bound contract session");
+    const cookie = `${environment.SESSION_COOKIE_NAME}=${elevated.token}`;
+    const rebuild = await server.inject({
+      method: "POST",
+      url: "/v1/admin/system/search/rebuilds",
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+        "idempotency-key": "contract-search-rebuild-0001",
+      },
+      payload: {
+        reasonCode: "CONTRACT_INDEX_RECOVERY",
+        rollbackWindowHours: 24,
+      },
+    });
+    const status = await server.inject({
+      method: "GET",
+      url: `/v1/admin/system/search/rebuilds/${memorySearchRebuildId}`,
+      headers: { cookie },
+    });
+    searchIndexOperationsStore.markObserving(memorySearchRebuildId);
+    const rollback = await server.inject({
+      method: "POST",
+      url: `/v1/admin/system/search/rebuilds/${memorySearchRebuildId}/rollback`,
+      headers: {
+        cookie,
+        origin: environment.PUBLIC_ADMIN_URL,
+        "content-type": "application/json",
+        "idempotency-key": "contract-search-rollback-0001",
+      },
+      payload: { reasonCode: "CONTRACT_ROLLBACK_DRILL" },
+    });
+    const checks = [
+      [rebuild, "/admin/system/search/rebuilds", "post", "202"],
+      [status, "/admin/system/search/rebuilds/{operationId}", "get", "200"],
+      [rollback, "/admin/system/search/rebuilds/{operationId}/rollback", "post", "202"],
+    ] as const;
+    for (const [response, path, method, code] of checks) {
+      const schema =
+        contract.paths[path]?.[method]?.responses[code]?.content?.["application/json"]?.schema;
+      expect(response.statusCode).toBe(Number(code));
       expect(response.headers["cache-control"]).toBe("no-store");
       expect(ajv.validate(schema ?? false, response.json()), ajv.errorsText(ajv.errors)).toBe(true);
     }

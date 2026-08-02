@@ -71,6 +71,9 @@ assert.equal(workerEnvironment.MEDIA_PROCESS_MAX_BYTES, 20_971_520);
 assert.equal(workerEnvironment.OPENSEARCH_INDEX_PREFIX, "socal_local");
 assert.equal(workerEnvironment.SEARCH_RECONCILIATION_BATCH_SIZE, 100);
 assert.equal(workerEnvironment.SEARCH_RECONCILIATION_INTERVAL_MS, 300_000);
+assert.equal(workerEnvironment.SEARCH_REBUILD_BATCH_SIZE, 250);
+assert.equal(workerEnvironment.SEARCH_REBUILD_POLL_INTERVAL_MS, 5_000);
+assert.equal(workerEnvironment.SEARCH_REBUILD_LEASE_SECONDS, 300);
 
 let missingConfigurationError: RuntimeConfigError | undefined;
 try {

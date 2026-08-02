@@ -23,6 +23,7 @@ import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 import type { MfaStore } from "./modules/admin/mfa.store";
 import type { ModerationStore } from "./modules/admin/moderation.store";
 import type { QueueOperationsStore } from "./modules/admin/queue-operations.store";
+import type { SearchIndexOperationsStore } from "./modules/admin/search-index-operations.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
 import type { OtpDeliveryGateway } from "./modules/auth/otp-delivery.gateway";
 import type { PasswordNotificationGateway } from "./modules/auth/password-notification.gateway";
@@ -79,6 +80,7 @@ export type CreateApiApplicationOptions = Pick<NestApplicationOptions, "logger">
   homepageDataSource?: HomepageDataSource;
   homepageCache?: HomepageCache;
   queueOperationsStore?: QueueOperationsStore;
+  searchIndexOperationsStore?: SearchIndexOperationsStore;
 };
 
 class NestStructuredLogger implements LoggerService {
@@ -167,6 +169,7 @@ export async function createApiApplication(
       options.homepageDataSource,
       options.homepageCache,
       options.queueOperationsStore,
+      options.searchIndexOperationsStore,
     ),
     adapter,
     {

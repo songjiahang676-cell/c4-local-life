@@ -408,3 +408,21 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   重建。对账默认 dry-run，repair 只修复派生 DLQ 证据，PostgreSQL 业务表仍权威。
 - OpenAPI/生成类型、Prisma/additive migration/回滚说明、Contracts/API/Worker/Admin/真实 PostgreSQL、
   全仓质量、API runtime、Linux Chromium 与四镜像受保护门禁均有真实证据后方可标记 done。
+
+## 22.25 SEARCH-005 全量重建与 alias 切换验收
+
+- recent-MFA `PLATFORM_ADMIN` 才能创建重建/回滚；MFA auditor 只能读取。请求由 actor/type/key/hash 幂等
+  绑定，同键变更 409，同时只允许一个有效重建/回滚窗口；请求与完成写最小 AuditLog。API 响应、日志和
+  指标不含 Listing 内容、PII、query、扫描 cursor、校验摘要或 provider 原始错误。
+- 新物理索引不带 alias；Worker 以稳定 UUID cursor 分批从 PostgreSQL 重载严格公开投影，崩溃后由短租约
+  恢复，重复批次由 OpenSearch external version 保证幂等。正常 Listing 事件在回填/追赶/切换窗口双写
+  候选索引；alias 已切但 durable completion 尚未提交的窗口仍同时写 source/target。
+- 切换前刷新候选索引，并对 PostgreSQL 应公开集合与候选索引的全部 `id + contentVersion` 做有序数量和
+  摘要对账。遗漏、额外文档、旧版本或索引领先均以固定 code 失败，read/write alias 不改变；不能通过
+  降低 strict mapping、跳过校验或把索引写回 PostgreSQL 修复。
+- read/write alias 必须在单次原子 action 中从精确 expected source 切到已验证 target，并在提交后复核
+  两者共享唯一 write index。观察窗口内旧 source 持续双写且不删除；回滚是独立 durable job，重新全量
+  校验旧 source 后原子恢复，父 operation 留下 `ROLLED_BACK` 证据。
+- Prisma additive migration、检查约束、租约/并发/失败/回滚 repository 测试、API 授权与契约测试、Worker
+  重建/校验/双写测试、真实 PostgreSQL 与 OpenSearch 重建/切换/回滚演练、全仓质量及受保护 CI 均有真实
+  证据后方可标记 done；未执行的真实依赖演练不得以 mock 结果代替。

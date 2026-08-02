@@ -9,6 +9,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import type { ModerationStore } from "./modules/admin/moderation.store";
 import type { MfaStore } from "./modules/admin/mfa.store";
 import type { QueueOperationsStore } from "./modules/admin/queue-operations.store";
+import type { SearchIndexOperationsStore } from "./modules/admin/search-index-operations.store";
 import { AuthModule } from "./modules/auth/auth.module";
 import type { AuthSessionStore } from "./modules/auth/auth-session.store";
 import type { OtpChallengeStore } from "./modules/auth/otp-challenge.store";
@@ -62,6 +63,7 @@ export class AppModule {
     homepageDataSource?: HomepageDataSource,
     homepageCache?: HomepageCache,
     queueOperationsStore?: QueueOperationsStore,
+    searchIndexOperationsStore?: SearchIndexOperationsStore,
   ): DynamicModule {
     return {
       module: AppModule,
@@ -75,7 +77,14 @@ export class AppModule {
           passwordStore,
           passwordNotificationGateway,
         ),
-        AdminModule.register(environment, mfaStore, moderationStore, metrics, queueOperationsStore),
+        AdminModule.register(
+          environment,
+          mfaStore,
+          moderationStore,
+          metrics,
+          queueOperationsStore,
+          searchIndexOperationsStore,
+        ),
         HealthModule,
         HomepageModule.register(
           environment,

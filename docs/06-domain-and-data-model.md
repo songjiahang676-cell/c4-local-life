@@ -383,3 +383,14 @@ region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COU
 和可选回滚来源版本；每个 scope 同时最多一个草稿。发布版本通过 trigger 禁止 UPDATE/DELETE，回滚会
 复制历史配置并追加更高版本，绝不改写历史。发布/回滚和 `homepage.layout.published` Outbox 事件在同一
 事务提交，PostgreSQL 继续是唯一事实源。
+
+## 6.11 SEARCH-005 索引操作状态
+
+`search_index_operations` 与 `admin_jobs` 一对一保存重建/回滚类型、phase、schema version、source/
+target 物理索引名、稳定 Listing UUID cursor、全量校验数量/摘要和观察窗口。它不保存搜索文档、query、
+Listing 内容或 PII。actor/type/idempotency key 的唯一性由 AdminJob 提供；全局 PostgreSQL advisory lock
+防止并行重建，短租约和条件 phase 更新允许 Worker 崩溃恢复。回滚 operation 通过自引用父 operation
+保留完整因果链，父记录和 AuditLog 不级联删除。
+
+OpenSearch 仍是派生状态：候选/旧索引名称只是恢复证据，业务版本和是否公开始终从 PostgreSQL Listing
+计算。切换成功不会删除 source；观察窗口后的物理清理属于单独审批任务，不能由 migration cascade。

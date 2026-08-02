@@ -199,7 +199,7 @@ function mapJob(row: {
 }): QueueAdminJobProjection {
   return {
     id: row.id,
-    type: row.type,
+    type: row.type as QueueAdminJobProjection["type"],
     status: row.status,
     dryRun: row.dryRun,
     estimatedItems: row.estimatedItems,
@@ -484,7 +484,10 @@ export class QueueOperationsRepository {
 
   async getJob(jobId: string): Promise<QueueAdminJobProjection | null> {
     const job = await this.#client.adminJob.findUnique({
-      where: { id: jobId },
+      where: {
+        id: jobId,
+        type: { in: [AdminJobType.QUEUE_REPLAY, AdminJobType.QUEUE_RECONCILIATION] },
+      },
       select: jobProjectionSelect,
     });
     return job ? mapJob(job) : null;
@@ -515,7 +518,11 @@ export class QueueOperationsRepository {
       WITH candidate AS (
         SELECT "id"
         FROM "admin_jobs"
-        WHERE (
+        WHERE "type" IN (
+          'QUEUE_REPLAY'::"AdminJobType",
+          'QUEUE_RECONCILIATION'::"AdminJobType"
+        )
+        AND (
           ("status" = 'PENDING'::"AdminJobStatus" AND "available_at" <= ${input.now})
           OR ("status" = 'RUNNING'::"AdminJobStatus" AND "lease_expires_at" < ${input.now})
         )
@@ -549,7 +556,7 @@ export class QueueOperationsRepository {
         job."completed_at" AS "completedAt"
     `);
     const row = rows[0];
-    return row ? { ...mapJob(row), ...row, leaseExpiresAt } : null;
+    return row ? { ...row, ...mapJob(row), leaseExpiresAt } : null;
   }
 
   async listPendingJobItems(jobId: string, limit: number): Promise<QueueAdminJobItem[]> {

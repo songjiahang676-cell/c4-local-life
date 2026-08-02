@@ -274,3 +274,18 @@ Admin 只经四条精确 BFF/API 路径查看失败、创建 replay/reconciliati
 OpenAPI 从 70 paths / 181 schemas / 80 operationIds 增量为 74 / 188 / 84；Prisma 从 62 增至 65 models。
 PostgreSQL 仍是 canonical，Redis/BullMQ 仍可重建；没有改变进程、数据库、REST 版本或消息范式，因此
 不需要新增 ADR。
+
+## 30.16 SEARCH-005 索引重建实现边界
+
+`SearchIndexOperationsController/Service` 只负责 strict contract、recent-MFA Policy、actor/type/key/hash
+幂等和应用编排；生产 Store 调用 PostgreSQL Repository，Controller 不接触 Prisma 或 OpenSearch。
+`AdminJob` 复用 EVT-002 的 durable lease/control-plane，`SearchIndexOperation` 只保存 phase、物理索引名、
+稳定 cursor、数量/摘要和回滚时间，不复制 Listing 文档。Queue dispatcher 与 Search dispatcher 在 SQL
+claim 中精确过滤各自 job type，不能互相误领。
+
+现有 Worker 进程创建无 alias 候选索引、回填/追赶 canonical Listing、校验全部 ID/version，并通过单次
+OpenSearch `updateAliases` 原子切换。正常事件 writer 在重建和观察窗口查询最小 operation 状态并用
+external version 双写；临时依赖失败保留租约重试，契约/对账失败写固定 code 且不切换。公共 OpenAPI
+从 74 paths / 188 schemas / 84 operationIds 增量为 77 / 192 / 87；Prisma 从 65 增至 66 models。
+PostgreSQL 仍是 canonical，OpenSearch 物理索引仍可重建；没有新增进程、主数据库、队列或 API 范式，
+因此不需要 ADR。

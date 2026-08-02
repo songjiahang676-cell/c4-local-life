@@ -8,6 +8,7 @@ import { AdminSessionService } from "./admin-session.service";
 import { DatabaseModerationStore } from "./database-moderation.store";
 import { DatabaseMfaStore } from "./database-mfa.store";
 import { DatabaseQueueOperationsStore } from "./database-queue-operations.store";
+import { DatabaseSearchIndexOperationsStore } from "./database-search-index-operations.store";
 import { MfaController } from "./mfa.controller";
 import { MfaService } from "./mfa.service";
 import { ModerationController } from "./moderation.controller";
@@ -17,6 +18,12 @@ import { MFA_STORE, type MfaStore } from "./mfa.store";
 import { QueueOperationsController } from "./queue-operations.controller";
 import { QueueOperationsService } from "./queue-operations.service";
 import { QUEUE_OPERATIONS_STORE, type QueueOperationsStore } from "./queue-operations.store";
+import { SearchIndexOperationsController } from "./search-index-operations.controller";
+import { SearchIndexOperationsService } from "./search-index-operations.service";
+import {
+  SEARCH_INDEX_OPERATIONS_STORE,
+  type SearchIndexOperationsStore,
+} from "./search-index-operations.store";
 
 @Module({})
 export class AdminModule {
@@ -26,6 +33,7 @@ export class AdminModule {
     moderationStore?: ModerationStore,
     metrics?: MetricsRegistry,
     queueOperationsStore?: QueueOperationsStore,
+    searchIndexOperationsStore?: SearchIndexOperationsStore,
   ): DynamicModule {
     const storeProviders: Provider[] = mfaStore
       ? [{ provide: MFA_STORE, useValue: mfaStore }]
@@ -42,6 +50,15 @@ export class AdminModule {
           DatabaseQueueOperationsStore,
           { provide: QUEUE_OPERATIONS_STORE, useExisting: DatabaseQueueOperationsStore },
         ];
+    const searchIndexOperationsStoreProviders: Provider[] = searchIndexOperationsStore
+      ? [{ provide: SEARCH_INDEX_OPERATIONS_STORE, useValue: searchIndexOperationsStore }]
+      : [
+          DatabaseSearchIndexOperationsStore,
+          {
+            provide: SEARCH_INDEX_OPERATIONS_STORE,
+            useExisting: DatabaseSearchIndexOperationsStore,
+          },
+        ];
     return {
       module: AdminModule,
       controllers: [
@@ -49,6 +66,7 @@ export class AdminModule {
         MfaController,
         ModerationController,
         QueueOperationsController,
+        SearchIndexOperationsController,
       ],
       providers: [
         { provide: API_ENVIRONMENT, useValue: environment },
@@ -56,10 +74,12 @@ export class AdminModule {
         ...storeProviders,
         ...moderationStoreProviders,
         ...queueOperationsStoreProviders,
+        ...searchIndexOperationsStoreProviders,
         AdminSessionService,
         MfaService,
         ModerationService,
         QueueOperationsService,
+        SearchIndexOperationsService,
       ],
       exports: [MfaService],
     };

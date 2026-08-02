@@ -108,7 +108,8 @@ try {
             to_regclass('public.notification_templates') AS notification_templates,
             to_regclass('public.admin_jobs') AS admin_jobs,
             to_regclass('public.admin_job_items') AS admin_job_items,
-            to_regclass('public.queue_dead_letters') AS queue_dead_letters`,
+            to_regclass('public.queue_dead_letters') AS queue_dead_letters,
+            to_regclass('public.search_index_operations') AS search_index_operations`,
   );
   if (Object.values(coreTables.rows[0]).some((value) => value === null)) {
     throw new Error("One or more core baseline tables are missing");
@@ -839,6 +840,35 @@ try {
     queueOperationsStorage.rows[0]?.safety_checks !== 6
   ) {
     throw new Error("Queue operations control-plane constraints are missing");
+  }
+
+  const searchIndexOperationStorage = await client.query(
+    `SELECT
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'search_index_operations_job_id_key'
+       ) AS job_idempotency,
+       (
+         SELECT count(*)::integer
+           FROM information_schema.table_constraints
+          WHERE constraint_schema = 'public'
+            AND constraint_type = 'CHECK'
+            AND constraint_name IN (
+              'search_index_operations_schema_version_check',
+              'search_index_operations_rollback_window_check',
+              'search_index_operations_index_names_check',
+              'search_index_operations_validation_check',
+              'search_index_operations_phase_check'
+            )
+       ) AS safety_checks`,
+  );
+  if (
+    !searchIndexOperationStorage.rows[0]?.job_idempotency ||
+    searchIndexOperationStorage.rows[0]?.safety_checks !== 5
+  ) {
+    throw new Error("Search index rebuild control-plane constraints are missing");
   }
 
   await client.query("BEGIN");
@@ -1613,6 +1643,38 @@ try {
       WHERE id = '00000000-0000-4000-8000-000000000071'`,
     "23514",
   );
+  await client.query(
+    `INSERT INTO admin_jobs (
+       id, type, actor_id, idempotency_key, request_hash, reason_code, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000074',
+       'SEARCH_INDEX_REBUILD',
+       '00000000-0000-4000-8000-000000000001',
+       'baseline-search-rebuild',
+       repeat('a', 64),
+       'INDEX_DRIFT_RECOVERY',
+       now()
+     )`,
+  );
+  await expectSqlState(
+    "search index observing evidence coherence",
+    `INSERT INTO search_index_operations (
+       id, job_id, phase, schema_version, source_index, target_index,
+       rollback_window_hours, updated_at
+     )
+     VALUES (
+       '00000000-0000-4000-8000-000000000075',
+       '00000000-0000-4000-8000-000000000074',
+       'OBSERVING',
+       1,
+       'socal_baseline_listings_v1',
+       'socal_baseline_listings_v1_r0000000000004000',
+       24,
+       now()
+     )`,
+    "23514",
+  );
   await expectSqlState(
     "admin job item lifecycle coherence",
     `INSERT INTO admin_job_items (
@@ -1787,6 +1849,7 @@ try {
       notificationStorage: true,
       organizationMembershipLifecycle: true,
       queueOperationsStorage: true,
+      searchIndexOperationStorage: true,
       remainingVerticalStorage: true,
       negativeCases: savepointSequence,
     }),

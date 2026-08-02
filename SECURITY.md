@@ -219,3 +219,14 @@ JSON-LD 只接受 exact-key 的 `WebSite`、`BreadcrumbList` 与 `JobPosting` �
 页面已显示的 summary、雇主、用工形式和城市级位置，不包含电话、邮箱、精确地址、owner-only 属性、
 审核/风险、薪资推断或评分；字段不完整、未来发布或已过期即不输出。结构化数据与 robots 都不是权限
 控制，底层公开投影和私有接口仍执行原有授权与最小化策略。
+
+## 搜索索引重建与回滚边界
+
+重建/回滚写 API 只允许 recent-MFA PLATFORM_ADMIN，并以 actor/type/key/hash 绑定幂等请求；MFA auditor
+只能读取最小 operation 状态。候选索引必须无 alias、严格 mapping `_meta` 匹配，且在全量 canonical
+ID/version 对账成功后才能原子切换 read/write alias。观察窗口内旧 source 持续 external-version 双写，
+回滚前再次全量校验；任何 drift、错 source 或 mapping 不一致均失败关闭且不改 alias。
+
+响应、Audit、结构日志和 metrics 不包含 Listing 文档、PII、query、扫描 cursor、校验摘要或 OpenSearch
+原始错误。索引永不作为 PostgreSQL 备份，SEARCH-005 不自动删除候选/旧物理索引；异常恢复按运行手册
+保留 source/target 与 AdminJob 证据并优先 roll forward。

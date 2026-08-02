@@ -576,6 +576,7 @@ try {
        to_regclass('public.admin_jobs')::text AS admin_jobs,
        to_regclass('public.admin_job_items')::text AS admin_job_items,
        to_regclass('public.queue_dead_letters')::text AS queue_dead_letters,
+       to_regclass('public.search_index_operations')::text AS search_index_operations,
        EXISTS (
          SELECT 1
            FROM pg_indexes
@@ -587,7 +588,13 @@ try {
            FROM pg_indexes
           WHERE schemaname = 'public'
             AND indexname = 'queue_dead_letters_queue_name_event_id_key'
-       ) AS queue_event_idempotency`,
+       ) AS queue_event_idempotency,
+       EXISTS (
+         SELECT 1
+           FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = 'search_index_operations_job_id_key'
+       ) AS search_job_idempotency`,
   );
   if (
     sentinel.rowCount !== 1 ||
@@ -653,8 +660,10 @@ try {
     queueOperationsStorage.rows[0].admin_jobs !== "admin_jobs" ||
     queueOperationsStorage.rows[0].admin_job_items !== "admin_job_items" ||
     queueOperationsStorage.rows[0].queue_dead_letters !== "queue_dead_letters" ||
+    queueOperationsStorage.rows[0].search_index_operations !== "search_index_operations" ||
     !queueOperationsStorage.rows[0].actor_idempotency ||
     !queueOperationsStorage.rows[0].queue_event_idempotency ||
+    !queueOperationsStorage.rows[0].search_job_idempotency ||
     moderationSentinelSnapshot.rowCount !== 1 ||
     moderationSentinelSnapshot.rows[0].listing_version !== 3 ||
     moderationSentinelSnapshot.rows[0].snapshot.sensitiveFieldsRedacted !== true ||
@@ -694,6 +703,7 @@ try {
       notificationStorage: true,
       organizationMembershipLifecycle: true,
       queueOperationsStorage: true,
+      searchIndexOperationStorage: true,
       moderationSnapshotBackfilledAndRedacted: true,
     }),
   );

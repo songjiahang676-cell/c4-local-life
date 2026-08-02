@@ -12,6 +12,7 @@ import {
 } from "@socal/database/notification";
 import { OutboxEventRepository } from "@socal/database/outbox";
 import { QueueOperationsRepository } from "@socal/database/queue-operations";
+import { SearchIndexOperationRepository } from "@socal/database/search-index-operations";
 import {
   createObservabilityRuntime,
   shutdownTracing,
@@ -51,8 +52,14 @@ import {
 } from "./search/listing-index-handler";
 import { ListingIndexReconciler } from "./search/listing-index-reconciler";
 import { listingIndexNames } from "./search/listing-index-definition";
-import { OpenSearchListingIndex } from "./search/listing-index";
+import {
+  OpenSearchListingIndex,
+  OpenSearchListingIndexCatalog,
+  RebuildAwareListingIndex,
+} from "./search/listing-index";
+import { ListingIndexManager } from "./search/listing-index-manager";
 import { createOpenSearchClient } from "./search/opensearch-client";
+import { SearchIndexRebuildDispatcher } from "./search/search-index-rebuild-dispatcher";
 
 const runtimeState: { observability?: ObservabilityRuntime } = {};
 process.on("uncaughtException", (error: Error) => {
@@ -93,6 +100,10 @@ const outboxRepository = new OutboxEventRepository({
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
 const queueOperationsRepository = new QueueOperationsRepository({
+  connectionString: environment.DATABASE_URL,
+  poolMaximum: environment.DATABASE_POOL_MAX,
+});
+const searchIndexOperationRepository = new SearchIndexOperationRepository({
   connectionString: environment.DATABASE_URL,
   poolMaximum: environment.DATABASE_POOL_MAX,
 });
@@ -144,11 +155,19 @@ const openSearchClient = createOpenSearchClient({
     : {}),
 });
 const listingIndexNamesValue = listingIndexNames(environment.OPENSEARCH_INDEX_PREFIX);
-const listingIndex = new OpenSearchListingIndex(
+const primaryListingIndex = new OpenSearchListingIndex(
   openSearchClient,
   listingIndexNamesValue.readAlias,
   listingIndexNamesValue.writeAlias,
 );
+const listingIndex = new RebuildAwareListingIndex(openSearchClient, primaryListingIndex, (now) =>
+  searchIndexOperationRepository.listSecondaryWriteTargets(now),
+);
+const listingIndexManager = new ListingIndexManager(
+  openSearchClient,
+  environment.OPENSEARCH_INDEX_PREFIX,
+);
+const listingIndexCatalog = new OpenSearchListingIndexCatalog(openSearchClient);
 const outboxDispatcher = new OutboxDispatcher({
   repository: outboxRepository,
   publisher: outboxPublisher,
@@ -205,6 +224,17 @@ const listingIndexReconciler = new ListingIndexReconciler({
     batchSize: environment.SEARCH_RECONCILIATION_BATCH_SIZE,
     intervalMilliseconds: environment.SEARCH_RECONCILIATION_INTERVAL_MS,
   },
+});
+const searchIndexRebuildDispatcher = new SearchIndexRebuildDispatcher({
+  repository: searchIndexOperationRepository,
+  listings: listingSearchRepository,
+  manager: listingIndexManager,
+  catalog: listingIndexCatalog,
+  observability: runtimeState.observability,
+  indexPrefix: environment.OPENSEARCH_INDEX_PREFIX,
+  batchSize: environment.SEARCH_REBUILD_BATCH_SIZE,
+  pollIntervalMilliseconds: environment.SEARCH_REBUILD_POLL_INTERVAL_MS,
+  leaseSeconds: environment.SEARCH_REBUILD_LEASE_SECONDS,
 });
 const homepageCacheInvalidation = new HomepageCacheInvalidationHandler(
   new RedisHomepageCacheInvalidator(connection),
@@ -393,6 +423,7 @@ async function shutdown(signal: string): Promise<void> {
   logEvent("worker.shutdown.started", { signal });
   await listingExpiryDispatcher.stop();
   await listingIndexReconciler.stop();
+  await searchIndexRebuildDispatcher.stop();
   await queueOperationsDispatcher.stop();
   await outboxDispatcher.stop();
   await new Promise<void>((resolve, reject) => {
@@ -408,6 +439,7 @@ async function shutdown(signal: string): Promise<void> {
   await notificationRepository.close();
   await outboxRepository.close();
   await queueOperationsRepository.close();
+  await searchIndexOperationRepository.close();
   await openSearchClient.close();
   await connection.quit();
   await shutdownTracing();
@@ -421,12 +453,14 @@ outboxDispatcher.start();
 queueOperationsDispatcher.start();
 listingExpiryDispatcher.start();
 listingIndexReconciler.start();
+searchIndexRebuildDispatcher.start();
 logEvent("worker.started", {
   concurrency: environment.WORKER_CONCURRENCY,
   healthPort: environment.WORKER_HEALTH_PORT,
   outboxBatchSize: environment.OUTBOX_BATCH_SIZE,
   listingExpiryBatchSize: environment.LISTING_EXPIRY_BATCH_SIZE,
   searchReconciliationBatchSize: environment.SEARCH_RECONCILIATION_BATCH_SIZE,
+  searchRebuildBatchSize: environment.SEARCH_REBUILD_BATCH_SIZE,
   queue: environment.OUTBOX_QUEUE_NAME,
   ...runtimeConfigSummary(environment),
 });

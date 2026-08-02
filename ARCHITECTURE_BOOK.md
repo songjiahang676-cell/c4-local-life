@@ -1067,6 +1067,17 @@ region、UTC date 与 90 天保留上限，公开聚合仍在 SQL 中强制 `COU
 复制历史配置并追加更高版本，绝不改写历史。发布/回滚和 `homepage.layout.published` Outbox 事件在同一
 事务提交，PostgreSQL 继续是唯一事实源。
 
+## 6.11 SEARCH-005 索引操作状态
+
+`search_index_operations` 与 `admin_jobs` 一对一保存重建/回滚类型、phase、schema version、source/
+target 物理索引名、稳定 Listing UUID cursor、全量校验数量/摘要和观察窗口。它不保存搜索文档、query、
+Listing 内容或 PII。actor/type/idempotency key 的唯一性由 AdminJob 提供；全局 PostgreSQL advisory lock
+防止并行重建，短租约和条件 phase 更新允许 Worker 崩溃恢复。回滚 operation 通过自引用父 operation
+保留完整因果链，父记录和 AuditLog 不级联删除。
+
+OpenSearch 仍是派生状态：候选/旧索引名称只是恢复证据，业务版本和是否公开始终从 PostgreSQL Listing
+计算。切换成功不会删除 source；观察窗口后的物理清理属于单独审批任务，不能由 migration cascade。
+
 ---
 
 <!-- source: docs\07-system-architecture.md -->
@@ -1899,6 +1910,24 @@ BUSINESS/PROVIDER 实体建议在相应信任档案任务完成前不进入契�
 生成的 64 位十六进制摘要，不保存 IP/User-Agent。相同 query/source/UTC day 只能贡献一次；任何公开
 近期建议或热门词都要求至少 5 个不同来源，读取时再次做敏感词筛查。样本默认 30 天到期，数据库强制
 不超过 90 天，过期行按有界批次清理；低频行始终内部可见性且绝不进入响应。
+
+## 9.15 SEARCH-005 可恢复全量重建与 alias 回滚
+
+重建由 PostgreSQL `AdminJob/SearchIndexOperation` 驱动，不以进程内状态或 OpenSearch task 作为唯一
+证据。Worker 创建 operation UUID 派生、无 alias 的候选索引，按稳定 Listing UUID cursor 从 canonical
+PostgreSQL 重载严格公开投影，并再做一轮追赶。正常 Listing 事件使用 external version 同时写当前
+write alias 与候选索引；切换阶段同时写 source/target，保证 alias 已切而 durable completion 尚未提交
+时仍可安全回滚。
+
+切换前刷新候选索引，按 ID 顺序比较 PostgreSQL 应公开集合与候选索引全部 `id + contentVersion` 的
+数量和滚动 SHA-256；遗漏、额外文档、旧版本或索引领先都会失败关闭。read/write alias 只能在一次
+`updateAliases` 中从精确 expected source 切到已验证 target，并在提交后再次确认两者共享唯一 write
+index。任何 mapping `_meta` 漂移都会中止，不允许原地放宽 strict mapping。
+
+观察窗口内旧 source 索引继续双写且不自动删除。回滚是独立幂等 Admin job，先重新全量校验仍在双写的
+旧 source，再原子恢复两个 alias；已接受的回滚即使跨过窗口截止时间也持续双写 target 直到完成。API
+只公开 phase、索引名、数量和固定失败 code，不公开扫描 cursor、摘要、Listing 内容、PII、query 或
+provider 原始错误。
 
 ---
 
@@ -3049,6 +3078,19 @@ Idempotency-Key 或请求哈希。
 - 崩溃/重复投递：批次短租约可恢复，item 唯一键与条件更新保证目标幂等；Worker 正常关闭等待在途
   DLQ 落库，异常窗口由 reconciliation 补录。每次申请和完成均追加最小 AuditLog。
 
+## 14.32 SEARCH-005 索引重建威胁和缓解
+
+- 未授权切换/回滚：读取只允许 MFA-bound PLATFORM_ADMIN/READ_ONLY_AUDITOR；创建和回滚只允许 recent-
+  MFA PLATFORM_ADMIN。后端 Policy、同源 CSRF 和 actor/type/key/hash 幂等均在 API 执行，前端不可代替。
+- 错索引/竞态切换：候选索引必须无 alias 且 `_meta` 精确匹配；切换要求 expected source，read/write
+  alias 必须共享唯一 write index并通过单次原子 action 更新。切换阶段 source/target 都继续写入。
+- 不完整或被污染投影：回填仅从 PostgreSQL 重载公开 DTO；切换前全量比较有序 ID/version 数量和摘要，
+  mismatch 失败关闭。不能以索引回写 PostgreSQL、跳过校验、降低 strict mapping 或强制降低版本。
+- 回滚数据丢失：观察窗口持续写旧 source；已接受回滚即使跨过截止时间也持续写 target，重新全量校验
+  后才能原子恢复。SEARCH-005 不自动删除物理索引。
+- 信息泄漏/高基数遥测：响应只返回 phase、索引名、计数和固定 code；日志/指标/Audit 不包含 Listing
+  内容、PII、query、cursor、摘要或 provider error，metric label 只使用固定 phase/outcome。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3528,6 +3570,14 @@ failed/poll_failed）。既有 `socal_worker_jobs_total`/duration、Outbox outco
 provider detail 均不进入 metric label；正式 waiting/active/delayed/failed Dashboard 与告警阈值仍由
 `OBS-002` 结合 Beta 流量固化。
 
+## 17.19 SEARCH-005 重建与切换指标
+
+`socal_search_rebuild_operations_total{phase,outcome}` 的 phase 只允许 prepare/backfill/catch_up/validate/
+switch/rollback/observation，outcome 只允许 completed/retry/failed/stale。日志事件只记录 operation/job UUID、
+job type、phase、固定 error code/type 和 stale lease；不记录索引文档、query、cursor、校验摘要、actor、
+reason/ticket 或 provider 文本。Dashboard 应联合现有索引 freshness、Outbox oldest age、OpenSearch health
+和 Admin Audit 判断卡点；生产阈值由 `OBS-002` 用 Beta 基线确定，不能从 CI 耗时推断。
+
 ---
 
 <!-- source: docs\18-testing-quality.md -->
@@ -3968,6 +4018,17 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
 - Admin 测试覆盖双语、筛选提交、选择/确认、recent-MFA 禁用和 dry-run 默认；完整质量、真实 PostgreSQL/
   Redis、API runtime、Linux Chromium 与四镜像受保护门禁全绿后方可标记完成。
 
+## 18.38 SEARCH-005 重建与回滚验证增量
+
+- Repository 真实 PostgreSQL 测试覆盖 actor/type/key 并发幂等、并行 operation 拒绝、Search/Queue job
+  领取隔离、短租约 phase 恢复、source/target 双写目标、切换/回滚完成和四类 Audit 证据；baseline/
+  upgrade 检查新表、唯一索引、phase/name/hash/window 约束和旧数据保留。
+- API/Contracts 测试覆盖三条 OpenAPI 路径、严格 DTO、guest/primary/stale/auditor/admin 权限矩阵、同键
+  变更、并发重建、窗口外回滚、exact retry 和响应 PII/cursor/hash 最小化。
+- Worker 单元测试覆盖候选名称、回填到追赶、逐版本 mismatch 失败关闭、原子切换参数、临时依赖重试及
+  alias + candidate/rollback 多目标写入。真实 OpenSearch 测试创建随机候选，证明无 alias、版本枚举、
+  read/write 一次切换和旧 source 回滚；完整托管门禁不得静默跳过 PostgreSQL/OpenSearch。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4297,6 +4358,35 @@ application/xml`、`Cache-Control: no-store`、双语 alternate、无 query/账�
   allowlist 并验证 sitemap/页面 noindex；不要删除业务 Listing 或用 robots Disallow 隐藏错误。
 - JSON-LD 告警按页面可见字段复核。Job 已过期、summary/雇主/用工形式缺失或 Region 非 California
   时应没有 `JobPosting`；不得为了富结果补造 salary、rating、电话、地址或 Organization URL。
+
+## 20.23 SEARCH-005 全量索引重建、切换与回滚
+
+1. 先保存 incident/ticket 编号并确认 PostgreSQL、Outbox 和 Worker 可用；禁止从现有 OpenSearch 文档
+   反向恢复业务表。使用 recent-MFA `PLATFORM_ADMIN` 会话和新的 `Idempotency-Key` 调用
+   `POST /v1/admin/system/search/rebuilds`，只提交固定 `reasonCode`、可选 `ticketRef` 和 1–168 小时的
+   `rollbackWindowHours`。同一 actor/type/key 的精确重试返回同一 operation；变更请求返回 409；已有
+   重建或仍在观察窗口时拒绝第二个重建。
+2. 用 `GET /v1/admin/system/search/rebuilds/{operationId}` 观察 `PENDING → BACKFILLING →
+   CATCHING_UP → VALIDATING → SWITCHING → OBSERVING`。Worker 创建 operation UUID 派生的新物理索引，
+   不给候选索引挂 alias；回填用稳定 Listing UUID cursor 并从 PostgreSQL 重载公开投影。每个写入同时
+   使用 external version 写当前 alias 与候选索引，重复批次、进程退出和过期租约均可安全恢复。
+3. `VALIDATING` 会刷新候选索引并按 ID 顺序比较 PostgreSQL 应公开的全部 `id + contentVersion` 与候选
+   索引；数量和滚动 SHA-256 任一不等即以固定 `SEARCH_INDEX_VALIDATION_MISMATCH` 失败，alias 不变。
+   日志、响应和工单不得包含 Listing 标题、正文、query、坐标、联系方式、完整文档、扫描 cursor 或
+   摘要值。
+4. `SWITCHING` 一次性 remove/add read/write alias，并要求两者只指向同一 write index；切换前后都重验
+   mapping `_meta`。切换阶段同时写 source/target，消除 alias 已切但数据库状态尚未提交的崩溃窗口。
+   `socal_search_rebuild_operations_total{phase,outcome}` 的 `retry` 表示临时依赖故障，Worker 会在租约
+   到期后重试；`failed` 表示契约或全量校验失败，必须开新 operation，不能就地放宽 mapping/校验。
+5. `OBSERVING` 期间旧 source 索引继续接收每个 Listing 变更，不自动删除。需要回滚时，在
+   `rollbackUntil` 前用新 `Idempotency-Key` 调用
+   `POST /v1/admin/system/search/rebuilds/{operationId}/rollback`。回滚是独立审计 job，先重新全量校验旧
+   索引，再原子恢复两个 alias；完成后父 operation 为 `ROLLED_BACK`。即使观察窗口在已接受回滚期间
+   到期，回滚 target 仍继续双写直至完成。
+6. 观察窗口正常结束后 phase 变为 `SUCCEEDED`，旧索引仍保留。物理清理由单独、经审批的容量/保留任务
+   执行；SEARCH-005 不删除任何索引。回滚应用或数据库 migration 前先停 Search Admin API/dispatcher，
+   导出 `admin_jobs`、`search_index_operations` 与 AuditLog 证据，并核对 alias；优先按 migration 的
+   `ROLLBACK.md` roll forward 修复。
 
 ---
 
@@ -4751,6 +4841,24 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
   重建。对账默认 dry-run，repair 只修复派生 DLQ 证据，PostgreSQL 业务表仍权威。
 - OpenAPI/生成类型、Prisma/additive migration/回滚说明、Contracts/API/Worker/Admin/真实 PostgreSQL、
   全仓质量、API runtime、Linux Chromium 与四镜像受保护门禁均有真实证据后方可标记 done。
+
+## 22.25 SEARCH-005 全量重建与 alias 切换验收
+
+- recent-MFA `PLATFORM_ADMIN` 才能创建重建/回滚；MFA auditor 只能读取。请求由 actor/type/key/hash 幂等
+  绑定，同键变更 409，同时只允许一个有效重建/回滚窗口；请求与完成写最小 AuditLog。API 响应、日志和
+  指标不含 Listing 内容、PII、query、扫描 cursor、校验摘要或 provider 原始错误。
+- 新物理索引不带 alias；Worker 以稳定 UUID cursor 分批从 PostgreSQL 重载严格公开投影，崩溃后由短租约
+  恢复，重复批次由 OpenSearch external version 保证幂等。正常 Listing 事件在回填/追赶/切换窗口双写
+  候选索引；alias 已切但 durable completion 尚未提交的窗口仍同时写 source/target。
+- 切换前刷新候选索引，并对 PostgreSQL 应公开集合与候选索引的全部 `id + contentVersion` 做有序数量和
+  摘要对账。遗漏、额外文档、旧版本或索引领先均以固定 code 失败，read/write alias 不改变；不能通过
+  降低 strict mapping、跳过校验或把索引写回 PostgreSQL 修复。
+- read/write alias 必须在单次原子 action 中从精确 expected source 切到已验证 target，并在提交后复核
+  两者共享唯一 write index。观察窗口内旧 source 持续双写且不删除；回滚是独立 durable job，重新全量
+  校验旧 source 后原子恢复，父 operation 留下 `ROLLED_BACK` 证据。
+- Prisma additive migration、检查约束、租约/并发/失败/回滚 repository 测试、API 授权与契约测试、Worker
+  重建/校验/双写测试、真实 PostgreSQL 与 OpenSearch 重建/切换/回滚演练、全仓质量及受保护 CI 均有真实
+  证据后方可标记 done；未执行的真实依赖演练不得以 mock 结果代替。
 
 ---
 
@@ -5488,6 +5596,15 @@ PLATFORM_ADMIN + recent-MFA 可提交重放/对账。
 页面只轮询聚合进度；失败不会在浏览器展开原始 provider/handler detail。中英文共用语义表格、可见
 label/focus、移动横向容器和明确 loading/error/empty 状态，前端禁用不替代后端授权。
 
+## 28.13 SEARCH-005 索引恢复控制面
+
+Admin API 提供精确的重建创建、operation 读取和父 operation 回滚路径。PLATFORM_ADMIN + recent-MFA
+提交新的 Idempotency-Key、reasonCode、可选 ticketRef/回滚窗口；READ_ONLY_AUDITOR 仅能读取 phase、
+source/target、数量、窗口和固定失败码。响应不返回 cursor、摘要、Listing 内容、actor 或 provider 错误。
+
+当前可通过受控 API/运行手册操作；后续若增加可视化面板，必须只调用同一 BFF/API、保留显式确认和
+双语/键盘/移动状态，不新增直连 OpenSearch/Prisma 的快捷路径，也不能以 UI 禁用替代 Policy。
+
 ---
 
 <!-- source: docs\29-migration-and-launch.md -->
@@ -5863,3 +5980,18 @@ Admin 只经四条精确 BFF/API 路径查看失败、创建 replay/reconciliati
 OpenAPI 从 70 paths / 181 schemas / 80 operationIds 增量为 74 / 188 / 84；Prisma 从 62 增至 65 models。
 PostgreSQL 仍是 canonical，Redis/BullMQ 仍可重建；没有改变进程、数据库、REST 版本或消息范式，因此
 不需要新增 ADR。
+
+## 30.16 SEARCH-005 索引重建实现边界
+
+`SearchIndexOperationsController/Service` 只负责 strict contract、recent-MFA Policy、actor/type/key/hash
+幂等和应用编排；生产 Store 调用 PostgreSQL Repository，Controller 不接触 Prisma 或 OpenSearch。
+`AdminJob` 复用 EVT-002 的 durable lease/control-plane，`SearchIndexOperation` 只保存 phase、物理索引名、
+稳定 cursor、数量/摘要和回滚时间，不复制 Listing 文档。Queue dispatcher 与 Search dispatcher 在 SQL
+claim 中精确过滤各自 job type，不能互相误领。
+
+现有 Worker 进程创建无 alias 候选索引、回填/追赶 canonical Listing、校验全部 ID/version，并通过单次
+OpenSearch `updateAliases` 原子切换。正常事件 writer 在重建和观察窗口查询最小 operation 状态并用
+external version 双写；临时依赖失败保留租约重试，契约/对账失败写固定 code 且不切换。公共 OpenAPI
+从 74 paths / 188 schemas / 84 operationIds 增量为 77 / 192 / 87；Prisma 从 65 增至 66 models。
+PostgreSQL 仍是 canonical，OpenSearch 物理索引仍可重建；没有新增进程、主数据库、队列或 API 范式，
+因此不需要 ADR。
