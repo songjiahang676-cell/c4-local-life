@@ -1209,3 +1209,25 @@ Observability: Added `locale` to the bounded search query counter and a versione
 Docs: Updated search ranking、observability、testing、acceptance、infrastructure observability and schema validation documentation；updated Backlog、Gate checklist、status and this worklog
 
 Known gaps: PR #46 remains draft and stacked on `codex/search-005` until its parent chain is resolved；`SEO-004` still requires real Narrator/Edge speech and interactive 200% zoom evidence，so Gate 3 remains open。Production Grafana/Prometheus provisioning、data-source permissions、OpenSearch exporter integration、traffic-derived thresholds and alert routing remain `OBS-002`/operations inputs rather than fabricated completion evidence
+
+## WEB-003 — 全局 Header/Region/Search suggestion
+
+Task: WEB-003 全局 Header/Region/Search suggestion
+
+Changed: Replaced the duplicated public homepage/list/detail headers with one bilingual responsive `GlobalSiteHeader` containing brand、current-route navigation、language switch、active CITY selector、global search suggestions and account actions；implemented a debounced WAI-ARIA combobox/listbox with ArrowUp/ArrowDown/Enter/Escape、active descendant、visible loading/empty/unavailable states and restrained live announcements；added the existing public suggestion GET route to the Web BFF allowlist and deterministic production Chromium fixture coverage
+
+Contracts: OpenAPI remains 77 paths / 192 schemas / 87 operationIds；the Header consumes the existing `GET /v1/regions`、`GET /v1/search/suggestions` and `GET /v1/auth/session` contracts through bounded strict parsers。Prisma remains 66 models and no public API、generated contract or database shape changed
+
+Migrations: None；Prisma and all 30 migrations are unchanged。Rollback restores the prior page-specific public headers and removes the Web suggestion allowlist/component；PostgreSQL canonical data、Redis and OpenSearch are unaffected
+
+Security: Public region/suggestion reads force `credentials: omit` and `no-store`，while Session remains same-origin/no-store。The global account action never renders display name、contact data、role or organization。Strict parsing rejects unknown top-level fields、duplicate values、wrong locale、invalid time/type/code/slug、control or bidi characters and bounded-count/length violations；query changes immediately clear old suggestions，AbortController prevents stale responses from restoring selectable results，and suggestion values cannot supply arbitrary URLs
+
+Tests run: Targeted Header/home/list/BFF tests passed 25/25。Root `pnpm ci:quality` passed workflow/governance/runtime/container/seed/migration/OpenAPI/format/Prisma checks、9 workspace typechecks、9 lints、95 local-passed / 31 explicitly service-skipped files with 461 passed / 94 skipped tests、8 production builds and the 17-chunk Web budget。Local production Chromium passed 36/36 across desktop and Pixel 7 including axe、keyboard、errors、account/Admin boundaries and performance；the first run correctly exposed three strict-locator/network-idle regressions，which were repaired and fully rerun。Protected PR #47 run `30731100524` passed architecture at 101 tasks / 66 Prisma models / 77 OpenAPI paths / 192 schemas / 39 JSON files；126/126 files and 555/555 tests against real PostgreSQL、Redis、OpenSearch and ClamAV；30-migration fresh baseline、28-migration prior-baseline upgrade with sentinel preservation and 47 negative cases；coverage 74.68% statements、78.55% lines、77.46% functions、66.50% branches；8 Linux builds、17-chunk Web budget at largest 84,732 / 100,000 and total 305,056 / 500,000 gzip bytes、API runtime、Linux Chromium 36/36 and all four non-root Web/Admin/API/Worker image health checks
+
+Not run: Local `bash scripts/check-architecture.sh` could not start because this Windows environment has no Bash；the equivalent protected Linux checker passed。Local disposable PostgreSQL、Redis、OpenSearch、ClamAV and four-image smoke remain unavailable without Docker/service endpoints；the 94 local skips were reported rather than called passes。Windows Playwright completed all assertions but left its four child services alive during teardown；only the verified test-port processes were terminated and the runner then returned exit code 0
+
+Observability: No new server metric or log cardinality was introduced。The Header exposes only user-facing bounded loading/result/failure announcements；it does not log queries、Session payloads、account identity or provider errors。Existing Search RED/quality metrics remain authoritative and unchanged
+
+Docs: Updated UI/UX design-system、security/privacy、testing strategy、acceptance criteria、implementation sequence、Backlog、Gate checklist、status and this worklog；OpenAPI、Prisma、migration guidance and ADRs required no change
+
+Known gaps: PR #47 remains draft and stacked on `codex/search-006` until its parent chain is resolved。`SEO-003` still owns the complete message/Intl/document-language/routing baseline，and `SEO-004` still requires real Narrator/Edge speech plus interactive 200% zoom evidence；Gate 3 remains open。Production brand/domain、approved city content and observed traffic/SLO evidence remain external deployment inputs and are not fabricated here
