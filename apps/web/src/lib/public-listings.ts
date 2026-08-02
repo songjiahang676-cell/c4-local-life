@@ -16,6 +16,7 @@ import {
   type SearchListingResult,
   type SearchResponse,
 } from "@socal/contracts";
+import { formatDateTime, formatFixedDecimalCurrency } from "./i18n";
 
 export const PUBLIC_VERTICALS = {
   jobs: "JOB",
@@ -668,11 +669,7 @@ export function formatListingPrice(locale: Locale, price: Money | null): string 
   if (price.unit === "FREE") return locale === "zh-Hans" ? "免费" : "Free";
   if (price.unit === "NEGOTIABLE") return locale === "zh-Hans" ? "面议" : "Negotiable";
   if (!price.amount) return locale === "zh-Hans" ? "价格未提供" : "Price not provided";
-  const amount = new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: price.currency,
-    maximumFractionDigits: 2,
-  }).format(Number(price.amount));
+  const amount = formatFixedDecimalCurrency(locale, price.amount, price.currency);
   const units: Readonly<Record<Exclude<Money["unit"], "FREE" | "NEGOTIABLE">, [string, string]>> = {
     FIXED: ["", ""],
     HOURLY: ["/小时", "/hour"],
@@ -686,10 +683,7 @@ export function formatListingPrice(locale: Locale, price: Money | null): string 
 }
 
 export function formatListingDate(locale: Locale, value: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeZone: "America/Los_Angeles",
-  }).format(new Date(value));
+  return formatDateTime(locale, value);
 }
 
 export function publicAttributeEntries(

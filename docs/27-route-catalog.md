@@ -123,3 +123,12 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 - 所有账户/Admin 页 `noindex`，响应设置防缓存私密 header。
 - 旧 slug 用持久 redirect 表 301；违规/删除资源 404/410。
 - 任意筛选 query 参数按 canonical 策略处理，不自动 index。
+
+## 27.5 Locale 规范化
+
+- 标准中文前缀为 `/zh-Hans`，标准英文前缀为 `/en-US`。`/en` 及其后缀仅作入站兼容
+  别名，服务器返回 308 到对应 `/en-US` 路径并保留 query。
+- Route builder 只接收同源绝对 pathname 和未携带 locale 的资源路径。语言切换只替换首个
+  locale segment，canonical/hreflang/内部链接不输出 `/en` 别名。
+- `/` 继续转到 `/zh-Hans`；没有显式 locale 的未知路由不依据 `Accept-Language` 或客户端可控
+  header 推断其 canonical 语言。

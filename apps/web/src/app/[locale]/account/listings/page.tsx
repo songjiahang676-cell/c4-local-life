@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountListings, type AccountListingsLocale } from "@/components/account-listings";
+import { messageCatalogs } from "@/i18n/messages";
+import { switchLocalePath } from "@/lib/i18n";
 
 const locales = new Set<AccountListingsLocale>(["zh-Hans", "en-US"]);
 
@@ -19,6 +21,7 @@ export default async function AccountListingsPage({
   if (!locales.has(rawLocale as AccountListingsLocale)) notFound();
   const locale = rawLocale as AccountListingsLocale;
   const english = locale === "en-US";
+  const messages = messageCatalogs[locale].common;
 
   return (
     <main className="accountListingsPage pageShell" id="main-content" tabIndex={-1}>
@@ -39,8 +42,8 @@ export default async function AccountListingsPage({
         </div>
         <div>
           <Link
-            aria-label={english ? "切换到中文" : "Switch to English"}
-            href={english ? "/zh-Hans/account/listings" : "/en-US/account/listings"}
+            aria-label={english ? messages.switchToChinese : messages.switchToEnglish}
+            href={switchLocalePath(locale, `/${locale}/account/listings`)}
           >
             {english ? "中文" : "English"}
           </Link>

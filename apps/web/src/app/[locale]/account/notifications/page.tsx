@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NotificationCenter, type NotificationLocale } from "@/components/notification-center";
+import { messageCatalogs } from "@/i18n/messages";
+import { switchLocalePath } from "@/lib/i18n";
 
 const locales = new Set<NotificationLocale>(["zh-Hans", "en-US"]);
 
@@ -19,6 +21,7 @@ export default async function NotificationsPage({
   if (!locales.has(rawLocale as NotificationLocale)) notFound();
   const locale = rawLocale as NotificationLocale;
   const english = locale === "en-US";
+  const messages = messageCatalogs[locale].common;
 
   return (
     <main className="notificationPage pageShell" id="main-content" tabIndex={-1}>
@@ -38,8 +41,8 @@ export default async function NotificationsPage({
           </span>
         </div>
         <Link
-          aria-label={english ? "切换到中文" : "Switch to English"}
-          href={english ? "/zh-Hans/account/notifications" : "/en-US/account/notifications"}
+          aria-label={english ? messages.switchToChinese : messages.switchToEnglish}
+          href={switchLocalePath(locale, `/${locale}/account/notifications`)}
         >
           {english ? "中文" : "English"}
         </Link>

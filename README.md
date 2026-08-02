@@ -317,6 +317,12 @@ Worker 在既有队列中幂等失效 Redis 派生版本；原首页模拟数字
 一次确认仍 active 的
 运营白名单城市；搜索、query、账户、联系方式和精确地址不进入 sitemap，robots 才据此公布真实索引。
 
+`SEO-003` 统一了 Web i18n 路由和格式化基线：`zh-Hans`/`en-US` 是唯一标准前缀，`/en`
+以 308 规范化到 `/en-US`；语言切换保留深层资源路径且拒绝跨源、query/hash、控制与双向字符输入。
+Proxy 只从路径派生并覆盖内部 locale header，因此首屏 `<html lang>` 可信且与局部 locale 一致。
+强类型 common/search/listings 目录保证中英 key 等价，计数、数字、Los Angeles 日期/相对时间与货币
+统一使用 `Intl`，金额显示不先转为 IEEE 浮点数。
+
 `PERF-001` 已把首页缓存接到现有派生状态边界：API 与 Worker 共享 locale/region/device 缓存键，
 只有 strict、完整、非 partial 的匿名投影会写入 Redis，TTL 取模块最小值并封顶 300 秒；损坏、错
 scope、过大条目或 Redis 故障均删除/忽略并回源 PostgreSQL，单实例并发 miss 会合并。Web 仅对完整

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { Locale } from "@socal/contracts";
-
-export const SUPPORTED_LOCALES = ["zh-Hans", "en-US"] as const satisfies readonly Locale[];
+export { isSupportedLocale, SUPPORTED_LOCALES } from "./i18n";
 
 const defaultPublicOrigin = "http://localhost:3000";
 const metadataControlCharacters = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
@@ -48,10 +47,6 @@ type PublicPageMetadataInput = Readonly<{
   modifiedTime?: string;
   expirationTime?: string;
 }>;
-
-export function isSupportedLocale(value: string): value is Locale {
-  return (SUPPORTED_LOCALES as readonly string[]).includes(value);
-}
 
 export function sanitizeMetadataText(value: string, maximumCodePoints: number): string {
   const normalized = value

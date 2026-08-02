@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { messageCatalogs } from "@/i18n/messages";
 import { isSupportedLocale, localeLayoutMetadata } from "@/lib/seo";
 
 export function generateStaticParams() {
@@ -25,11 +26,12 @@ export default async function LocaleLayout({
 }>) {
   const { locale } = await params;
   if (!isSupportedLocale(locale)) notFound();
+  const messages = messageCatalogs[locale].common;
 
   return (
     <div data-locale={locale} lang={locale}>
       <a className="publicSkipLink" href="#main-content">
-        {locale === "zh-Hans" ? "跳到主要内容" : "Skip to main content"}
+        {messages.skipToMainContent}
       </a>
       {children}
     </div>

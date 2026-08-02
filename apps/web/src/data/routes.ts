@@ -1,3 +1,8 @@
+import type { Locale } from "@socal/contracts";
+import { localizedPath } from "../lib/i18n";
+
+export { localizedPath } from "../lib/i18n";
+
 export const ROUTES = {
   home: "/",
   news: "/news",
@@ -45,11 +50,7 @@ export const ROUTES = {
   sitemap: "/sitemap",
 } as const;
 
-export function localizedPath(locale: string, path: string): string {
-  return path === "/" ? `/${locale}` : `/${locale}${path}`;
-}
-
-export function loginRedirect(locale: string, destination: string): string {
+export function loginRedirect(locale: Locale, destination: string): string {
   const returnTo = localizedPath(locale, destination);
   return `${localizedPath(locale, ROUTES.login)}?returnTo=${encodeURIComponent(returnTo)}`;
 }

@@ -1888,8 +1888,9 @@ OpenSearch 请求固定 `PUBLISHED`、`expiresAt > snapshotAt`、显式 filter/s
 漂移失败为 503，不用宽松转换掩盖泄漏。OpenSearch transport/查询超时返回 504，不可用返回 503，
 因此 Listing 详情、发布和 canonical 写入链仍可独立工作。
 
-`socal_search_queries_total{outcome,sort,geo}` 只接受固定低基数枚举；query、cursor、PIT、资源 ID、
-分类/地区、坐标和金额均不记录。SEARCH-004 负责的同义词、建议和热门查询隐私见下一节；
+`socal_search_queries_total{outcome,sort,geo,locale}` 只接受固定低基数枚举；locale 只允许
+`zh-Hans`/`en-US`，query、cursor、PIT、资源 ID、分类/地区、坐标和金额均不记录。SEARCH-004 负责的
+同义词、建议和热门查询隐私见下一节；
 SEARCH-005 才负责全量重建与 alias 回滚。
 
 ## 9.14 SEARCH-004 同义词、建议与热门查询隐私
@@ -1928,6 +1929,22 @@ index。任何 mapping `_meta` 漂移都会中止，不允许原地放宽 strict
 旧 source，再原子恢复两个 alias；已接受的回滚即使跨过窗口截止时间也持续双写 target 直到完成。API
 只公开 phase、索引名、数量和固定失败 code，不公开扫描 cursor、摘要、Listing 内容、PII、query 或
 provider 原始错误。
+
+## 9.16 SEARCH-006 双语相关性评估与运行期面板
+
+`datasets/search-relevance/v1.json` 是版本化的离线基线：8 条纯合成公共文档、各 8 条 `zh-Hans`/
+`en-US` 查询和 1–3 级 judgments。JSON Schema 与运行时解析器共同拒绝未知字段、重复 ID、未知文档、
+控制/双向字符和 contact-like 文本；语料不来自用户、生产库或外部抓取。`evaluateSearchRelevance`
+固定计算 NDCG@10、MRR、Recall@10 和零结果率，并同时检查整体及两个 locale 达到数据集内审核门槛。
+真实 OpenSearch 集成测试使用生产索引定义和查询 adapter 生成排名；离线 ideal-run 单测只验证公式，
+不能替代真实节点结果。
+
+运行期 `socal_search_queries_total` 增加唯一的新维度 `locale=zh-Hans|en-US`，仍只含固定低基数枚举。
+`infra/observability/dashboards/search-quality.json` 从该 counter 与既有 route RED/index/rebuild 指标展示
+双语样本量、零结果率、`/v1/search` p95、timeout/unavailable、索引 freshness 和恢复失败。面板不含
+query、hash、cursor、PIT、分类/地区/Listing/用户 ID、坐标、金额或 provider detail；分母使用实际
+请求量，不能把 CI 合成分数发布为生产指标。生产数据源绑定、OpenSearch cluster exporter、Beta SLO/
+告警阈值和访问控制仍由 `OBS-002` 完成。
 
 ---
 
@@ -2084,6 +2101,21 @@ URL 或持久客户端缓存。
 配置只决定已批准模块的顺序、开关和有界参数，不允许注入组件、任意样式或 HTML。每个 slot 使用稳定
 key，用户可见字符串引用可本地化 content key，图片引用受控 asset key；广告模块必须呈现明确赞助标识。
 禁用或无真实数据的模块由渲染层隐藏或显示诚实空态，不用占位数字补齐版面。
+
+## 10.13 WEB-003 全局 Header、地区与搜索建议
+
+公开首页、频道列表、搜索结果和详情页共享同一个双语 Header。品牌、主导航、地区选择、全局搜索、
+语言切换和账户入口保持一致；当前频道使用 `aria-current`，窄屏允许导航横向滚动，但页面本身不得产生
+横向溢出，所有操作目标保持至少 44 CSS px 和可见焦点。
+
+地区选择只读取 active CITY taxonomy，失败时保留“全南加州”这一诚实默认值。搜索建议使用
+`combobox` + `listbox` 模式，支持上下方向键、Enter 和 Escape；输入防抖期间立即清除旧结果，loading、
+empty 和 unavailable 都有双语可见状态与节制的 live region。地区建议更新地区筛选并清空查询，其余建议
+只填充查询；任何状态都不阻止用户直接提交普通 GET 搜索。
+
+地区和建议是匿名公开读取，不转发 Cookie；会话检查仅同源、`no-store`，且 Header 对已登录用户只显示
+通用“账户”入口，不把 display name 或联系方式复制到全局 UI。所有三个响应均经过有界 strict parser，
+未知顶层字段、重复项、错误 locale、控制/双向字符或越界值失败关闭。
 
 ---
 
@@ -2596,6 +2628,24 @@ expiresAt`、去重稳定 UUID、输出 canonical 与双语 alternate。每次�
   [`accessibility-baseline.md`](./docs/accessibility-baseline.md)。真实 Narrator/Edge 与 200% zoom 未完成
   前，`SEO-004` 和 Gate 3 必须保持未关闭。
 
+## 13.14 SEO-003 i18n message/format/routing 基线
+
+- Web 只使用标准 `zh-Hans` 和 `en-US` locale，默认为 `zh-Hans`。`/en` 是仅用于兼容的
+  展示别名，必须以 308 保留后缀路径和 query 转到 `/en-US`；canonical、hreflang、内部链接和
+  locale switch 始终输出标准 locale。
+- 语言切换只替换第一个精确 locale segment，保留后续资源路径；绝对 URL、protocol-relative
+  路径、query/hash、反斜杠、重复斜杠、控制字符和双向控制字符均失败关闭。不依据
+  `Accept-Language` 静默改变 URL。
+- root layout 从请求路径派生的内部 locale header 输出文档级 `<html lang>`。Proxy 每次覆盖
+  客户端同名 header，因此客户端不能伪造文档语言；locale layout 仍在局部边界输出同值
+  `lang` 和本地化 skip link。
+- common/search/listings 资源使用强类型中英 key 等价目录；参数化计数使用
+  `Intl.PluralRules` 和 `Intl.NumberFormat`，不拼接翻译片段。日期/相对时间统一使用
+  `Intl` 与 `America/Los_Angeles`；固定小数金额先保留字符串精度，用 `BigInt` 和
+  `formatToParts` 显示，不先转 IEEE 浮点数。
+- 单元测试覆盖 locale/catalog/Intl/路径篡改负例；production Chromium 在桌面和移动端
+  验证别名转向、双语文档 `lang`、伪造 header 覆盖与深层 locale switch。
+
 ---
 
 <!-- source: docs\14-security-privacy-compliance.md -->
@@ -3091,6 +3141,30 @@ Idempotency-Key 或请求哈希。
 - 信息泄漏/高基数遥测：响应只返回 phase、索引名、计数和固定 code；日志/指标/Audit 不包含 Listing
   内容、PII、query、cursor、摘要或 provider error，metric label 只使用固定 phase/outcome。
 
+## 14.33 WEB-003 全局 Header 威胁和缓解
+
+- Cookie/身份扩散：公开地区与搜索建议请求固定 `credentials: omit` 和 `no-store`；只有同源 Session 检查
+  使用浏览器 Cookie。Header 不显示 display name、邮箱、电话、角色或组织，只显示通用账户入口。
+- 恶意发现响应：客户端对顶层键、数量、类型、locale、时间、地区代码、slug、长度、重复值、控制字符和
+  双向字符执行有界 strict 校验；任何漂移或损坏均清空数据并显示不泄漏 provider detail 的通用失败态。
+- 陈旧建议/竞态：每次查询变化立即清空旧结果并进入 loading，防抖请求使用 AbortController；关闭列表或
+  新请求后旧响应不能恢复为可选项，用户仍可提交普通 GET 搜索。
+- 键盘与导航劫持：建议仅产生同源搜索参数，不接受任意 URL；地区值只接受受限代码。combobox 使用原生
+  键盘事件、稳定 active descendant、Escape 关闭和可见焦点，不以鼠标交互替代访问控制或搜索授权。
+
+## 14.34 SEO-003 locale 路由威胁和缓解
+
+- Header 伪造：文档语言的内部 request header 每次都由 Proxy 根据路径重建，客户端传入
+  `zh-Hans`、`en-US` 或任意字符串都不是信任边界。根 layout 只接受精确白名单值，其他值
+  回退为默认 locale。
+- Open redirect/注入：`/en` 别名只在同一 `NextURL` clone 内替换 pathname；路由 builder 拒绝
+  scheme/host、protocol-relative、query/hash、反斜杠、重复斜杠、控制与双向控制字符，不将用户
+  文本解析为导航目标。
+- 开放重定向链/重复内容：别名只单跳到标准 `/en-US`，内部 builder 拒绝已含 locale 的
+  输入，locale switch 只替换第一 segment，防止加倍 locale 或改写 slug 内同名文本。
+- 隐私/日志：Proxy 不写 cookie，不记录 URL、query、header 或语言偏好；这个路由层没有新的
+  PII 采集或高基数指标。
+
 ---
 
 <!-- source: docs\15-performance-reliability.md -->
@@ -3518,11 +3592,13 @@ hash、阈值值和审核员均不得成为标签。运行期误杀率只使用�
 
 ## 17.13 SEARCH-003 查询结果指标
 
-`socal_search_queries_total{outcome,sort,geo}` 的 outcome 只允许 success、empty、invalid_cursor、
-expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false。HTTP RED
+`socal_search_queries_total{outcome,sort,geo,locale}` 的 outcome 只允许 success、empty、invalid_cursor、
+expired_cursor、timeout、unavailable；sort 只允许公共五种排序，geo 只允许 true/false，locale 只允许
+zh-Hans/en-US。HTTP RED
 histogram 继续提供 `/v1/search` 路由级 latency/status，不再复制可变 bucket。query、cursor、PIT、
 Listing/category/region ID、坐标、价格、命中数和 provider detail 均不能作为标签或结构日志字段。
-零结果率、相关性和正式 Dashboard 属于 SEARCH-006/OBS-002，不能用当前测试计数伪造生产指标。
+零结果率和 SEARCH-006 Dashboard 从运行期 counter/RED histogram 计算；正式告警/SLO 仍属于 OBS-002，
+不能用测试计数或离线相关性分数伪造生产指标。
 
 ## 17.14 SEARCH-004 发现隐私指标
 
@@ -3577,6 +3653,20 @@ switch/rollback/observation，outcome 只允许 completed/retry/failed/stale。�
 job type、phase、固定 error code/type 和 stale lease；不记录索引文档、query、cursor、校验摘要、actor、
 reason/ticket 或 provider 文本。Dashboard 应联合现有索引 freshness、Outbox oldest age、OpenSearch health
 和 Admin Audit 判断卡点；生产阈值由 `OBS-002` 用 Beta 基线确定，不能从 CI 耗时推断。
+
+## 17.20 SEARCH-006 搜索质量 Dashboard
+
+版本化 Grafana 契约位于 `infra/observability/dashboards/search-quality.json`，包含：
+
+- 15 分钟双语零结果率及对应请求样本量；
+- 5 分钟 `/v1/search` route-level p95 和 timeout/unavailable 比率；
+- 15 分钟 urgent/normal 索引 freshness p95；
+- 1 小时 rebuild/reconciliation 失败增量。
+
+比率分母使用 `clamp_min` 防止无流量除零；面板查询仅允许已由代码发出的指标和固定 outcome/sort/geo/
+locale/route/priority/phase 标签。NDCG/MRR/Recall 是带 `SYNTHETIC` 分类的离线门禁报告，不写入
+Prometheus，不与生产流量曲线拼接。`OBS-002` 必须在 Beta 样本基础上补数据源、权限、集群 exporter、
+正式 SLO/告警和 runbook 链接。
 
 ---
 
@@ -4029,6 +4119,44 @@ HTML、JUnit、trace、截图和视频输出到被 Git 忽略的 `reports/e2e/`�
   alias + candidate/rollback 多目标写入。真实 OpenSearch 测试创建随机候选，证明无 alias、版本枚举、
   read/write 一次切换和旧 source 回滚；完整托管门禁不得静默跳过 PostgreSQL/OpenSearch。
 
+## 18.39 SEARCH-006 相关性与 Dashboard 验证增量
+
+- JSON Schema 与 strict runtime parser 验证 8 条纯合成文档、16 条平衡中英 query、judgment 文档引用、
+  1–3 grade、唯一 ID、门槛和 contact/control/bidi 负例；禁止生产、用户或抓取数据进入 fixture。
+- 公式单测覆盖 ideal ranking、graded gain 倒序、全零结果、缺失/重复 query run、重复/未知文档；报告
+  同时包含 overall 与 zh-Hans/en-US 的 NDCG@10、MRR、Recall@10、零结果率，并对每个 scope 判门槛。
+- 托管 CI 在随机严格索引中使用生产 v1 analyzer/mapping、公开 query adapter 与同一数据集产生排名；
+  没有 `OPENSEARCH_INTEGRATION_URL` 时只明确 skip，不能把 ideal-run 单测当作真实相关性通过。
+- Dashboard contract 测试锁定零结果、样本量、route p95、timeout/unavailable、freshness 和 recovery
+  面板，只允许已发出的 metric 与固定标签。locale 指标只允许两值，query/cursor/PIT/资源 ID/筛选/
+  坐标/金额/provider detail 不进入指标；离线分数不得导出为生产时序。
+- OpenAPI、Prisma 和 migration 保持不变；完整质量、API runtime、Linux Chromium、真实服务和四个
+  non-root 镜像受保护门禁继续执行。生产 Dashboard provisioning、cluster exporter 和告警归 OBS-002。
+
+## 18.40 WEB-003 全局 Header 验证增量
+
+- parser 单测覆盖合法双语建议/地区，以及未知顶层字段、重复项、错误 locale、控制/双向字符和越界值；
+  malformed 数据失败关闭，不能继续渲染旧建议。
+- 组件测试覆盖匿名地区/建议不携带 Cookie、Session 仅同源读取、通用账户入口不暴露 display name、
+  loading/empty/unavailable、地区选择、上下方向键、Enter、Escape 和连续请求竞态。
+- Web BFF 契约测试只允许公开 GET `/v1/search/suggestions`，拒绝 mutation 与未列入白名单的搜索路径；
+  OpenAPI、Prisma 和 migration 保持不变。
+- production Chromium 在桌面和移动项目验证真实 Header 地区、建议 listbox、active descendant、Enter、
+  Escape、账户入口和页面无横向溢出；全仓质量、Linux E2E、真实服务和四镜像保护门禁全绿后才可完成。
+
+## 18.41 SEO-003 i18n 验证增量
+
+- 纯函数单测锁定两个标准 locale、`/en` 别名、精确首 segment 切换、非 locale 路径回退和
+  已 locale 输入防加倍；绝对/`//`/query/hash/反斜杠/重复斜杠/控制/双向字符均为负例。
+- Catalog 测试比较中英顶层与复数 key，并验证 `Intl.PluralRules`、`NumberFormat`、
+  `DateTimeFormat`、`RelativeTimeFormat` 与默认 Los Angeles 时区。金额测试包含小数补齐和
+  超界精度拒绝，防止重新引入 `Number(amount)`。
+- production standalone Chromium 桌面/移动项目要求 `/en` 308 保留路径/query，`/zh-Hans`
+  与 `/en-US` 的文档/局部 `lang` 一致，客户端伪造的内部 locale header 被路径值覆盖，
+  列表/发布/账户深层语言链接输出标准对等路由。
+- 不增加 OpenAPI、Prisma 或 migration；完整质量、性能预算、Linux Chromium、真实依赖与四个
+  non-root 镜像的受保护门禁全绿后才可标记 done。
+
 ---
 
 <!-- source: docs\19-delivery-roadmap.md -->
@@ -4367,7 +4495,7 @@ application/xml`、`Cache-Control: no-store`、双语 alternate、无 query/账�
    `rollbackWindowHours`。同一 actor/type/key 的精确重试返回同一 operation；变更请求返回 409；已有
    重建或仍在观察窗口时拒绝第二个重建。
 2. 用 `GET /v1/admin/system/search/rebuilds/{operationId}` 观察 `PENDING → BACKFILLING →
-   CATCHING_UP → VALIDATING → SWITCHING → OBSERVING`。Worker 创建 operation UUID 派生的新物理索引，
+CATCHING_UP → VALIDATING → SWITCHING → OBSERVING`。Worker 创建 operation UUID 派生的新物理索引，
    不给候选索引挂 alias；回填用稳定 Listing UUID cursor 并从 PostgreSQL 重载公开投影。每个写入同时
    使用 external version 写当前 alias 与候选索引，重复批次、进程退出和过期租约均可安全恢复。
 3. `VALIDATING` 会刷新候选索引并按 ID 顺序比较 PostgreSQL 应公开的全部 `id + contentVersion` 与候选
@@ -4859,6 +4987,43 @@ SCANNING→READY/REJECTED、变体和 Outbox 必须在数据库事务中按 life
 - Prisma additive migration、检查约束、租约/并发/失败/回滚 repository 测试、API 授权与契约测试、Worker
   重建/校验/双写测试、真实 PostgreSQL 与 OpenSearch 重建/切换/回滚演练、全仓质量及受保护 CI 均有真实
   证据后方可标记 done；未执行的真实依赖演练不得以 mock 结果代替。
+
+## 22.26 SEARCH-006 相关性评估与 Dashboard 验收
+
+- 版本化数据集明确标为 `SYNTHETIC`，至少各 8 条 zh-Hans/en-US 查询，分级 judgments 只引用固定合成
+  corpus；Schema/runtime 双重验证拒绝未知/重复引用、控制字符、双向字符和 contact-like 文本。
+- NDCG@10、MRR、Recall@10、零结果率对 overall 和两个 locale 分别计算并达到数据集审核门槛；真实
+  OpenSearch 必须用生产 analyzer/mapping/query adapter 生成排名，ideal fixture 只能证明公式正确。
+- 运行期指标能按固定 locale 计算零结果率和样本量，Dashboard 能展示 `/v1/search` p95、依赖失败、
+  索引 freshness 与恢复失败；query/cursor/PIT/ID/筛选/坐标/金额/provider detail 不进入 labels。
+- CI/离线分数不伪装成生产指标，生产数据源/权限/cluster exporter/SLO/告警仍明确由 OBS-002 交付。
+  OpenAPI、Prisma、migration 不变化；全仓质量、真实 OpenSearch、API runtime、Linux Chromium 和四镜像
+  受保护门禁全绿后方可标记 done。
+
+## 22.27 WEB-003 全局 Header/Region/Search suggestion 验收
+
+- 首页、公开列表、搜索和详情页复用同一双语响应式 Header，含品牌、当前频道、语言、地区、搜索和账户
+  入口；桌面/移动保持 44px 触控目标、可见焦点和页面无横向溢出。
+- active CITY 地区与建议响应通过 strict、有界、去重 parser；公开读取不携带 Cookie，失败提供诚实状态，
+  Session 只同源 no-store 且全局 UI 不显示 display name 或其他 PII。
+- 搜索建议使用可访问 combobox/listbox，支持上下方向键、Enter、Escape、active descendant、节制 live
+  region、查询防抖和旧响应取消；建议失败不阻止普通 GET 搜索。
+- BFF 仅放行契约内 GET suggestions；单元/组件/production Chromium 覆盖中英文、桌面/移动、错误态和
+  键盘路径。OpenAPI、Prisma、migration 不变化；全仓与受保护真实服务/镜像门禁全绿后方可标记 done。
+
+## 22.28 SEO-003 i18n message/format/routing 验收
+
+- `zh-Hans` 与 `en-US` 为唯一标准 locale；公开、发布和账户路由具有等价模板。`/en`
+  仅 308 到保留后缀/query 的 `/en-US`，内部 locale switch 在深层路由上保留同一资源并且不改写
+  slug 内文本。
+- 服务器首屏的 `<html lang>` 与路径 locale 一致；伪造内部 header 不能改变文档语言，
+  locale layout 的局部 `lang` 和 skip link 与根文档一致。
+- common/search/listings 强类型目录的中英 key 等价；计数、数字、日期、相对时间和货币使用
+  `Intl` 或等价标准 API，UTC 时间按 `America/Los_Angeles` 显示，固定小数金额不经 IEEE
+  浮点转换。
+- 路由输入负例、catalog/Intl 单测和 production Chromium 桌面/移动契约均通过；
+  OpenAPI、Prisma 与 migration 不变化，全仓、真实服务、Linux E2E 与四镜像保护门禁全绿后
+  方可标记 done。
 
 ---
 
@@ -5452,6 +5617,15 @@ Admin route 只是视图入口，权限以 API action 为准。没有权限的�
 - 所有账户/Admin 页 `noindex`，响应设置防缓存私密 header。
 - 旧 slug 用持久 redirect 表 301；违规/删除资源 404/410。
 - 任意筛选 query 参数按 canonical 策略处理，不自动 index。
+
+## 27.5 Locale 规范化
+
+- 标准中文前缀为 `/zh-Hans`，标准英文前缀为 `/en-US`。`/en` 及其后缀仅作入站兼容
+  别名，服务器返回 308 到对应 `/en-US` 路径并保留 query。
+- Route builder 只接收同源绝对 pathname 和未携带 locale 的资源路径。语言切换只替换首个
+  locale segment，canonical/hreflang/内部链接不输出 `/en` 别名。
+- `/` 继续转到 `/zh-Hans`；没有显式 locale 的未知路由不依据 `Accept-Language` 或客户端可控
+  header 推断其 canonical 语言。
 
 ---
 

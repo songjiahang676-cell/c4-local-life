@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { WebVitalsReporter } from "@/components/web-vitals-reporter";
+import { localeFromRequestHeader, ROUTE_LOCALE_HEADER } from "@/lib/i18n";
 import { publicWebOrigin } from "@/lib/seo";
 import "./globals.css";
 
@@ -18,9 +20,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const requestHeaders = await headers();
+  const locale = localeFromRequestHeader(requestHeaders.get(ROUTE_LOCALE_HEADER));
   return (
-    <html lang="zh-Hans">
+    <html lang={locale}>
       <body>
         {children}
         <WebVitalsReporter />

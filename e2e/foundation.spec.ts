@@ -4,6 +4,31 @@ const webBaseUrl = "http://127.0.0.1:3100";
 const apiBaseUrl = "http://127.0.0.1:4100/v1";
 const adminBaseUrl = "http://127.0.0.1:3101";
 
+test("serves canonical locale routes with a trustworthy document language", async ({
+  page,
+  request,
+}) => {
+  const aliasResponse = await request.get("/en/rentals?q=synthetic", { maxRedirects: 0 });
+  expect(aliasResponse.status()).toBe(308);
+  expect(aliasResponse.headers().location).toBe("/en-US/rentals?q=synthetic");
+
+  await page.setExtraHTTPHeaders({ "x-socal-route-locale": "zh-Hans" });
+  const englishResponse = await page.goto("/en-US/rentals?q=synthetic");
+  expect(englishResponse?.ok()).toBe(true);
+  await expect(page.locator("html")).toHaveAttribute("lang", "en-US");
+  await expect(page.locator('[data-locale="en-US"]')).toHaveAttribute("lang", "en-US");
+  await expect(page.getByRole("link", { name: "中文 / English" })).toHaveAttribute(
+    "href",
+    "/zh-Hans/rentals",
+  );
+
+  await page.setExtraHTTPHeaders({ "x-socal-route-locale": "en-US" });
+  const chineseResponse = await page.goto("/zh-Hans");
+  expect(chineseResponse?.ok()).toBe(true);
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-Hans");
+  await expect(page.locator('[data-locale="zh-Hans"]')).toHaveAttribute("lang", "zh-Hans");
+});
+
 test("renders the localized public homepage at desktop and mobile widths", async ({ page }) => {
   const response = await page.goto("/zh-Hans");
 
@@ -429,7 +454,7 @@ test("completes the bilingual rental form and recovers its account-scoped autosa
   await page.reload();
   await expect(page.getByText("已恢复此账号在本机保存的内容。")).toBeVisible();
   await expect(page.getByLabel("标题")).toHaveValue("尔湾公寓出租测试");
-  await expect(page.getByRole("link", { name: "Switch to English" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "切换到英文" })).toHaveAttribute(
     "href",
     "/en-US/post/rental/new",
   );
@@ -710,7 +735,7 @@ test("completes the bilingual Job wage and employment-policy path through submis
   await page.getByRole("button", { name: "提交审核" }).click();
   await expect(page.getByText(/已提交；平台会按风险规则/)).toBeVisible();
   expect(submitted).toBe(true);
-  await expect(page.getByRole("link", { name: "Switch to English" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "切换到英文" })).toHaveAttribute(
     "href",
     "/en-US/post/job/new",
   );
@@ -1309,7 +1334,7 @@ test("renders and updates the private bilingual notification center", async ({ p
   await page.getByRole("button", { name: "标记为已读" }).click();
   await expect(page.getByText("0 条未读")).toBeVisible();
   await expect(page.getByRole("button", { name: "标记为已读" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Switch to English" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "切换到英文" })).toHaveAttribute(
     "href",
     "/en-US/account/notifications",
   );

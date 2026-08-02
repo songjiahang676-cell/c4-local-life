@@ -6,6 +6,8 @@ import { Languages, MapPin, Search, Tag, UserRound, UserPlus } from "lucide-reac
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { primaryNavigation } from "../data/homepage";
 import { localizedPath, ROUTES } from "../data/routes";
+import { formatCountMessage, messageCatalogs } from "../i18n/messages";
+import { switchLocalePath } from "../lib/i18n";
 import { AppIcon } from "./icons/app-icon";
 import { parseAccountSessionResponse } from "./account-shell";
 
@@ -37,7 +39,6 @@ const copy = {
     suggestionLoading: "正在加载搜索建议",
     suggestionEmpty: "没有可用建议，可直接提交搜索",
     suggestionUnavailable: "搜索建议暂不可用，可直接提交搜索",
-    suggestionCount: (count: number) => `${count} 条搜索建议可用`,
     suggestionTypes: { QUERY: "搜索词", CATEGORY: "分类", REGION: "地区" },
   },
   "en-US": {
@@ -60,7 +61,6 @@ const copy = {
     suggestionLoading: "Loading search suggestions",
     suggestionEmpty: "No suggestions are available; submit your search directly",
     suggestionUnavailable: "Suggestions are unavailable; submit your search directly",
-    suggestionCount: (count: number) => `${count} search suggestions available`,
     suggestionTypes: { QUERY: "Query", CATEGORY: "Category", REGION: "Region" },
   },
 } as const;
@@ -157,13 +157,6 @@ export function parseHeaderRegions(value: unknown, locale: Locale): HeaderRegion
     regions.push({ code: rawRegion.code, name: rawRegion.name[locale] });
   }
   return regions.sort((left, right) => left.name.localeCompare(right.name, locale));
-}
-
-function switchLocalePath(locale: Locale, pathname: string): string {
-  const target = locale === "zh-Hans" ? "en-US" : "zh-Hans";
-  return pathname.startsWith(`/${locale}`)
-    ? pathname.replace(`/${locale}`, `/${target}`)
-    : `/${target}`;
 }
 
 function currentRoute(locale: Locale, pathname: string, route: string): boolean {
@@ -301,11 +294,17 @@ export function GlobalSiteHeader({
 
   const status = useMemo(() => {
     if (suggestionState === "loading") return labels.suggestionLoading;
-    if (suggestionState === "ready") return labels.suggestionCount(suggestions.length);
+    if (suggestionState === "ready") {
+      return formatCountMessage(
+        locale,
+        messageCatalogs[locale].search.suggestionCount,
+        suggestions.length,
+      );
+    }
     if (suggestionState === "empty") return labels.suggestionEmpty;
     if (suggestionState === "unavailable") return labels.suggestionUnavailable;
     return "";
-  }, [labels, suggestionState, suggestions.length]);
+  }, [labels, locale, suggestionState, suggestions.length]);
 
   const chooseSuggestion = (suggestion: SearchSuggestion) => {
     if (suggestion.type === "REGION") {
