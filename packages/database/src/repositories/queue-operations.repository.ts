@@ -792,7 +792,9 @@ export class QueueOperationsRepository {
   async #transaction<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    if (this.#client instanceof PrismaClient) return this.#client.$transaction(operation);
+    if ("$transaction" in this.#client) {
+      return this.#client.$transaction(operation, { maxWait: 5_000, timeout: 10_000 });
+    }
     return operation(this.#client);
   }
 }
