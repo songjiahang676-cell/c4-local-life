@@ -57,6 +57,7 @@ Gate 2 的 16 个 Backlog 任务均已实现并通过本地完整质量、真实
 - [x] `WEB-003` 双语响应式全局 Header、公开地区、键盘搜索建议和 PII 最小化账户入口。
 - [x] `SEO-001` metadata/canonical/hreflang/robots 与搜索/私有 noindex 矩阵。
 - [x] `SEO-002` strict schema.org、真实资源 locale/vertical/month sitemap、过期移除与失败关闭。
+- [x] `SEO-003` 双语 domain message catalog、严格 locale routing/document language、canonical switch 和精确 Intl 数字/日期/相对时间/定点金额格式。
 - [ ] `SEO-004` a11y。
 - [x] `PERF-001` 匿名缓存安全、请求合并、CWV/API 指标和可执行性能预算。
 - [x] `EVT-002` 受控 DLQ/Outbox 重放、dry-run 对账、权限审计和 PII 最小化。
